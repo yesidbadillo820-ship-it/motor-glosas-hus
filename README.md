@@ -49,6 +49,26 @@ python -m icfes exportar-web --salida ICFES.html   # app que funciona sin intern
 
 Guía completa: [`docs/GUIA_SISTEMA_ICFES.md`](docs/GUIA_SISTEMA_ICFES.md).
 
+## Módulo aparte: curso de noruego
+
+La carpeta `noruego/` contiene una aplicación web para aprender **noruego
+(bokmål)** desde cero, pensada para hispanohablantes y para usarse desde el
+celular: se instala como aplicación (PWA) y funciona sin internet.
+
+Independiente de `app/` y sin librerías externas (solo Python 3.11 estándar).
+
+En Windows, doble clic en `tools\NORUEGO.cmd`. Desde la consola:
+
+```bash
+cd C:\temp-notas
+python -m noruego revisar          # valida el contenido del curso
+python -m noruego exportar         # genera la app en static/noruego/
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+# En el celular, mismo wifi: http://LA-IP:8000/static/noruego/index.html
+```
+
+Guía completa: [`docs/GUIA_CURSO_NORUEGO.md`](docs/GUIA_CURSO_NORUEGO.md).
+
 ## Requisitos
 
 - Python 3.10+

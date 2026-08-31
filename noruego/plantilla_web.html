@@ -1,0 +1,1641 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0E1420">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Norsk">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icono-192.png">
+<title>Norsk — curso de noruego</title>
+<style>
+/* ===========================================================================
+   Identidad propia: la noche del norte. Azul profundo con un verde de aurora.
+   Todo con tipografías del sistema: la app tiene que abrir sin internet y sin
+   esperar a que baje una fuente.
+   Mobile first de verdad: primero se escribe la pantalla del celular y solo
+   después se ensancha para el computador.
+   =========================================================================== */
+:root{
+  --noche:#F4F6FA; --sup:#FFFFFF; --sup2:#EDF1F7; --sup3:#E1E8F2;
+  --tinta:#0F1729; --tinta2:#4A5873; --tinta3:#7A88A3;
+  --linea:#DCE4EF; --linea2:#EBF0F7;
+  --aurora:#0E9C74; --aurora2:#0B7D5D; --aurora-f:#E6F7F1;
+  --oro:#B7791F; --oro-f:#FDF6E3; --oro-vivo:#F4B740;
+  --rojo:#C4373C; --rojo-f:#FDEDEE;
+  --violeta:#5B4BC4; --violeta-f:#EEEBFB;
+  --r1:8px; --r2:14px; --r3:20px; --r4:28px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:44px;
+  --e1:0 1px 2px rgba(15,23,41,.06);
+  --e2:0 2px 6px rgba(15,23,41,.07), 0 8px 24px -12px rgba(15,23,41,.24);
+  --e3:0 8px 32px -8px rgba(15,23,41,.28);
+  --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
+  --toque:52px;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --noche:#0B1120; --sup:#151E31; --sup2:#1C2740; --sup3:#25324F;
+  --tinta:#E8EEF9; --tinta2:#A3B1CC; --tinta3:#7686A5;
+  --linea:#25324F; --linea2:#1B2540;
+  --aurora:#35D6A4; --aurora2:#5BE3BA; --aurora-f:#0D2A22;
+  --oro:#F4B740; --oro-f:#2A2110; --oro-vivo:#F4B740;
+  --rojo:#F0797E; --rojo-f:#2C1417;
+  --violeta:#9B8CF5; --violeta-f:#1D1A38;
+  --e1:0 1px 2px rgba(0,0,0,.5);
+  --e2:0 2px 6px rgba(0,0,0,.5), 0 10px 28px -14px rgba(0,0,0,.9);
+  --e3:0 10px 34px -8px rgba(0,0,0,.9);
+}}
+:root[data-theme="dark"]{
+  --noche:#0B1120; --sup:#151E31; --sup2:#1C2740; --sup3:#25324F;
+  --tinta:#E8EEF9; --tinta2:#A3B1CC; --tinta3:#7686A5;
+  --linea:#25324F; --linea2:#1B2540;
+  --aurora:#35D6A4; --aurora2:#5BE3BA; --aurora-f:#0D2A22;
+  --oro:#F4B740; --oro-f:#2A2110; --oro-vivo:#F4B740;
+  --rojo:#F0797E; --rojo-f:#2C1417;
+  --violeta:#9B8CF5; --violeta-f:#1D1A38;
+  --e1:0 1px 2px rgba(0,0,0,.5);
+  --e2:0 2px 6px rgba(0,0,0,.5), 0 10px 28px -14px rgba(0,0,0,.9);
+  --e3:0 10px 34px -8px rgba(0,0,0,.9);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{margin:0; background:var(--noche); color:var(--tinta); font-family:var(--sans);
+  font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  overscroll-behavior-y:contain}
+h1,h2,h3{margin:0; font-weight:700; letter-spacing:-.02em; text-wrap:balance}
+h1{font-size:1.5rem; line-height:1.2}
+h2{font-size:1.15rem}
+h3{font-size:1rem; font-weight:650}
+p{margin:0 0 var(--s3)}
+.num{font-family:var(--mono); font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+.rot{font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; font-weight:700;
+  color:var(--tinta3)}
+.tenue{color:var(--tinta2)} .mini{font-size:.85rem} .micro{font-size:.75rem}
+.centro{text-align:center}
+
+/* ------------------------------------------------------------- estructura - */
+.pantalla{max-width:560px; margin:0 auto; padding:0 var(--s4)
+  calc(84px + env(safe-area-inset-bottom)); min-height:100vh}
+.tope{position:sticky; top:0; z-index:30; margin:0 calc(var(--s4)*-1) var(--s4);
+  padding:calc(var(--s3) + env(safe-area-inset-top)) var(--s4) var(--s3);
+  background:color-mix(in srgb,var(--noche) 90%,transparent); backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--linea)}
+.tope .fila{display:flex; align-items:center; justify-content:space-between; gap:var(--s3);
+  max-width:560px; margin:0 auto}
+.medallas{display:flex; gap:var(--s3); align-items:center}
+.medalla{display:flex; align-items:center; gap:5px; font-weight:700; font-size:.92rem}
+.medalla .ic{font-size:1.05rem}
+.medalla.xp{color:var(--oro)} .medalla.racha{color:var(--rojo)}
+.medalla.vidas{color:var(--rojo)}
+
+.tarjeta{background:var(--sup); border:1px solid var(--linea); border-radius:var(--r3);
+  padding:var(--s4); margin-bottom:var(--s4); box-shadow:var(--e2)}
+.tarjeta.acento{border-color:var(--aurora); background:linear-gradient(160deg,
+  var(--aurora-f), var(--sup) 70%)}
+.tarjeta.plana{box-shadow:none; background:var(--sup2)}
+.enc{display:flex; justify-content:space-between; align-items:flex-start; gap:var(--s3);
+  margin-bottom:var(--s3)}
+
+/* ----------------------------------------------------------------- botones - */
+button{font:inherit; font-weight:650; cursor:pointer; border-radius:var(--r2);
+  border:1px solid var(--linea); background:var(--sup); color:var(--tinta);
+  min-height:var(--toque); padding:0 var(--s4); display:inline-flex; align-items:center;
+  justify-content:center; gap:var(--s2); transition:transform .1s, background .15s,
+  border-color .15s; touch-action:manipulation}
+button:active{transform:scale(.975)}
+button:disabled{opacity:.45; cursor:default; transform:none}
+.pri{background:var(--aurora); border-color:var(--aurora); color:#04140F; font-weight:750;
+  box-shadow:0 3px 0 var(--aurora2)}
+.pri:active{box-shadow:0 1px 0 var(--aurora2); transform:translateY(2px) scale(1)}
+:root[data-theme="dark"] .pri,
+:root:not([data-theme="light"]) .pri{color:#04140F}
+.blq{width:100%}
+.peligro{background:var(--rojo); border-color:var(--rojo); color:#fff; box-shadow:none}
+.fantasma{border-color:transparent; background:transparent; color:var(--tinta2)}
+.fila-btn{display:flex; gap:var(--s2); flex-wrap:wrap}
+
+/* ------------------------------------------------------------------ fichas - */
+.ficha{display:inline-flex; align-items:center; gap:5px; font-size:.76rem; font-weight:700;
+  padding:4px 10px; border-radius:99px; background:var(--sup2); color:var(--tinta2);
+  border:1px solid var(--linea); white-space:nowrap}
+.ficha.on{background:var(--aurora-f); color:var(--aurora2); border-color:transparent}
+.ficha.oro{background:var(--oro-f); color:var(--oro); border-color:transparent}
+.ficha.vio{background:var(--violeta-f); color:var(--violeta); border-color:transparent}
+.ficha.rojo{background:var(--rojo-f); color:var(--rojo); border-color:transparent}
+
+/* ------------------------------------------------------------ progreso ---- */
+.barra{height:10px; border-radius:99px; background:var(--sup3); overflow:hidden}
+.barra i{display:block; height:100%; background:var(--aurora); border-radius:99px;
+  transition:width .45s cubic-bezier(.2,.7,.3,1)}
+.barra.fina{height:6px}
+.anillo{--p:0; width:56px; height:56px; border-radius:50%; display:grid; place-items:center;
+  background:conic-gradient(var(--aurora) calc(var(--p)*1%), var(--sup3) 0); flex:none}
+.anillo b{width:44px; height:44px; border-radius:50%; background:var(--sup); display:grid;
+  place-items:center; font-size:1.1rem}
+
+/* ------------------------------------------------------- camino del curso - */
+.modulo{margin-bottom:var(--s6)}
+.mod-cab{display:flex; align-items:center; gap:var(--s3); margin-bottom:var(--s4);
+  padding:var(--s4); border-radius:var(--r3); background:var(--sup);
+  border:1px solid var(--linea); box-shadow:var(--e1)}
+.mod-cab .ic{font-size:1.7rem; flex:none}
+.mod-cab .tx{min-width:0; flex:1}
+.mod-cab h2{font-size:1.05rem}
+.senda{display:flex; flex-direction:column; gap:var(--s3); position:relative;
+  padding-left:var(--s6)}
+.senda::before{content:""; position:absolute; left:21px; top:14px; bottom:14px; width:3px;
+  background:var(--sup3); border-radius:99px}
+.nodo{display:flex; align-items:center; gap:var(--s3); position:relative; text-align:left;
+  width:100%; padding:var(--s3); border-radius:var(--r2); background:var(--sup);
+  border:1px solid var(--linea); min-height:64px; font-weight:600}
+.nodo .bola{position:absolute; left:calc(var(--s6)*-1 + 6px); width:32px; height:32px;
+  border-radius:50%; display:grid; place-items:center; font-size:.85rem; font-weight:800;
+  background:var(--sup3); color:var(--tinta3); border:3px solid var(--noche); flex:none}
+.nodo.hecha{border-color:var(--aurora)}
+.nodo.hecha .bola{background:var(--aurora); color:#04140F}
+.nodo.actual{border-color:var(--aurora); box-shadow:0 0 0 3px var(--aurora-f)}
+.nodo.actual .bola{background:var(--aurora); color:#04140F}
+.nodo.bloqueada{opacity:.5}
+.nodo .tx{min-width:0}
+.nodo .tx b{display:block; font-size:.95rem}
+.nodo .tx span{display:block; font-size:.78rem; color:var(--tinta3); font-weight:400}
+.nodo .estrellas{margin-left:auto; font-size:.8rem; color:var(--oro); white-space:nowrap}
+
+/* ------------------------------------------------------------- ejercicios - */
+.lec-tope{position:sticky; top:0; z-index:30; background:var(--noche);
+  padding:calc(var(--s3) + env(safe-area-inset-top)) 0 var(--s3); margin-bottom:var(--s4);
+  display:flex; align-items:center; gap:var(--s3)}
+.lec-tope .barra{flex:1}
+.lec-tope .x{min-height:40px; width:40px; padding:0; border:0; background:none;
+  color:var(--tinta3); font-size:1.3rem}
+.vidas-tope{font-size:1rem; white-space:nowrap; color:var(--rojo); font-weight:700}
+.pregunta{font-size:1.25rem; font-weight:650; line-height:1.35; margin-bottom:var(--s4)}
+.material{background:var(--sup2); border-radius:var(--r2); padding:var(--s4);
+  margin-bottom:var(--s4); font-size:1.05rem; line-height:1.6; white-space:pre-wrap}
+.material.grande{font-size:1.5rem; font-weight:700; text-align:center; letter-spacing:-.02em}
+.opciones{display:flex; flex-direction:column; gap:var(--s2)}
+.op{width:100%; justify-content:flex-start; text-align:left; padding:var(--s3) var(--s4);
+  min-height:60px; font-weight:600; font-size:1rem; line-height:1.4; border-width:2px;
+  box-shadow:0 2px 0 var(--linea)}
+.op .letra{width:26px; height:26px; border-radius:8px; background:var(--sup2);
+  font-size:.75rem; font-weight:800; display:grid; place-items:center; flex:none;
+  color:var(--tinta3)}
+.op.sel{border-color:var(--aurora); background:var(--aurora-f)}
+.op.bien{border-color:var(--aurora); background:var(--aurora-f); color:var(--aurora2)}
+.op.mal{border-color:var(--rojo); background:var(--rojo-f); color:var(--rojo)}
+.op.rejilla{min-height:52px}
+.op[disabled]{opacity:1}
+.entrada{width:100%; font:inherit; font-size:1.15rem; padding:var(--s4); border-radius:var(--r2);
+  border:2px solid var(--linea); background:var(--sup); color:var(--tinta); min-height:var(--toque)}
+.entrada:focus{outline:none; border-color:var(--aurora)}
+.entrada.bien{border-color:var(--aurora); background:var(--aurora-f)}
+.entrada.mal{border-color:var(--rojo); background:var(--rojo-f)}
+.fichas-palabras{display:flex; flex-wrap:wrap; gap:var(--s2); min-height:56px;
+  padding:var(--s3); border-radius:var(--r2); background:var(--sup2);
+  border:2px dashed var(--linea); margin-bottom:var(--s3); align-content:flex-start}
+.palabra{min-height:44px; padding:0 var(--s3); border-radius:var(--r1); font-weight:650;
+  font-size:.98rem; box-shadow:0 2px 0 var(--linea)}
+.parejas{display:grid; grid-template-columns:1fr 1fr; gap:var(--s2)}
+.parejas button{min-height:58px; font-size:.92rem; font-weight:650; padding:var(--s2);
+  line-height:1.25; text-align:center; white-space:normal}
+.parejas button.sel{border-color:var(--aurora); background:var(--aurora-f)}
+.parejas button.ok{border-color:var(--aurora); background:var(--aurora-f); opacity:.5}
+.audio-btn{width:100%; min-height:88px; border-radius:var(--r3); font-size:2rem;
+  background:var(--violeta-f); border-color:transparent; color:var(--violeta);
+  margin-bottom:var(--s4)}
+.audio-btn.chico{min-height:52px; width:52px; font-size:1.3rem; padding:0; flex:none}
+
+/* ------------------------------------------------------------ veredicto --- */
+.veredicto{position:fixed; left:0; right:0; bottom:0; z-index:50; padding:var(--s4)
+  var(--s4) calc(var(--s4) + env(safe-area-inset-bottom)); border-top:2px solid;
+  animation:sube .22s ease-out}
+@keyframes sube{from{transform:translateY(100%)} to{transform:none}}
+.veredicto.si{background:var(--aurora-f); border-color:var(--aurora)}
+.veredicto.no{background:var(--rojo-f); border-color:var(--rojo)}
+.veredicto .cab{display:flex; align-items:center; gap:var(--s2); font-weight:800;
+  font-size:1.1rem; margin-bottom:6px}
+.veredicto.si .cab{color:var(--aurora2)} .veredicto.no .cab{color:var(--rojo)}
+.veredicto .dato{font-size:.92rem; color:var(--tinta2); margin-bottom:var(--s3)}
+.veredicto .dato b{color:var(--tinta)}
+.veredicto .interior{max-width:560px; margin:0 auto}
+@media (prefers-reduced-motion:reduce){ .veredicto{animation:none} }
+
+/* ----------------------------------------------------------- diccionario - */
+.buscador{position:relative; margin-bottom:var(--s4)}
+.buscador input{width:100%; font:inherit; padding:var(--s3) var(--s4) var(--s3) 44px;
+  min-height:var(--toque); border-radius:var(--r2); border:1px solid var(--linea);
+  background:var(--sup); color:var(--tinta)}
+.buscador input:focus{outline:none; border-color:var(--aurora)}
+.buscador .lupa{position:absolute; left:var(--s4); top:50%; transform:translateY(-50%);
+  color:var(--tinta3); pointer-events:none}
+.palabra-fila{display:flex; align-items:center; gap:var(--s3); padding:var(--s3) 0;
+  border-bottom:1px solid var(--linea2)}
+.palabra-fila:last-child{border-bottom:0}
+.palabra-fila .tx{flex:1; min-width:0}
+.palabra-fila .tx b{display:block; font-size:1rem}
+.palabra-fila .tx .es{font-size:.9rem; color:var(--tinta2)}
+.palabra-fila .tx .pr{font-size:.78rem; color:var(--tinta3); font-family:var(--mono)}
+.palabra-fila .fav{min-height:40px; width:40px; padding:0; border:0; background:none;
+  font-size:1.1rem; color:var(--tinta3)}
+.palabra-fila .fav.on{color:var(--oro-vivo)}
+.filtros{display:flex; gap:var(--s2); overflow-x:auto; padding-bottom:var(--s2);
+  margin-bottom:var(--s3); scrollbar-width:none}
+.filtros::-webkit-scrollbar{display:none}
+.filtros button{min-height:40px; padding:0 var(--s3); font-size:.85rem; border-radius:99px;
+  white-space:nowrap; flex:none}
+.filtros button[aria-pressed="true"]{background:var(--aurora); border-color:var(--aurora);
+  color:#04140F}
+
+/* ------------------------------------------------------------- gramática -- */
+.regla{border-left:4px solid var(--aurora); padding-left:var(--s4); margin-bottom:var(--s5)}
+.regla .caja{background:var(--sup2); border-radius:var(--r2); padding:var(--s3) var(--s4);
+  margin:var(--s3) 0}
+.ejemplo{display:flex; align-items:flex-start; gap:var(--s3); padding:var(--s2) 0;
+  border-bottom:1px solid var(--linea2)}
+.ejemplo:last-child{border-bottom:0}
+.ejemplo .tx{flex:1; min-width:0}
+.ejemplo .no{font-weight:700}
+.ejemplo .es{font-size:.9rem; color:var(--tinta2)}
+.ejemplo .pr{font-size:.75rem; color:var(--tinta3); font-family:var(--mono)}
+.error-tipico{background:var(--rojo-f); border-radius:var(--r2); padding:var(--s3) var(--s4);
+  font-size:.9rem; color:var(--rojo); margin-top:var(--s3)}
+.error-tipico b{display:block; font-size:.7rem; text-transform:uppercase; letter-spacing:.1em;
+  margin-bottom:4px}
+
+/* ------------------------------------------------------------ estadística - */
+.rejilla2{display:grid; grid-template-columns:1fr 1fr; gap:var(--s3)}
+.dato{background:var(--sup); border:1px solid var(--linea); border-radius:var(--r2);
+  padding:var(--s3) var(--s4)}
+.dato b{display:block; font-family:var(--mono); font-size:1.6rem; font-weight:700;
+  letter-spacing:-.03em; line-height:1.15}
+.dato span{font-size:.76rem; color:var(--tinta3)}
+.calendario{display:grid; grid-template-columns:repeat(7,1fr); gap:5px}
+.calendario i{aspect-ratio:1; border-radius:5px; background:var(--sup3); display:block}
+.calendario i[data-n="1"]{background:color-mix(in srgb,var(--aurora) 35%,transparent)}
+.calendario i[data-n="2"]{background:color-mix(in srgb,var(--aurora) 65%,transparent)}
+.calendario i[data-n="3"]{background:var(--aurora)}
+.logro{display:flex; align-items:center; gap:var(--s3); padding:var(--s3);
+  border-radius:var(--r2); background:var(--sup2); margin-bottom:var(--s2)}
+.logro.gris{opacity:.4}
+.logro .ic{font-size:1.5rem; flex:none}
+.logro .tx b{display:block; font-size:.92rem}
+.logro .tx span{font-size:.78rem; color:var(--tinta3)}
+
+/* ------------------------------------------------------------ navegación -- */
+.nav{position:fixed; left:0; right:0; bottom:0; z-index:40; display:flex;
+  background:color-mix(in srgb,var(--sup) 96%,transparent); backdrop-filter:blur(14px);
+  border-top:1px solid var(--linea); padding-bottom:env(safe-area-inset-bottom)}
+.nav button{flex:1; flex-direction:column; gap:2px; border:0; border-radius:0; background:none;
+  min-height:60px; padding:8px 2px; font-size:.66rem; font-weight:700; color:var(--tinta3)}
+.nav button .ic{font-size:1.3rem; line-height:1}
+.nav button[aria-current="page"]{color:var(--aurora2)}
+
+/* ------------------------------------------------------------- varios ----- */
+.aviso{display:flex; gap:var(--s3); padding:var(--s3) var(--s4); border-radius:var(--r2);
+  font-size:.88rem; line-height:1.5; margin-bottom:var(--s4); background:var(--sup2)}
+.aviso.oro{background:var(--oro-f); color:var(--oro)}
+.aviso.vio{background:var(--violeta-f); color:var(--violeta)}
+.vacio{text-align:center; padding:var(--s7) var(--s4); color:var(--tinta3)}
+.vacio .big{font-size:2.5rem; display:block; margin-bottom:var(--s3)}
+label{display:block; font-size:.8rem; font-weight:700; color:var(--tinta2);
+  margin:var(--s4) 0 6px}
+select,input[type=text],input[type=number]{width:100%; font:inherit; padding:var(--s3);
+  min-height:var(--toque); border-radius:var(--r2); border:1px solid var(--linea);
+  background:var(--sup); color:var(--tinta)}
+textarea{width:100%; font-family:var(--mono); font-size:.75rem; padding:var(--s3);
+  border-radius:var(--r2); border:1px solid var(--linea); background:var(--sup2);
+  color:var(--tinta); min-height:180px}
+.desliza{overflow-x:auto}
+table.datos{width:100%; border-collapse:collapse; font-size:.85rem}
+table.datos th{text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--tinta3); padding:8px 6px; border-bottom:1px solid var(--linea)}
+table.datos td{padding:9px 6px; border-bottom:1px solid var(--linea2)}
+:focus-visible{outline:3px solid var(--aurora); outline-offset:2px}
+@media (prefers-reduced-motion:no-preference){
+  .entra{animation:aparece .25s ease-out both}
+  @keyframes aparece{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+}
+@media(min-width:700px){
+  .pantalla{max-width:640px; padding-bottom:var(--s7)}
+  .nav{position:sticky; bottom:0; max-width:640px; margin:0 auto; border-radius:var(--r3)
+    var(--r3) 0 0; border:1px solid var(--linea); border-bottom:0}
+  .parejas{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="pantalla" id="app"></div>
+<nav class="nav" id="nav"></nav>
+<script>
+"use strict";
+const DATOS = /*<DATOS>*/{"lecciones":[],"modulos":[],"lexico":{},"niveles":[],"temas":[],"juego":{},"notas":{},"idiomaVoz":"nb-NO"}/*</DATOS>*/;
+/* El bloque de arriba se reemplaza al exportar. Con los valores por defecto la
+   plantilla sigue siendo un HTML válido que se puede abrir tal cual. */
+
+/* ===========================================================================
+   Guardado. Todo vive en este navegador: no hay servidor, no hay cuenta y no
+   se sube nada. Envuelto en try/catch porque en ventana privada localStorage
+   lanza excepción y el estudiante no puede quedarse sin app por eso.
+   =========================================================================== */
+const CLAVE = "norsk.v1";
+const BASE = {
+  perfil:{nombre:"", metaDiaria:30, creado:""},
+  xp:0, racha:0, ultimoDia:"", xpHoy:0, diaXp:"",
+  lecciones:{},      // clave -> {estrellas, veces, mejor, ultima}
+  tarjetas:{},       // idFuente -> {reps, facilidad, intervalo, proxima, fallos}
+  errores:[],        // últimos fallos, para el cuaderno
+  favoritas:[],      // palabras marcadas en el diccionario
+  vistas:{},         // idFuente -> veces vista (palabras aprendidas)
+  logros:[],
+  dias:{},           // fecha -> xp de ese día
+};
+function leerGuardado(){
+  try{ const c = localStorage.getItem(CLAVE); if(c) return JSON.parse(c); }catch(e){}
+  return null;
+}
+let E = Object.assign(JSON.parse(JSON.stringify(BASE)), leerGuardado() || {});
+for(const k in BASE) if(E[k] === undefined) E[k] = JSON.parse(JSON.stringify(BASE[k]));
+function guardar(){ try{ localStorage.setItem(CLAVE, JSON.stringify(E)); }catch(e){} }
+
+/* ------------------------------------------------------------------ fechas */
+function hoyISO(){ const d = new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function aDias(iso){ const [a,m,d] = iso.split("-").map(Number); return Date.UTC(a,m-1,d)/86400000; }
+function deDias(n){ return new Date(n*86400000).toISOString().slice(0,10); }
+
+/* ------------------------------------------------------------ índices ----- */
+const LECCIONES = {}; for(const l of DATOS.lecciones) LECCIONES[l.clave] = l;
+const ORDEN_LECCIONES = DATOS.lecciones.slice().sort((a,b) => a.indice - b.indice);
+const MODULOS = {}; for(const m of DATOS.modulos) MODULOS[m.clave] = m;
+const LEXICO_POR_ID = {};
+for(const tipo in DATOS.lexico) for(const e of DATOS.lexico[tipo]){ e._tipo = tipo; LEXICO_POR_ID[e.id] = e; }
+const GRAMATICA_POR_CLAVE = {};
+for(const g of (DATOS.lexico.gramatica || [])) GRAMATICA_POR_CLAVE[g.clave] = g;
+const JUEGO = Object.assign({xpAcierto:10, xpLeccion:20, xpPerfecta:25, vidas:5}, DATOS.juego);
+
+function textoNoruego(e){ return e ? (e.no || e.inf || e.base || e.letra || "") : ""; }
+
+/* ===========================================================================
+   Niveles de jugador. Suben rápido al principio y despacio después, para que
+   los primeros días se sientan y el resto no se infle.
+   =========================================================================== */
+function nivelJugador(xp){ return Math.floor(Math.sqrt(Math.max(0,xp)/45)) + 1; }
+function xpDeNivel(n){ return Math.pow(n-1, 2) * 45; }
+function progresoNivel(xp){
+  const n = nivelJugador(xp), base = xpDeNivel(n), techo = xpDeNivel(n+1);
+  return {nivel:n, base, techo, pct: Math.min(100, (xp-base)/(techo-base)*100), falta: techo-xp};
+}
+
+/* ------------------------------------------------------------------ racha - */
+function tocarDia(){
+  const hoy = hoyISO();
+  if(E.diaXp !== hoy){ E.diaXp = hoy; E.xpHoy = 0; }
+  if(E.ultimoDia === hoy) return;
+  if(E.ultimoDia && aDias(hoy) - aDias(E.ultimoDia) === 1) E.racha += 1;
+  else if(E.ultimoDia !== hoy) E.racha = 1;
+  E.ultimoDia = hoy;
+  if(!E.perfil.creado) E.perfil.creado = hoy;
+  guardar();
+}
+function rachaViva(){
+  if(!E.ultimoDia) return 0;
+  const d = aDias(hoyISO()) - aDias(E.ultimoDia);
+  return d <= 1 ? E.racha : 0;
+}
+
+/* ===========================================================================
+   Repaso espaciado. La app decide sola qué toca repasar: el estudiante nunca
+   tiene que elegirlo. Cada palabra o frase que aparece en un ejercicio deja
+   una tarjeta; acertar la aleja en el tiempo y fallar la trae de vuelta.
+   =========================================================================== */
+function tarjeta(id){ return E.tarjetas[id] || {reps:0, facilidad:2.5, intervalo:0, proxima:null, fallos:0}; }
+function calificarTarjeta(id, acerto, segundos){
+  const t = tarjeta(id);
+  // Calidad 0-5: acertar rápido vale más que acertar a las malas.
+  const calidad = !acerto ? (t.fallos >= 2 ? 0 : 1)
+                : segundos > 25 ? 3 : segundos > 9 ? 4 : 5;
+  let reps, intervalo;
+  if(calidad < 3){ reps = 0; intervalo = 1; }
+  else {
+    reps = t.reps + 1;
+    intervalo = reps === 1 ? 1 : reps === 2 ? 4 : Math.max(1, Math.round(t.intervalo * t.facilidad));
+  }
+  const facilidad = Math.max(1.3, t.facilidad + (0.1 - (5-calidad)*(0.08 + (5-calidad)*0.02)));
+  E.tarjetas[id] = {reps, facilidad:Math.round(facilidad*1000)/1000, intervalo,
+    proxima: deDias(aDias(hoyISO()) + intervalo),
+    fallos: acerto ? t.fallos : t.fallos + 1};
+  E.vistas[id] = (E.vistas[id] || 0) + 1;
+}
+function vencidas(){
+  const hoy = hoyISO();
+  return Object.keys(E.tarjetas).filter(id => {
+    const t = E.tarjetas[id];
+    return t.proxima && t.proxima <= hoy && LEXICO_POR_ID[id];
+  });
+}
+/** Las que más se atragantan: dos fallos o más y poca soltura. */
+function dificiles(){
+  return Object.keys(E.tarjetas)
+    .filter(id => E.tarjetas[id].fallos >= 2 && LEXICO_POR_ID[id])
+    .sort((a,b) => E.tarjetas[b].fallos - E.tarjetas[a].fallos);
+}
+function palabrasAprendidas(){
+  // Una palabra cuenta como aprendida cuando se acertó al menos dos veces
+  // seguidas: verla una vez no es saberla.
+  return Object.keys(E.tarjetas).filter(id => E.tarjetas[id].reps >= 2).length;
+}
+
+/* ===========================================================================
+   Desbloqueo. No se puede saltar al final del curso: cada lección se abre
+   cuando la anterior quedó aprobada. Así nadie llega a B1 sin haber visto
+   los géneros.
+   =========================================================================== */
+function estadoLeccion(clave){
+  const guardadaTiene = E.lecciones[clave];
+  if(guardadaTiene && guardadaTiene.estrellas > 0) return "hecha";
+  const idx = LECCIONES[clave] ? LECCIONES[clave].indice : 0;
+  if(idx === 0) return "actual";
+  const previa = ORDEN_LECCIONES[idx-1];
+  const previaHecha = E.lecciones[previa.clave] && E.lecciones[previa.clave].estrellas > 0;
+  return previaHecha ? "actual" : "bloqueada";
+}
+function siguienteLeccion(){
+  for(const l of ORDEN_LECCIONES) if(estadoLeccion(l.clave) === "actual") return l;
+  return ORDEN_LECCIONES[ORDEN_LECCIONES.length-1];
+}
+function avanceCurso(){
+  const hechas = ORDEN_LECCIONES.filter(l => estadoLeccion(l.clave) === "hecha").length;
+  return {hechas, total: ORDEN_LECCIONES.length, pct: hechas/ORDEN_LECCIONES.length*100};
+}
+function nivelActual(){
+  const sig = siguienteLeccion();
+  const mod = MODULOS[sig.modulo];
+  return mod ? mod.nivel : "cero";
+}
+
+/* ===========================================================================
+   Logros. Existen para marcar hitos reales del aprendizaje, no para adornar.
+   =========================================================================== */
+const LOGROS = [
+  {id:"primera", ic:"🌱", t:"Primera lección", d:"Terminaste tu primera lección.",
+   ok:() => avanceCurso().hechas >= 1},
+  {id:"racha3", ic:"🔥", t:"Tres días seguidos", d:"La constancia es lo que enseña un idioma.",
+   ok:() => rachaViva() >= 3},
+  {id:"racha7", ic:"⚡", t:"Una semana entera", d:"Siete días sin fallar uno.",
+   ok:() => rachaViva() >= 7},
+  {id:"racha30", ic:"🏔️", t:"Un mes completo", d:"Treinta días seguidos estudiando.",
+   ok:() => rachaViva() >= 30},
+  {id:"palabras50", ic:"📖", t:"Cincuenta palabras", d:"Ya sostienes una conversación básica.",
+   ok:() => palabrasAprendidas() >= 50},
+  {id:"palabras200", ic:"📚", t:"Doscientas palabras", d:"Con esto se entiende el día a día.",
+   ok:() => palabrasAprendidas() >= 200},
+  {id:"sonidos", ic:"🔤", t:"Los sonidos del norte", d:"Terminaste el módulo de pronunciación.",
+   ok:() => (MODULOS.sonidos||{lecciones:[]}).lecciones.every(c => estadoLeccion(c) === "hecha")},
+  {id:"modulo5", ic:"🧭", t:"Cinco módulos", d:"Ya llevas media base del idioma.",
+   ok:() => DATOS.modulos.filter(m => m.lecciones.every(c => estadoLeccion(c) === "hecha")).length >= 5},
+  {id:"perfecta", ic:"💎", t:"Lección perfecta", d:"Una lección entera sin fallar ni una.",
+   ok:() => Object.values(E.lecciones).some(l => l.estrellas >= 3)},
+  {id:"nivel10", ic:"🌟", t:"Nivel 10", d:"Diez niveles de experiencia.",
+   ok:() => nivelJugador(E.xp) >= 10},
+];
+function revisarLogros(){
+  const nuevos = [];
+  for(const lo of LOGROS){
+    if(E.logros.includes(lo.id)) continue;
+    let cumple = false;
+    try{ cumple = lo.ok(); }catch(e){}
+    if(cumple){ E.logros.push(lo.id); nuevos.push(lo); }
+  }
+  if(nuevos.length) guardar();
+  return nuevos;
+}
+
+/* ===========================================================================
+   Audio. Se usa la voz del propio celular (SpeechSynthesis). Si el aparato no
+   tiene voz noruega instalada, se dice CLARAMENTE en vez de leer noruego con
+   acento español, que enseñaría mal.
+   =========================================================================== */
+let VOZ = null, VOZ_BUSCADA = false;
+function buscarVoz(){
+  if(!("speechSynthesis" in window)) return null;
+  const voces = window.speechSynthesis.getVoices() || [];
+  VOZ = voces.find(v => v.lang && v.lang.toLowerCase().startsWith("nb"))
+     || voces.find(v => v.lang && v.lang.toLowerCase().startsWith("no"))
+     || voces.find(v => v.lang && v.lang.toLowerCase().startsWith("nn")) || null;
+  VOZ_BUSCADA = true;
+  return VOZ;
+}
+if("speechSynthesis" in window){
+  buscarVoz();
+  window.speechSynthesis.onvoiceschanged = () => { buscarVoz(); };
+}
+function hayVoz(){ if(!VOZ_BUSCADA) buscarVoz(); return !!VOZ; }
+function decir(texto, velocidad){
+  if(!texto || !("speechSynthesis" in window)) return false;
+  if(!VOZ_BUSCADA) buscarVoz();
+  try{
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = DATOS.idiomaVoz || "nb-NO";
+    if(VOZ) u.voice = VOZ;
+    u.rate = velocidad || 0.9;
+    window.speechSynthesis.speak(u);
+    return true;
+  }catch(e){ return false; }
+}
+function vibrar(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
+
+/* ------------------------------------------------------------ utilidades - */
+function esc(s){ return String(s == null ? "" : s)
+  .replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function plural(n, uno, muchos){ return n === 1 ? uno : muchos; }
+function revolver(lista){
+  const c = lista.slice();
+  for(let i = c.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [c[i],c[j]]=[c[j],c[i]]; }
+  return c;
+}
+/** Compara una respuesta escrita perdonando lo que no es error de idioma. */
+function normalizar(texto){
+  let t = String(texto || "").trim().toLowerCase().replace(/aa/g, "å");
+  t = t.replace(/[.,!?¿¡;:"'()]/g, " ");
+  t = t.normalize("NFD").replace(/[̀-ͯ]/g, (m, i, s) => "");
+  // Se restauran æ, ø y å, que en noruego son letras propias y no acentos.
+  t = String(texto || "").trim().toLowerCase().replace(/aa/g, "å")
+        .replace(/[.,!?¿¡;:"'()]/g, " ")
+        .replace(/[áàâä]/g,"a").replace(/[éèêë]/g,"e").replace(/[íìîï]/g,"i")
+        .replace(/[óòôö]/g,"o").replace(/[úùûü]/g,"u").replace(/ñ/g,"n");
+  return t.split(/\s+/).filter(Boolean).join(" ");
+}
+
+/* ===========================================================================
+   Navegación
+   =========================================================================== */
+const VISTAS = [["inicio","🏠","Inicio"],["curso","🗺️","Curso"],["repaso","🔁","Repaso"],
+                ["diccionario","📖","Palabras"],["perfil","📊","Perfil"]];
+let vista = "inicio", sesion = null, pantallaExtra = null;
+
+function ir(v, extra){
+  if(sesion && !confirm("Vas a salir de la lección. Lo que llevas se pierde. ¿Salir?")) return;
+  sesion = null; vista = v; pantallaExtra = extra || null;
+  pintar(); window.scrollTo(0,0);
+}
+function pintar(){
+  tocarDia();
+  const app = document.getElementById("app");
+  const nav = document.getElementById("nav");
+  if(sesion){ nav.style.display = "none"; app.innerHTML = vLeccion(); tras(); return; }
+  nav.style.display = "";
+  nav.innerHTML = VISTAS.map(([id,ic,t]) =>
+    `<button ${id===vista?'aria-current="page"':""} onclick="ir('${id}')">
+      <span class="ic">${ic}</span>${t}</button>`).join("");
+  const render = {inicio:vInicio, curso:vCurso, repaso:vRepaso,
+                  diccionario:vDiccionario, perfil:vPerfil}[vista] || vInicio;
+  app.innerHTML = render();
+  tras();
+}
+function tras(){
+  // Enganches que necesitan el DOM ya pintado.
+  const auto = document.querySelector("[data-autofoco]");
+  if(auto) setTimeout(() => auto.focus(), 60);
+  const audio = document.querySelector("[data-autoaudio]");
+  if(audio) setTimeout(() => decir(audio.getAttribute("data-autoaudio")), 260);
+}
+
+function cabecera(titulo, sub){
+  const p = progresoNivel(E.xp), meta = E.perfil.metaDiaria || 30;
+  return `<div class="tope"><div class="fila">
+      <div><div class="rot">Nivel ${p.nivel}</div>
+        <div style="font-weight:800;font-size:1.05rem">${esc(titulo)}</div></div>
+      <div class="medallas">
+        <span class="medalla racha" title="Racha"><span class="ic">🔥</span>${rachaViva()}</span>
+        <span class="medalla xp" title="Experiencia"><span class="ic">⭐</span>${E.xp}</span>
+      </div></div></div>
+    ${sub ? `<p class="tenue mini" style="margin-top:calc(var(--s2)*-1)">${esc(sub)}</p>` : ""}`;
+}
+
+/* ------------------------------------------------------------------ INICIO */
+function vInicio(){
+  if(!E.perfil.nombre) return vBienvenida();
+  const p = progresoNivel(E.xp), meta = E.perfil.metaDiaria || 30;
+  const pctMeta = Math.min(100, E.xpHoy / meta * 100);
+  const sig = siguienteLeccion(), mod = MODULOS[sig.modulo] || {};
+  const pend = vencidas().length, avance = avanceCurso();
+  const nuevos = revisarLogros();
+
+  let h = cabecera(saludo(), "");
+  h += `<div class="entra">`;
+
+  if(nuevos.length){
+    h += nuevos.map(l => `<div class="aviso oro"><span style="font-size:1.4rem">${l.ic}</span>
+      <span><b>¡Logro nuevo: ${esc(l.t)}!</b><br>${esc(l.d)}</span></div>`).join("");
+  }
+
+  // Objetivo del día
+  h += `<div class="tarjeta"><div class="enc" style="align-items:center">
+      <div><div class="rot">Objetivo de hoy</div>
+        <h2>${E.xpHoy >= meta ? `${E.xpHoy} XP hoy` : `${E.xpHoy} de ${meta} XP`}</h2>
+        <p class="tenue mini" style="margin:2px 0 0">${
+          E.xpHoy >= meta ? "¡Meta cumplida! Lo de más suma para el nivel."
+          : `Te faltan ${meta - E.xpHoy} XP. Son unos ${Math.max(1, Math.ceil((meta-E.xpHoy)/JUEGO.xpAcierto/4))} minutos.`}</p></div>
+      <div class="anillo" style="--p:${pctMeta}"><b>${E.xpHoy >= meta ? "✓" : "🎯"}</b></div>
+    </div>
+    <div class="barra"><i style="width:${p.pct}%"></i></div>
+    <p class="micro tenue" style="margin:6px 0 0">Nivel ${p.nivel} · faltan ${p.falta} XP para el ${p.nivel+1}</p>
+  </div>`;
+
+  // Lección recomendada
+  h += `<div class="tarjeta acento"><div class="rot">Sigue por aquí</div>
+    <h2 style="margin:2px 0 4px">${esc(sig.titulo)}</h2>
+    <p class="tenue mini">${esc(mod.icono || "")} ${esc(mod.titulo || "")} · ${esc(sig.objetivo)}</p>
+    <button class="pri blq" onclick="empezar('${sig.clave}')">
+      ${E.lecciones[sig.clave] ? "Continuar" : "Empezar"} lección</button></div>`;
+
+  // Repaso pendiente
+  if(pend > 0){
+    h += `<div class="tarjeta"><div class="enc"><div><div class="rot">Repaso inteligente</div>
+      <h2>${pend} ${plural(pend,"palabra lista","palabras listas")} para repasar</h2></div>
+      <span style="font-size:1.8rem">🔁</span></div>
+      <p class="tenue mini">Son las que estás a punto de olvidar. El sistema las eligió solo.</p>
+      <button class="blq" onclick="ir('repaso')">Repasar ahora</button></div>`;
+  }
+
+  // Resumen
+  h += `<div class="rejilla2" style="margin-bottom:var(--s4)">
+    <div class="dato"><b>${palabrasAprendidas()}</b><span>palabras aprendidas</span></div>
+    <div class="dato"><b>${avance.hechas}/${avance.total}</b><span>lecciones</span></div>
+    <div class="dato"><b>${rachaViva()}</b><span>${plural(rachaViva(),"día seguido","días seguidos")}</span></div>
+    <div class="dato"><b>${nivelActual() === "cero" ? "0" : nivelActual()}</b><span>nivel del curso</span></div>
+  </div>`;
+
+  const errores = E.errores.slice(-4).reverse();
+  if(errores.length){
+    h += `<div class="tarjeta"><div class="rot">Errores recientes</div>
+      <h2 style="margin-bottom:var(--s3)">Lo que se te atravesó</h2>` +
+      errores.map(er => `<div class="ejemplo"><div class="tx">
+        <div class="no">${esc(er.no)}</div><div class="es">${esc(er.es)}</div></div>
+        <button class="audio-btn chico" onclick="decir('${esc(er.no).replace(/'/g,"")}')">🔊</button>
+      </div>`).join("") + `</div>`;
+  }
+  if(!hayVoz()){
+    h += `<div class="aviso vio"><span>🔈</span><span>Tu dispositivo no tiene voz noruega
+      instalada, así que el audio está apagado. En Android se agrega en
+      <b>Ajustes → Idiomas → Texto a voz</b>; en iPhone, en
+      <b>Ajustes → Accesibilidad → Contenido hablado → Voces</b>. Mientras tanto usa la
+      pronunciación aproximada que aparece debajo de cada palabra.</span></div>`;
+  }
+  return h + `</div>`;
+}
+function saludo(){
+  const h = new Date().getHours();
+  const n = E.perfil.nombre ? ", " + E.perfil.nombre : "";
+  return (h < 12 ? "God morgen" : h < 18 ? "God dag" : "God kveld") + n;
+}
+
+function vBienvenida(){
+  return `<div class="entra" style="padding-top:var(--s7)">
+    <div class="centro" style="margin-bottom:var(--s6)">
+      <div style="font-size:3.5rem;line-height:1">🇳🇴</div>
+      <h1 style="margin-top:var(--s3)">Norsk</h1>
+      <p class="tenue">Curso de noruego para hispanohablantes.<br>De cero a nivel profesional.</p>
+    </div>
+    <div class="tarjeta">
+      <label for="b-nombre">¿Cómo te llamas?</label>
+      <input type="text" id="b-nombre" placeholder="Tu nombre" data-autofoco autocomplete="given-name">
+      <label for="b-meta">¿Cuánto quieres estudiar al día?</label>
+      <select id="b-meta">
+        <option value="15">Tranquilo · 15 XP (unos 3 minutos)</option>
+        <option value="30" selected>Normal · 30 XP (unos 6 minutos)</option>
+        <option value="60">Serio · 60 XP (unos 12 minutos)</option>
+        <option value="120">Intenso · 120 XP (más de 20 minutos)</option>
+      </select>
+      <button class="pri blq" style="margin-top:var(--s5)" onclick="crearPerfil()">Empezar</button>
+    </div>
+    <div class="aviso"><span>🔒</span><span>Todo tu avance se guarda solo en este
+      dispositivo. No hay cuenta, no hay servidor y funciona sin internet.</span></div>
+    <div class="aviso"><span>📚</span><span>El curso enseña <b>bokmål</b>, la forma escrita
+      que usa la gran mayoría de los noruegos y la única que se evalúa en la prueba oficial
+      para extranjeros.</span></div>
+  </div>`;
+}
+function crearPerfil(){
+  const n = document.getElementById("b-nombre").value.trim();
+  E.perfil.nombre = n || "Estudiante";
+  E.perfil.metaDiaria = parseInt(document.getElementById("b-meta").value, 10) || 30;
+  E.perfil.creado = hoyISO();
+  guardar(); ir("inicio");
+}
+
+/* ------------------------------------------------------------------- CURSO */
+function vCurso(){
+  const avance = avanceCurso();
+  let h = cabecera("El curso", "");
+  h += `<div class="entra"><div class="tarjeta plana">
+    <div class="enc"><div><div class="rot">Avance total</div>
+      <h2>${avance.hechas} de ${avance.total} lecciones</h2></div>
+      <span class="ficha on">${Math.round(avance.pct)}%</span></div>
+    <div class="barra"><i style="width:${avance.pct}%"></i></div></div>`;
+
+  let nivelPrevio = null;
+  for(const mod of DATOS.modulos){
+    if(mod.nivel !== nivelPrevio){
+      const niv = DATOS.niveles.find(n => n.clave === mod.nivel) || {titulo:mod.nivel, descripcion:""};
+      h += `<div style="margin:var(--s6) 0 var(--s4)">
+        <div class="rot">${esc(niv.titulo)}</div>
+        <p class="tenue mini" style="margin:2px 0 0">${esc(niv.descripcion)}</p></div>`;
+      nivelPrevio = mod.nivel;
+    }
+    const hechas = mod.lecciones.filter(c => estadoLeccion(c) === "hecha").length;
+    h += `<div class="modulo"><div class="mod-cab">
+        <span class="ic">${mod.icono}</span>
+        <div class="tx"><h2>${esc(mod.titulo)}</h2>
+          <p class="tenue micro" style="margin:0">${esc(mod.descripcion)}</p></div>
+        <span class="ficha ${hechas === mod.lecciones.length ? "on" : ""}">${hechas}/${mod.lecciones.length}</span>
+      </div><div class="senda">`;
+    for(const clave of mod.lecciones){
+      const lec = LECCIONES[clave]; if(!lec) continue;
+      const est = estadoLeccion(clave), guardada = E.lecciones[clave];
+      const estrellas = guardada ? guardada.estrellas : 0;
+      h += `<button class="nodo ${est}" ${est === "bloqueada" ? "disabled" : ""}
+          onclick="empezar('${clave}')">
+        <span class="bola">${est === "hecha" ? "✓" : est === "bloqueada" ? "🔒" : "▶"}</span>
+        <span class="tx"><b>${esc(lec.titulo)}</b><span>${esc(lec.objetivo)}</span></span>
+        ${estrellas ? `<span class="estrellas">${"★".repeat(estrellas)}${"☆".repeat(3-estrellas)}</span>` : ""}
+      </button>`;
+    }
+    h += `</div></div>`;
+  }
+  return h + `</div>`;
+}
+
+/* ===========================================================================
+   El reproductor de lecciones: donde de verdad se aprende.
+   =========================================================================== */
+const OPCION_MULTIPLE = ["opcion","escuchar_opcion","completar","error","genero",
+                         "forma_nominal","dialogo"];
+const ESCRITA = ["traducir_es_no","traducir_no_es","escuchar_escribir","conjugar"];
+
+function empezar(clave){
+  const lec = LECCIONES[clave];
+  if(!lec || estadoLeccion(clave) === "bloqueada") return;
+  const hechas = (E.lecciones[clave] || {}).veces || 0;
+  const variantes = lec.variantes || [];
+  if(!variantes.length) return;
+  const ejercicios = variantes[hechas % variantes.length];
+  sesion = {clave, lec, ejercicios: revolver(ejercicios), i:0, bien:0, fallos:0,
+            vidas: JUEGO.vidas, xp:0, mostrando:false, respuesta:null, correcta:null,
+            inicio:Date.now(), marca:Date.now(), parejas:null, banco:null,
+            repaso:false, terminada:false};
+  pintar(); window.scrollTo(0,0);
+}
+function empezarRepaso(){
+  const ids = vencidas();
+  if(!ids.length) return;
+  // Se arman ejercicios a partir de los MISMOS ejercicios del curso que usan
+  // esas palabras: así el repaso pregunta como preguntó la lección.
+  const porFuente = {};
+  for(const lec of DATOS.lecciones)
+    for(const variante of lec.variantes)
+      for(const e of variante)
+        if(ids.includes(e.fuente)) (porFuente[e.fuente] = porFuente[e.fuente] || []).push(e);
+  const elegidos = [];
+  for(const id of ids.slice(0, 20)){
+    const opciones = porFuente[id];
+    if(opciones && opciones.length) elegidos.push(opciones[Math.floor(Math.random()*opciones.length)]);
+  }
+  if(!elegidos.length) return;
+  sesion = {clave:"__repaso__", lec:{titulo:"Repaso inteligente", clave:"__repaso__"},
+            ejercicios: revolver(elegidos), i:0, bien:0, fallos:0, vidas: 99, xp:0,
+            mostrando:false, respuesta:null, correcta:null, inicio:Date.now(),
+            marca:Date.now(), parejas:null, banco:null, repaso:true, terminada:false};
+  pintar(); window.scrollTo(0,0);
+}
+
+function vLeccion(){
+  const s = sesion;
+  if(s.terminada || s.i >= s.ejercicios.length) return vResultado();
+  const e = s.ejercicios[s.i];
+  const pct = s.i / s.ejercicios.length * 100;
+
+  let h = `<div class="lec-tope">
+      <button class="x" onclick="salirLeccion()" aria-label="Salir">✕</button>
+      <div class="barra"><i style="width:${pct}%"></i></div>
+      ${s.repaso ? `<span class="ficha on">${s.i+1}/${s.ejercicios.length}</span>`
+        : `<span class="vidas-tope">${"♥".repeat(Math.max(0,s.vidas))}</span>`}
+    </div>`;
+
+  h += `<div class="entra" style="padding-bottom:180px">`;
+  h += `<div class="pregunta">${esc(e.enunciado)}</div>`;
+
+  if(e.tipo === "parejas") h += cuerpoParejas(e);
+  else if(e.tipo === "ordenar") h += cuerpoOrdenar(e);
+  else if(e.tipo === "pronunciar") h += cuerpoPronunciar(e);
+  else if(OPCION_MULTIPLE.includes(e.tipo)) h += cuerpoOpciones(e);
+  else if(ESCRITA.includes(e.tipo)) h += cuerpoEscrita(e);
+  h += `</div>`;
+
+  if(s.mostrando) h += panelVeredicto(e);
+  else if(e.tipo !== "parejas") h += `<div class="veredicto" style="background:var(--noche);
+    border-color:var(--linea)"><div class="interior">
+      <button class="pri blq" onclick="comprobar()" ${botonListo(e) ? "" : "disabled"}>Comprobar</button>
+    </div></div>`;
+  return h;
+}
+function botonListo(e){
+  const s = sesion;
+  if(ESCRITA.includes(e.tipo)) return true;   // se valida al comprobar
+  if(e.tipo === "ordenar") return (s.banco && s.banco.puestas.length > 0);
+  if(e.tipo === "pronunciar") return true;
+  return s.respuesta !== null && s.respuesta !== undefined;
+}
+
+/* ------------------------------------------------------------- los cuerpos */
+function audioGrande(texto, etiqueta){
+  let h = `<button class="audio-btn" onclick="decir(${JSON.stringify(texto)})"
+    aria-label="Escuchar">🔊<span class="mini" style="margin-left:8px">${etiqueta||"Escuchar"}</span></button>`;
+  if(!hayVoz()){
+    // Sin voz noruega instalada, un ejercicio de escucha sería imposible de
+    // responder. Se muestra el texto para que el ejercicio siga sirviendo, y
+    // se dice por qué: enseñar mal es peor que no tener audio.
+    h += `<div class="aviso vio" style="margin-top:calc(var(--s3)*-1)">
+      <span>🔇</span><span>Este dispositivo no tiene voz noruega, así que en vez de
+      oírlo lo vas a leer: <b>${esc(texto)}</b></span></div>`;
+  }
+  return h;
+}
+function cuerpoOpciones(e){
+  const s = sesion, letras = ["A","B","C","D"];
+  let h = "";
+  if(e.tipo === "escuchar_opcion"){
+    h += audioGrande(e.audio, "Toca para oír");
+    h += `<p class="tenue mini centro" style="margin-top:calc(var(--s3)*-1)">
+      <button class="fantasma mini" onclick="decir(${JSON.stringify(e.audio)}, 0.55)">🐢 Más despacio</button></p>`;
+  } else if(e.contexto){
+    h += `<div class="material${e.tipo==="completar"||e.tipo==="dialogo"?"":" grande"}">${esc(e.contexto)}</div>`;
+  }
+  if(e.pista && e.tipo === "dialogo")
+    h += `<p class="tenue mini">Quieres decir: «${esc(e.pista)}»</p>`;
+  h += `<div class="opciones">`;
+  (e.opciones||[]).forEach((o, i) => {
+    let cl = "";
+    if(s.mostrando){
+      if(i === e.correcta) cl = "bien";
+      else if(i === s.respuesta) cl = "mal";
+    } else if(s.respuesta === i) cl = "sel";
+    h += `<button class="op ${cl}" ${s.mostrando?"disabled":""} onclick="elegir(${i})">
+      <span class="letra">${letras[i]||""}</span><span>${esc(o)}</span></button>`;
+  });
+  return h + `</div>`;
+}
+function cuerpoEscrita(e){
+  const s = sesion;
+  let h = "";
+  if(e.tipo === "escuchar_escribir"){
+    h += audioGrande(e.audio, "Toca para oír");
+    h += `<p class="centro" style="margin-top:calc(var(--s3)*-1)">
+      <button class="fantasma mini" onclick="decir(${JSON.stringify(e.audio)}, 0.55)">🐢 Más despacio</button></p>`;
+  } else if(e.contexto){
+    h += `<div class="material grande">${esc(e.contexto)}</div>`;
+  }
+  const clase = s.mostrando ? (s.correcta ? "bien" : "mal") : "";
+  h += `<input type="text" class="entrada ${clase}" id="resp" ${s.mostrando?"disabled":""}
+    value="${esc(s.respuesta || "")}" placeholder="Escribe aquí"
+    autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+    ${s.mostrando ? "" : "data-autofoco"}
+    oninput="sesion.respuesta=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();comprobar()}">`;
+  if(e.pista && !s.mostrando && e.tipo === "traducir_es_no")
+    h += `<p class="tenue micro" style="margin-top:var(--s2)">Suena aproximadamente:
+      «${esc(e.pista)}»</p>`;
+  return h;
+}
+function cuerpoOrdenar(e){
+  const s = sesion;
+  if(!s.banco) s.banco = {puestas:[], sueltas:(e.datos && e.datos.revueltas) ?
+    e.datos.revueltas.slice() : revolver(e.orden || [])};
+  let h = "";
+  if(e.contexto) h += `<div class="material">${esc(e.contexto)}</div>`;
+  h += `<div class="fichas-palabras">` + s.banco.puestas.map((p, i) =>
+      `<button class="op palabra" ${s.mostrando?"disabled":""} onclick="quitarPalabra(${i})">${esc(p)}</button>`
+    ).join("") + `</div>`;
+  h += `<div class="fichas-palabras" style="border-style:solid;background:transparent">` +
+    s.banco.sueltas.map((p, i) =>
+      `<button class="op palabra" ${s.mostrando?"disabled":""} onclick="ponerPalabra(${i})">${esc(p)}</button>`
+    ).join("") + `</div>`;
+  return h;
+}
+function ponerPalabra(i){
+  const b = sesion.banco; b.puestas.push(b.sueltas.splice(i,1)[0]); pintar();
+}
+function quitarPalabra(i){
+  const b = sesion.banco; b.sueltas.push(b.puestas.splice(i,1)[0]); pintar();
+}
+function cuerpoParejas(e){
+  const s = sesion;
+  if(!s.parejas){
+    const lista = (e.datos && e.datos.parejas) || [];
+    s.parejas = {izq: revolver(lista.map((p,i) => ({t:p.no, i, lado:"no", pron:p.pron}))),
+                 der: revolver(lista.map((p,i) => ({t:p.es, i, lado:"es"}))),
+                 sel:null, ok:[], fallos:0, total:lista.length};
+  }
+  const p = s.parejas;
+  let h = `<div class="parejas">`;
+  const filas = Math.max(p.izq.length, p.der.length);
+  for(let f = 0; f < filas; f++){
+    for(const lado of [p.izq, p.der]){
+      const item = lado[f];
+      if(!item){ h += `<span></span>`; continue; }
+      const hecho = p.ok.includes(item.i);
+      const sel = p.sel && p.sel.lado === item.lado && p.sel.i === item.i;
+      h += `<button class="${hecho?"ok":sel?"sel":""}" ${hecho?"disabled":""}
+        onclick="tocarPareja('${item.lado}',${item.i})">${esc(item.t)}</button>`;
+    }
+  }
+  h += `</div><p class="tenue mini centro" style="margin-top:var(--s3)">
+    Une cada palabra noruega con su significado. ${p.ok.length}/${p.total}</p>`;
+  return h;
+}
+function tocarPareja(lado, i){
+  const p = sesion.parejas;
+  if(!p.sel){ p.sel = {lado, i}; pintar(); return; }
+  if(p.sel.lado === lado){ p.sel = {lado, i}; pintar(); return; }
+  if(p.sel.i === i){
+    p.ok.push(i); p.sel = null;
+    const item = p.izq.find(x => x.i === i);
+    if(item) decir(item.t);
+    vibrar(20);
+    if(p.ok.length >= p.total){ sesion.respuesta = 0; comprobar(); return; }
+  } else { p.fallos++; p.sel = null; vibrar([40,60,40]); }
+  pintar();
+}
+function cuerpoPronunciar(e){
+  let h = `<div class="material grande">${esc(e.contexto || e.audio)}</div>`;
+  h += audioGrande(e.audio, "Escúchalo");
+  h += `<p class="centro"><button class="fantasma" onclick="decir(${JSON.stringify(e.audio)}, 0.5)">
+    🐢 Más despacio</button></p>`;
+  if(e.pista) h += `<div class="tarjeta plana centro"><div class="rot">Aproximación</div>
+    <div style="font-family:var(--mono);font-size:1.2rem;font-weight:700">${esc(e.pista)}</div>
+    ${e.datos && e.datos.es ? `<div class="tenue mini">${esc(e.datos.es)}</div>` : ""}</div>`;
+  h += `<p class="tenue mini centro">Escúchalo, repítelo en voz alta y cuando te salga
+    parecido, sigue.</p>`;
+  return h;
+}
+
+/* --------------------------------------------------------------- respuesta */
+function elegir(i){ if(sesion.mostrando) return; sesion.respuesta = i; pintar(); }
+
+function comprobar(){
+  const s = sesion, e = s.ejercicios[s.i];
+  if(s.mostrando) return siguiente();
+  const segundos = (Date.now() - s.marca)/1000;
+  let bien = false;
+  if(e.tipo === "parejas"){
+    bien = s.parejas ? s.parejas.fallos === 0 : false;
+  } else if(e.tipo === "ordenar"){
+    bien = normalizar((s.banco.puestas || []).join(" ")) === normalizar((e.orden||[]).join(" "));
+  } else if(e.tipo === "pronunciar"){
+    bien = true;   // se autoevalúa: aquí se practica, no se examina
+  } else if(ESCRITA.includes(e.tipo)){
+    const dada = normalizar(s.respuesta || "");
+    const validas = [e.respuesta].concat(e.alternativas || []).map(normalizar);
+    bien = validas.includes(dada);
+  } else {
+    bien = s.respuesta === e.correcta;
+  }
+  s.correcta = bien; s.mostrando = true;
+  if(bien){ s.bien++; s.xp += JUEGO.xpAcierto; vibrar(25); }
+  else {
+    s.fallos++;
+    if(!s.repaso) s.vidas--;
+    vibrar([50,60,50]);
+    const fuente = LEXICO_POR_ID[e.fuente];
+    E.errores.push({no: e.audio || (fuente ? textoNoruego(fuente) : ""),
+                    es: e.respuesta || (fuente ? fuente.es : "") || e.pista || "",
+                    fecha: hoyISO()});
+    if(E.errores.length > 60) E.errores = E.errores.slice(-60);
+    // Una fallada vuelve a aparecer al final de la misma sesión.
+    if(s.ejercicios.length < 40) s.ejercicios.push(e);
+  }
+  if(e.fuente) calificarTarjeta(e.fuente, bien, segundos);
+  guardar();
+  if(bien && e.audio) decir(e.audio);
+  pintar();
+  if(!s.repaso && s.vidas <= 0) setTimeout(() => { s.terminada = true; pintar(); }, 900);
+}
+function panelVeredicto(e){
+  const s = sesion;
+  const correcto = e.tipo === "ordenar" ? (e.orden||[]).join(" ")
+    : ESCRITA.includes(e.tipo) ? e.respuesta
+    : (e.opciones||[])[e.correcta] || "";
+  let h = `<div class="veredicto ${s.correcta ? "si" : "no"}"><div class="interior">
+    <div class="cab">${s.correcta ? "✓ ¡Correcto!" : "✗ No es esa"}</div>`;
+  if(!s.correcta && correcto)
+    h += `<div class="dato">Respuesta correcta: <b>${esc(correcto)}</b></div>`;
+  if(e.explicacion) h += `<div class="dato">${esc(e.explicacion)}</div>`;
+  if(e.audio) h += `<div class="fila-btn" style="margin-bottom:var(--s3)">
+    <button class="fantasma" onclick="decir(${JSON.stringify(e.audio)})">🔊 Oír</button>
+    <button class="fantasma" onclick="decir(${JSON.stringify(e.audio)},0.55)">🐢 Despacio</button></div>`;
+  h += `<button class="pri blq" onclick="siguiente()" data-autofoco>Continuar</button>
+    </div></div>`;
+  return h;
+}
+function siguiente(){
+  const s = sesion;
+  s.i++; s.mostrando = false; s.respuesta = null; s.correcta = null;
+  s.parejas = null; s.banco = null; s.marca = Date.now();
+  if(s.i >= s.ejercicios.length) s.terminada = true;
+  pintar(); window.scrollTo(0,0);
+}
+function salirLeccion(){
+  if(confirm("¿Salir de la lección? Lo que llevas en esta lección se pierde.")){
+    sesion = null; pintar();
+  }
+}
+
+/* --------------------------------------------------------------- resultado */
+function vResultado(){
+  const s = sesion;
+  const total = s.bien + s.fallos;
+  const pct = total ? Math.round(s.bien / total * 100) : 0;
+  const sinVidas = !s.repaso && s.vidas <= 0;
+  const estrellas = sinVidas ? 0 : s.fallos === 0 ? 3 : s.fallos <= 2 ? 2 : 1;
+  const minutos = Math.max(1, Math.round((Date.now() - s.inicio)/60000));
+
+  if(!s.guardada){
+    s.guardada = true;
+    let xp = s.xp;
+    if(!sinVidas){
+      xp += JUEGO.xpLeccion;
+      if(s.fallos === 0) xp += JUEGO.xpPerfecta;
+      if(!s.repaso){
+        const previa = E.lecciones[s.clave] || {estrellas:0, veces:0};
+        E.lecciones[s.clave] = {estrellas: Math.max(previa.estrellas, estrellas),
+          veces: previa.veces + 1, mejor: Math.max(previa.mejor || 0, pct), ultima: hoyISO()};
+      }
+    }
+    E.xp += xp; E.xpHoy += xp; s.xpGanado = xp;
+    E.dias[hoyISO()] = (E.dias[hoyISO()] || 0) + xp;
+    guardar();
+  }
+  const nuevos = revisarLogros();
+
+  let h = `<div class="entra" style="padding-top:var(--s7)">`;
+  if(sinVidas){
+    h += `<div class="centro"><div style="font-size:3.5rem">💔</div>
+      <h1>Se acabaron los corazones</h1>
+      <p class="tenue">Fallaste ${s.fallos} veces. No pasa nada: repetir la lección es
+      justamente lo que hace que se quede.</p></div>`;
+  } else {
+    h += `<div class="centro"><div style="font-size:3.5rem">${estrellas===3?"🌟":"🎉"}</div>
+      <h1>${estrellas === 3 ? "¡Perfecta!" : "¡Lección terminada!"}</h1>
+      <div style="font-size:2rem;color:var(--oro-vivo);letter-spacing:6px;margin:var(--s3) 0">
+        ${"★".repeat(estrellas)}${"☆".repeat(3-estrellas)}</div></div>`;
+  }
+  h += `<div class="rejilla2" style="margin:var(--s5) 0">
+    <div class="dato"><b>+${s.xpGanado || 0}</b><span>XP ganados</span></div>
+    <div class="dato"><b>${pct}%</b><span>de acierto</span></div>
+    <div class="dato"><b>${s.bien}/${total}</b><span>respuestas</span></div>
+    <div class="dato"><b>${minutos}</b><span>${plural(minutos,"minuto","minutos")}</span></div>
+  </div>`;
+
+  if(nuevos.length) h += nuevos.map(l => `<div class="aviso oro">
+    <span style="font-size:1.4rem">${l.ic}</span><span><b>¡Logro nuevo: ${esc(l.t)}!</b><br>
+    ${esc(l.d)}</span></div>`).join("");
+
+  const dif = dificiles().slice(0,5);
+  if(dif.length){
+    h += `<div class="tarjeta"><div class="rot">Lo que más te cuesta</div>
+      <p class="tenue mini">Estas van a volver pronto en el repaso. No tienes que hacer nada:
+      el sistema las trae solo.</p>` +
+      dif.map(id => { const w = LEXICO_POR_ID[id]; if(!w) return "";
+        return `<div class="ejemplo"><div class="tx"><div class="no">${esc(textoNoruego(w))}</div>
+          <div class="es">${esc(w.es||"")}</div></div>
+          <button class="audio-btn chico" onclick="decir(${JSON.stringify(textoNoruego(w))})">🔊</button></div>`;
+      }).join("") + `</div>`;
+  }
+
+  h += `<div class="fila-btn" style="flex-direction:column">`;
+  if(sinVidas) h += `<button class="pri blq" onclick="empezar('${s.clave}')">Volver a intentarlo</button>`;
+  else if(!s.repaso){
+    const sig = siguienteLeccion();
+    h += `<button class="pri blq" onclick="empezar('${sig.clave}')">Siguiente lección</button>`;
+  }
+  h += `<button class="blq" onclick="sesion=null;vista='inicio';pintar()">Volver al inicio</button>
+    </div></div>`;
+  return h;
+}
+
+/* ------------------------------------------------------------------ REPASO */
+function vRepaso(){
+  const pend = vencidas(), dif = dificiles();
+  let h = cabecera("Repaso", "");
+  h += `<div class="entra">`;
+  h += `<div class="tarjeta ${pend.length?"acento":""}">
+    <div class="rot">Repaso inteligente</div>
+    <h2 style="margin:2px 0 6px">${pend.length ? `${pend.length} ${plural(pend.length,"palabra","palabras")} listas`
+      : "Nada pendiente por ahora"}</h2>
+    <p class="tenue mini">${pend.length
+      ? "El sistema eligió estas solo: son las que estás justo a punto de olvidar. Repasarlas ahora es lo que las fija."
+      : "Vuelve mañana o sigue con el curso. El repaso aparece cuando toca, no antes."}</p>
+    <button class="pri blq" ${pend.length?"":"disabled"} onclick="empezarRepaso()">
+      ${pend.length ? `Repasar ${Math.min(pend.length,20)}` : "Sin repasos pendientes"}</button></div>`;
+
+  if(dif.length){
+    h += `<div class="tarjeta"><div class="rot">Tus palabras difíciles</div>
+      <h2 style="margin-bottom:var(--s3)">${dif.length} que se te resisten</h2>` +
+      dif.slice(0,12).map(id => { const w = LEXICO_POR_ID[id]; if(!w) return "";
+        const t = E.tarjetas[id];
+        return `<div class="palabra-fila"><div class="tx">
+          <b>${esc(textoNoruego(w))}</b><div class="es">${esc(w.es||"")}</div>
+          <div class="pr">${esc(w.pron||"")}</div></div>
+          <span class="ficha rojo">${t.fallos} ${plural(t.fallos,"fallo","fallos")}</span>
+          <button class="audio-btn chico" onclick="decir(${JSON.stringify(textoNoruego(w))})">🔊</button>
+        </div>`; }).join("") + `</div>`;
+  }
+
+  const agenda = {};
+  for(const id in E.tarjetas){ const p = E.tarjetas[id].proxima; if(p) agenda[p] = (agenda[p]||0)+1; }
+  const proximos = Object.keys(agenda).filter(f => f > hoyISO()).sort().slice(0,7);
+  if(proximos.length){
+    h += `<div class="tarjeta plana"><div class="rot">Lo que viene</div>` +
+      proximos.map(f => `<div class="palabra-fila"><div class="tx"><b>${esc(f)}</b></div>
+        <span class="ficha">${agenda[f]} ${plural(agenda[f],"palabra","palabras")}</span></div>`).join("")
+      + `</div>`;
+  }
+  return h + `</div>`;
+}
+
+/* ------------------------------------------------------------- DICCIONARIO */
+let busqueda = "", filtroDic = "todo";
+function vDiccionario(){
+  if(pantallaExtra === "gramatica") return vGramatica();
+  if(pantallaExtra === "conversaciones") return vConversaciones();
+  if(pantallaExtra && pantallaExtra.startsWith("dialogo:")) return vDialogo(pantallaExtra.slice(8));
+
+  const tipos = [["todo","Todo"],["sustantivos","Sustantivos"],["verbos","Verbos"],
+                 ["adjetivos","Adjetivos"],["frases","Frases"],["numeros","Números"],
+                 ["favoritas","⭐ Marcadas"],["aprendidas","Aprendidas"]];
+  let lista = [];
+  if(filtroDic === "favoritas") lista = E.favoritas.map(id => LEXICO_POR_ID[id]).filter(Boolean);
+  else if(filtroDic === "aprendidas")
+    lista = Object.keys(E.tarjetas).filter(id => E.tarjetas[id].reps >= 2)
+      .map(id => LEXICO_POR_ID[id]).filter(Boolean);
+  else {
+    for(const tipo in DATOS.lexico){
+      if(tipo === "sonidos" || tipo === "gramatica" || tipo === "dialogos") continue;
+      if(filtroDic !== "todo" && tipo !== filtroDic) continue;
+      lista = lista.concat(DATOS.lexico[tipo]);
+    }
+  }
+  const q = normalizar(busqueda);
+  if(q) lista = lista.filter(w =>
+    normalizar(textoNoruego(w)).includes(q) || normalizar(w.es||"").includes(q));
+  lista = lista.slice(0, 300);
+
+  let h = cabecera("Palabras", "");
+  h += `<div class="entra">
+    <div class="fila-btn" style="margin-bottom:var(--s4)">
+      <button style="flex:1" onclick="ir('diccionario','gramatica')">🧩 Gramática</button>
+      <button style="flex:1" onclick="ir('diccionario','conversaciones')">💬 Conversaciones</button>
+    </div>
+    <div class="buscador"><span class="lupa">🔍</span>
+      <input type="text" placeholder="Buscar en español o noruego…" value="${esc(busqueda)}"
+        oninput="busqueda=this.value; refrescarLista()" autocomplete="off"></div>
+    <div class="filtros">` + tipos.map(([v,t]) =>
+      `<button aria-pressed="${filtroDic===v}" onclick="filtroDic='${v}'; pintar()">${t}</button>`
+    ).join("") + `</div><div id="lista-dic">${filasDiccionario(lista)}</div></div>`;
+  return h;
+}
+function filasDiccionario(lista){
+  if(!lista.length) return `<div class="vacio"><span class="big">🔍</span>
+    <p>No hay palabras con ese filtro.</p></div>`;
+  return lista.map(w => {
+    const id = w.id, fav = E.favoritas.includes(id), t = E.tarjetas[id];
+    const extra = w._tipo === "sustantivos" && w.genero
+      ? `${w.genero} ${w.no} · ${w.def}${w.plural ? " · " + w.plural : ""}`
+      : w._tipo === "verbos" ? `å ${w.inf} · ${w.pres} · ${w.pas} · ${w.perf}`
+      : w._tipo === "adjetivos" ? `${w.base} · ${w.neutro} · ${w.plural}` : "";
+    return `<div class="palabra-fila">
+      <button class="audio-btn chico" onclick="decir(${JSON.stringify(textoNoruego(w))})">🔊</button>
+      <div class="tx"><b>${esc(textoNoruego(w))}</b>
+        <div class="es">${esc(w.es||"")}</div>
+        ${w.pron ? `<div class="pr">≈ ${esc(w.pron)}</div>` : ""}
+        ${extra ? `<div class="pr">${esc(extra)}</div>` : ""}
+        ${w.nota ? `<div class="micro tenue" style="margin-top:2px">${esc(w.nota)}</div>` : ""}</div>
+      ${t && t.reps >= 2 ? `<span class="ficha on">✓</span>` : ""}
+      <button class="fav ${fav?"on":""}" onclick="marcarFav('${id}')"
+        aria-label="Marcar">${fav ? "★" : "☆"}</button></div>`;
+  }).join("");
+}
+function refrescarLista(){
+  const caja = document.getElementById("lista-dic"); if(!caja) return;
+  let lista = [];
+  for(const tipo in DATOS.lexico){
+    if(tipo === "sonidos" || tipo === "gramatica" || tipo === "dialogos") continue;
+    if(filtroDic !== "todo" && filtroDic !== "favoritas" && filtroDic !== "aprendidas"
+       && tipo !== filtroDic) continue;
+    lista = lista.concat(DATOS.lexico[tipo]);
+  }
+  if(filtroDic === "favoritas") lista = E.favoritas.map(id => LEXICO_POR_ID[id]).filter(Boolean);
+  if(filtroDic === "aprendidas") lista = Object.keys(E.tarjetas)
+    .filter(id => E.tarjetas[id].reps >= 2).map(id => LEXICO_POR_ID[id]).filter(Boolean);
+  const q = normalizar(busqueda);
+  if(q) lista = lista.filter(w => normalizar(textoNoruego(w)).includes(q) ||
+    normalizar(w.es||"").includes(q));
+  caja.innerHTML = filasDiccionario(lista.slice(0,300));
+}
+function marcarFav(id){
+  const i = E.favoritas.indexOf(id);
+  if(i >= 0) E.favoritas.splice(i,1); else E.favoritas.push(id);
+  guardar(); refrescarLista();
+}
+
+/* --------------------------------------------------------------- GRAMÁTICA */
+function vGramatica(){
+  const reglas = DATOS.lexico.gramatica || [];
+  let h = cabecera("Gramática", "");
+  h += `<div class="entra">
+    <button class="fantasma" onclick="ir('diccionario')">← Volver a palabras</button>
+    <p class="tenue mini">Cada regla trae el ejemplo, el error típico y, cuando ayuda,
+    la comparación con el español.</p>`;
+  const porNivel = {};
+  for(const r of reglas) (porNivel[r.nivel] = porNivel[r.nivel] || []).push(r);
+  for(const niv of DATOS.niveles){
+    const grupo = porNivel[niv.clave]; if(!grupo) continue;
+    h += `<div class="rot" style="margin:var(--s5) 0 var(--s3)">${esc(niv.titulo)}</div>`;
+    for(const r of grupo){
+      h += `<div class="tarjeta"><div class="regla">
+        <h3>${esc(r.titulo)}</h3>
+        <p class="tenue mini" style="margin:var(--s2) 0">${esc(r.explicacion)}</p>
+        ${r.regla ? `<div class="caja"><span class="rot">La regla</span><br>
+          <b style="font-family:var(--mono)">${esc(r.regla)}</b></div>` : ""}
+        ${r.ejemplos.map(e => `<div class="ejemplo">
+          <button class="audio-btn chico" onclick="decir(${JSON.stringify(e.no)})">🔊</button>
+          <div class="tx"><div class="no">${esc(e.no)}</div>
+          <div class="es">${esc(e.es)}</div>
+          ${e.pron ? `<div class="pr">≈ ${esc(e.pron)}</div>` : ""}</div></div>`).join("")}
+        <div class="error-tipico"><b>Error típico</b>${esc(r.error)}</div>
+        ${r.contraste ? `<p class="mini tenue" style="margin-top:var(--s3)">
+          <b>Comparado con el español:</b> ${esc(r.contraste)}</p>` : ""}
+      </div></div>`;
+    }
+  }
+  const sonidos = DATOS.lexico.sonidos || [];
+  if(sonidos.length){
+    h += `<div class="rot" style="margin:var(--s6) 0 var(--s3)">Pronunciación</div>`;
+    h += `<div class="aviso"><span>ℹ️</span><span>${esc(DATOS.notas.sonidos || "")}</span></div>`;
+    for(const s of sonidos){
+      h += `<div class="tarjeta"><h3>${esc(s.letra)} — ${esc(s.nombre)}</h3>
+        <p class="tenue mini" style="margin:var(--s2) 0">${esc(s.como)}</p>` +
+        s.ejemplos.map(e => `<div class="ejemplo">
+          <button class="audio-btn chico" onclick="decir(${JSON.stringify(e.no)})">🔊</button>
+          <div class="tx"><div class="no">${esc(e.no)}</div><div class="es">${esc(e.es)}</div>
+          <div class="pr">≈ ${esc(e.pron)}</div></div></div>`).join("") +
+        `<div class="caja" style="background:var(--sup2);border-radius:var(--r2);
+          padding:var(--s3);margin-top:var(--s3)"><span class="rot">Cómo lograrlo</span><br>
+          <span class="mini">${esc(s.consejo)}</span></div></div>`;
+    }
+  }
+  return h + `</div>`;
+}
+
+/* ----------------------------------------------------------- CONVERSACIONES */
+function vConversaciones(){
+  const dial = DATOS.lexico.dialogos || [];
+  let h = cabecera("Conversaciones", "");
+  h += `<div class="entra">
+    <button class="fantasma" onclick="ir('diccionario')">← Volver a palabras</button>
+    <p class="tenue mini">Situaciones reales. Escucha la conversación completa, y practica
+    tus respuestas en la lección del módulo correspondiente.</p>`;
+  for(const d of dial){
+    h += `<button class="nodo" style="margin-bottom:var(--s2)"
+      onclick="ir('diccionario','dialogo:${d.id}')">
+      <span class="bola">💬</span>
+      <span class="tx"><b>${esc(d.titulo)}</b><span>${esc(d.situacion)}</span></span>
+      <span class="ficha">${esc(d.nivel)}</span></button>`;
+  }
+  return h + `</div>`;
+}
+function vDialogo(id){
+  const d = (DATOS.lexico.dialogos || []).find(x => x.id === id);
+  if(!d) return vConversaciones();
+  let h = cabecera(d.titulo, "");
+  h += `<div class="entra">
+    <button class="fantasma" onclick="ir('diccionario','conversaciones')">← Conversaciones</button>
+    <div class="aviso"><span>🎬</span><span>${esc(d.situacion)}</span></div>
+    <div class="fila-btn" style="margin-bottom:var(--s4)">
+      <button class="pri" style="flex:1" onclick="leerDialogo('${d.id}')">▶ Escuchar todo</button>
+    </div>`;
+  d.lineas.forEach((l, i) => {
+    const mio = l.quien === "Tú";
+    h += `<div class="tarjeta ${mio?"acento":"plana"}" style="margin-bottom:var(--s2)">
+      <div class="rot">${esc(l.quien)}</div>
+      <div style="display:flex;gap:var(--s3);align-items:flex-start;margin-top:4px">
+        <button class="audio-btn chico" onclick="decir(${JSON.stringify(l.no)})">🔊</button>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:1.05rem">${esc(l.no)}</div>
+          <div class="tenue mini">${esc(l.es)}</div>
+          <div class="pr micro" style="font-family:var(--mono);color:var(--tinta3)">≈ ${esc(l.pron)}</div>
+        </div></div></div>`;
+  });
+  return h + `</div>`;
+}
+function leerDialogo(id){
+  const d = (DATOS.lexico.dialogos || []).find(x => x.id === id);
+  if(!d || !("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  d.lineas.forEach(l => {
+    try{
+      const u = new SpeechSynthesisUtterance(l.no);
+      u.lang = DATOS.idiomaVoz || "nb-NO";
+      if(VOZ) u.voice = VOZ;
+      u.rate = 0.88;
+      window.speechSynthesis.speak(u);
+    }catch(e){}
+  });
+}
+
+/* ------------------------------------------------------------------ PERFIL */
+let panelPerfil = "resumen";
+function vPerfil(){
+  const p = progresoNivel(E.xp), avance = avanceCurso();
+  let h = cabecera("Perfil", "");
+  h += `<div class="entra">
+    <div class="filtros">` + [["resumen","Resumen"],["logros","Logros"],["ajustes","Ajustes"],
+      ["contenido","Contenido"]].map(([v,t]) =>
+      `<button aria-pressed="${panelPerfil===v}" onclick="panelPerfil='${v}';pintar()">${t}</button>`
+    ).join("") + `</div>`;
+
+  if(panelPerfil === "resumen"){
+    h += `<div class="tarjeta acento centro">
+      <div style="font-size:2.6rem">🇳🇴</div>
+      <h2>${esc(E.perfil.nombre || "Estudiante")}</h2>
+      <p class="tenue mini">Nivel ${p.nivel} · ${E.xp} XP · desde ${esc(E.perfil.creado || hoyISO())}</p>
+      <div class="barra" style="margin-top:var(--s3)"><i style="width:${p.pct}%"></i></div>
+      <p class="micro tenue" style="margin-top:6px">Faltan ${p.falta} XP para el nivel ${p.nivel+1}</p></div>`;
+    h += `<div class="rejilla2" style="margin-bottom:var(--s4)">
+      <div class="dato"><b>${palabrasAprendidas()}</b><span>palabras aprendidas</span></div>
+      <div class="dato"><b>${Object.keys(E.tarjetas).length}</b><span>palabras vistas</span></div>
+      <div class="dato"><b>${avance.hechas}</b><span>lecciones hechas</span></div>
+      <div class="dato"><b>${rachaViva()}</b><span>racha actual</span></div>
+      <div class="dato"><b>${vencidas().length}</b><span>repasos pendientes</span></div>
+      <div class="dato"><b>${dificiles().length}</b><span>palabras difíciles</span></div>
+    </div>`;
+    h += `<div class="tarjeta"><div class="rot">Constancia</div>
+      <h2 style="margin-bottom:var(--s3)">Últimas 8 semanas</h2>` + calendarioXP() + `</div>`;
+    // Avance por nivel del MCER
+    h += `<div class="tarjeta"><div class="rot">Avance por nivel</div>
+      <h2 style="margin-bottom:var(--s3)">Dónde estás en el curso</h2>`;
+    for(const niv of DATOS.niveles){
+      const mods = DATOS.modulos.filter(m => m.nivel === niv.clave);
+      if(!mods.length) continue;
+      const total = mods.reduce((s,m) => s + m.lecciones.length, 0);
+      const hechas = mods.reduce((s,m) =>
+        s + m.lecciones.filter(c => estadoLeccion(c) === "hecha").length, 0);
+      h += `<div style="margin-bottom:var(--s3)">
+        <div style="display:flex;justify-content:space-between;font-size:.88rem;font-weight:650">
+          <span>${esc(niv.titulo)}</span><span class="num">${hechas}/${total}</span></div>
+        <div class="barra fina" style="margin-top:5px"><i style="width:${total?hechas/total*100:0}%"></i></div>
+      </div>`;
+    }
+    h += `</div>`;
+  }
+
+  if(panelPerfil === "logros"){
+    const ganados = LOGROS.filter(l => E.logros.includes(l.id));
+    h += `<div class="tarjeta"><div class="rot">Logros</div>
+      <h2 style="margin-bottom:var(--s3)">${ganados.length} de ${LOGROS.length}</h2>` +
+      LOGROS.map(l => `<div class="logro ${E.logros.includes(l.id)?"":"gris"}">
+        <span class="ic">${l.ic}</span><div class="tx"><b>${esc(l.t)}</b>
+        <span>${esc(l.d)}</span></div>
+        ${E.logros.includes(l.id) ? `<span class="ficha on">✓</span>` : ""}</div>`).join("")
+      + `</div>`;
+  }
+
+  if(panelPerfil === "ajustes"){
+    h += `<div class="tarjeta"><div class="rot">Tu cuenta</div>
+      <label for="a-nombre">Nombre</label>
+      <input type="text" id="a-nombre" value="${esc(E.perfil.nombre||"")}">
+      <label for="a-meta">Objetivo diario</label>
+      <select id="a-meta">
+        ${[15,30,60,120].map(v => `<option value="${v}" ${E.perfil.metaDiaria===v?"selected":""}>
+          ${v} XP al día</option>`).join("")}
+      </select>
+      <button class="pri blq" style="margin-top:var(--s4)" onclick="guardarAjustes()">Guardar</button></div>
+    ${promesaInstalar ? `<div class="tarjeta acento"><div class="rot">Instalar</div>
+      <h2 style="margin:2px 0 6px">Ponla en tu pantalla de inicio</h2>
+      <p class="tenue mini">Se abre como una aplicación, a pantalla completa y sin internet.</p>
+      <button class="pri blq" onclick="instalar()">Instalar Norsk</button></div>` : ""}
+    <div class="tarjeta"><div class="rot">Audio</div>
+      <p class="tenue mini">${hayVoz()
+        ? "Tu dispositivo tiene voz noruega instalada: el audio funciona."
+        : "No se encontró voz noruega en este dispositivo. El audio está apagado y solo verás la pronunciación aproximada."}</p>
+      <button class="blq" onclick="decir('Hei! Jeg snakker norsk.')">🔊 Probar el audio</button></div>
+    <div class="tarjeta"><div class="rot">Tu avance</div>
+      <p class="tenue mini">Todo vive solo en este navegador. Si cambias de teléfono o borras
+      los datos de navegación, se pierde. Sácale copia de vez en cuando.</p>
+      <div class="fila-btn">
+        <button style="flex:1" onclick="exportarAvance()">Copiar mi avance</button>
+        <button style="flex:1" onclick="document.getElementById('a-imp').click()">Cargar</button>
+        <input type="file" id="a-imp" accept=".json,.txt" hidden onchange="importarAvance(this)">
+      </div><div id="caja-exp"></div>
+      <button class="peligro blq" style="margin-top:var(--s4)" onclick="borrarTodo()">
+        Borrar todo mi avance</button></div>
+    <div class="tarjeta"><div class="rot">Sobre el curso</div>
+      <p class="tenue mini">${esc(DATOS.notas.sustantivos || "")}</p>
+      <p class="tenue mini">Enseña <b>bokmål</b>. Las pronunciaciones son
+      <b>aproximaciones pensadas para hispanohablantes</b>, no transcripciones fonéticas
+      oficiales: sirven para arrancar, y el oído se afina escuchando.</p>
+      <p class="tenue micro">Contenido actual: ${Object.values(DATOS.lexico).reduce((s,g)=>s+g.length,0)}
+      elementos · ${DATOS.lecciones.length} lecciones · ${DATOS.modulos.length} módulos.</p></div>`;
+  }
+
+  if(panelPerfil === "contenido") h += vAdmin();
+  return h + `</div>`;
+}
+function calendarioXP(){
+  const hoy = aDias(hoyISO());
+  const fin = hoy + (6 - ((new Date(hoy*86400000).getUTCDay()+6)%7));
+  const ini = fin - 55;
+  let celdas = "";
+  for(let d = ini; d <= fin; d++){
+    const f = deDias(d), xp = E.dias[f] || 0;
+    const n = xp === 0 ? 0 : xp < 20 ? 1 : xp < 60 ? 2 : 3;
+    celdas += `<i data-n="${n}" title="${f}: ${xp} XP"></i>`;
+  }
+  return `<div class="calendario" style="grid-auto-flow:column;grid-template-rows:repeat(7,1fr);
+    grid-template-columns:repeat(8,1fr)">${celdas}</div>
+    <p class="micro tenue" style="margin-top:var(--s2)">Cada cuadro es un día. Mientras más
+    verde, más estudiaste.</p>`;
+}
+function guardarAjustes(){
+  E.perfil.nombre = document.getElementById("a-nombre").value.trim() || "Estudiante";
+  E.perfil.metaDiaria = parseInt(document.getElementById("a-meta").value,10) || 30;
+  guardar(); pintar();
+}
+function exportarAvance(){
+  const caja = document.getElementById("caja-exp");
+  caja.innerHTML = `<label>Copia este texto y guárdalo en un archivo</label>
+    <textarea id="a-txt"></textarea>`;
+  const t = document.getElementById("a-txt");
+  t.value = JSON.stringify(E, null, 1); t.focus(); t.select();
+}
+function importarAvance(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  const lector = new FileReader();
+  lector.onload = () => {
+    try{
+      const d = JSON.parse(lector.result);
+      if(!d || typeof d !== "object" || !d.perfil) throw new Error("formato");
+      E = Object.assign(JSON.parse(JSON.stringify(BASE)), d);
+      guardar(); alert("Avance cargado."); ir("inicio");
+    }catch(e){ alert("Ese archivo no tiene el formato correcto."); }
+  };
+  lector.readAsText(f);
+}
+function borrarTodo(){
+  if(!confirm("Se borra TODO: tu nivel, tu racha, tus palabras y tus lecciones. ¿Seguro?")) return;
+  E = JSON.parse(JSON.stringify(BASE)); guardar(); ir("inicio");
+}
+
+/* ===========================================================================
+   Panel de contenido. Sirve para agregar palabras y frases sin tocar el
+   código: se guardan en este navegador y entran al curso de inmediato.
+   El botón de exportar entrega el JSON listo para incorporarlo al curso
+   oficial, que es donde debe terminar el contenido bueno.
+   =========================================================================== */
+const TIPOS_EDITABLES = {
+  sustantivos:[["no","Palabra en noruego"],["genero","Género (en/ei/et)"],
+    ["def","Forma definida"],["plural","Plural"],["defPl","Plural definido"],
+    ["es","Español"],["pron","Pronunciación aproximada"],["tema","Tema"],["nivel","Nivel"],
+    ["nota","Nota (opcional)"]],
+  verbos:[["inf","Infinitivo"],["pres","Presente"],["pas","Pretérito"],["perf","Perfecto"],
+    ["grupo","Grupo (1/2/3/4/irr/modal)"],["es","Español"],["pron","Pronunciación"],
+    ["tema","Tema"],["nivel","Nivel"],["nota","Nota (opcional)"]],
+  frases:[["no","Frase en noruego"],["es","Español"],["pron","Pronunciación"],
+    ["tema","Tema"],["nivel","Nivel"],["nota","Nota (opcional)"]],
+};
+let tipoNuevo = "frases";
+function vAdmin(){
+  const propios = (E.contenido && E.contenido.agregados) || {};
+  const cuantos = Object.values(propios).reduce((s,g) => s + g.length, 0);
+  let h = `<div class="aviso"><span>✏️</span><span>Aquí puedes agregar palabras y frases sin
+    tocar el código. Se guardan en este dispositivo y aparecen de una vez en el diccionario
+    y en el repaso.</span></div>`;
+  h += `<div class="tarjeta"><div class="rot">Agregar contenido</div>
+    <label for="ad-tipo">¿Qué vas a agregar?</label>
+    <select id="ad-tipo" onchange="tipoNuevo=this.value;pintar()">` +
+    Object.keys(TIPOS_EDITABLES).map(t =>
+      `<option value="${t}" ${tipoNuevo===t?"selected":""}>${t}</option>`).join("") + `</select>`;
+  for(const [campo, etiqueta] of TIPOS_EDITABLES[tipoNuevo]){
+    h += `<label for="ad-${campo}">${esc(etiqueta)}</label>
+      <input type="text" id="ad-${campo}" autocomplete="off">`;
+  }
+  h += `<button class="pri blq" style="margin-top:var(--s4)" onclick="agregarContenido()">
+    Agregar al curso</button></div>`;
+
+  h += `<div class="tarjeta"><div class="enc"><div><div class="rot">Contenido propio</div>
+      <h2>${cuantos} ${plural(cuantos,"elemento agregado","elementos agregados")}</h2></div></div>`;
+  if(!cuantos) h += `<p class="tenue mini">Todavía no has agregado nada.</p>`;
+  else {
+    for(const tipo in propios) for(const w of propios[tipo]){
+      h += `<div class="palabra-fila"><div class="tx"><b>${esc(textoNoruego(w))}</b>
+        <div class="es">${esc(w.es||"")}</div><div class="pr">${esc(tipo)}</div></div>
+        <button class="fav" onclick="borrarContenido('${esc(tipo)}','${esc(w.id)}')">🗑️</button></div>`;
+    }
+    h += `<div class="fila-btn" style="margin-top:var(--s4)">
+      <button style="flex:1" onclick="exportarContenido()">Exportar para el curso oficial</button></div>
+      <div id="caja-cont"></div>`;
+  }
+  h += `</div>`;
+  h += `<div class="tarjeta plana"><div class="rot">Curso actual</div>
+    <div class="desliza"><table class="datos">
+    <tr><th>Tipo</th><th>Elementos</th></tr>` +
+    Object.keys(DATOS.lexico).map(t => `<tr><td>${esc(t)}</td>
+      <td class="num">${DATOS.lexico[t].length}</td></tr>`).join("") +
+    `<tr><td><b>Lecciones</b></td><td class="num"><b>${DATOS.lecciones.length}</b></td></tr>
+     <tr><td><b>Ejercicios</b></td><td class="num"><b>${
+       DATOS.lecciones.reduce((s,l) => s + (l.variantes[0]||[]).length, 0)}</b></td></tr>
+    </table></div></div>`;
+  return h;
+}
+function agregarContenido(){
+  const nuevo = {};
+  for(const [campo] of TIPOS_EDITABLES[tipoNuevo]){
+    const el = document.getElementById("ad-"+campo);
+    nuevo[campo] = el ? el.value.trim() : "";
+  }
+  const principal = nuevo.no || nuevo.inf;
+  if(!principal || !nuevo.es){ alert("Faltan la palabra en noruego y su traducción."); return; }
+  nuevo.id = "propio-" + tipoNuevo.slice(0,3) + "-" + Date.now().toString(36);
+  nuevo.nivel = nuevo.nivel || "A1";
+  nuevo.tema = nuevo.tema || "gramatica";
+  nuevo._tipo = tipoNuevo; nuevo._propio = true;
+  E.contenido = E.contenido || {agregados:{}};
+  E.contenido.agregados[tipoNuevo] = E.contenido.agregados[tipoNuevo] || [];
+  E.contenido.agregados[tipoNuevo].push(nuevo);
+  guardar(); aplicarContenidoPropio(); pintar();
+}
+function borrarContenido(tipo, id){
+  if(!E.contenido || !E.contenido.agregados[tipo]) return;
+  E.contenido.agregados[tipo] = E.contenido.agregados[tipo].filter(w => w.id !== id);
+  guardar(); location.reload();
+}
+function exportarContenido(){
+  const caja = document.getElementById("caja-cont");
+  caja.innerHTML = `<label>JSON listo para incorporarlo al curso oficial</label>
+    <textarea id="c-txt"></textarea>`;
+  const t = document.getElementById("c-txt");
+  t.value = JSON.stringify(E.contenido.agregados, null, 1); t.focus(); t.select();
+}
+/** Mete el contenido propio del usuario en el curso, como si viniera de fábrica. */
+function aplicarContenidoPropio(){
+  const propios = (E.contenido && E.contenido.agregados) || {};
+  for(const tipo in propios){
+    DATOS.lexico[tipo] = DATOS.lexico[tipo] || [];
+    for(const w of propios[tipo]){
+      if(LEXICO_POR_ID[w.id]) continue;
+      w._tipo = tipo; DATOS.lexico[tipo].push(w); LEXICO_POR_ID[w.id] = w;
+    }
+  }
+}
+aplicarContenidoPropio();
+
+/* --------------------------------------------------- instalación en el celular */
+let promesaInstalar = null;
+window.addEventListener("beforeinstallprompt", ev => {
+  ev.preventDefault(); promesaInstalar = ev;
+  const banda = document.getElementById("instalar-banda");
+  if(banda) banda.hidden = false;
+});
+function instalar(){
+  if(!promesaInstalar) return;
+  promesaInstalar.prompt();
+  promesaInstalar.userChoice.finally(() => { promesaInstalar = null; pintar(); });
+}
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+
+/* ------------------------------------------------------------------ teclado */
+document.addEventListener("keydown", ev => {
+  if(!sesion || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  const t = ev.target;
+  const escribiendo = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
+  const e = sesion.ejercicios[sesion.i];
+  if(!e) return;
+  if(ev.key === "Enter"){ ev.preventDefault(); comprobar(); return; }
+  if(escribiendo) return;
+  const n = parseInt(ev.key, 10);
+  if(n >= 1 && n <= 4 && OPCION_MULTIPLE.includes(e.tipo) && !sesion.mostrando){
+    ev.preventDefault(); elegir(n-1);
+  }
+});
+
+pintar();
+</script>
+</body>
+</html>

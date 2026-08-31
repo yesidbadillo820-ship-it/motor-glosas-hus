@@ -1,0 +1,428 @@
+{
+ "tipo": "numeros",
+ "variante": "bokmål",
+ "version": 1,
+ "nota": "Del 21 al 99 se dice primero la decena y luego la unidad, todo junto: tjueen (21), førtisju (47). La forma antigua al revés (enogtyve) ya casi no se usa.",
+ "palabras": [
+  {
+   "id": "n-0",
+   "no": "null",
+   "valor": 0,
+   "es": "0",
+   "pron": "nul",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-1",
+   "no": "en / ett",
+   "valor": 1,
+   "es": "1",
+   "pron": "en / et",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": "«en» con en/ei, «ett» con et: en bil, ett hus."
+  },
+  {
+   "id": "n-2",
+   "no": "to",
+   "valor": 2,
+   "es": "2",
+   "pron": "tu",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-3",
+   "no": "tre",
+   "valor": 3,
+   "es": "3",
+   "pron": "tre",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-4",
+   "no": "fire",
+   "valor": 4,
+   "es": "4",
+   "pron": "FI-re",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-5",
+   "no": "fem",
+   "valor": 5,
+   "es": "5",
+   "pron": "fem",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-6",
+   "no": "seks",
+   "valor": 6,
+   "es": "6",
+   "pron": "seks",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-7",
+   "no": "sju",
+   "valor": 7,
+   "es": "7",
+   "pron": "shu",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": "También se escribe «syv», sobre todo en textos formales."
+  },
+  {
+   "id": "n-8",
+   "no": "åtte",
+   "valor": 8,
+   "es": "8",
+   "pron": "OT-te",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-9",
+   "no": "ni",
+   "valor": 9,
+   "es": "9",
+   "pron": "ni",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-10",
+   "no": "ti",
+   "valor": 10,
+   "es": "10",
+   "pron": "ti",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-11",
+   "no": "elleve",
+   "valor": 11,
+   "es": "11",
+   "pron": "EL-ve",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-12",
+   "no": "tolv",
+   "valor": 12,
+   "es": "12",
+   "pron": "tol",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-13",
+   "no": "tretten",
+   "valor": 13,
+   "es": "13",
+   "pron": "TRET-ten",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-14",
+   "no": "fjorten",
+   "valor": 14,
+   "es": "14",
+   "pron": "FYUR-ten",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-15",
+   "no": "femten",
+   "valor": 15,
+   "es": "15",
+   "pron": "FEM-ten",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-16",
+   "no": "seksten",
+   "valor": 16,
+   "es": "16",
+   "pron": "SEIS-ten",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": "Se escribe «seksten» pero se pronuncia «SEIS-ten»: la k no suena."
+  },
+  {
+   "id": "n-17",
+   "no": "sytten",
+   "valor": 17,
+   "es": "17",
+   "pron": "SØT-ten",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-18",
+   "no": "atten",
+   "valor": 18,
+   "es": "18",
+   "pron": "AT-ten",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-19",
+   "no": "nitten",
+   "valor": 19,
+   "es": "19",
+   "pron": "NIT-ten",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": ""
+  },
+  {
+   "id": "n-20",
+   "no": "tjue",
+   "valor": 20,
+   "es": "20",
+   "pron": "SHU-e",
+   "tema": "numeros",
+   "nivel": "cero",
+   "nota": "También se dice «tyve» en estilo antiguo."
+  },
+  {
+   "id": "n-30",
+   "no": "tretti",
+   "valor": 30,
+   "es": "30",
+   "pron": "TRET-ti",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": ""
+  },
+  {
+   "id": "n-40",
+   "no": "førti",
+   "valor": 40,
+   "es": "40",
+   "pron": "FØ-ti",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": ""
+  },
+  {
+   "id": "n-50",
+   "no": "femti",
+   "valor": 50,
+   "es": "50",
+   "pron": "FEM-ti",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": ""
+  },
+  {
+   "id": "n-60",
+   "no": "seksti",
+   "valor": 60,
+   "es": "60",
+   "pron": "SEKS-ti",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": ""
+  },
+  {
+   "id": "n-70",
+   "no": "sytti",
+   "valor": 70,
+   "es": "70",
+   "pron": "SØT-ti",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": ""
+  },
+  {
+   "id": "n-80",
+   "no": "åtti",
+   "valor": 80,
+   "es": "80",
+   "pron": "OT-ti",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": ""
+  },
+  {
+   "id": "n-90",
+   "no": "nitti",
+   "valor": 90,
+   "es": "90",
+   "pron": "NIT-ti",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": ""
+  },
+  {
+   "id": "n-100",
+   "no": "hundre",
+   "valor": 100,
+   "es": "100",
+   "pron": "HUN-dre",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": "«hundre» sin artículo: hundre kroner."
+  },
+  {
+   "id": "n-1000",
+   "no": "tusen",
+   "valor": 1000,
+   "es": "1000",
+   "pron": "TU-sen",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": ""
+  },
+  {
+   "id": "n-21",
+   "no": "tjueen",
+   "valor": 21,
+   "es": "21",
+   "pron": "TJUEEN",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": "Se escribe todo junto hasta 99. A partir de cien se separa con «og»."
+  },
+  {
+   "id": "n-25",
+   "no": "tjuefem",
+   "valor": 25,
+   "es": "25",
+   "pron": "TJUEFEM",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": "Se escribe todo junto hasta 99. A partir de cien se separa con «og»."
+  },
+  {
+   "id": "n-32",
+   "no": "trettito",
+   "valor": 32,
+   "es": "32",
+   "pron": "TRETTITO",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": "Se escribe todo junto hasta 99. A partir de cien se separa con «og»."
+  },
+  {
+   "id": "n-47",
+   "no": "førtisju",
+   "valor": 47,
+   "es": "47",
+   "pron": "FØRTISJU",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": "Se escribe todo junto hasta 99. A partir de cien se separa con «og»."
+  },
+  {
+   "id": "n-58",
+   "no": "femtiåtte",
+   "valor": 58,
+   "es": "58",
+   "pron": "FEMTIÅTTE",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": "Se escribe todo junto hasta 99. A partir de cien se separa con «og»."
+  },
+  {
+   "id": "n-63",
+   "no": "sekstitre",
+   "valor": 63,
+   "es": "63",
+   "pron": "SEKSTITRE",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": "Se escribe todo junto hasta 99. A partir de cien se separa con «og»."
+  },
+  {
+   "id": "n-76",
+   "no": "syttiseks",
+   "valor": 76,
+   "es": "76",
+   "pron": "SYTTISEKS",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": "Se escribe todo junto hasta 99. A partir de cien se separa con «og»."
+  },
+  {
+   "id": "n-84",
+   "no": "åttifire",
+   "valor": 84,
+   "es": "84",
+   "pron": "ÅTTIFIRE",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": "Se escribe todo junto hasta 99. A partir de cien se separa con «og»."
+  },
+  {
+   "id": "n-99",
+   "no": "nittini",
+   "valor": 99,
+   "es": "99",
+   "pron": "NITTINI",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": "Se escribe todo junto hasta 99. A partir de cien se separa con «og»."
+  },
+  {
+   "id": "n-150",
+   "no": "hundre og femti",
+   "valor": 150,
+   "es": "150",
+   "pron": "HUNDRE OG FEMTI",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": "A partir de cien se usa «og» antes de las últimas dos cifras."
+  },
+  {
+   "id": "n-250",
+   "no": "to hundre og femti",
+   "valor": 250,
+   "es": "250",
+   "pron": "TO HUNDRE OG FEMTI",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": "A partir de cien se usa «og» antes de las últimas dos cifras."
+  },
+  {
+   "id": "n-2026",
+   "no": "to tusen og tjueseks",
+   "valor": 2026,
+   "es": "2026",
+   "pron": "TO TUSEN OG TJUESEKS",
+   "tema": "numeros",
+   "nivel": "A1",
+   "nota": "A partir de cien se usa «og» antes de las últimas dos cifras."
+  }
+ ]
+}

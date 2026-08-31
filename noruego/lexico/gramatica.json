@@ -1,0 +1,825 @@
+{
+ "tipo": "gramatica",
+ "variante": "bokmål",
+ "version": 1,
+ "nota": "Reglas explicadas para hispanohablantes: cada una trae ejemplo, el error típico y, cuando ayuda, la comparación con el español.",
+ "palabras": [
+  {
+   "id": "g-articulo",
+   "clave": "articulo",
+   "titulo": "El artículo va pegado al final",
+   "nivel": "cero",
+   "tema": "gramatica",
+   "explicacion": "En español el artículo va antes: «el carro». En noruego se pega al final de la palabra: «bilen». Para decir «un carro» sí va delante: «en bil».",
+   "ejemplos": [
+    {
+     "no": "en bil",
+     "es": "un carro",
+     "pron": "en bil"
+    },
+    {
+     "no": "bilen",
+     "es": "el carro",
+     "pron": "BI-len"
+    },
+    {
+     "no": "et hus",
+     "es": "una casa",
+     "pron": "et jus"
+    },
+    {
+     "no": "huset",
+     "es": "la casa",
+     "pron": "JU-se"
+    }
+   ],
+   "error": "Decir «den bil» pensando en «el carro». No existe: es «bilen».",
+   "contraste": "Español: el + carro (dos palabras). Noruego: bil + en (una sola palabra).",
+   "regla": "indefinido: en/ei/et + palabra · definido: palabra + en/a/et"
+  },
+  {
+   "id": "g-generos",
+   "clave": "generos",
+   "titulo": "Los tres géneros",
+   "nivel": "cero",
+   "tema": "gramatica",
+   "explicacion": "Cada sustantivo tiene un género que hay que aprender junto con la palabra. Son tres: en (masculino), ei (femenino) y et (neutro). En bokmål casi todos los femeninos se pueden decir también con «en», y así es como se habla en Oslo.",
+   "ejemplos": [
+    {
+     "no": "en bil → bilen",
+     "es": "un carro → el carro",
+     "pron": "en bil / BI-len"
+    },
+    {
+     "no": "ei jente → jenta",
+     "es": "una niña → la niña",
+     "pron": "ei YEN-te / YEN-ta"
+    },
+    {
+     "no": "et hus → huset",
+     "es": "una casa → la casa",
+     "pron": "et jus / JU-se"
+    }
+   ],
+   "error": "Adivinar el género. No hay reglas confiables: se aprende la palabra CON su artículo, siempre.",
+   "contraste": "En español el género se adivina casi siempre por la terminación (-o, -a). En noruego no. Aprende «en bil», nunca «bil» a secas.",
+   "regla": "en / ei / et"
+  },
+  {
+   "id": "g-verbo-persona",
+   "clave": "verbo-persona",
+   "titulo": "El verbo no cambia con la persona",
+   "nivel": "cero",
+   "tema": "gramatica",
+   "explicacion": "Esta es la mejor noticia del noruego: el verbo tiene UNA sola forma para todas las personas.",
+   "ejemplos": [
+    {
+     "no": "jeg snakker",
+     "es": "yo hablo",
+     "pron": "yei SNAK-ker"
+    },
+    {
+     "no": "du snakker",
+     "es": "tú hablas",
+     "pron": "du SNAK-ker"
+    },
+    {
+     "no": "vi snakker",
+     "es": "nosotros hablamos",
+     "pron": "vi SNAK-ker"
+    }
+   ],
+   "error": "Intentar conjugar como en español y decir «jeg snakke» o «vi snakkerne». La forma es siempre la misma.",
+   "contraste": "Español: hablo, hablas, habla, hablamos, habláis, hablan (6 formas). Noruego: snakker (1 forma).",
+   "regla": "presente = raíz + -r (o -er)"
+  },
+  {
+   "id": "g-v2",
+   "clave": "v2",
+   "titulo": "El verbo siempre va segundo",
+   "nivel": "A1",
+   "tema": "gramatica",
+   "explicacion": "En una frase afirmativa, el verbo ocupa SIEMPRE el segundo lugar. Si al principio pones otra cosa (hoy, mañana, en Oslo), el sujeto se corre detrás del verbo.",
+   "ejemplos": [
+    {
+     "no": "Jeg går på skolen i dag.",
+     "es": "Hoy voy a la escuela.",
+     "pron": "yei gor po SKU-len i dag"
+    },
+    {
+     "no": "I dag går jeg på skolen.",
+     "es": "Hoy voy a la escuela.",
+     "pron": "i dag gor yei po SKU-len"
+    },
+    {
+     "no": "Nå spiser vi.",
+     "es": "Ahora comemos.",
+     "pron": "no SPI-ser vi"
+    }
+   ],
+   "error": "Decir «I dag jeg går...». Es el error más común y el que más delata a un extranjero.",
+   "contraste": "El español mueve las palabras con libertad («Hoy yo voy», «Yo voy hoy»). El noruego no: el verbo se queda en el puesto 2 pase lo que pase.",
+   "regla": "1º cualquier cosa · 2º VERBO · 3º sujeto"
+  },
+  {
+   "id": "g-negacion",
+   "clave": "negacion",
+   "titulo": "La negación: ikke",
+   "nivel": "cero",
+   "tema": "gramatica",
+   "explicacion": "«Ikke» significa «no» y va DESPUÉS del verbo, no antes.",
+   "ejemplos": [
+    {
+     "no": "Jeg snakker ikke norsk.",
+     "es": "No hablo noruego.",
+     "pron": "yei SNAK-ker IK-ke noshk"
+    },
+    {
+     "no": "Han er ikke her.",
+     "es": "Él no está aquí.",
+     "pron": "jan ær IK-ke hær"
+    },
+    {
+     "no": "Jeg vil ikke spise.",
+     "es": "No quiero comer.",
+     "pron": "yei vil IK-ke SPI-se"
+    }
+   ],
+   "error": "Poner «ikke» antes del verbo, como el «no» español: «Jeg ikke snakker» está mal.",
+   "contraste": "Español: NO hablo. Noruego: hablo NO (snakker ikke).",
+   "regla": "sujeto + verbo + ikke + resto"
+  },
+  {
+   "id": "g-pregunta",
+   "clave": "pregunta",
+   "titulo": "Preguntas: el verbo va primero",
+   "nivel": "cero",
+   "tema": "gramatica",
+   "explicacion": "Para preguntar sí/no, se pone el verbo de primero. Con palabra interrogativa (hva, hvor...), esa palabra va primera y el verbo segundo.",
+   "ejemplos": [
+    {
+     "no": "Snakker du norsk?",
+     "es": "¿Hablas noruego?",
+     "pron": "SNAK-ker du noshk"
+    },
+    {
+     "no": "Hvor bor du?",
+     "es": "¿Dónde vives?",
+     "pron": "vur bur du"
+    },
+    {
+     "no": "Hva heter du?",
+     "es": "¿Cómo te llamas?",
+     "pron": "va HE-ter du"
+    }
+   ],
+   "error": "Traducir literalmente «¿Tú hablas noruego?» como «Du snakker norsk?». Se entiende, pero no es la forma correcta.",
+   "contraste": "El español pregunta solo con la entonación. El noruego cambia el orden.",
+   "regla": "VERBO + sujeto + ... ?"
+  },
+  {
+   "id": "g-interrogativos",
+   "clave": "interrogativos",
+   "titulo": "Las palabras para preguntar",
+   "nivel": "A1",
+   "tema": "gramatica",
+   "explicacion": "Casi todas empiezan por «hv-», y esa h no se pronuncia.",
+   "ejemplos": [
+    {
+     "no": "hva",
+     "es": "qué",
+     "pron": "va"
+    },
+    {
+     "no": "hvem",
+     "es": "quién",
+     "pron": "vem"
+    },
+    {
+     "no": "hvor",
+     "es": "dónde",
+     "pron": "vur"
+    },
+    {
+     "no": "hvorfor",
+     "es": "por qué",
+     "pron": "VUR-for"
+    },
+    {
+     "no": "hvordan",
+     "es": "cómo",
+     "pron": "VUR-dan"
+    },
+    {
+     "no": "når",
+     "es": "cuándo",
+     "pron": "nor"
+    },
+    {
+     "no": "hvilken",
+     "es": "cuál",
+     "pron": "VIL-ken"
+    }
+   ],
+   "error": "Pronunciar la «h». «Hva» suena «va», no «jva».",
+   "contraste": "",
+   "regla": "hv- = se escribe, no se pronuncia"
+  },
+  {
+   "id": "g-plural",
+   "clave": "plural",
+   "titulo": "El plural: -er",
+   "nivel": "cero",
+   "tema": "gramatica",
+   "explicacion": "El plural indefinido casi siempre se hace con -er. El plural definido («los carros») con -ene.",
+   "ejemplos": [
+    {
+     "no": "en bil → biler → bilene",
+     "es": "un carro → carros → los carros",
+     "pron": "bil / BI-ler / BI-le-ne"
+    },
+    {
+     "no": "et hus → hus → husene",
+     "es": "una casa → casas → las casas",
+     "pron": "jus / jus / JU-se-ne"
+    }
+   ],
+   "error": "Poner -er a los neutros de una sílaba: «et hus» hace «hus» en plural, no «huser».",
+   "contraste": "",
+   "regla": "-er (indefinido) · -ene (definido). Neutros de una sílaba: plural igual al singular."
+  },
+  {
+   "id": "g-adjetivo",
+   "clave": "adjetivo",
+   "titulo": "El adjetivo cambia tres veces",
+   "nivel": "A1",
+   "tema": "gramatica",
+   "explicacion": "El adjetivo se adapta al sustantivo: forma base con en/ei, +t con et, y +e en plural y en definido.",
+   "ejemplos": [
+    {
+     "no": "en stor bil",
+     "es": "un carro grande",
+     "pron": "en stur bil"
+    },
+    {
+     "no": "et stort hus",
+     "es": "una casa grande",
+     "pron": "et sturt jus"
+    },
+    {
+     "no": "store biler",
+     "es": "carros grandes",
+     "pron": "STU-re BI-ler"
+    }
+   ],
+   "error": "Olvidar la -t con los neutros: «et stor hus» está mal, es «et stort hus».",
+   "contraste": "En español el adjetivo cambia por género y número. En noruego, por género neutro y por plural/definido.",
+   "regla": "base · +t (et) · +e (plural y definido)"
+  },
+  {
+   "id": "g-doble-definido",
+   "clave": "doble-definido",
+   "titulo": "La doble definición",
+   "nivel": "A2",
+   "tema": "gramatica",
+   "explicacion": "Cuando hay un adjetivo, «el carro grande» lleva marca DOS veces: el artículo «den/det/de» delante y la terminación al final.",
+   "ejemplos": [
+    {
+     "no": "den store bilen",
+     "es": "el carro grande",
+     "pron": "den STU-re BI-len"
+    },
+    {
+     "no": "det store huset",
+     "es": "la casa grande",
+     "pron": "de STU-re JU-se"
+    },
+    {
+     "no": "de store bilene",
+     "es": "los carros grandes",
+     "pron": "di STU-re BI-le-ne"
+    }
+   ],
+   "error": "Decir solo «store bilen» o solo «den store bil». Van las dos marcas.",
+   "contraste": "En español basta una: «el carro grande».",
+   "regla": "den/det/de + adjetivo+e + sustantivo+definido"
+  },
+  {
+   "id": "g-infinitivo",
+   "clave": "infinitivo",
+   "titulo": "Å + infinitivo",
+   "nivel": "A1",
+   "tema": "gramatica",
+   "explicacion": "El infinitivo lleva «å» delante, como el «to» del inglés. Pero después de un verbo modal NO lleva «å».",
+   "ejemplos": [
+    {
+     "no": "Jeg liker å lese.",
+     "es": "Me gusta leer.",
+     "pron": "yei LI-ker o LE-se"
+    },
+    {
+     "no": "Jeg kan lese.",
+     "es": "Puedo leer.",
+     "pron": "yei kan LE-se"
+    },
+    {
+     "no": "Det er godt å hvile.",
+     "es": "Es bueno descansar.",
+     "pron": "de ær got o VI-le"
+    }
+   ],
+   "error": "Poner «å» después de un modal: «Jeg kan å lese» está mal.",
+   "contraste": "",
+   "regla": "å + infinitivo · SIN å después de kan, vil, skal, må, bør"
+  },
+  {
+   "id": "g-modales",
+   "clave": "modales",
+   "titulo": "Los verbos modales",
+   "nivel": "A1",
+   "tema": "gramatica",
+   "explicacion": "Kan (poder), vil (querer), skal (ir a / deber), må (tener que), bør (debería). Van con el infinitivo pelado.",
+   "ejemplos": [
+    {
+     "no": "Jeg kan snakke norsk.",
+     "es": "Puedo hablar noruego.",
+     "pron": "yei kan SNAK-ke noshk"
+    },
+    {
+     "no": "Jeg må jobbe i dag.",
+     "es": "Tengo que trabajar hoy.",
+     "pron": "yei mo YOB-be i dag"
+    },
+    {
+     "no": "Vi skal reise til Bergen.",
+     "es": "Vamos a viajar a Bergen.",
+     "pron": "vi skal REI-se til BÆR-gen"
+    }
+   ],
+   "error": "Confundir «vil» con el futuro inglés «will». «Vil» es QUERER; el futuro es «skal».",
+   "contraste": "«Jeg vil spise» = quiero comer, NO «comeré».",
+   "regla": "modal + infinitivo sin å"
+  },
+  {
+   "id": "g-pasado",
+   "clave": "pasado",
+   "titulo": "El pretérito por grupos",
+   "nivel": "A2",
+   "tema": "gramatica",
+   "explicacion": "Para hablar del pasado, se cambia la terminación según el grupo del verbo. Hay cuatro grupos regulares y un montón de irregulares.",
+   "ejemplos": [
+    {
+     "no": "snakke → snakket",
+     "es": "hablar → hablé (grupo 1)",
+     "pron": "SNAK-ke / SNAK-ket"
+    },
+    {
+     "no": "spise → spiste",
+     "es": "comer → comí (grupo 2)",
+     "pron": "SPI-se / SPIS-te"
+    },
+    {
+     "no": "prøve → prøvde",
+     "es": "intentar → intenté (grupo 3)",
+     "pron": "PRØ-ve / PRØV-de"
+    },
+    {
+     "no": "bo → bodde",
+     "es": "vivir → viví (grupo 4)",
+     "pron": "bu / BUD-de"
+    }
+   ],
+   "error": "Aplicar la terminación equivocada. Cuando aprendas un verbo, aprende de una vez su pasado.",
+   "contraste": "El noruego tiene UNA forma de pasado para todas las personas. El español tiene seis y además dos pasados (comí / comía).",
+   "regla": "1: -et · 2: -te · 3: -de · 4: -dde"
+  },
+  {
+   "id": "g-perfecto",
+   "clave": "perfecto",
+   "titulo": "El perfecto: har + participio",
+   "nivel": "A2",
+   "tema": "gramatica",
+   "explicacion": "«Har» + participio, igual que «he comido» en español.",
+   "ejemplos": [
+    {
+     "no": "Jeg har spist.",
+     "es": "He comido.",
+     "pron": "yei har spist"
+    },
+    {
+     "no": "Har du vært i Norge?",
+     "es": "¿Has estado en Noruega?",
+     "pron": "har du vært i NOR-ge"
+    },
+    {
+     "no": "Vi har bodd her i tre år.",
+     "es": "Hemos vivido aquí tres años.",
+     "pron": "vi har bud hær i tre or"
+    }
+   ],
+   "error": "Usar el pretérito cuando la acción sigue teniendo efecto hoy. Para eso va el perfecto.",
+   "contraste": "Se parece mucho al español, así que aprovéchalo.",
+   "regla": "har + participio"
+  },
+  {
+   "id": "g-futuro",
+   "clave": "futuro",
+   "titulo": "Cómo se dice el futuro",
+   "nivel": "A2",
+   "tema": "gramatica",
+   "explicacion": "Hay tres maneras y las tres son correctas: «skal» (plan o decisión), «kommer til å» (predicción) y el presente a secas cuando ya hay una palabra de tiempo.",
+   "ejemplos": [
+    {
+     "no": "Jeg skal jobbe i morgen.",
+     "es": "Voy a trabajar mañana.",
+     "pron": "yei skal YOB-be i MÅ-ren"
+    },
+    {
+     "no": "Det kommer til å regne.",
+     "es": "Va a llover.",
+     "pron": "de KOM-mer til o REI-ne"
+    },
+    {
+     "no": "Toget går klokka ti.",
+     "es": "El tren sale a las diez.",
+     "pron": "TU-ge gor KLOK-ka ti"
+    }
+   ],
+   "error": "Usar «vil» para el futuro por parecido con el inglés «will». «Vil» es querer.",
+   "contraste": "",
+   "regla": "skal (plan) · kommer til å (predicción) · presente (horarios)"
+  },
+  {
+   "id": "g-posesivos",
+   "clave": "posesivos",
+   "titulo": "Los posesivos van DETRÁS",
+   "nivel": "A2",
+   "tema": "gramatica",
+   "explicacion": "Lo normal en noruego es poner el posesivo después del sustantivo, y el sustantivo va en forma definida.",
+   "ejemplos": [
+    {
+     "no": "bilen min",
+     "es": "mi carro",
+     "pron": "BI-len min"
+    },
+    {
+     "no": "huset mitt",
+     "es": "mi casa",
+     "pron": "JU-se mit"
+    },
+    {
+     "no": "bøkene mine",
+     "es": "mis libros",
+     "pron": "BØ-ke-ne MI-ne"
+    }
+   ],
+   "error": "Decir «min bil». No está mal del todo (se usa para enfatizar), pero suena raro en el día a día.",
+   "contraste": "Español: MI carro. Noruego: carro-el MI.",
+   "regla": "sustantivo definido + min/mi/mitt/mine"
+  },
+  {
+   "id": "g-sin",
+   "clave": "sin",
+   "titulo": "Sin, si, sitt, sine: el posesivo reflexivo",
+   "nivel": "B1",
+   "tema": "gramatica",
+   "explicacion": "Cuando el dueño es el MISMO sujeto de la frase, se usa sin/si/sitt/sine. Si es otra persona, hans/hennes.",
+   "ejemplos": [
+    {
+     "no": "Han tar bilen sin.",
+     "es": "Él toma su propio carro.",
+     "pron": "jan tar BI-len sin"
+    },
+    {
+     "no": "Han tar bilen hans.",
+     "es": "Él toma el carro de él (de otro).",
+     "pron": "jan tar BI-len jans"
+    }
+   ],
+   "error": "Usar siempre «hans». Cambia el significado: uno toma su carro, el otro toma el carro ajeno.",
+   "contraste": "El español tiene la misma ambigüedad («su carro») y no la resuelve. El noruego sí.",
+   "regla": "mismo sujeto → sin · otra persona → hans/hennes"
+  },
+  {
+   "id": "g-subordinada",
+   "clave": "subordinada",
+   "titulo": "El orden en las frases subordinadas",
+   "nivel": "B1",
+   "tema": "gramatica",
+   "explicacion": "Después de «at» (que), «fordi» (porque), «hvis» (si), «når» (cuando), el «ikke» se pasa DELANTE del verbo.",
+   "ejemplos": [
+    {
+     "no": "Jeg vet at han ikke kommer.",
+     "es": "Sé que él no viene.",
+     "pron": "yei vet at jan IK-ke KOM-mer"
+    },
+    {
+     "no": "Hun sier at hun ikke kan.",
+     "es": "Ella dice que no puede.",
+     "pron": "jun SI-er at jun IK-ke kan"
+    }
+   ],
+   "error": "Mantener el orden de la frase principal: «Jeg vet at han kommer ikke» está mal.",
+   "contraste": "",
+   "regla": "en subordinada: ikke ANTES del verbo"
+  },
+  {
+   "id": "g-preposiciones",
+   "clave": "preposiciones",
+   "titulo": "i, på, til: las tres que más cuestan",
+   "nivel": "A2",
+   "tema": "gramatica",
+   "explicacion": "«i» = dentro de (países, ciudades, cuartos). «på» = sobre o en instituciones (skolen, jobb). «til» = hacia (movimiento).",
+   "ejemplos": [
+    {
+     "no": "Jeg bor i Norge.",
+     "es": "Vivo en Noruega.",
+     "pron": "yei bur i NOR-ge"
+    },
+    {
+     "no": "Jeg er på jobb.",
+     "es": "Estoy en el trabajo.",
+     "pron": "yei ær po yob"
+    },
+    {
+     "no": "Jeg går til skolen.",
+     "es": "Voy a la escuela.",
+     "pron": "yei gor til SKU-len"
+    }
+   ],
+   "error": "Traducir siempre «en» por «i». Con instituciones y actividades casi siempre es «på».",
+   "contraste": "El español usa «en» para casi todo. El noruego separa dentro / sobre / hacia.",
+   "regla": "i (dentro) · på (institución, superficie) · til (movimiento)"
+  },
+  {
+   "id": "g-pronombres",
+   "clave": "pronombres",
+   "titulo": "Los pronombres",
+   "nivel": "cero",
+   "tema": "gramatica",
+   "explicacion": "Sujeto: jeg, du, han, hun, den/det, vi, dere, de. Objeto: meg, deg, ham, henne, den/det, oss, dere, dem.",
+   "ejemplos": [
+    {
+     "no": "Jeg ser deg.",
+     "es": "Yo te veo.",
+     "pron": "yei ser dei"
+    },
+    {
+     "no": "Hun hjelper oss.",
+     "es": "Ella nos ayuda.",
+     "pron": "jun YEL-per os"
+    },
+    {
+     "no": "De snakker med dem.",
+     "es": "Ellos hablan con ellos.",
+     "pron": "di SNAK-ker me dem"
+    }
+   ],
+   "error": "Confundir «de» (ellos, se dice «di») con «dem» (a ellos). Y ojo: el pronombre objeto NUNCA se pega al verbo.",
+   "contraste": "Español: «te veo», «nos ayuda» (pegado al verbo). Noruego: siempre palabra aparte y después del verbo.",
+   "regla": ""
+  },
+  {
+   "id": "g-den-det",
+   "clave": "den-det",
+   "titulo": "Den o det",
+   "nivel": "A1",
+   "tema": "gramatica",
+   "explicacion": "Para decir «lo/eso» hay que saber el género: «den» para en/ei, «det» para et. Y para el clima o frases impersonales siempre es «det».",
+   "ejemplos": [
+    {
+     "no": "Bilen? Den er ny.",
+     "es": "¿El carro? Es nuevo.",
+     "pron": "BI-len? den ær ny"
+    },
+    {
+     "no": "Huset? Det er stort.",
+     "es": "¿La casa? Es grande.",
+     "pron": "JU-se? de ær sturt"
+    },
+    {
+     "no": "Det regner.",
+     "es": "Está lloviendo.",
+     "pron": "de REI-ner"
+    }
+   ],
+   "error": "Usar «det» para todo. Solo funciona con los neutros y con las frases impersonales.",
+   "contraste": "",
+   "regla": "en/ei → den · et → det · impersonal → det"
+  },
+  {
+   "id": "g-imperativo",
+   "clave": "imperativo",
+   "titulo": "El imperativo",
+   "nivel": "A2",
+   "tema": "gramatica",
+   "explicacion": "Se forma quitando la -e del infinitivo. Es cortísimo y por eso suena brusco: se suele suavizar con «vær så snill».",
+   "ejemplos": [
+    {
+     "no": "Snakk!",
+     "es": "¡Habla!",
+     "pron": "snak"
+    },
+    {
+     "no": "Kom hit!",
+     "es": "¡Ven aquí!",
+     "pron": "kom jit"
+    },
+    {
+     "no": "Hjelp meg, vær så snill.",
+     "es": "Ayúdame, por favor.",
+     "pron": "yelp mei, væ sho snil"
+    }
+   ],
+   "error": "Usar el infinitivo como orden: «Å snakke!» no es una orden.",
+   "contraste": "",
+   "regla": "infinitivo sin la -e final"
+  },
+  {
+   "id": "g-comparativo",
+   "clave": "comparativo",
+   "titulo": "Comparar: -ere y -est",
+   "nivel": "B1",
+   "tema": "gramatica",
+   "explicacion": "Más = -ere. El más = -est. Los adjetivos largos usan «mer» y «mest».",
+   "ejemplos": [
+    {
+     "no": "stor → større → størst",
+     "es": "grande → más grande → el más grande",
+     "pron": "stur / STØ-re / størst"
+    },
+    {
+     "no": "Han er eldre enn meg.",
+     "es": "Él es mayor que yo.",
+     "pron": "jan ær EL-dre en mei"
+    },
+    {
+     "no": "mer interessant",
+     "es": "más interesante",
+     "pron": "mer in-te-re-SANT"
+    }
+   ],
+   "error": "Decir «mer stor». Los adjetivos cortos usan -ere, no «mer».",
+   "contraste": "Español: MÁS grande (siempre con una palabra aparte). Noruego: pegado al final, como el inglés «bigger».",
+   "regla": "corto: -ere/-est · largo: mer/mest · «que» = enn"
+  },
+  {
+   "id": "g-compuestas",
+   "clave": "compuestas",
+   "titulo": "Las palabras compuestas se escriben juntas",
+   "nivel": "A2",
+   "tema": "gramatica",
+   "explicacion": "El noruego pega las palabras. Separarlas cambia el significado y es un error famoso incluso entre noruegos.",
+   "ejemplos": [
+    {
+     "no": "sykehus",
+     "es": "hospital (syke+hus)",
+     "pron": "SY-ke-jus"
+    },
+    {
+     "no": "flyplass",
+     "es": "aeropuerto (fly+plass)",
+     "pron": "FLY-plas"
+    },
+    {
+     "no": "husleie",
+     "es": "arriendo (hus+leie)",
+     "pron": "JUS-lei-e"
+    }
+   ],
+   "error": "Separarlas: «syke hus» son «casas enfermas». La última palabra manda el género.",
+   "contraste": "El español usa «de»: casa DE salud. El noruego pega.",
+   "regla": "la ÚLTIMA palabra decide el género y el plural"
+  },
+  {
+   "id": "g-pasiva",
+   "clave": "pasiva",
+   "titulo": "La pasiva: -s o bli",
+   "nivel": "B2",
+   "tema": "gramatica",
+   "explicacion": "Dos formas: agregar -s al infinitivo (general, reglas) o usar «bli» + participio (un hecho concreto).",
+   "ejemplos": [
+    {
+     "no": "Døra låses klokka ti.",
+     "es": "La puerta se cierra a las diez.",
+     "pron": "DØ-ra LO-ses KLOK-ka ti"
+    },
+    {
+     "no": "Huset ble solgt.",
+     "es": "La casa fue vendida.",
+     "pron": "JU-se ble solt"
+    }
+   ],
+   "error": "Usar «bli» para reglas generales. Para lo que pasa siempre, va la -s.",
+   "contraste": "",
+   "regla": "-s (regla general) · bli + participio (hecho concreto)"
+  },
+  {
+   "id": "g-som",
+   "clave": "som",
+   "titulo": "Som: el que, la que, quien",
+   "nivel": "B1",
+   "tema": "gramatica",
+   "explicacion": "«Som» sirve para todo: quien, que, el cual. No cambia nunca.",
+   "ejemplos": [
+    {
+     "no": "Mannen som bor her.",
+     "es": "El hombre que vive aquí.",
+     "pron": "MAN-nen som bur hær"
+    },
+    {
+     "no": "Boka som jeg leste.",
+     "es": "El libro que leí.",
+     "pron": "BU-ka som yei LES-te"
+    }
+   ],
+   "error": "Buscar una forma distinta para masculino/femenino/plural. «Som» es una sola para todo.",
+   "contraste": "Español: que, quien, el cual, la cual... Noruego: som y ya.",
+   "regla": ""
+  },
+  {
+   "id": "g-hjemme",
+   "clave": "hjemme",
+   "titulo": "hjem o hjemme: movimiento o lugar",
+   "nivel": "B1",
+   "tema": "gramatica",
+   "explicacion": "Varios adverbios noruegos tienen dos formas: una para el movimiento y otra para estar quieto.",
+   "ejemplos": [
+    {
+     "no": "Jeg går hjem.",
+     "es": "Voy a casa (movimiento).",
+     "pron": "yei gor yem"
+    },
+    {
+     "no": "Jeg er hjemme.",
+     "es": "Estoy en casa (quieto).",
+     "pron": "yei ær YEM-me"
+    },
+    {
+     "no": "Kom inn! / Jeg er inne.",
+     "es": "¡Entra! / Estoy adentro.",
+     "pron": "kom in / yei ær IN-ne"
+    }
+   ],
+   "error": "Usar la forma de movimiento para decir dónde estás: «Jeg er hjem» está mal.",
+   "contraste": "El español no distingue: «a casa» y «en casa» usan la misma palabra «casa».",
+   "regla": "movimiento: hjem, ut, inn, opp · lugar: hjemme, ute, inne, oppe"
+  },
+  {
+   "id": "g-ordinales",
+   "clave": "ordinales",
+   "titulo": "Los números ordinales",
+   "nivel": "A2",
+   "tema": "gramatica",
+   "explicacion": "Se usan para fechas y pisos. Se escriben con punto: 1. = første.",
+   "ejemplos": [
+    {
+     "no": "første",
+     "es": "primero",
+     "pron": "FØSH-te"
+    },
+    {
+     "no": "andre",
+     "es": "segundo",
+     "pron": "AN-dre"
+    },
+    {
+     "no": "tredje",
+     "es": "tercero",
+     "pron": "TRED-ye"
+    },
+    {
+     "no": "1. mai",
+     "es": "1 de mayo",
+     "pron": "FØSH-te mai"
+    }
+   ],
+   "error": "Leer «1. mai» como «en mai». Se lee «første mai».",
+   "contraste": "",
+   "regla": ""
+  },
+  {
+   "id": "g-man",
+   "clave": "man",
+   "titulo": "Man: el «se» impersonal",
+   "nivel": "B1",
+   "tema": "gramatica",
+   "explicacion": "«Man» es «uno» o el «se» impersonal del español.",
+   "ejemplos": [
+    {
+     "no": "Man må vente.",
+     "es": "Hay que esperar.",
+     "pron": "man mo VEN-te"
+    },
+    {
+     "no": "Hvordan sier man det?",
+     "es": "¿Cómo se dice eso?",
+     "pron": "VUR-dan SI-er man de"
+    }
+   ],
+   "error": "Traducir el «se» español con un reflexivo. En noruego es «man» (o «du» en lenguaje informal).",
+   "contraste": "",
+   "regla": ""
+  }
+ ]
+}

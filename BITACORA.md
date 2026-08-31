@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 31-08-2026 (cierre)
+**Última actualización:** 31-08-2026 (noche)
 
 ---
 
@@ -29,6 +29,7 @@
 | 8 | **Objeciones de otras EPS** | Bots que arman el Excel de OBJECIONES para DGH desde el archivo de cada entidad: FAMISANAR, SAVIA, EMSSANAR, Mutual Ser, FOMAG (Horus). | Cada uno con su `tools/organizar_objeciones_*.py` y su README. Si DGH devuelve errores, está `corregir_errores_dgh.py` y Claude los analiza. |
 | 9 | **Informes de cartera y conciliaciones** | Consolidados de estado de cartera por entidad (formato FAMISANAR), análisis de actas (ej. PROTEGER EPS) e informes en Word para la mesa. | Usted sube el Excel de la entidad al chat; Claude entrega el informe verificado al centavo. |
 | 10 | **Caja de bots del PC del auditor** | Bots de doble clic entregados POR CHAT (no van al repo porque procesan datos reales): ORGANIZAR ARCHIVOS, BAJAR PESO EXCEL, PARTIR/UNIR archivos grandes, OCR a PDF (PC y celular), UNIR EXCELES, CORREOS DE PAGOS, AUTORIZACIONES RIPS, DE1601 (NUEVA EPS), HERRAMIENTAS DE IMÁGENES. | Se piden por chat, llegan en ZIP, se descomprimen y doble clic al `.bat`. Si uno falla, pegue la pantalla del error en el chat. |
+| 11 | **Módulos personales de estudio** | Dos programas aparte, que no tocan el motor: **ICFES** (`icfes/`, preparación para el Saber 11) y **noruego** (`noruego/`, curso de idioma para el celular). Cada uno con su aplicación web que funciona sin internet. | Doble clic en `tools\ICFES.cmd` o `tools\NORUEGO.cmd`. Guías: `docs/GUIA_SISTEMA_ICFES.md` y `docs/GUIA_CURSO_NORUEGO.md`. |
 
 **Regla de oro:** no importa en qué chat esté — todo lo trabajado se anota en
 esta bitácora al terminar, y por eso cualquier chat nuevo "se acuerda" de todo.
@@ -88,6 +89,77 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 31-08-2026 (noche) — Curso de noruego para el celular (carpeta `noruego/`)
+
+**Qué se pidió.** Una aplicación web para aprender noruego desde cero hasta
+nivel profesional, para usarla **desde el celular**, al estilo de esas apps de
+idiomas pero dedicada solo al noruego. No es del hospital: es un módulo
+personal, igual que el del ICFES.
+
+**Dónde vive.** En la carpeta `noruego/`, **aparte**. No toca ni depende del
+Motor de Glosas: si mañana se borra la carpeta, la aplicación del hospital
+sigue funcionando exactamente igual.
+
+**Lo que quedó hecho:**
+
+1. **El curso completo: 18 módulos y 73 lecciones**, ordenadas de menos a más,
+   desde «no sé nada» (el alfabeto y los saludos) hasta noruego profesional.
+   Cada lección se abre solo cuando se terminó la anterior, para que no se
+   salte pasos.
+
+2. **El material de estudio: 423 elementos** guardados en archivos de texto
+   (`noruego/lexico/`): 133 sustantivos, 69 verbos, 40 adjetivos, 85 frases,
+   42 números, 13 sonidos difíciles del noruego, 29 reglas de gramática
+   explicadas y 12 conversaciones completas. Todo con su traducción, su
+   pronunciación aproximada y su ejemplo.
+
+3. **875 ejercicios** que el programa arma solo, en **15 formas distintas**
+   (escoger la traducción, escribir, ordenar la frase, oír y escribir,
+   emparejar, conjugar el verbo, escoger el artículo, completar el diálogo,
+   etc.). Ninguna lección quedó a medias: se revisó una por una.
+
+4. **La aplicación en el celular.** Es un solo archivo que se abre en el
+   navegador; desde el menú se le da «Agregar a la pantalla de inicio» y queda
+   como una aplicación más, con su ícono. **Funciona sin internet** una vez
+   abierta la primera vez. Todo está pensado para el dedo: botones grandes,
+   menú abajo, y no se sale de la pantalla ni en los celulares angostos.
+
+5. **Cómo mantiene el ritmo:** vidas por lección (cinco fallas y se repite),
+   puntos, racha de días seguidos, 10 logros y **repaso espaciado** — el
+   programa se acuerda de las palabras que le costaron y se las vuelve a
+   poner justo antes de que se le olviden.
+
+6. **Además del curso hay:** diccionario buscable con las 423 entradas,
+   las 29 reglas de gramática, las 12 conversaciones para practicar, la
+   pantalla de progreso, y un **panel para agregar palabras nuevas** sin
+   tocar una sola línea de programación.
+
+**Tres cosas que la aplicación dice de frente, en vez de disimular:**
+
+- La pronunciación que muestra es **aproximada, escrita a la colombiana**.
+  Sirve para arrancar, no reemplaza oír a un noruego.
+- Si el celular **no tiene voz noruega instalada**, los ejercicios de escuchar
+  **muestran el texto escrito** y lo avisan. Antes de arreglarlo, esos
+  ejercicios eran imposibles de responder en un celular sin esa voz.
+- El curso enseña **bokmål**, que es el noruego escrito de la mayoría. No
+  enseña nynorsk ni los dialectos.
+
+**Se cuidó no inventar nada.** Ninguna palabra, regla ni traducción salió de
+una suposición. Hay un revisor (`python -m noruego revisar`) que avisa si a
+alguna entrada le falta traducción, género o ejemplo — hoy sale limpio.
+
+**Lo que se probó:** 167 pruebas automáticas, y la aplicación se recorrió
+completa en un navegador de celular: se hicieron tres lecciones enteras, se
+buscó en el diccionario, se abrieron la gramática y las conversaciones, se
+agregó contenido desde el panel y se recargó la página para comprobar que el
+avance **no se pierde**. Sin errores y sin barras de desplazamiento de lado.
+
+**Cómo se usa:** doble clic en **`tools\NORUEGO.cmd`**. El bot arma la
+aplicación, muestra la dirección para escribirla en el celular y levanta el
+servidor. Guía completa: `docs/GUIA_CURSO_NORUEGO.md`.
+
+---
 
 ### 31-08-2026 — Los gestores no podían entrar al ADRES, y la pantalla no lo decía
 
@@ -8798,6 +8870,22 @@ artefacto privado con los números anonimizados) con su análisis de precios.
 
 ## 3) PENDIENTE
 
+### Curso de noruego (31-08, noche)
+- **Probarlo en SU celular.** Aquí se probó en un navegador de celular
+  simulado; falta verlo en el teléfono real: que se instale con «Agregar a la
+  pantalla de inicio», que se oiga la voz noruega y que el avance siga ahí al
+  día siguiente.
+- **Instalar la voz noruega si el celular no la trae.** En Android se busca en
+  Ajustes → Idiomas → Salida de texto a voz → instalar «norsk bokmål». Sin
+  ella, los ejercicios de escuchar muestran el texto en vez de sonar (la
+  aplicación lo avisa, no se traba).
+- **Más material para los niveles altos.** Los módulos B2 y C2 funcionan, pero
+  con el vocabulario que hay hoy. Se agregan palabras desde el propio panel de
+  la aplicación, sin tocar programación.
+- **La pronunciación escrita es aproximada.** Cuando haya con quién
+  confirmarla (un hablante o un curso formal), conviene repasarla.
+
+
 ### Objeciones del ADRES en DGH (28-08, al cierre)
 - **~~Cargar las 40 facturas que faltan~~ — HECHO en su mayor parte.** Al cierre
   quedaron cargadas **58 facturas, 866 renglones, $103.972.112**.
@@ -9539,6 +9627,18 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+### Curso de noruego — lo primero
+1. **Bajar los cambios y armar la aplicación:** `git pull` y doble clic en
+   **`tools\NORUEGO.cmd`**. El bot muestra en pantalla la dirección
+   (`http://<IP>:8000/static/noruego/index.html`) para escribirla en el celular
+   estando en el mismo wifi.
+2. **Instalarla en el celular** con «Agregar a la pantalla de inicio» y hacer
+   **la primera lección completa**. Si algo se ve mal o un ejercicio no se
+   puede responder, mande la foto de la pantalla.
+3. **Comprobar el sonido.** Si en los ejercicios de escuchar sale el aviso de
+   que no hay voz noruega, instale la voz (ver PENDIENTE) y vuelva a entrar.
+
 
 ### Objeciones del ADRES en DGH — lo primero del día siguiente
 
