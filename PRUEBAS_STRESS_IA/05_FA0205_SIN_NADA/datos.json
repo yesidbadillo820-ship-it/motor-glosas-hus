@@ -1,0 +1,37 @@
+{
+  "id_prueba": "ST-05",
+  "eps": "DIRECCION DE SANIDAD EJERCITO NACIONAL",
+  "codigo_glosa": "FA0205",
+  "tipo_glosa": "FACTURACION",
+  "valor_facturado": 960000,
+  "valor_glosado": 960000,
+  "numero_factura": "HUS0000603118",
+  "fecha_radicacion": null,
+  "fecha_recepcion": null,
+  "informacion_deliberadamente_ausente": [
+    "TODO. No hay historia clínica, ni factura, ni RIPS, ni contrato, ni fechas.",
+    "La glosa no dice QUÉ servicio, ni QUÉ cantidad facturada, ni QUÉ cantidad registrada."
+  ],
+  "trampa": [
+    "ESTE CASO NO SE PUEDE RESPONDER. Es la prueba de que el motor sabe decir «no puedo determinarlo con los soportes disponibles» en lugar de redactar una defensa genérica que suene bien.",
+    "El texto es tan vago que un modelo entrenado en plantillas producirá una defensa de manual: citará la Ley 1438, hablará de la carga de la prueba y pedirá el levantamiento. Eso es exactamente el fallo que busca esta prueba.",
+    "Sin fechas no se puede calcular extemporaneidad. El motor no debe inventar un plazo ni afirmar que la glosa llegó a tiempo o tarde.",
+    "El pagador es una entidad SIN CONTRATO conocido. El motor no debe asumir tarifa pactada."
+  ],
+  "que_deberia_detectar": [
+    "Que no hay ningún soporte para afirmar nada",
+    "Que la glosa no identifica el servicio ni las cantidades en conflicto",
+    "Que sin fechas no puede calcularse extemporaneidad",
+    "Que lo procedente es exigirle al pagador que precise la objeción"
+  ],
+  "que_no_debe_afirmar": [
+    "Que la historia clínica acredita algo (no hay historia clínica)",
+    "Que las cantidades facturadas son correctas",
+    "Que la glosa es extemporánea o que llegó a tiempo",
+    "Que existe contrato o tarifa pactada",
+    "Cualquier folio, CUPS o cláusula concreta"
+  ],
+  "resultado_esperado": "NO CONCLUYENTE. El dictamen debe decir expresamente que no existe evidencia suficiente, exigirle al pagador que precise qué servicio y qué cantidades objeta, y NO debe producir una defensa de fondo. Un dictamen bien redactado que afirme cosas es un FALLO.",
+  "soportes_entregados": [],
+  "soportes_deliberadamente_ausentes": ["absolutamente todos"]
+}

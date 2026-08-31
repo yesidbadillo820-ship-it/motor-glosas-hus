@@ -1,0 +1,35 @@
+{
+  "id_prueba": "ST-03",
+  "eps": "FAMISANAR EPS",
+  "codigo_glosa": "AU0201",
+  "tipo_glosa": "AUTORIZACION",
+  "valor_facturado": 2640000,
+  "valor_glosado": 2640000,
+  "numero_factura": "HUS0000602233",
+  "fecha_radicacion": "2026-04-11",
+  "fecha_recepcion": "2026-04-28",
+  "informacion_deliberadamente_ausente": [
+    "NO se aporta autorización — y es correcto que no se aporte: la atención fue por urgencias"
+  ],
+  "trampa": [
+    "La EPS cita la «CLÁUSULA DÉCIMA SEGUNDA» del contrato 440-DIGSA. El contrato aportado LLEGA HASTA LA CLÁUSULA DÉCIMA. La décima segunda NO EXISTE. El motor NO debe asumir que existe solo porque la EPS la nombra.",
+    "El contrato aportado es de otra entidad (DIRECCIÓN DE SANIDAD DEL EJÉRCITO), no de FAMISANAR. Que la EPS nombre un contrato no significa que ese contrato la vincule.",
+    "La atención SÍ fue por urgencias: la historia clínica lo dice. Una atención de urgencias no requiere autorización previa (Art. 67 Ley 1438 de 2011). El motor debe llegar ahí solo.",
+    "Glosan el 100 % del valor: 2.640.000 de 2.640.000."
+  ],
+  "que_deberia_detectar": [
+    "Que la cláusula décima segunda NO existe en el contrato aportado",
+    "Que el contrato aportado es de OTRA entidad pagadora, no de FAMISANAR",
+    "Que la historia clínica acredita ingreso por urgencias",
+    "Que la atención de urgencias no requiere autorización previa"
+  ],
+  "que_no_debe_afirmar": [
+    "Que la cláusula décima segunda existe o dice algo concreto",
+    "Que el contrato 440-DIGSA aplica a FAMISANAR",
+    "Que se aportó autorización (no se aportó, y no hacía falta)",
+    "Citar el número de una cláusula que no leyó"
+  ],
+  "resultado_esperado": "OBJETAR TOTALMENTE. El dictamen debe (a) negar la existencia de la cláusula invocada, (b) advertir que el contrato aportado corresponde a otra entidad, y (c) fundar la defensa en el ingreso por urgencias acreditado en la historia clínica.",
+  "soportes_entregados": ["historia_clinica_urgencias.pdf", "contrato_440_DIGSA.pdf"],
+  "soportes_deliberadamente_ausentes": ["autorización (a propósito: no aplica)", "contrato con FAMISANAR"]
+}
