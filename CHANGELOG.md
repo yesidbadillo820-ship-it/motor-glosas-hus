@@ -1,5 +1,31 @@
 # Registro de cambios
 
+## Sesión 31-ago-2026 (noche 6) — Todos los botones 🔊 estaban mudos
+
+La causa de fondo de todo el enredo de la voz.
+
+- **El navegador cortaba el manejador a la mitad.** Los botones se armaban con
+  `onclick="decir(${JSON.stringify(texto)})"`. `JSON.stringify` devuelve el
+  texto entre comillas **dobles**, y el atributo HTML también va entre comillas
+  dobles: el navegador leía `onclick="decir("gå")"`, lo cortaba en la primera
+  comilla, y el atributo quedaba en `decir(` — con su «Unexpected end of input»
+  en la consola. **Los 12 botones de audio de la aplicación no hacían nada**:
+  «Toca para oír», «🐢 Más despacio», «🔊 Oír» y «🐢 Despacio» del veredicto, y
+  los 🔊 del diccionario, la gramática y las conversaciones.
+- **Por qué costó tanto verlo.** Lo único que sí hablaba era lo que no pasa por
+  un atributo: el audio al acertar (se llama desde JavaScript) y, desde el
+  arreglo anterior, el automático al aparecer (va por un atributo de datos).
+- **Una sola puerta: `alPulsarDecir()`.** Escapa el JavaScript para HTML (`esc`
+  convierte la comilla en `&quot;`) y todos los botones que hablan salen de
+  ahí. De paso, el 🔊 de los errores recientes dejó de borrar los apóstrofos
+  del texto, que era lo que hacía para esquivar el problema.
+- **3 pruebas nuevas** (208): que ningún `onclick` lleve un `JSON.stringify` sin
+  escapar, que todos los botones salgan del ayudante y que el ayudante escape.
+
+Comprobado en Chromium con voz simulada: hablan los cinco sitios probados
+—automático, «Toca para oír», «Más despacio», «Oír» del veredicto y el 🔊 del
+diccionario— y el `onclick` ya llega entero (`decir("øl")`), sin errores.
+
 ## Sesión 31-ago-2026 (noche 5) — «Escucha y elige» no sonaba al aparecer
 
 Fallo real reportado desde el uso: en los ejercicios de escucha la palabra

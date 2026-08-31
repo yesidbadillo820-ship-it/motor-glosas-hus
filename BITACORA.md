@@ -8985,6 +8985,15 @@ responde, y se pierde por tiempo.
   compartir), que se oiga la voz noruega y que el avance siga ahí al día
   siguiente. **Si esa opción no aparece, es que la página no cargó** — revise
   el wifi y el enlace, no el celular.
+- **~~Ningún botón de altavoz funcionaba~~ — ARREGLADO (esta era la de fondo).**
+  Los doce botones 🔊 de la aplicación estaban mudos: «Toca para oír», los de
+  «más despacio», los del recuadro de respuesta y los del diccionario, la
+  gramática y las conversaciones. Un error de escritura del programa hacía que
+  el navegador cortara la orden por la mitad y el botón no hiciera nada. Lo
+  único que sí sonaba era lo que no pasaba por un botón. Ya quedó, y ahora
+  todos los botones que hablan salen de un mismo sitio para que no vuelva a
+  pasar de a uno.
+
 - **~~En «escucha y elige» la palabra no sonaba al aparecer~~ — ARREGLADO.**
   Solo se oía al pulsar «Comprobar», así que el ejercicio se resolvía leyendo en
   vez de escuchando. La orden de reproducir estaba escrita en el programa pero
