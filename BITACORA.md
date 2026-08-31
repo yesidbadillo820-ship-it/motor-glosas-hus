@@ -8976,6 +8976,39 @@ responde, y se pierde por tiempo.
 
 ---
 
+### 31-08 (noche) — «¿Por qué me salen otros auditores?»: el aviso de firma
+
+Yesid mostró el historial de la HUS0000554177: la devolución quedó firmada por
+**LAURA DIAZ** y la hizo otro gestor. Es el mismo mal del 25-08 (Vanesa y
+Óscar): el sistema firma cada movimiento con la **sesión abierta en el
+navegador**, no con quién está sentado al computador — y la sesión dura 8
+horas, así que una sesión olvidada firma por otros el resto del día. La regla
+de oficina («cada uno con su usuario y cerrar sesión») ya demostró que sola no
+alcanza.
+
+**El control que escogió Yesid:** antes de firmar, la pantalla lo dice grande.
+En los tres puntos de la pre-auditoría donde se firma —la ventana de auditar
+(radicar / devolver / dejar pendiente), el paso 4 «Cargar envío» y el paso 3
+«Registrar oficio»— ahora sale un recuadro azul:
+
+> ✍️ **Quedará firmado por: LAURA DIAZ** · No soy yo — cambiar de usuario
+
+El enlace cierra la sesión equivocada y lleva al login, de una. Quien sí es,
+no hace ningún clic de más.
+
+**Para averiguar quién tenía la sesión** en un caso ya ocurrido sigue
+sirviendo el comando de solo lectura:
+
+    venv\Scripts\python.exe tools\preauditoria_quien_hizo_que.py FHUS-AS-I01261-26
+
+**Lo que quedó pendiente de decidir** (se le propusieron y no los escogió por
+ahora): cierre de sesión por inactividad, y que coordinación pueda corregir
+una firma ya guardada dejando rastro.
+
+8 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
 
 ### Curso de noruego (31-08, noche)
