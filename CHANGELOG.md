@@ -1,5 +1,59 @@
 # Registro de cambios
 
+## Sesión 31-ago-2026 — Curso de noruego (`noruego/`)
+
+Aplicación web para aprender noruego bokmål desde cero, para hispanohablantes,
+instalable en el celular (PWA) y funcional sin internet. Módulo independiente:
+no importa nada de `app/` ni de `tools/` y solo usa la librería estándar.
+
+### Contenido
+- **423 elementos de léxico** en JSON: 133 sustantivos con género y las cuatro
+  formas, 69 verbos con sus cuatro tiempos y su grupo, 40 adjetivos con las tres
+  formas, 85 frases de uso real, 42 números, 13 guías de pronunciación, 29
+  reglas de gramática (con ejemplo, error típico y comparación con el español) y
+  12 conversaciones de situaciones reales.
+- **18 módulos y 73 lecciones**, de nivel cero a B2, con la estructura definida
+  hasta C2.
+
+### Motor
+- Los ejercicios **se generan a partir de los datos**, no se escriben a mano:
+  de «bil es masculino y su definido es bilen» salen solos el ejercicio de
+  género, el de forma, el de traducción, el de escucha y el de parejas. 875
+  ejercicios por variante, 3 variantes por lección (2.625 en total).
+- 15 tipos de ejercicio: opción, completar, ordenar, traducir en las dos
+  direcciones, escuchar y elegir, escuchar y escribir, parejas, conjugar,
+  género, forma nominal, encontrar el error, diálogo, lectura y pronunciación.
+
+### Aplicación
+- Mobile first: barra inferior, botones de 52 px, zona segura del iPhone,
+  vibración, atajos de teclado.
+- Repetición espaciada que decide sola qué repasar, con detección de palabras
+  difíciles.
+- XP, niveles de jugador, racha, objetivo diario, corazones, estrellas, 10
+  logros y desbloqueo progresivo.
+- Audio con la voz del propio dispositivo (`nb-NO`). **Si no hay voz noruega,
+  muestra el texto y lo dice**, en vez de leer con acento español.
+- Diccionario buscable, gramática explicada, conversaciones, estadísticas con
+  calendario de constancia, copia de seguridad y panel para agregar contenido
+  sin tocar código.
+- PWA: manifest, service worker con caché e iconos generados.
+
+### Correcciones encontradas durante el desarrollo
+- `fuentes=("frases")` era una cadena, no una tupla: al recorrerla daba letras
+  sueltas y dejaba lecciones sin material.
+- El tipo de ejercicio rotaba con los ejercicios ya generados, así que un tipo
+  imposible de construir con ese material **bloqueaba el ciclo entero**: 27
+  lecciones quedaban casi vacías. Ahora rota con los intentos.
+- Sin voz noruega instalada, los ejercicios de escucha eran imposibles de
+  responder. Ahora muestran el texto como respaldo.
+
+### Pruebas
+167 pruebas en `tests/test_noruego/`; `ruff` limpio. Recorrido completo
+verificado en Chromium emulando un celular: alta de usuario, tres lecciones
+completas, XP, logros, diccionario, gramática, conversaciones, perfil, panel de
+contenido y **persistencia tras recargar**, sin errores de JavaScript y sin
+desbordamiento horizontal.
+
 ## Sesión 26-ago-2026 (cierre 7) — un solo vocabulario de color
 
 Idea #12, decidida por el área. **Corrige lo que la propuesta afirmaba:** que
