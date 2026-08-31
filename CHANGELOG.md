@@ -1,5 +1,33 @@
 # Registro de cambios
 
+## Sesión 31-ago-2026 (tarde) — El bot de noruego no mostraba la dirección
+
+Arreglo de la primera prueba real en el PC de cartera.
+
+- **`tools/NORUEGO.cmd` imprimía la ayuda de `ipconfig` en vez de la IP.** La
+  línea era `ipconfig ^| findstr /C:"IPv4"`: el `^|` solo va escapado dentro de
+  un `for /f`; suelto, el `|` le llega a `ipconfig` como argumento. Como no
+  salía la dirección, el bot igual mostraba el texto de relleno
+  `http://LA-IP-DE-ARRIBA:8000/...` — y eso fue literalmente lo que se escribió
+  en Chrome (`DNS_PROBE_FINISHED_NXDOMAIN`).
+- **Nuevo `noruego/red.py` + `python -m noruego direccion`.** La IP se averigua
+  abriendo un socket UDP hacia `8.8.8.8` sin enviar ningún byte (en UDP,
+  `connect()` solo fija la ruta local): funciona sin internet, no genera tráfico
+  y no depende del idioma de Windows ni de cuántos adaptadores tenga el equipo.
+  El comando imprime el **enlace completo**, listo para copiar; sin red no
+  imprime nada y devuelve 1.
+- **El bot y `exportar` ya no muestran texto de relleno** cuando pueden mostrar
+  el enlace real. El relleno que queda (`ESE-NUMERO`) solo aparece si de verdad
+  no hubo IP, y va acompañado de cómo conseguirla.
+- **Se explica dónde está «Agregar a la pantalla de inicio»:** Android (Chrome)
+  en los tres puntos, iPhone (Safari) en el botón de compartir. En el computador
+  no aplica — se abre `static\noruego\index.html` con doble clic. Se buscó esa
+  opción en el Chrome de escritorio, donde no existe con ese nombre.
+- **26 pruebas nuevas** (193 en `tests/test_noruego`): `test_red.py` comprueba
+  que no salga tráfico, que sin red no reviente y que nunca se ofrezca una IP de
+  loopback; `test_bots_windows.py` rechaza el `^|` fuera de un `for /f`, el
+  texto de relleno viejo, los finales de línea LF y los subcomandos inexistentes.
+
 ## Sesión 31-ago-2026 — Curso de noruego (`noruego/`)
 
 Aplicación web para aprender noruego bokmål desde cero, para hispanohablantes,

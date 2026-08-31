@@ -156,8 +156,25 @@ agregó contenido desde el panel y se recargó la página para comprobar que el
 avance **no se pierde**. Sin errores y sin barras de desplazamiento de lado.
 
 **Cómo se usa:** doble clic en **`tools\NORUEGO.cmd`**. El bot arma la
-aplicación, muestra la dirección para escribirla en el celular y levanta el
-servidor. Guía completa: `docs/GUIA_CURSO_NORUEGO.md`.
+aplicación, **escribe el enlace completo** para copiarlo en el celular y
+levanta el servidor. Guía completa: `docs/GUIA_CURSO_NORUEGO.md`.
+
+**Arreglo del mismo día, en la primera prueba real.** El bot no mostró la
+dirección: sacaba la ayuda de `ipconfig` en vez del número. Era un error de
+una sola letra en el archivo del bot (la barra `|` iba «escapada» donde no
+debía, así que `ipconfig` la recibió como si fuera una orden). Como no salió
+la dirección, el usuario escribió en el navegador el texto de relleno que
+decía el bot —«LA-IP-DE-ARRIBA»— y el navegador respondió que la página no
+existe. **Ya no hay texto de relleno:** ahora el propio programa averigua con
+qué número se ve este computador en la red y **escribe el enlace completo,
+listo para copiar** (`http://192.168.x.x:8000/...`). También se agregó el
+comando `python -m noruego direccion` y **26 pruebas nuevas** que vigilan ese
+archivo, para que ese error no pueda volver.
+
+Y se aclaró dónde sale **«Agregar a la pantalla de inicio»**: es del
+**celular**, no del computador. En Android es el menú de los tres puntos; en
+iPhone, el botón de compartir. En el PC no hace falta: se abre el archivo con
+doble clic. El bot y la guía ahora lo dicen.
 
 ---
 
@@ -8873,8 +8890,10 @@ artefacto privado con los números anonimizados) con su análisis de precios.
 ### Curso de noruego (31-08, noche)
 - **Probarlo en SU celular.** Aquí se probó en un navegador de celular
   simulado; falta verlo en el teléfono real: que se instale con «Agregar a la
-  pantalla de inicio», que se oiga la voz noruega y que el avance siga ahí al
-  día siguiente.
+  pantalla de inicio» (Android: los tres puntos; iPhone: el botón de
+  compartir), que se oiga la voz noruega y que el avance siga ahí al día
+  siguiente. **Si esa opción no aparece, es que la página no cargó** — revise
+  el wifi y el enlace, no el celular.
 - **Instalar la voz noruega si el celular no la trae.** En Android se busca en
   Ajustes → Idiomas → Salida de texto a voz → instalar «norsk bokmål». Sin
   ella, los ejercicios de escuchar muestran el texto en vez de sonar (la
@@ -9630,9 +9649,10 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ### Curso de noruego — lo primero
 1. **Bajar los cambios y armar la aplicación:** `git pull` y doble clic en
-   **`tools\NORUEGO.cmd`**. El bot muestra en pantalla la dirección
-   (`http://<IP>:8000/static/noruego/index.html`) para escribirla en el celular
-   estando en el mismo wifi.
+   **`tools\NORUEGO.cmd`**. El bot escribe en pantalla el **enlace completo**
+   (algo como `http://192.168.1.15:8000/static/noruego/index.html`). Ese es el
+   que se copia **letra por letra** en el navegador del celular, con el mismo
+   wifi. No escriba el del ejemplo: el número cambia en cada computador.
 2. **Instalarla en el celular** con «Agregar a la pantalla de inicio» y hacer
    **la primera lección completa**. Si algo se ve mal o un ejercicio no se
    puede responder, mande la foto de la pantalla.
