@@ -20208,6 +20208,43 @@ async function gaAutocompletar(texto){
   }catch(e){ /* el autocompletado es de cortesía: si falla, se sigue escribiendo */ }
 }
 
+// Cuando la factura no está en el paquete escogido, no se dice «no existe»:
+// se mira en cuáles SÍ está y se ofrece llevar al auditor allá (31-08-2026).
+async function gaAvisarDondeEsta(numero, caja){
+  var donde = [];
+  try{
+    var r = await fetch('/glosas-adres/factura/'+encodeURIComponent(numero)+'/paquetes', {headers: authH()});
+    if(r.ok) donde = await r.json();
+  }catch(_){ /* si falla, queda el mensaje simple */ }
+  if(!donde.length){
+    caja.innerHTML = '<div class="chart-card" style="padding:1.2rem;color:var(--text3)">'+
+      'La factura <b>'+escHtml(numero)+'</b> no está en ningún paquete cargado.</div>';
+    return;
+  }
+  var botones = donde.map(function(p){
+    return '<button class="btn btn-primary" style="font-size:.8rem" onclick="gaIrAPaquete('+p.paquete_id+',\''+
+           String(p.factura||numero).replace(/'/g,"") + '\')">'+
+           'Ver en el paquete '+escHtml(p.paquete||p.paquete_id)+
+           ' · '+p.glosas+' glosa(s) · '+fmtCOP(p.valor_glosado)+'</button>';
+  }).join(' ');
+  caja.innerHTML = '<div class="chart-card" style="padding:1.2rem">'+
+    '<div style="font-size:.9rem;margin-bottom:.6rem">La factura <b>'+escHtml(numero)+
+    '</b> no está en el paquete que tiene escogido arriba, pero sí está en '+
+    (donde.length>1 ? 'estos paquetes' : 'este')+':</div>'+
+    '<div style="display:flex;gap:.5rem;flex-wrap:wrap">'+botones+'</div></div>';
+}
+
+// Cambia el paquete de arriba y trae la factura allá.
+async function gaIrAPaquete(paqueteId, factura){
+  var sel = document.getElementById('ga-paquete');
+  if(sel){ sel.value = String(paqueteId); }
+  GA_PAQUETE = paqueteId;
+  var input = document.getElementById('ga-factura');
+  if(input && factura) input.value = factura;
+  gaCargarLista();
+  gaBuscar();
+}
+
 async function gaBuscar(){
   var numero = (document.getElementById('ga-factura').value||'').trim();
   var caja = document.getElementById('ga-resultado');
@@ -20217,8 +20254,7 @@ async function gaBuscar(){
     var url = '/glosas-adres/factura/'+encodeURIComponent(numero)+(GA_PAQUETE?'?paquete_id='+GA_PAQUETE:'');
     var r = await fetch(url, {headers: authH()});
     if(r.status === 404){
-      caja.innerHTML = '<div class="chart-card" style="padding:1.2rem;color:var(--text3)">'+
-        'La factura <b>'+escHtml(numero)+'</b> no está en ningún paquete cargado.</div>';
+      await gaAvisarDondeEsta(numero, caja);
       return;
     }
     if(!r.ok) throw new Error('HTTP '+r.status);
@@ -20512,6 +20548,17 @@ function gaPintar(d){
   if(d.aviso_detallado){
     h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #f59e0b;background:rgba(245,158,11,.10);font-size:.8rem">'+
          '<b>Sin detallado.</b> '+escHtml(d.aviso_detallado)+'</div>';
+  }
+  // La misma factura glosada en dos paquetes: acá solo se ve la de este.
+  if(d.aviso_otros_paquetes){
+    h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.10);font-size:.8rem">'+
+         '<b>Esta factura está glosada en más de un paquete.</b> '+escHtml(d.aviso_otros_paquetes)+
+         '<div style="margin-top:.5rem;display:flex;gap:.4rem;flex-wrap:wrap">'+
+         (d.otros_paquetes||[]).map(function(p){
+           return '<button class="btn btn-ghost" style="font-size:.75rem" onclick="gaIrAPaquete('+p.paquete_id+',\''+
+                  String(d.factura||'').replace(/'/g,"") + '\')">Ver en el paquete '+escHtml(p.paquete||p.paquete_id)+'</button>';
+         }).join('')+
+         '</div></div>';
   }
   if(r.por_asignar){
     h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.10);font-size:.8rem">'+

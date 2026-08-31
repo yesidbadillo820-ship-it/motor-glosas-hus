@@ -116,20 +116,20 @@ FILAS = [
 ]
 
 
-def _reporte_bytes() -> bytes:
+def _reporte_bytes(paquete: str = "31068", filas=None) -> bytes:
     """Un reporte del ADRES con la misma pinta del real, en memoria."""
     wb = openpyxl.Workbook()
     ws = wb.active
     for _ in range(6):  # el reporte real trae el título arriba
         ws.append([])
     ws.append(CABECERA_REPORTE)
-    for factura, tipo, cod, desc, glosado, causal in FILAS:
+    for factura, tipo, cod, desc, glosado, causal in filas if filas is not None else FILAS:
         ws.append(
             [
                 "680010079201",
                 "14345108",
                 factura,
-                "31068",
+                paquete,
                 1,
                 glosado + 1000,
                 0,
@@ -984,6 +984,79 @@ class TestPermisos:
             assert r.json()["decidido_por"] == "gestor@hus.gov.co"
         finally:
             app.dependency_overrides.clear()
+
+
+class TestFacturaEnVariosPaquetes:
+    """«La glosan dos veces pero acá solo me aparece una sola vez» (31-08-2026).
+
+    El ADRES glosa la misma factura en más de un paquete. La pantalla trabaja
+    sobre el paquete que el auditor tiene escogido arriba, así que al buscar
+    una factura del otro paquete respondía **«no está en ningún paquete
+    cargado»** — y era mentira: sí estaba, en otro. El auditor se queda
+    creyendo que esa glosa no llegó.
+    """
+
+    @pytest.fixture()
+    def dos_paquetes(self, client):
+        """El 31068 completo y un 31073 con solo la HUS352890."""
+        a = client.post(
+            "/glosas-adres/importar",
+            files={"archivo": ("ReporteGlosasReclamPAQUETE 31068.xlsx", _reporte_bytes())},
+        )
+        assert a.status_code == 200, a.text
+        solo_una = [f for f in FILAS if f[0] == "HUS352890"]
+        b = client.post(
+            "/glosas-adres/importar",
+            files={
+                "archivo": (
+                    "ReporteGlosasReclamPAQUETE 31073.xlsx",
+                    _reporte_bytes(paquete="31073", filas=solo_una),
+                )
+            },
+        )
+        assert b.status_code == 200, b.text
+        return a.json()["paquete_id"], b.json()["paquete_id"]
+
+    def test_dice_en_que_paquete_esta_de_verdad(self, client, dos_paquetes):
+        viejo, nuevo = dos_paquetes
+        r = client.get("/glosas-adres/factura/HUS311371", params={"paquete_id": nuevo})
+        assert r.status_code == 404
+        detalle = r.json()["detail"]
+        assert "31068" in detalle, detalle
+        assert "no está en ningún paquete cargado" not in detalle
+
+    def test_la_que_no_existe_sigue_diciendo_que_no_esta(self, client, dos_paquetes):
+        r = client.get("/glosas-adres/factura/HUS999999")
+        assert r.status_code == 404
+        assert "no está en ningún paquete cargado" in r.json()["detail"]
+
+    def test_dice_en_que_paquetes_esta_con_su_plata(self, client, dos_paquetes):
+        viejo, nuevo = dos_paquetes
+        r = client.get("/glosas-adres/factura/HUS352890/paquetes")
+        assert r.status_code == 200, r.text
+        por_paquete = {p["paquete"]: p for p in r.json()}
+        assert set(por_paquete) == {"31068", "31073"}
+        # En los dos está la misma plata: 37.600 + 85.800 + 5.000 + 450.000 + 12.000.
+        assert por_paquete["31068"]["valor_glosado"] == pytest.approx(590400)
+        assert por_paquete["31068"]["glosas"] == 4  # sin contar la glosa total
+        assert por_paquete["31068"]["glosas_totales_ocultas"] == 1
+        assert por_paquete["31073"]["pendientes"] == 4
+
+    def test_una_factura_que_no_esta_no_inventa_paquetes(self, client, dos_paquetes):
+        assert client.get("/glosas-adres/factura/HUS999999/paquetes").json() == []
+
+    def test_la_ficha_avisa_que_la_misma_factura_esta_en_otro_paquete(self, client, dos_paquetes):
+        viejo, nuevo = dos_paquetes
+        d = client.get("/glosas-adres/factura/HUS352890", params={"paquete_id": viejo}).json()
+        assert [p["paquete"] for p in d["otros_paquetes"]] == ["31073"]
+        aviso = d["aviso_otros_paquetes"]
+        assert "31073" in aviso
+        assert "no cubre" in aviso  # lo que se responde acá no cubre el otro paquete
+
+    def test_la_factura_de_un_solo_paquete_no_lleva_aviso(self, client, paquete):
+        d = client.get("/glosas-adres/factura/HUS352890").json()
+        assert d["otros_paquetes"] == []
+        assert d["aviso_otros_paquetes"] == ""
 
 
 class TestInformeExcel:
