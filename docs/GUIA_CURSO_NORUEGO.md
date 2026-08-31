@@ -14,21 +14,50 @@ ni de `tools/` y solo usa la librería estándar de Python 3.11.
 **escribe en pantalla el enlace completo** de tu computador y levanta el
 servidor. Deja esa ventana abierta.
 
-El enlace se ve así, con el número de tu computador:
+El bot escribe **una sola línea** que empieza por `http://` y termina en
+`index.html`. **Copie esa línea, la que salga en su ventana.** No la escriba
+de memoria y no copie ninguna dirección de esta guía: el número es distinto en
+cada computador. (Aquí no se pone ningún ejemplo a propósito — dos veces se
+copió el ejemplo en lugar del número real.)
 
-```
-http://192.168.1.15:8000/static/noruego/index.html
-```
+Después, en el celular conectado a la **misma red** del computador:
 
-> Ese número **cambia en cada computador y en cada wifi**. Copie el que
-> muestre su ventana; no escriba el del ejemplo.
-
-Después, en el celular conectado al **mismo wifi**:
-
-1. Abre el navegador y escribe el enlace **tal cual**, en la barra de
-   direcciones de arriba. No lo busques en Google.
+1. Abre el navegador y pega el enlace en la **barra de direcciones** de
+   arriba. No lo busques en Google.
 2. Cuando cargue la aplicación, instálala (ver abajo).
 3. Ábrela desde el ícono. A partir de ahí funciona **sin internet**.
+
+### Si el celular dice «tardó demasiado en responder»
+
+El enlace está bien, pero **el celular no llega al computador**. Es lo normal
+en la red del hospital y casi siempre es una de estas tres:
+
+| Causa | Cómo se comprueba | Qué hacer |
+|---|---|---|
+| **El firewall de Windows bloquea el puerto** | Es lo más frecuente | Abrir PowerShell **como administrador** y correr el comando de abajo |
+| **El celular está en otra red** | El computador está por **cable** (dirección `172.x`) y el celular por wifi de visitantes | Conectar el celular al wifi del hospital, no al de invitados |
+| **La red del hospital separa wifi y cable** | Ninguna de las dos anteriores lo arregla | Usar la dirección del túnel (ver abajo) |
+
+Regla del firewall (una sola vez, PowerShell **como administrador**):
+
+```powershell
+New-NetFirewallRule -DisplayName "Curso noruego" -Direction Inbound `
+  -Protocol TCP -LocalPort 8000 -Action Allow -Profile Any
+```
+
+### La forma que sirve aunque la red no coopere
+
+El Motor de Glosas ya se ve **desde fuera del hospital** por el túnel del
+puerto 8080. La aplicación vive dentro de `static/`, así que **el mismo túnel
+también la sirve**, sin firewall, sin wifi y hasta con datos del celular:
+
+```
+<la dirección con la que usted entra al Motor de Glosas>/static/noruego/index.html
+```
+
+Es decir: la misma dirección de siempre, cambiando lo que va después del
+dominio por `/static/noruego/index.html`. No hace falta reiniciar nada: los
+archivos de `static/` se leen del disco en cada visita.
 
 ### Dónde sale «Agregar a la pantalla de inicio»
 
@@ -41,8 +70,8 @@ ese nombre.
 | **iPhone (Safari)** | El botón de **compartir** (el cuadrito con la flecha hacia arriba, abajo en el centro) → **«Añadir a pantalla de inicio»**. |
 | **En el computador** | No hace falta: abra `static\noruego\index.html` con doble clic. (En Chrome de escritorio la opción existe, pero se llama **«Instalar página como aplicación…»**, dentro de *Enviar, guardar y compartir*.) |
 
-Si la opción no aparece, es porque **la página no cargó**. Revise que el
-celular esté en el mismo wifi y que el enlace esté escrito completo.
+Si la opción no aparece, es porque **la página no cargó**. Vuelva a la
+sección de arriba: no es el celular, es la red.
 
 ### Desde la consola
 

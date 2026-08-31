@@ -15,6 +15,7 @@ Fallas reales que estas pruebas evitan:
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -127,3 +128,35 @@ def test_el_bot_solo_llama_a_comandos_que_existen():
 def test_el_gitattributes_mantiene_la_regla_de_crlf():
     reglas = (RAIZ / ".gitattributes").read_text(encoding="utf-8")
     assert "*.cmd text eol=crlf" in reglas
+
+
+# --- La guía del usuario ---------------------------------------------------
+# Dos veces seguidas se copió la dirección de EJEMPLO en vez de la propia:
+# primero «LA-IP-DE-ARRIBA», después el 192.168.1.15 de la guía (la máquina
+# real era otra). La conclusión es que cualquier dirección impresa como
+# ejemplo termina escrita en el navegador, así que no puede haber ninguna.
+
+GUIA = RAIZ / "docs" / "GUIA_CURSO_NORUEGO.md"
+
+#: Una dirección de máquina completa y copiable: http://<numeros>:<puerto>/
+DIRECCION_COPIABLE = re.compile(r"https?://\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?/")
+
+
+def test_la_guia_no_trae_ninguna_direccion_de_ejemplo():
+    encontradas = DIRECCION_COPIABLE.findall(GUIA.read_text(encoding="utf-8"))
+    assert not encontradas, (
+        "la guía muestra una dirección copiable y el usuario la copia en vez "
+        f"de la suya: {encontradas}"
+    )
+
+
+def test_el_bot_no_trae_ninguna_direccion_de_ejemplo():
+    encontradas = DIRECCION_COPIABLE.findall(_texto())
+    assert not encontradas, f"el bot muestra una dirección copiable: {encontradas}"
+
+
+def test_el_bot_explica_que_hacer_si_el_celular_no_conecta():
+    """«Tardó demasiado en responder» es firewall o red, no un enlace malo."""
+    texto = _texto()
+    assert "New-NetFirewallRule" in texto, "no dice cómo abrir el puerto en el firewall"
+    assert "8000" in texto
