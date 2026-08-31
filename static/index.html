@@ -690,42 +690,97 @@ header::after{
 
 /* ─── SIDEBAR NAV (lateral, estilo Linear/Epic) ────────────── */
 .main-layout{flex:1;display:flex;overflow:hidden;min-height:0}
-.sidebar-nav{width:240px;flex-shrink:0;background:var(--bg-card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;transition:width .2s var(--ease)}
-.sidebar-nav.collapsed{width:64px}
-.sn-toggle{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1rem;border-bottom:1px solid var(--border);color:var(--text3);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
-.sidebar-nav.collapsed .sn-toggle-label{display:none}
-.sn-toggle button{background:transparent;border:none;cursor:pointer;color:var(--text3);padding:4px;border-radius:4px;display:flex;align-items:center;justify-content:center}
-.sn-toggle button:hover{background:var(--bg-subtle);color:var(--text)}
-.sn-group{padding:.75rem 0;border-bottom:1px solid var(--border)}
-.sn-group:last-child{border-bottom:none}
-.sn-label{padding:.35rem 1.1rem;font-size:.66rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:.25rem}
-.sidebar-nav.collapsed .sn-label{display:none}
-.sn-item{
-  width:100%;display:flex;align-items:center;gap:.75rem;padding:.6rem 1.15rem;
-  background:transparent;border:none;cursor:pointer;font-family:var(--font);
-  font-size:.82rem;font-weight:500;color:var(--text2);text-align:left;
-  transition:background .2s var(--ease-out),color .2s var(--ease-out),transform .15s var(--ease-out);
-  position:relative;border-radius:0;
+/* ═══════════════════════════════════════════════════════════════════
+   MENÚ LATERAL — pulido visual (31-08-2026)
+
+   Solo estética: ni una ruta, ni un permiso, ni un onclick cambian.
+   Se conservan todas las clases y todos los nombres que el JS usa
+   (.sn-item, .sn-group, .sn-label, .sn-badge, .collapsed, .active…).
+
+   Qué se corrigió y por qué:
+   · El grupo se separaba con una LÍNEA a todo el ancho; eso corta el
+     menú en bloques y compite con el item activo. Se cambia por aire
+     y un rótulo mejor jerarquizado — pesa menos y ordena más.
+   · Los items iban pegados al borde. Ahora viven en una «pista» con
+     margen lateral, así el estado activo se lee como una pieza y no
+     como una banda que cruza la pantalla.
+   · El hover movía el item 3px a la derecha. En un menú de 30 entradas
+     eso es ruido: se reemplaza por un cambio de fondo, que es lo que
+     hace un producto serio.
+   ══════════════════════════════════════════════════════════════════ */
+.sidebar-nav{
+  width:248px;flex-shrink:0;background:var(--bg-card);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;
+  transition:width .2s var(--ease);
+  scrollbar-width:thin;scrollbar-color:var(--border2) transparent;
 }
-.sn-item:hover{background:var(--sinac-gray-50);color:var(--text);transform:translateX(3px);box-shadow:inset 0 0 0 1px rgba(11,61,145,.06)}
-.sn-item:hover svg{color:var(--sinac-blue-700)}
-/* 13-08-2026. La pestaña activa pasa de azul a NARANJA, como la pidió el
-   auditor. Se usa el token que ya existe (--c-amber / --c-amber-light), no
-   un color suelto: si mañana se ajusta la paleta, esto va con ella. */
+.sidebar-nav::-webkit-scrollbar{width:8px}
+.sidebar-nav::-webkit-scrollbar-track{background:transparent}
+.sidebar-nav::-webkit-scrollbar-thumb{background:transparent;border-radius:4px;border:2px solid transparent;background-clip:content-box}
+.sidebar-nav:hover::-webkit-scrollbar-thumb{background:var(--border2);background-clip:content-box}
+.sidebar-nav.collapsed{width:68px}
+
+.sn-toggle{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.85rem 1rem .8rem 1.15rem;
+  color:var(--text4);font-size:.63rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.9px;
+}
+.sidebar-nav.collapsed .sn-toggle{justify-content:center;padding-left:1rem;padding-right:1rem}
+.sidebar-nav.collapsed .sn-toggle-label{display:none}
+.sn-toggle button{
+  background:transparent;border:none;cursor:pointer;color:var(--text3);
+  padding:5px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  transition:background .15s var(--ease-out),color .15s var(--ease-out);
+}
+.sn-toggle button:hover{background:var(--bg-subtle);color:var(--text)}
+
+/* Los grupos se separan con AIRE, no con una línea a todo el ancho:
+   la línea partía el menú en bloques y competía con el item activo. */
+.sn-group{padding:.15rem .5rem .55rem}
+.sn-group + .sn-group{margin-top:.1rem}
+.sn-group:last-child{padding-bottom:.75rem}
+.sn-label{
+  padding:.55rem .65rem .3rem;
+  font-size:.62rem;font-weight:700;color:var(--text4);
+  text-transform:uppercase;letter-spacing:.9px;
+}
+.sidebar-nav.collapsed .sn-label{
+  /* Colapsado no cabe el rótulo, pero el grupo sí tiene que notarse:
+     queda una rayita corta y centrada en su lugar. */
+  padding:0;height:1px;overflow:hidden;color:transparent;
+  margin:.5rem auto .45rem;width:20px;background:var(--border2);
+}
+.sn-item{
+  width:100%;display:flex;align-items:center;gap:.7rem;
+  padding:.5rem .65rem;border-radius:7px;
+  background:transparent;border:none;cursor:pointer;font-family:var(--font);
+  font-size:.815rem;font-weight:500;color:var(--text2);text-align:left;
+  letter-spacing:.005em;line-height:1.35;
+  transition:background .15s var(--ease-out),color .15s var(--ease-out);
+  position:relative;
+}
+.sn-item + .sn-item{margin-top:1px}
+/* El hover ya no desplaza el item: en un menú de treinta entradas ese
+   salto de 3px es ruido. Cambia el fondo, que es lo que se espera. */
+.sn-item:hover{background:var(--bg-subtle);color:var(--text)}
+.sn-item:hover svg{color:var(--text2)}
+
+/* 13-08-2026. La pestaña activa es NARANJA, como la pidió el auditor.
+   31-08-2026: se conserva el color, se cambia la forma. Antes era una
+   banda a todo el ancho con una barra que latía; ahora es una pieza
+   con esquinas suaves y una marca fija a la izquierda — se distingue
+   igual de rápido y no compite con el contenido de la pantalla. */
 .sn-item.active{
   background:var(--c-amber-light);
   color:var(--c-amber);font-weight:600;
 }
 .sn-item.active::before{
-  content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  height:16px;width:3px;
   background:var(--c-amber);
   border-radius:0 3px 3px 0;
-  box-shadow:0 0 8px rgba(230,81,0,.35);
-  animation:snActivePulse 2.4s ease-in-out infinite;
-}
-@keyframes snActivePulse{
-  0%,100%{box-shadow:0 0 8px rgba(230,81,0,.30)}
-  50%{box-shadow:0 0 13px rgba(230,81,0,.55)}
 }
 /* Cascade slide-in al cargar el sidebar */
 .sn-group .sn-item{opacity:0;animation:snItemIn .35s var(--ease-out) forwards}
@@ -742,26 +797,55 @@ header::after{
 }
 @media (prefers-reduced-motion: reduce){
   .sn-group .sn-item{opacity:1;animation:none}
-  .sn-item.active::before{animation:none}
 }
-body.dark .sn-item.active{background:rgba(230,81,0,.18);color:#fdba74}
-body.dark .sn-item:hover{background:rgba(255,255,255,.05)}
-.sn-item svg{flex-shrink:0;color:var(--text3)}
+body.dark .sn-item.active{background:rgba(230,81,0,.16);color:#fdba74}
+body.dark .sn-item:hover{background:rgba(255,255,255,.045)}
+
+/* Iconos: mismo tamaño para todos y alineados en una columna, para que
+   las etiquetas arranquen a la misma altura en todo el menú. */
+.sn-item svg{flex-shrink:0;width:17px;height:17px;color:var(--text4);transition:color .15s var(--ease-out)}
 .sn-item.active svg{color:var(--c-amber)}
 body.dark .sn-item.active svg{color:#fdba74}
 .sn-item-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sidebar-nav.collapsed .sn-item-label{display:none}
-.sidebar-nav.collapsed .sn-item{justify-content:center;padding:.6rem;position:relative}
-.sidebar-nav.collapsed .sn-item[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:var(--navy);color:#fff;padding:4px 10px;border-radius:6px;font-size:.72rem;white-space:nowrap;z-index:100;box-shadow:var(--sh-md)}
-.sn-badge{background:var(--c-red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;flex-shrink:0;box-shadow:0 0 0 0 rgba(239,68,68,.65);animation:snBadgePulse 2s ease-out infinite}
-@keyframes snBadgePulse{
-  0%{box-shadow:0 0 0 0 rgba(239,68,68,.55)}
-  70%{box-shadow:0 0 0 6px rgba(239,68,68,0)}
-  100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}
+.sidebar-nav.collapsed .sn-item{justify-content:center;padding:.55rem;position:relative}
+.sidebar-nav.collapsed .sn-item.active::before{display:none}
+.sidebar-nav.collapsed .sn-item[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%);background:var(--navy);color:#fff;padding:5px 10px;border-radius:6px;font-size:.72rem;font-weight:500;white-space:nowrap;z-index:100;box-shadow:var(--sh-md)}
+
+/* Badges: eran un círculo rojo que latía sin parar. Un número que
+   parpadea todo el día se deja de ver, y son tres a la vez. Ahora es
+   una pastilla discreta que se lee de un vistazo; el rojo se reserva
+   para «Alertas» y «Vencimientos», que es donde corre un plazo. */
+.sn-badge{
+  background:var(--bg-subtle);color:var(--text2);
+  font-size:10.5px;font-weight:700;font-variant-numeric:tabular-nums;
+  min-width:19px;height:18px;border-radius:9px;padding:0 6px;
+  display:inline-flex;align-items:center;justify-content:center;
+  margin-left:auto;flex-shrink:0;line-height:1;
+  border:1px solid var(--border2);
 }
+.sn-item.active .sn-badge{background:#fff;border-color:rgba(230,81,0,.35);color:var(--c-amber)}
+body.dark .sn-badge{background:rgba(255,255,255,.07);border-color:transparent;color:var(--text2)}
+body.dark .sn-item.active .sn-badge{background:rgba(255,255,255,.12);color:#fdba74}
+
+/* El rojo se reserva para donde CORRE UN PLAZO: vencimientos y alertas.
+   Una glosa que no se contesta a tiempo se da por aceptada (Art. 57 Ley
+   1438), así que ese número sí tiene que saltar. Si todos los badges van
+   en rojo, ninguno destaca — que es lo que pasaba.
+   Se selecciona por el id que ya existe en el HTML: no se toca el markup
+   ni el JavaScript que los muestra y los llena. */
+#venc-badge-side, #alert-badge-side, #sn-sug-badge{
+  background:var(--c-red);border-color:transparent;color:#fff;
+}
+.sn-item.active #venc-badge-side,
+.sn-item.active #alert-badge-side{background:var(--c-red);color:#fff;border-color:transparent}
+body.dark #venc-badge-side, body.dark #alert-badge-side, body.dark #sn-sug-badge{
+  background:var(--c-red);color:#fff;
+}
+
 @media (prefers-reduced-motion: reduce){.sn-badge{animation:none}}
 .sidebar-nav.collapsed .sn-badge{position:absolute;top:4px;right:4px;margin-left:0;min-width:14px;height:14px;font-size:9px}
-.sn-brand-footer{margin-top:auto;padding:1rem .75rem;border-top:1px solid var(--border);background:var(--bg-subtle)}
+.sn-brand-footer{margin-top:auto;padding:.85rem .75rem;border-top:1px solid var(--border);background:var(--bg-subtle)}
 .sidebar-nav.collapsed .sn-brand-footer{padding:.6rem .3rem}
 .sidebar-nav.collapsed .sn-brand-footer img{max-height:24px}
 .sidebar-nav.collapsed .sn-brand-footer div{display:none}
@@ -5842,23 +5926,26 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
 
   /* 3. SIDEBAR PREMIUM: search input + favoritos + recientes */
   .sn-search{
-    margin:.5rem .75rem .65rem; position:sticky; top:0; z-index:5;
-    background:var(--bg-card);
+    margin:0 .75rem .5rem; position:sticky; top:0; z-index:5;
+    background:var(--bg-card); padding-bottom:.35rem;
   }
+  .sidebar-nav.collapsed .sn-search{display:none}
   .sn-search input{
-    width:100%; padding:.45rem .6rem .45rem 2rem;
-    font-size:.78rem;
-    background:var(--bg-subtle); border:1px solid var(--border);
+    width:100%; padding:.48rem .65rem .48rem 2.05rem;
+    font-size:.78rem; font-family:var(--font);
+    background:var(--bg-subtle); border:1px solid var(--border2);
     border-radius:8px; color:var(--text);
-    transition:all .15s ease;
+    transition:border-color .15s ease, box-shadow .15s ease, background .15s ease;
   }
+  /* 31-08-2026: el foco se pinta con el azul del sistema, no con el teal —
+     era el único punto del menú donde aparecía ese color. */
   .sn-search input:focus{
-    outline:none; border-color:var(--c-teal2);
+    outline:none; border-color:var(--sinac-blue-700);
     background:var(--bg-card);
-    box-shadow:0 0 0 3px rgba(2,132,199,.1);
+    box-shadow:0 0 0 3px rgba(21,101,192,.12);
   }
   .sn-search::before{
-    content:""; position:absolute; left:.55rem; top:50%;
+    content:""; position:absolute; left:.62rem; top:calc(50% - .17rem);
     transform:translateY(-50%); width:12px; height:12px;
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>");
     background-size:contain; background-repeat:no-repeat; opacity:.6;
