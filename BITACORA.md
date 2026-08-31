@@ -215,6 +215,68 @@ FECHA DE CARGUE, CODIGO RESPUESTA, VALOR ACEPTADO y OBSERVACION con la respuesta
 del paquete 31068: **1.299 de 1.586 filas (81 %)**, $41.968.198 aceptados. Las
 287 restantes quedaron en blanco a propósito y con su motivo en el informe.
 
+### 28-08-2026 (noche) — Se revisaron las normas que nadie había comprobado: dos estaban mal, y una iba en un documento que se firma
+
+**Por qué se hizo.** El motor tiene cargadas 150 normas. De ellas, **24 son las
+que de verdad escribe en los dictámenes** — o sea, las que llegan a la EPS — y
+**ninguna se había comparado contra su texto oficial**. Se bajaron una por una
+del normograma de la Superintendencia Nacional de Salud y se compararon.
+
+**Resultado: de 24, dos estaban mal. Y las dos eran graves.**
+
+**1. La Resolución 2175 de 2015 no es de glosas.** El motor la tenía cargada
+como «procedimiento de conciliación de glosas médicas». El texto oficial dice
+que es del **reporte de atenciones a menores de 18 años, gestantes y partos**,
+del programa Familias en Acción.
+
+Lo grave es dónde salía: en el **acta de conciliación**, el documento que firman
+un representante del hospital y uno de la EPS. El acta decía suscribirse «en
+cumplimiento de … la Resolución 2175 de 2015». A la EPS le bastaba abrirla para
+restarle seriedad al acta completa.
+
+Y las otras dos normas de esa misma frase estaban corridas al artículo de al
+lado: decía **Ley 1438 art. 56** (que es el de pagos) cuando el de glosas es el
+**57**; y **Decreto 4747 art. 20** (que es el del RIPS) cuando el de glosas es
+el **23**. El acta ahora invoca los tres correctos más el Manual Único
+(Res. 2284/2023, Anexo Técnico 3).
+
+**⚠ Esto necesita una revisión que no es del programa:** si ya se firmó alguna
+acta con el texto viejo, eso lo tiene que mirar el área jurídica.
+
+**2. Había cuatro listados del PBS «vigentes» al mismo tiempo.** El listado de
+lo que cubre la UPC lo reexpide el Ministerio **cada diciembre**. El motor tenía
+como vigentes la Res. 5269 de 2017, la Res. 2481 de 2020 y la Res. 2292 de 2021
+— las tres derogadas hace años.
+
+Con eso, el motor podía decirle a la EPS que un servicio **está cubierto**
+citando un listado que dejó de aplicar hace ocho años. A la entidad le basta
+mostrar la derogatoria para ratificar la glosa. Es lo mismo que pasó en la
+mañana con la Res. 3047, pero en la **cobertura**, que es donde se decide si
+el servicio se paga.
+
+La cadena, verificada eslabón por eslabón: 5269/2017 → 5857/2018 → 2481/2020 →
+2292/2021 → 2808/2022 → 2366/2023 → **2718/2024**, que es la última a la que el
+normograma no le anota derogatoria. Se cargó esa para que el motor tenga qué
+citar. No se borró ninguna: para un servicio de 2022 el listado bueno es el
+de 2022.
+
+**⚠ Falta confirmar:** que la Res. 2718 de 2024 siga siendo la vigente. Sale
+una cada diciembre y el normograma puede ir atrasado. No se afirma que sea la
+de 2026 porque no se ha visto.
+
+**Las otras diez estaban bien.** Solo les faltaba dejar anotado contra qué
+fuente se comprobaron, que ya quedó. Y a la Res. 2003 de 2014 —bien marcada
+como derogada— le faltaba decir **quién** la derogó, que es el dato que el aviso
+le muestra al gestor para que sepa por cuál cambiarla.
+
+**Quedan nueve sin comprobar, y no por descuido:** el normograma de la
+Supersalud solo tiene normas de salud, así que la Ley 1581 de 2012 (datos
+personales), la Ley 1150 de 2007 (contratación) y el Decreto 1072 de 2015
+(Trabajo) hay que buscarlas en otro lado; cuatro no aparecieron; y la
+**Res. 124 de 2026 es del propio hospital**, así que esa la confirma el área.
+
+**El corpus pasó de 149 normas con 81 sin comprobar a 150 con 53.**
+
 ### 28-08-2026 — Se auditaron las 135 glosas reales de la base, y la norma derogada que el motor seguía escribiendo
 
 **Lo que se revisó.** Usted exportó desde la PC de cartera las **135 glosas
@@ -9322,9 +9384,11 @@ pertenecen a otro paquete, hay que conseguir sus glosas para poder armarlas.
 
 ### Lo primero (28-08, cierre)
 
-**1. Fusionar y desplegar.** La entrega de la causal en el recuadro y el sello
-que hablaba de un texto viejo **ya la fusionó usted** (PR #529). Falta la de
-hoy: la Res. 3047 de 2008 y sus dos hermanas derogadas.
+**1. Comprobar en pantalla lo que ya se fusionó.** Las dos entregas del motor
+están fusionadas: la causal que salía en el recuadro y el sello que hablaba de
+un texto viejo (PR #529), y la Res. 3047 de 2008 con sus dos hermanas derogadas
+(PR #533). Falta la comprobación en la PC de cartera — hasta que se vea
+corriendo, esto no está verificado.
 
 Después del despliegue, corra **la misma glosa de siempre** (SO0102 de la
 factura HUS0000498954) y mire dos cosas: que en el recuadro ya **no** diga
@@ -9345,6 +9409,17 @@ lado, entre paréntesis, desde cuándo está derogada.
   hoy, concluye «sin contrato» y aplica SOAT pleno — cuando lo más probable es
   que el servicio sí estuviera cubierto. Hay que decidir qué debe hacer el
   motor en ese caso.
+- **¿La Res. 2718 de 2024 sigue siendo el listado del PBS vigente?** Es la
+  última a la que el normograma no le anota derogatoria, pero el Ministerio
+  saca una cada diciembre y esa página puede ir atrasada. Vale la pena
+  confirmarlo: de ahí depende que el motor pueda afirmar que un servicio está
+  cubierto.
+- **¿Se firmó alguna acta de conciliación con el texto viejo?** El acta
+  invocaba la Res. 2175 de 2015, que no es de glosas. Ya quedó corregida, pero
+  las que ya se firmaron las tiene que mirar el área jurídica — eso no lo
+  arregla el programa.
+- **La Res. 124 de 2026 la tiene que confirmar el área.** Es del propio
+  hospital, no de un ministerio, así que no hay normograma donde comprobarla.
 - **El texto de TARIFAS de Salud Total se está cortando.** Salud Total no
   acepta la fila si la Observación IPS pasa de **500 caracteres**, y esa
   plantilla mide **543**. El programa la corta sola por el último punto que
