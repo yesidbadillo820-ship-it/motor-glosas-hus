@@ -19992,6 +19992,11 @@ async function gaBuscar(){
       return;
     }
     if(!r.ok) throw new Error('HTTP '+r.status);
+    // 31-08-2026: cada factura se abre LIMPIA. El filtro es de la factura que
+    // se esta mirando; si se heredara de la anterior, en una factura de pocas
+    // glosas la barra del filtro no se dibuja y las filas escondidas no se
+    // podrian ni ver ni destapar.
+    GA_FILTRO = {texto:'', causal:'', clasificacion:'', estado:''};
     GA_DATOS = await r.json();
     gaPintar(GA_DATOS);
   }catch(e){
@@ -20059,7 +20064,13 @@ function gaAvisoRepetidas(d){
 
 function gaBarraFiltro(d){
   var glosas = d.glosas || [];
-  if(glosas.length < 5) return '';   // con 4 filas el filtro estorba
+  if(glosas.length < 5){
+    // Con 4 filas el filtro estorba y no se dibuja. Y si no se dibuja, no hay
+    // donde verlo ni donde quitarlo: se limpia, para que ninguna glosa quede
+    // escondida sin que nadie pueda destaparla.
+    GA_FILTRO = {texto:'', causal:'', clasificacion:'', estado:''};
+    return '';
+  }
 
   var causales = {}, clasifs = {};
   glosas.forEach(function(g){
@@ -20125,6 +20136,12 @@ function gaAplicarFiltro(){
     if(ok) visibles++;
   });
   var cuenta = document.getElementById('ga-filtro-cuenta');
+  if(!cuenta && visibles !== filas.length){
+    // No se dibujo la barra: nadie podria ver ni quitar este filtro. Antes de
+    // esconder una glosa a ciegas, se muestran todas.
+    filas.forEach(function(tr){ tr.style.display = ''; });
+    return;
+  }
   if(cuenta){
     cuenta.innerHTML = (visibles === filas.length)
       ? filas.length + ' glosas'

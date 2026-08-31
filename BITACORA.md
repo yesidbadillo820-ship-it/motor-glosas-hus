@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 28-08-2026 (cierre)
+**Última actualización:** 31-08-2026
 
 ---
 
@@ -62,6 +62,38 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 31-08-2026 — La glosa que no aparecía en pantalla (y los 73 detallados del 31078)
+
+**Lo que reportó Jhon.** Abrió una factura del paquete 31078 y arriba le decía
+**4 glosas, 1 sin decidir**, pero en la tabla solo salían **3**. Preguntó dónde
+podía responder la que faltaba. No había dónde: no estaba en la pantalla.
+
+**Qué estaba pasando.** La glosa sí venía del servidor —por eso la contaban los
+recuadros de arriba y salía su pastilla de clasificación (GLOSADA TOTAL POR
+FURIPS 1, $9.935.370)—. Lo que la escondía era el **filtro** de la tabla, ese
+que sirve para responder de a varias por causal. El filtro se quedaba puesto de
+la factura anterior, y como en una factura de **menos de 5 glosas la barra del
+filtro no se dibuja**, no había ni dónde verlo ni dónde quitarlo. La glosa
+desaparecía en silencio.
+
+**Qué se arregló** (tres candados, para que no vuelva a pasar):
+
+1. Cada factura se abre **con el filtro limpio**: ya no se hereda de la anterior.
+2. Si la barra del filtro no se dibuja, el filtro **se borra solo**.
+3. Y si aun así algo escondiera filas sin que haya barra a la vista, la pantalla
+   **las vuelve a mostrar todas** antes que ocultar una glosa a ciegas.
+
+Quedó con pruebas automáticas: las tres defensas fallan si alguien las quita.
+
+**Mientras se despliega:** si le vuelve a pasar, **recargue la página** (F5) y
+la glosa aparece. Es exactamente lo que hace el arreglo, pero a mano.
+
+**También del día — los 73 detallados del paquete 31078.** Quedaron con el mismo
+formato del modelo que pasó el auditor (el HUS311371): numeración corrida 1, 2,
+3…, el TOTAL en letras en blanco, la hoja llamada `Sheet`, sin área de impresión,
+impresión A4 vertical al 52% y la raya sobre el bloque de totales. Los 73 abren
+sin reparar y siguen sumando **$257.497.923**.
 
 ### 28-08-2026 (cierre) — Las objeciones del ADRES quedaron cargadas: 58 facturas y $103,9 millones
 
