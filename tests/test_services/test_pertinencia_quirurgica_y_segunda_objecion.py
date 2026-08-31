@@ -104,9 +104,14 @@ class TestElPromptExigeLaSegundaObjecion:
         assert "UN PARRAFO INDEPENDIENTE POR CADA UNA" in _prompt()
 
     def test_le_da_el_fundamento_propio_de_la_tarifa(self):
+        """El fundamento se endureció el mismo día (tercera corrida): ahora
+        exige además nombrar <contrato> y <tarifa>. Lo que la prueba vigila
+        sigue siendo lo mismo: que la objeción de tarifa reciba SU fundamento
+        y no el de la pertinencia."""
         p = _prompt()
         assert "PACTA SUNT SERVANDA" in p
-        assert "un tope que no consta en el contrato no existe" in p
+        assert "no existe" in p and "CLÁUSULA" in p
+        assert "<contrato>" in p and "<tarifa>" in p
 
     def test_le_prohibe_resolverla_con_las_normas_de_la_primera(self):
         p = _prompt()

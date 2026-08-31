@@ -2595,10 +2595,15 @@ RE_HAY_SEGUNDA_OBJECION = re.compile(
 # la segunda con las normas de la primera.
 FUNDAMENTO_POR_FAMILIA: dict[str, str] = {
     "tarifa": (
-        "el CONTRATO y su tarifa pactada — PACTA SUNT SERVANDA (Art. 1602 C.C., "
-        "Art. 871 C.Co.): la tarifa no se modifica unilateralmente en vía de "
-        "glosa. Si la entidad alega un TOPE, EXÍJALE la cláusula y el número: "
-        "un tope que no consta en el contrato no existe"
+        "el CONTRATO y su tarifa — PACTA SUNT SERVANDA (Art. 1602 C.C., Art. 871 "
+        "C.Co.): la tarifa no se modifica unilateralmente en vía de glosa. "
+        "OBLIGATORIO nombrar el CONTRATO y la TARIFA que van en <contrato> y "
+        "<tarifa> de tu propia respuesta, con esas palabras exactas. Si la "
+        "entidad alega un TOPE, EXÍGELE la CLÁUSULA y el NÚMERO donde consta: "
+        "un tope que no aparece en el contrato no existe, y así hay que decirlo. "
+        "Si <tarifa> dice que NO está determinada o que la vigencia terminó, ESO "
+        "es lo que se escribe —y se pide la fecha de prestación—, no una tarifa "
+        "inventada"
     ),
     "autorización": (
         "Art. 67 Ley 715/2001 y Art. 168 Ley 100/1993 — la urgencia está "
@@ -2870,6 +2875,19 @@ def build_user_prompt(
             "PROHIBIDO resolver la segunda con las normas de la primera, y PROHIBIDO "
             "omitirla. Si no hay con que contestarla en el expediente, DIGA QUE FALTA "
             "y pida el dato — pero no la deje en silencio.\n"
+            # 31-08-2026, tercera corrida: ante el tope contractual la IA
+            # escribio «EL VALOR FACTURADO SE AJUSTA A LA COMPLEJIDAD DEL
+            # PROCEDIMIENTO». Eso no defiende nada: no cita contrato, no cita
+            # tarifa, no exige la clausula. En auditoria se ratifica solo.
+            "PROHIBIDAS las formulas vacias para contestar una objecion de dinero. "
+            "Estan EXPRESAMENTE prohibidas, entre otras: «se ajusta a la complejidad "
+            "del procedimiento», «corresponde a los estandares del mercado», «el valor "
+            "es razonable», «acorde con la naturaleza del servicio». Una objecion de "
+            "TARIFA o de TOPE se contesta con TRES cosas concretas o no se contesta: "
+            "(1) el NUMERO del contrato, (2) la TARIFA aplicable tal como aparece en "
+            "<tarifa>, y (3) la exigencia de que la entidad muestre la CLAUSULA del "
+            "tope que invoca. Si te faltan datos para las tres, DILO — pedir el dato "
+            "es defensa; llenar el renglon con un adjetivo no lo es.\n"
         )
 
     # ─── PERTINENCIA QUIRURGICA: SE CONTESTA CON LA NOTA OPERATORIA ───

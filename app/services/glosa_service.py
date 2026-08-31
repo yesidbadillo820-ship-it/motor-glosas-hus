@@ -4342,7 +4342,105 @@ def _es_codigo_de_glosa(codigo: str) -> bool:
         return False
 
 
-def _neutralizar_cups_sin_respaldo(texto: str, evidencia: str) -> str:
+# ── Frases con las que no se defiende un peso (31-08-2026) ──
+# Tercera corrida de la prueba 2. Ante «EL VALOR UNITARIO DEL CLAVO SUPERA EL
+# TOPE CONTRACTUAL», el dictamen contestó: «EL VALOR FACTURADO SE AJUSTA A LA
+# COMPLEJIDAD DEL PROCEDIMIENTO». Palabras del auditor: «eso en auditoría no
+# sirve para nada y hace perder el dinero».
+#
+# Tiene razón, y la razón es concreta: no cita contrato, no cita tarifa y no
+# exige la cláusula del tope. Es un adjetivo puesto donde iba una cuenta.
+_RE_RELLENO_TARIFARIO = re.compile(
+    r"SE\s+AJUSTA\s+A\s+LA\s+COMPLEJIDAD|ACORDE\s+(?:CON|A)\s+LA\s+(?:COMPLEJIDAD|"
+    r"NATURALEZA)|CORRESPONDE\s+A\s+(?:LOS\s+EST[ÁA]NDARES|LA\s+COMPLEJIDAD)|"
+    r"(?:EL\s+)?VALOR\s+(?:FACTURADO\s+)?ES\s+RAZONABLE|PRECIOS?\s+DEL\s+MERCADO",
+    re.IGNORECASE,
+)
+
+# Con qué SÍ se contesta: el número del contrato, la tarifa, o la exigencia de
+# la cláusula. Basta una de las tres para que no sea relleno.
+_RE_DEFENSA_TARIFARIA_REAL = re.compile(
+    r"CONTRATO\s+(?:N[°ºo\.]{0,2}\s*)?[\w\-/]*\d|TARIFA\s+(?:PACTADA|APLICADA|SOAT|"
+    r"NO\s+DETERMINADA)|CL[ÁA]USULA|PACTA\s+SUNT\s+SERVANDA|VIGENCIA\s+TERMINADA|"
+    r"ART[.\s]*1602|ART[.\s]*871",
+    re.IGNORECASE,
+)
+
+
+def _objecion_de_dinero_con_relleno(texto_glosa: str, dictamen: str) -> bool:
+    """True si la glosa objeta plata y el dictamen la despachó con un adjetivo.
+
+    Las tres condiciones: la glosa objeta tarifa o tope, el dictamen usa una
+    fórmula vacía, y NO trae ninguna de las tres cosas con las que de verdad
+    se contesta (número de contrato, tarifa, o la exigencia de la cláusula).
+
+    Si trae aunque sea una, no se avisa: la frase de relleno puede ser un
+    adorno alrededor de un argumento que sí existe.
+    """
+    if not texto_glosa or not dictamen:
+        return False
+    from app.services.glosa_ia_prompts import FAMILIAS_DE_OBJECION
+
+    fam_tarifa = next((f for f in FAMILIAS_DE_OBJECION if f[0] == "tarifa"), None)
+    if fam_tarifa is None or not fam_tarifa[2].search(texto_glosa.upper()):
+        return False
+    if not _RE_RELLENO_TARIFARIO.search(dictamen):
+        return False
+    return not _RE_DEFENSA_TARIFARIA_REAL.search(dictamen)
+
+
+def _quitar_causal_propia_del_cuerpo(texto: str, codigo_glosa: str) -> str:
+    """Borra del cuerpo del dictamen el código de LA GLOSA que se contesta.
+
+    31-08-2026, prueba 2, tercera corrida. El escrito decía «EL PROCEDIMIENTO
+    OSTEOSÍNTESIS DE FÉMUR (código CL4506)». CL4506 es la causal de NUEVA EPS,
+    no el procedimiento del hospital.
+
+    Por qué no lo atrapó ninguna de las redes que ya existían:
+
+      • `_quitar_causal_del_servicio` limpia el campo <servicio> de la IA, no
+        el cuerpo narrativo.
+      • `_neutralizar_cups_sin_respaldo` sí mira el cuerpo, pero su patrón
+        EXIGE la palabra literal «CUPS» (`_PAT_MENCION_CUPS`). Acá decía
+        «código» a secas, entre paréntesis. Nunca hubo coincidencia.
+
+    Esta red va aparte y a propósito NO ensancha `_PAT_MENCION_CUPS`: hacerlo
+    pondría bajo sospecha cualquier «código NNN» del escrito —números de
+    contrato, radicados, actas— y esa red borra. Acá solo se toca UN código:
+    el de la glosa que se está respondiendo, que por definición es la causal
+    de la entidad y jamás el procedimiento. Cero margen para llevarse por
+    delante lo que no es.
+    """
+    if not texto or not codigo_glosa:
+        return texto
+    cod = codigo_glosa.upper().strip().replace("-", "").replace(" ", "")
+    if not re.fullmatch(r"[A-Z]{2}\d{2,4}", cod):
+        return texto
+    fam, num = cod[:2], cod[2:]
+    # El código con o sin guiones/espacios: CL4506, CL-4506, CL 4506.
+    _cod = rf"{fam}\s*-?\s*{num}"
+    # 1) Entre paréntesis, con o sin la palabra «código»: «(código CL4506)».
+    limpio = re.sub(
+        rf"\s*\(\s*(?:c[óo]digo|cups)?\s*[:\-]?\s*{_cod}\s*\)",
+        "",
+        texto,
+        flags=re.IGNORECASE,
+    )
+    # 2) Rotulado sin paréntesis: «, código CL4506», «con CUPS CL-4506».
+    limpio = re.sub(
+        rf"[,;]?\s*(?:\b(?:con|del|de|el|la)\s+)?(?:c[óo]digo|cups)\s*[:\-]?\s*{_cod}\b",
+        "",
+        limpio,
+        flags=re.IGNORECASE,
+    )
+    # Barrer lo que quede: paréntesis vacíos y espacios dobles.
+    limpio = re.sub(r"\(\s*\)", "", limpio)
+    limpio = re.sub(r"\s+([,.;:])", r"\1", limpio)
+    limpio = re.sub(r"[ \t]{2,}", " ", limpio)
+    return limpio if limpio.strip() else texto
+
+
+def _neutralizar_cups_sin_respaldo(texto: str, evidencia: str, codigo_glosa: str = "") -> str:
     """Quita del dictamen los CUPS que no están ni en el expediente ni en el catálogo.
 
     Conservadora por diseño: solo borra el código cuando NO aparece en lo que
@@ -4354,9 +4452,22 @@ def _neutralizar_cups_sin_respaldo(texto: str, evidencia: str) -> str:
 
     borrados: list[str] = []
     despojados: list[str] = []
+    # 31-08-2026 (prueba 2, 3.ª corrida) — «PROCEDIMIENTO OSTEOSÍNTESIS DE
+    # FÉMUR (código CL4506)». El campo <servicio> ya se estaba limpiando, pero
+    # el CUERPO no: esta red también preguntaba solo al catálogo de 200
+    # causales, y CL4506 no está entre ellas. Mismo hueco, otro sitio.
+    # El código de la glosa que se contesta no necesita catálogo: es la causal
+    # de la entidad por definición.
+    _propio = (codigo_glosa or "").upper().strip().replace("-", "").replace(" ", "")
+
+    def _es_la_causal_de_esta_glosa(codigo: str) -> bool:
+        return bool(_propio) and codigo.upper().replace("-", "").replace(" ", "") == _propio
 
     def _sub(m: "re.Match[str]") -> str:
         codigo = m.group(1)
+        if _es_la_causal_de_esta_glosa(codigo):
+            borrados.append(codigo)
+            return ""
         if _cups_esta_en_catalogo(codigo):
             return m.group(0)  # es un CUPS de verdad: no se toca
         # 27-08-2026 — EL CÓDIGO DE LA GLOSA NUNCA ES EL DEL SERVICIO.
@@ -9558,9 +9669,27 @@ class GlosaService:
             #  de pierna". Se retira el número cuando no está en lo que la
             #  IA leyó NI se puede verificar en el catálogo.
             # ═══════════════════════════════════════════════════════════
+            # 31-08-2026 — la causal de ESTA glosa, fuera del cuerpo.
+            try:
+                _sin_causal_propia = _quitar_causal_propia_del_cuerpo(
+                    dictamen, str(locals().get("codigo_det") or "")
+                )
+                if _sin_causal_propia != dictamen:
+                    dictamen = _sin_causal_propia
+                    _correcciones.append(
+                        "El escrito presentaba el código de la glosa como si fuera "
+                        "el del procedimiento. Lo retiré: una causal de la entidad "
+                        "nunca es el CUPS del servicio, y presentarla así deja ver "
+                        "que el dictamen confundió las dos cosas."
+                    )
+            except Exception as _e_cp:
+                logger.debug(f"[CAUSAL-PROPIA] red no aplicada: {_e_cp}")
+
             try:
                 _dictamen_cups_respaldado = _neutralizar_cups_sin_respaldo(
-                    dictamen, _evidencia_leida
+                    dictamen,
+                    _evidencia_leida,
+                    str(locals().get("codigo_det") or ""),
                 )
                 if _dictamen_cups_respaldado != dictamen:
                     dictamen = _dictamen_cups_respaldado
@@ -9689,6 +9818,20 @@ class GlosaService:
                     logger.info("[NOTA-OPERATORIA] pertinencia quirúrgica sin citar la nota")
             except Exception as _e_no:
                 logger.debug(f"[NOTA-OPERATORIA] red no aplicada: {_e_no}")
+
+            # 31-08-2026 — LA OBJECIÓN DE DINERO DESPACHADA CON UN ADJETIVO.
+            try:
+                if _objecion_de_dinero_con_relleno(texto_base, dictamen):
+                    _correcciones.append(
+                        "OJO: la glosa objeta el valor o el tope, y el dictamen lo "
+                        "contesta con una frase de relleno («se ajusta a la "
+                        "complejidad» y parecidas), sin número de contrato, sin "
+                        "tarifa y sin exigir la cláusula del tope. Así se ratifica "
+                        "sola: complete esos tres datos antes de radicar."
+                    )
+                    logger.info("[RELLENO-TARIFARIO] objeción de dinero sin datos duros")
+            except Exception as _e_rt:
+                logger.debug(f"[RELLENO-TARIFARIO] red no aplicada: {_e_rt}")
 
             # 28-08-2026 — EL SELLO TIENE QUE HABLAR DEL TEXTO FINAL (2.ª vez).
             # Ayer se arregló para la red de CUPS y quedó el mismo defecto en
@@ -11523,6 +11666,36 @@ class GlosaService:
         # dice que la relación está por verificar. Sin evidencia, no se afirma.
         bloque_adjuntos = ""
         filas_adj, soportes_reales, aviso_adj = self._soportes_reales(numero_factura)
+        # 31-08-2026 (prueba 2, 3.ª corrida) — LO ADJUNTADO SE RELACIONA SIEMPRE.
+        # El primer intento metió esta relación DENTRO del «si el índice no
+        # encontró nada». En esta corrida el índice sí respondió, se fue por la
+        # otra rama y los dos PDF que el gestor acababa de subir volvieron a no
+        # aparecer. Son dos hechos distintos: lo que obra en el expediente
+        # institucional (lo dice el índice) y lo que va anexo a ESTE escrito (lo
+        # sabe el motor porque acaba de recibirlo). El segundo no depende del
+        # primero, así que se relaciona aparte y pase lo que pase.
+        _bloque_anexos = ""
+        if adjuntos:
+            _filas_anx = "".join(
+                f'<tr><td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;'
+                f'width:40px;">{i}</td>'
+                f'<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">'
+                f"{nombre}</td></tr>"
+                for i, nombre in enumerate(adjuntos, 1)
+            )
+            _bloque_anexos = (
+                '<div style="background:#f0fdf4;border:2px solid #16a34a;'
+                'border-radius:8px;padding:12px;margin-top:10px;">'
+                '<div style="font-weight:bold;color:#15803d;margin-bottom:8px;">'
+                "📎 DOCUMENTOS ANEXOS A ESTA RESPUESTA</div>"
+                '<table style="width:100%;font-size:11px;border-collapse:collapse;">'
+                "<tbody>" + _filas_anx + "</tbody></table>"
+                '<div style="color:#14532d;font-size:10px;margin-top:8px;">'
+                "Relación de lo que se anexa con este escrito. La verificación "
+                "contra el expediente institucional de la factura la hace el "
+                "índice del servidor de radicación, aparte."
+                "</div></div>"
+            )
         if not soportes_reales:
             # 31-08-2026 — LO ADJUNTADO TAMBIÉN ES UN SOPORTE APORTADO.
             # Hasta hoy, sin expediente indexado el dictamen no relacionaba
@@ -11536,26 +11709,7 @@ class GlosaService:
             # anexos a esta respuesta. Sin folios: el motor conoce el nombre
             # del archivo, no su foliación.
             if adjuntos:
-                _filas_anx = "".join(
-                    f'<tr><td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;'
-                    f'width:40px;">{i}</td>'
-                    f'<td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;">'
-                    f"{nombre}</td></tr>"
-                    for i, nombre in enumerate(adjuntos, 1)
-                )
-                bloque_adjuntos = (
-                    '<div style="background:#f0fdf4;border:2px solid #16a34a;'
-                    'border-radius:8px;padding:12px;margin-top:10px;">'
-                    '<div style="font-weight:bold;color:#15803d;margin-bottom:8px;">'
-                    "📎 DOCUMENTOS ANEXOS A ESTA RESPUESTA</div>"
-                    '<table style="width:100%;font-size:11px;border-collapse:collapse;">'
-                    "<tbody>" + _filas_anx + "</tbody></table>"
-                    '<div style="color:#14532d;font-size:10px;margin-top:8px;">'
-                    "Relación de lo que se anexa con este escrito. La verificación "
-                    "contra el expediente institucional de la factura queda "
-                    "pendiente del índice del servidor de radicación."
-                    "</div></div>"
-                ) + (aviso_adj or "")
+                bloque_adjuntos = _bloque_anexos + (aviso_adj or "")
             else:
                 # Sin expediente que respalde y sin nada adjunto, no se firma
                 # una relación de soportes.
@@ -11577,6 +11731,7 @@ class GlosaService:
                     </tbody>
                 </table>
             </div>"""
+            bloque_adjuntos += _bloque_anexos
 
         # Bloque metadatos JSON REMOVIDO — antes se incluía para parsers
         # automatizados pero aparecía como texto crudo en el PDF consolidado
@@ -11905,6 +12060,8 @@ class GlosaService:
         # metadatos). Lista exhaustiva para que ningún apéndice se cuele al argumento.
         cierres = (
             "📎 RELACIÓN DE SOPORTES",
+            "📎 DOCUMENTOS ANEXOS A ESTA RESPUESTA",
+            "DOCUMENTOS ANEXOS A ESTA RESPUESTA",
             "RELACIÓN DE SOPORTES APORTADOS",
             "RELACION DE SOPORTES",
             "📲 TRAZABILIDAD",
