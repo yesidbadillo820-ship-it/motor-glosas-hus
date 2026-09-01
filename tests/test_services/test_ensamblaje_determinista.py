@@ -1,19 +1,21 @@
-"""El modelo escribe el argumento; el motor arma el dictamen.
+"""El renglón del servicio lo arma el motor, no el modelo.
 
-01-09-2026 — refactor pedido por el auditor tras GL-149: «quítale el control
-del ensamblaje». El renglón «Servicio objetado» y el bloque económico no son
-redacción: son datos verificables. Ahora salen del catálogo CUPS y de la malla
-contractual, no de lo que el modelo quiera escribir.
+01-09-2026. «Servicio objetado» no es redacción: es un dato verificable — qué
+se facturó. Sale del catálogo CUPS, no de lo que el modelo quiera escribir.
+
+NOTA DE HISTORIA. Este archivo nació junto a un contrato Pydantic que le pedía
+al modelo un objeto JSON en vez del XML de once etiquetas. Esa parte se
+revirtió el mismo día por decisión del auditor: la corrida de prueba no mejoró
+y no valía la pena seguir peleando con el formato. Lo que quedó —y quedó porque
+NUNCA dependió del JSON— es esto: el renglón del servicio armado con datos
+duros. Si alguien vuelve a intentar la salida estructurada, que sepa que el
+punto delicado era `validador_dictamen._extraer_argumento_xml`: solo entiende
+`<argumento>` y rechazaría un dictamen bueno por «falta el tag».
 """
 
 import pytest
 
 from app.services.glosa_service import _linea_servicio_determinista
-from app.services.respuesta_ia_estructurada import (
-    RespuestaIA,
-    esquema_para_el_prompt,
-    parsear_respuesta_ia,
-)
 
 
 class TestElRenglonDelServicioSaleDeLaBase:
@@ -51,162 +53,3 @@ class TestElRenglonDelServicioSaleDeLaBase:
         for basura in ("", "   ", "N/A", "902210"):
             r = _linea_servicio_determinista("", "OSTEOSÍNTESIS DE FÉMUR", "", basura)
             assert r == "OSTEOSÍNTESIS DE FÉMUR"
-
-
-class TestElContratoDeSalidaDelModelo:
-    def test_dos_campos_y_nada_mas(self):
-        assert set(RespuestaIA.model_fields) == {"justificacion_clinica", "fundamentos_ley"}
-
-    def test_el_hecho_clinico_va_antes_que_la_ley(self):
-        r = RespuestaIA(
-            justificacion_clinica="La nota operatoria del folio 1 registra conminución.",
-            fundamentos_ley="Art. 17 Ley 1751/2015.",
-        )
-        arg = r.argumento()
-        assert arg.index("nota operatoria") < arg.index("Ley 1751")
-
-    def test_lee_el_json_limpio(self):
-        r = parsear_respuesta_ia(
-            '{"justificacion_clinica":"Folio 1: conminución.","fundamentos_ley":"Art. 17."}'
-        )
-        assert r and "Folio 1" in r.argumento()
-
-    def test_lee_el_json_envuelto_en_comillas_de_bloque(self):
-        r = parsear_respuesta_ia(
-            'Aquí tienes:\n```json\n{"justificacion_clinica":"X","fundamentos_ley":"Y"}\n```'
-        )
-        assert r and r.argumento() == "X Y"
-
-    def test_aplana_una_lista_de_parrafos(self):
-        r = parsear_respuesta_ia('{"justificacion_clinica":["uno","dos"],"fundamentos_ley":"tres"}')
-        assert r and r.argumento() == "uno dos tres"
-
-    @pytest.mark.parametrize(
-        "basura",
-        [
-            "",
-            "   ",
-            "esto no es json",
-            '{"otra_cosa":1}',
-            "[1,2,3]",
-            '{"justificacion_clinica":""}',
-        ],
-    )
-    def test_lo_que_no_sirve_devuelve_none(self, basura: str):
-        """None NO es fatal: el motor sigue por el camino XML de siempre.
-
-        Un modelo que un día devuelva mal el JSON no puede dejar sin dictamen
-        al hospital.
-        """
-        assert parsear_respuesta_ia(basura) is None
-
-
-class TestElEsquemaLeCierraLasPuertas:
-    def test_le_prohibe_las_cifras_y_el_codigo(self):
-        e = esquema_para_el_prompt()
-        for prohibido in ("cifras", "tarifas", "UVB", "topes", "código de la glosa"):
-            assert prohibido in e, prohibido
-
-    def test_le_dice_quien_arma_lo_que_el_no_escribe(self):
-        assert "los arma el motor con los datos de la base" in esquema_para_el_prompt()
-
-    def test_le_prohibe_agregar_claves(self):
-        assert "PROHIBIDO agregar claves" in esquema_para_el_prompt()
-
-
-class TestLasRedesSIGUENHaciendoFalta:
-    """El JSON restringe el sobre, no el contenido de un campo de texto.
-
-    El auditor pidió borrar las redes de limpieza «porque el modelo no tendrá
-    la capacidad física de imprimir el código». No es así: dentro de
-    `justificacion_clinica` puede escribirlo igual — en GL-149 lo escribió en
-    el cuerpo del argumento, no solo en el campo del servicio.
-    """
-
-    def test_el_codigo_puede_venir_dentro_del_campo_libre(self):
-        r = parsear_respuesta_ia(
-            '{"justificacion_clinica":"El procedimiento código CL4506 fue pertinente.",'
-            '"fundamentos_ley":"Art. 17."}'
-        )
-        assert r is not None
-        assert "CL4506" in r.argumento(), (
-            "si esto falla, el contrato empezó a filtrar contenido y habría que "
-            "revisar si las redes siguen haciendo falta"
-        )
-
-    def test_por_eso_la_red_del_cuerpo_sigue_viva(self):
-        from app.services.glosa_service import _quitar_causal_propia_del_cuerpo
-
-        assert (
-            _quitar_causal_propia_del_cuerpo(
-                "El procedimiento código CL4506 fue pertinente.", "CL4506"
-            )
-            == "El procedimiento fue pertinente."
-        )
-
-
-class TestLaBanderaYLaCaidaSuave:
-    """La salida JSON es una mejora, no un punto único de falla.
-
-    01-09-2026. Si un día el modelo devuelve mal las llaves, el hospital NO
-    puede quedarse sin dictamen: se sigue por el camino XML de siempre.
-    """
-
-    def test_la_bandera_nace_apagada(self):
-        from app.core.config import Settings
-
-        assert Settings.model_fields["glosa_salida_json"].default is False, (
-            "la bandera no puede nacer encendida: cambiaría el comportamiento "
-            "de producción sin que nadie lo decida"
-        )
-
-    def test_el_motor_lee_la_bandera_una_sola_vez(self):
-        import io as _io
-
-        motor = _io.open("app/services/glosa_service.py", encoding="utf-8").read()
-        assert motor.count("_flag_json = bool(") == 1
-
-    def test_el_motor_cae_al_xml_cuando_el_json_no_sirve(self):
-        import io as _io
-
-        motor = _io.open("app/services/glosa_service.py", encoding="utf-8").read()
-        assert "if not arg_ia:" in motor
-        i = motor.index("if not arg_ia:")
-        assert 'self._xml("argumento", res_ia, "")' in motor[i : i + 200]
-
-    def test_deja_rastro_en_el_log_cuando_cae(self):
-        import io as _io
-
-        motor = _io.open("app/services/glosa_service.py", encoding="utf-8").read()
-        assert "no devolvió JSON utilizable" in motor
-
-
-class TestElValidadorEntiendeLasDosFormas:
-    """Si solo entendiera XML, rechazaría un dictamen bueno por un defecto
-    que no existe, y mandaría al gestor a buscar un fantasma."""
-
-    def test_sigue_leyendo_el_xml_de_siempre(self):
-        from app.services.validador_dictamen import _extraer_argumento_xml
-
-        assert _extraer_argumento_xml("<argumento>texto viejo</argumento>") == "texto viejo"
-
-    def test_ahora_tambien_lee_el_json(self):
-        from app.services.validador_dictamen import _extraer_argumento_xml
-
-        r = _extraer_argumento_xml(
-            '{"justificacion_clinica":"Folio 1: conminución.","fundamentos_ley":"Art. 17."}'
-        )
-        assert r == "Folio 1: conminución. Art. 17."
-
-    def test_lo_que_no_es_ninguna_de_las_dos_sigue_siendo_none(self):
-        from app.services.validador_dictamen import _extraer_argumento_xml
-
-        assert _extraer_argumento_xml("cualquier cosa") is None
-        assert _extraer_argumento_xml("") is None
-
-    def test_el_xml_manda_cuando_vienen_los_dos(self):
-        """dictamen_directo produce XML: ese camino no puede cambiar."""
-        from app.services.validador_dictamen import _extraer_argumento_xml
-
-        mixto = '<argumento>el del XML</argumento> {"justificacion_clinica":"el del JSON"}'
-        assert _extraer_argumento_xml(mixto) == "el del XML"

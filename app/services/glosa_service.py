@@ -7335,17 +7335,6 @@ class GlosaService:
         except Exception:
             _flag_campos = False
 
-        # 01-09-2026 — bandera de la salida JSON (refactor GL-149). Misma
-        # forma que la de arriba: se lee una vez y gobierna tanto lo que se le
-        # pide a la IA como cómo se lee lo que devuelve. OFF por defecto.
-        _flag_json = False
-        try:
-            from app.core.config import get_settings as _get_settings_js
-
-            _flag_json = bool(_get_settings_js().glosa_salida_json)
-        except Exception:
-            _flag_json = False
-
         codigos_detectados = self._extraer_codigos_glosa(texto_base)
         codigo_det = codigos_detectados[0] if codigos_detectados else "N/A"
 
@@ -8068,21 +8057,6 @@ class GlosaService:
                         )
             except Exception as _e_sc:
                 logger.debug(f"[SUBCONCEPTOS] no inyectados: {_e_sc}")
-
-            # 01-09-2026 — SALIDA JSON (bandera glosa_salida_json, OFF por
-            # defecto). El esquema va AL FINAL del prompt a propósito: es lo
-            # último que el modelo lee antes de responder, que es donde más
-            # pesa una instrucción de formato.
-            if _flag_json:
-                try:
-                    from app.services.respuesta_ia_estructurada import (
-                        esquema_para_el_prompt,
-                    )
-
-                    user_prompt = user_prompt + "\n\n" + esquema_para_el_prompt()
-                    logger.info("[SALIDA-JSON] esquema estructurado inyectado al prompt")
-                except Exception as _e_ej:
-                    logger.debug(f"[SALIDA-JSON] esquema no inyectado: {_e_ej}")
 
             # Mejora #3: si el flag está ON, inyectar al user prompt los
             # valores DETERMINISTAS (EPS efectiva, contrato del catálogo,
@@ -9144,34 +9118,19 @@ class GlosaService:
                         )
             except Exception as _e_vv:
                 logger.debug(f"[VIGENCIA-VENCIDA] guarda no aplicada: {_e_vv}")
-            # 01-09-2026 — el argumento sale del JSON cuando la bandera está
-            # encendida Y el JSON vino utilizable. Si viene mal, se sigue por
-            # el XML de siempre: un modelo que un día devuelva mal las llaves
-            # no puede dejar sin dictamen al hospital. Por eso el fallback no
-            # es un detalle de implementación, es el requisito.
-            arg_ia = ""
-            if _flag_json:
-                try:
-                    from app.services.respuesta_ia_estructurada import (
-                        parsear_respuesta_ia,
-                    )
-
-                    _resp_json = parsear_respuesta_ia(res_ia or "")
-                    if _resp_json is not None:
-                        arg_ia = _resp_json.argumento()
-                        logger.info(
-                            "[SALIDA-JSON] argumento tomado del contrato "
-                            f"estructurado ({len(arg_ia)} chars)"
-                        )
-                    else:
-                        logger.warning(
-                            "[SALIDA-JSON] el modelo no devolvió JSON utilizable; "
-                            "se sigue por el camino XML"
-                        )
-                except Exception as _e_pj:
-                    logger.debug(f"[SALIDA-JSON] parseo no aplicado: {_e_pj}")
-            if not arg_ia:
-                arg_ia = self._xml("argumento", res_ia, "")
+            # 01-09-2026 — ROLLBACK DEL CAMINO JSON, decisión del auditor.
+            # Se probó pedirle al modelo un objeto JSON con dos claves en vez
+            # del XML de once etiquetas. En la corrida de prueba el resultado
+            # no mejoró y el auditor cortó: «no vamos a quemar más tokens
+            # intentando que este modelo obedezca formatos que su entrenamiento
+            # no soporta». Se vuelve al XML y a las redes de limpieza.
+            #
+            # Lo que SÍ se conserva de ese trabajo, porque no dependía del JSON:
+            # el renglón del servicio lo arma el motor con el catálogo CUPS
+            # (_linea_servicio_determinista), el bloque económico sale de la
+            # malla, y las prohibiciones de dinero y de documentos siguen en el
+            # system prompt.
+            arg_ia = self._xml("argumento", res_ia, "")
             # 01-09-2026 — EL PÁRRAFO DEL TOPE LO ARMA EL MOTOR, NO EL MODELO.
             # Tres corridas de la prueba 2 con el mismo resultado: la objeción
             # de dinero salía muda o con un adjetivo. Se saca del prompt y se
