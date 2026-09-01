@@ -179,7 +179,12 @@ class TestBugDArt168FueraContexto:
         )
         resultado = _neutralizar_art_168_fuera_de_contexto(dictamen, texto_glosa)
         assert "168" not in resultado
-        assert "normativa de continuidad" in resultado
+        assert "SISTEMA GENERAL DE SEGURIDAD SOCIAL EN SALUD" in resultado.upper(), (
+            "la frase debe seguir siendo legible, no un hueco"
+        )
+        assert "NORMATIVA DE CONTINUIDAD Y COBERTURA" not in resultado.upper(), (
+            "esa frase se leía como el título de una norma que no existe (2.ª auditoría 25-08)"
+        )
 
     def test_terapia_enzimatica_cronica_NO_invoca_art_168(self):
         # Caso 1 real: medicamento huérfano IMIGLUCERASA en hospital.
@@ -365,9 +370,15 @@ class TestBugHRegimenARL:
 
     def test_arl_bloque_explica_subrogacion(self):
         # Punto clave para la defensa real: si la ARL alega concausa,
-        # debe pagar al hospital y subrogar contra EPS (no prorratear).
+        # debe pagar al hospital el 100% (no prorratear) y su controversia
+        # con la EPS no es oponible a la IPS. Ronda 32 (22-jul-2026): la
+        # redacción cambió — la revisión adversarial encontró que la cita
+        # "subrogarse ... Ley 776/2002 Art. 18" estaba MAL atribuida (el
+        # Art. 18 es prescripción); ahora la controversia de origen se
+        # funda en la Junta de Calificación (Decreto 1352/2013).
         bloque = REGIMEN_ESPECIAL["ARL"]
-        assert "subrogarse" in bloque.lower() or "subrogación" in bloque.lower()
+        assert "no le es oponible a la IPS" in bloque
+        assert "Junta de Calificación" in bloque
         assert "100%" in bloque
 
     def test_eps_sanitas_NO_dispara_arl(self):

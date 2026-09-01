@@ -3494,12 +3494,83 @@ def actividad_usuario(
     }
 
 
-@router.get("/")
-def listar_usuarios(
+# Los roles a los que se les puede pasar trabajo. Un VIEWER mira pero no
+# gestiona, así que no tiene sentido ofrecerlo en un desplegable de «¿a quién
+# le asigno esta glosa?».
+#
+# "ADMIN" a secas no es un rol válido hoy —los válidos son ROLES_VALIDOS— pero
+# se acepta igual: es la forma vieja de escribir SUPER_ADMIN, y este archivo ya
+# la contempla más abajo. Si quedara una fila así de antes, esa persona
+# desaparecería del desplegable sin que nadie entendiera por qué.
+ROLES_ASIGNABLES = frozenset({ROL_SUPER_ADMIN, ROL_COORDINADOR, ROL_AUDITOR, "ADMIN"})
+
+
+class UsuarioAsignable(BaseModel):
+    """Lo mínimo que necesita una lista de «a quién le paso esto»."""
+
+    id: int
+    nombre: str
+    email: str
+    rol: str
+    # Siempre 1: acá solo salen los activos. Va en la respuesta porque las
+    # pantallas del portal ya filtran por este campo, y así el filtro de
+    # ellas sigue funcionando igual sin tener que tocarlo.
+    activo: int = 1
+
+
+@router.get("/asignables", response_model=list[UsuarioAsignable])
+def listar_asignables(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
-    """Lista todos los usuarios registrados."""
+    """Los compañeros a los que se les puede pasar una glosa.
+
+    POR QUÉ EXISTE (21-08-2026). Cinco pantallas del portal —importación
+    masiva, asignación en lote, reasignar una glosa, reasignar todo lo de un
+    gestor y el buscador de Ctrl+K— necesitaban un desplegable con los
+    auditores. Para llenarlo pedían la lista COMPLETA de usuarios y filtraban
+    en el navegador. O sea: para armar un desplegable, cualquiera que hubiera
+    entrado con su clave recibía el listado entero de cuentas del portal
+    —incluidas las inactivas y las de administración— con sus correos y roles.
+
+    Acá el filtro se hace en el servidor y solo sale lo que un desplegable
+    necesita: quién está activo y puede recibir trabajo. La lista completa de
+    usuarios quedó donde corresponde, en `GET /usuarios/`, que ahora exige rol
+    de coordinación.
+    """
+    # El rol se compara en mayúsculas: la base guarda el texto tal cual se
+    # escribió, y una fila vieja en minúsculas dejaría a esa persona fuera del
+    # desplegable en silencio. Son unas decenas de filas; filtrar acá no pesa.
+    usuarios = (
+        db.query(UsuarioRecord)
+        .filter(UsuarioRecord.activo == 1)
+        .order_by(UsuarioRecord.nombre)
+        .all()
+    )
+    return [
+        UsuarioAsignable(
+            id=u.id,
+            nombre=u.nombre or "",
+            email=u.email or "",
+            rol=u.rol or "",
+        )
+        for u in usuarios
+        if (u.rol or "").strip().upper() in ROLES_ASIGNABLES
+    ]
+
+
+@router.get("/")
+def listar_usuarios(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Lista todos los usuarios registrados. Solo COORDINADOR o SUPER_ADMIN.
+
+    Antes del 21-08-2026 la pedía cualquiera que hubiera entrado con su clave,
+    porque cinco desplegables del portal la usaban para llenarse. Esos
+    desplegables ahora piden `GET /usuarios/asignables`, que trae solo lo
+    suyo, y esta quedó para lo que de verdad es: administrar usuarios.
+    """
     usuarios = db.query(UsuarioRecord).order_by(UsuarioRecord.id).all()
     # Incluir rustdesk_id solo si current_user es admin/coordinador
     # (los AUDITOR no necesitan ver IDs ajenos para nada).
@@ -3631,9 +3702,9 @@ def _garantizar_al_menos_un_super_admin_activo(db: Session, excluir_id: int = No
 def crear_usuario(
     data: UsuarioCreate,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_admin),
 ):
-    """Crea un nuevo usuario."""
+    """Crea un nuevo usuario (solo SUPER_ADMIN)."""
     email = data.email.strip().lower()
     if not email or "@" not in email:
         raise HTTPException(status_code=400, detail="Email inválido")
@@ -3756,9 +3827,15 @@ def cambiar_password(
     usuario_id: int,
     data: PasswordChange,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_admin),
 ):
-    """Cambia la contraseña de un usuario."""
+    """Resetea la contraseña de un usuario (solo SUPER_ADMIN).
+
+    Ronda 30: antes dependía de get_usuario_actual — cualquier usuario
+    autenticado podía sobreescribir el password de otro (incluido el
+    SUPER_ADMIN) y tomar la cuenta. El auto-servicio legítimo vive en
+    POST /auth/cambiar-password, que exige la contraseña actual.
+    """
     if len(data.nueva_password) < 6:
         raise HTTPException(status_code=400, detail="La contraseña debe tener mínimo 6 caracteres")
 
@@ -3767,6 +3844,10 @@ def cambiar_password(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     usuario.password_hash = get_password_hash(data.nueva_password)
+    # Reset administrativo: forzar rotación en el próximo login del usuario
+    # afectado (coherente con /auth/cambiar-password, que lo limpia).
+    if hasattr(usuario, "must_change_password"):
+        usuario.must_change_password = 1
     db.commit()
 
     AuditRepository(db).registrar(

@@ -27,6 +27,26 @@ from app.models.db import UsuarioRecord
 router = APIRouter(prefix="/ia-status", tags=["ia-status"])
 
 
+def _cadena_groq() -> list[str]:
+    """La cadena de modelos Groq, leída de la configuración y sin repetidos.
+
+    Única fuente de verdad: `app/core/config.py`. Nunca escribir acá el nombre
+    de un modelo — ese fue el error que dejó a `llama-4-scout` figurando como
+    primario durante dos semanas después de que Groq lo retiró.
+    """
+    c = get_settings()
+    cadena: list[str] = []
+    for modelo in (
+        c.groq_model,
+        c.groq_model_fallback_1,
+        c.groq_model_fallback_2,
+        c.groq_model_fallback_3,
+    ):
+        if modelo and modelo not in cadena:
+            cadena.append(modelo)
+    return cadena
+
+
 PROVEEDORES_INFO = {
     "anthropic": {
         "nombre": "Anthropic Claude",
@@ -48,11 +68,10 @@ PROVEEDORES_INFO = {
         "rol": "SOLO OCR/lectura de PDFs escaneados (pdf_service + cadena multimodal del pdf_fallback_patch). NO genera dictamenes desde jun-2026.",
         "fortaleza": "PDF nativo + Vision gratis — evita quemar creditos de Claude en OCR",
         "tier": "Free tier muy generoso",
-        "modelos_disponibles": [
-            "gemini-2.0-flash",
-            "gemini-1.5-flash",
-            "gemini-1.5-pro",
-        ],
+        # Igual que con Groq: el modelo se lee de la configuración, no se
+        # escribe acá. `gemini-2.0-flash` y `gemini-1.5-*` ya fueron
+        # retirados por Google y este panel los seguía ofreciendo.
+        "modelos_disponibles": [get_settings().gemini_model],
         "rate_limit": "Flash: 15 RPM / 1500 RPD · Pro: 2 RPM / 50 RPD",
         "console_url": "https://aistudio.google.com/apikey",
     },
@@ -62,15 +81,12 @@ PROVEEDORES_INFO = {
         "rol": "Proveedor PRIMARIO de dictamenes (gratis y rapido). Anthropic entra para casos complejos o como fallback de calidad.",
         "fortaleza": "Velocidad bestial (LPU dedicado): 200-400 tokens/s",
         "tier": "Free con rate limits",
-        # Cadena vigente jul-2026: Llama 4 Scout es el PRIMARIO real de
-        # dictámenes (etiqueta de producción); gpt-oss/qwen quedan de
-        # respaldo en la cadena de retry.
-        "modelos_disponibles": [
-            "meta-llama/llama-4-scout-17b-16e-instruct",
-            "openai/gpt-oss-120b",
-            "qwen/qwen3-32b",
-            "llama-3.3-70b-versatile",
-        ],
+        # La cadena NO se escribe acá: se lee de la configuración. Esta lista
+        # estuvo dos semanas mostrando `llama-4-scout` como primario después
+        # de que Groq lo retiró, porque el arreglo del 05-08 tocó config.py y
+        # no este archivo. Un panel de diagnóstico que miente sobre la
+        # configuración es peor que no tener panel. 19-08-2026.
+        "modelos_disponibles": _cadena_groq(),
         "rate_limit": "30 RPM en tier gratis (bucket por modelo)",
         "console_url": "https://console.groq.com/keys",
     },
@@ -122,6 +138,29 @@ def listar_proveedores(
         "proveedores": estado,
         "fallback_chain": _calcular_fallback_chain(cfg, primary),
     }
+
+
+def _explicar_ping(e: Exception, proveedor: str) -> str:
+    """Traduce el fallo del ping a algo accionable para el auditor.
+
+    20-08-2026. Decía «The read operation timed out» y «[WinError 10054] Se ha
+    forzado la interrupción de una conexión existente por el host remoto». El
+    auditor no sabe qué es un WinError ni qué hacer con eso.
+    """
+    texto = str(e)
+    if any(m in texto for m in ("10054", "10060", "ConnectError", "getaddrinfo")):
+        return (
+            f"La red del hospital no deja salir hacia {proveedor}. No es un "
+            "problema del motor ni de la clave."
+        )
+    if "timed out" in texto.lower() or "Timeout" in texto:
+        return (
+            f"{proveedor} no contestó en 15 segundos. Puede ser lentitud "
+            "momentánea: vuelva a darle «Ping en vivo a los 3»."
+        )
+    if "401" in texto or "403" in texto or "API key" in texto:
+        return f"{proveedor} rechazó la clave. Revise la línea correspondiente del .env."
+    return texto[:150]
 
 
 def _calcular_fallback_chain(cfg, primary: str) -> list[str]:
@@ -195,7 +234,13 @@ async def health_check(
             return {"ok": False, "error": "sin API key"}
         from app.services.gemini_service import GeminiService
 
-        gs = GeminiService(api_key=cfg.gemini_api_key, default_model=cfg.gemini_model)
+        # 20-08-2026. El ping usaba los 90 segundos por defecto del servicio.
+        # Un «ping» que tarda minuto y medio no sirve de diagnóstico: el panel
+        # se queda colgado y termina diciendo «The read operation timed out»,
+        # que no le dice nada al auditor. Para esta pantalla, un proveedor que
+        # no contesta cuatro palabras en 15 segundos está caído a efectos
+        # prácticos, y eso es lo que hay que reportar.
+        gs = GeminiService(api_key=cfg.gemini_api_key, default_model=cfg.gemini_model, timeout=15.0)
         import time
 
         t0 = time.time()
@@ -205,7 +250,7 @@ async def health_check(
             res["latency_ms"] = ms
             return res
         except Exception as e:
-            return {"ok": False, "error": str(e)[:150]}
+            return {"ok": False, "error": _explicar_ping(e, "Gemini")}
 
     async def _ping_groq():
         if not cfg.groq_api_key:
@@ -231,7 +276,7 @@ async def health_check(
                 "respuesta": (r.choices[0].message.content or "")[:50],
             }
         except Exception as e:
-            return {"ok": False, "error": str(e)[:200]}
+            return {"ok": False, "error": _explicar_ping(e, "Groq")}
 
     pings = await asyncio.gather(
         _ping_anthropic(),

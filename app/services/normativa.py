@@ -99,17 +99,57 @@ NORMAS_VIGENTES: dict[str, dict] = {
         "tipo": "RESOLUCION",
         "vigente": True,  # aún citable como antecedente
     },
-    "RESOLUCION 5269/2017": {
-        "nombre": "Resolución 5269 de 2017",
-        "resumen": "Plan de Beneficios en Salud (PBS). Listado de servicios cubiertos.",
+    # 28-08-2026 — EL LISTADO DEL PBS SE REEXPIDE CADA AÑO.
+    # Este catálogo tenía la Res. 5269 de 2017 como vigente. La derogó el art.
+    # 132 de la Res. 5857 de 2018, y desde entonces la cadena siguió: 2481/2020
+    # → 2292/2021 → 2808/2022 → 2366/2023 → 2718/2024. Con la ficha vieja el
+    # motor podía afirmar que un servicio está cubierto invocando un listado de
+    # hace ocho años; a la entidad le basta mostrar la derogatoria.
+    # La cadena completa, con la nota de vigencia literal de cada eslabón, está
+    # en normativa_completa.py.
+    "RESOLUCION 2718/2024": {
+        "nombre": "Resolución 2718 de 2024 (MinSalud)",
+        "resumen": (
+            "Servicios y tecnologías de salud financiados con recursos de la UPC. Rige a "
+            "partir del 1 de enero de 2025. Es el último eslabón sin derogatoria anotada "
+            "en el normograma al 28-08-2026; el listado se reexpide cada diciembre, así "
+            "que conviene verificar si salió uno posterior. Para un servicio anterior "
+            "aplica el listado que regía ese día."
+        ),
         "tipo": "RESOLUCION",
         "vigente": True,
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud)",
     },
+    # CORREGIDA EL 28-08-2026 CONTRA EL TEXTO OFICIAL.
+    #
+    # Este catálogo decía «Procedimiento de conciliación de glosas médicas», y
+    # con eso el acta de conciliación —el documento que FIRMAN el HUS y la
+    # EPS— se suscribía «en cumplimiento de la Resolución 2175 de 2015».
+    #
+    # No es eso. Del normograma de la Supersalud, encabezado literal:
+    #
+    #   «RESOLUCIÓN 2175 DE 2015 (junio 18) — Por la cual se establece el
+    #    anexo técnico para el reporte de las atenciones en salud a menores de
+    #    18 años, gestantes y atenciones de parto y se adopta el mecanismo de
+    #    transferencia de los archivos.»
+    #
+    # Es del programa Familias en Acción. Nada que ver con glosas. Es el mismo
+    # error de la Ley 1388 de 2010 —citada para discapacidad auditiva cuando es
+    # de cáncer infantil— pero dentro de nuestro propio tema y en un documento
+    # firmado: a la EPS le basta abrirla para restarle seriedad al acta.
+    #
+    # No se borra del catálogo: existe y el motor puede toparse con ella. Se
+    # deja con lo que de verdad dice.
     "RESOLUCION 2175/2015": {
-        "nombre": "Resolución 2175 de 2015",
-        "resumen": "Procedimiento de conciliación de glosas médicas.",
+        "nombre": "Resolución 2175 de 2015 (MinSalud)",
+        "resumen": (
+            "Anexo técnico para el reporte de atenciones en salud a menores de 18 años, "
+            "gestantes y atenciones de parto (Familias en Acción). NO regula glosas ni "
+            "conciliación: para eso rige la Res. 2284 de 2023, Anexo Técnico 3."
+        ),
         "tipo": "RESOLUCION",
         "vigente": True,
+        "verificada": "28-08-2026 fuente oficial (normograma Supersalud, encabezado literal)",
     },
     "CIRCULAR 047/2025": {
         "nombre": "Circular Externa 047 de 2025 (MinSalud)",
@@ -161,17 +201,33 @@ NORMAS_VIGENTES: dict[str, dict] = {
         "tipo": "RESOLUCION",
         "vigente": True,
     },
+    # Verificada el 25-08-2026 contra el PDF oficial del Ministerio: NO es la
+    # norma de RIPS, como decía este resumen. Reglamenta los datos clínicos
+    # para la interoperabilidad de la historia clínica (Ley 2015 de 2020).
     "RESOLUCION 866/2021": {
         "nombre": "Resolución 866 de 2021",
-        "resumen": "Registros Individuales de Prestación de Servicios de Salud (RIPS). Campos obligatorios.",
+        "resumen": "Datos clínicos para la interoperabilidad de la historia clínica (Ley 2015 de 2020). NO es la norma de RIPS.",
         "tipo": "RESOLUCION",
         "vigente": True,
     },
+    # Derogada por el art. 12 de la Resolución 1099 de 2026 (verificado el
+    # 25-08-2026 en el PDF oficial). Sigue aplicando a atenciones anteriores.
+    #
+    # SE QUEDA EN ESTE CATÁLOGO A PROPÓSITO, no en NORMAS_DEROGADAS. Ese otro
+    # diccionario es para citas EQUIVOCADAS («la Ley 1122 es de 2007, no de
+    # 2011»), que están mal siempre, y produce un hallazgo de nivel «error».
+    # Esta no está equivocada: es la norma correcta para las atenciones
+    # anteriores a junio de 2026. De la fecha avisa el verificador de citas,
+    # con severidad media y explicando la regla — ver NORMA_DEROGADA en
+    # citation_verifier.py.
+    #
+    # (El campo «vigente» de aquí es informativo: validar_citas solo mira si la
+    # clave está en el diccionario, no lee este campo.)
     "RESOLUCION 5159/2015": {
         "nombre": "Resolución 5159 de 2015",
-        "resumen": "Cobertura en salud para población privada de la libertad (PPL). Complemento con Ley 1709/2014.",
+        "resumen": "Modelo de atención en salud para la población privada de la libertad (PPL). Derogada por la Res. 1099 de 2026; aplica a atenciones anteriores a junio de 2026.",
         "tipo": "RESOLUCION",
-        "vigente": True,
+        "vigente": False,
     },
     # Códigos
     "ART 871 C.COMERCIO": {
@@ -195,13 +251,15 @@ NORMAS_VIGENTES: dict[str, dict] = {
     },
     "SENTENCIA T-1025/2002": {
         "nombre": "Sentencia T-1025 de 2002",
-        "resumen": "Urgencias no requieren autorización previa. Aplica transversalmente.",
+        # Verificada el 24-08-2026 contra la relatoría de la Corte Constitucional.
+        "resumen": "Consentimiento informado en cirugía de asignación de sexo en menores intersexuales. NO trata de urgencias.",
         "tipo": "SENTENCIA",
         "vigente": True,
     },
     "SENTENCIA T-478/1995": {
         "nombre": "Sentencia T-478 de 1995",
-        "resumen": "Autonomía médica como derecho fundamental protegido.",
+        # Verificada el 24-08-2026 contra la relatoría de la Corte Constitucional.
+        "resumen": "Seguridad social y tratamiento asilar de personas con discapacidad psíquica. NO trata de autonomía médica.",
         "tipo": "SENTENCIA",
         "vigente": True,
     },

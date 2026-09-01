@@ -1,0 +1,421 @@
+{
+  "area": "matematicas",
+  "version": 1,
+  "nota": "Preguntas de práctica escritas para este sistema siguiendo las competencias y componentes del Saber 11. No son preguntas del ICFES.",
+  "preguntas": [
+    {
+      "id": "MAT-001",
+      "competencia": "Formulación y ejecución",
+      "componente": "Numérico-variacional",
+      "tema": "Descuentos sucesivos",
+      "dificultad": 3,
+      "enunciado": "Un almacén anuncia 20 % de descuento y, sobre el valor ya rebajado, otro 10 % adicional. ¿A qué descuento único equivalen los dos descuentos juntos?",
+      "opciones": [
+        "28 %",
+        "30 %",
+        "26 %",
+        "25 %"
+      ],
+      "correcta": 0,
+      "explicacion": "Los descuentos sucesivos no se suman: se multiplican los factores de lo que queda. Del precio queda el 80 % y de eso el 90 %: 0,80 × 0,90 = 0,72. Si queda el 72 %, el descuento fue del 28 %.",
+      "trampa": "El distractor «30 %» es sumar 20 + 10, que es exactamente lo que el almacén quiere que uno crea. Regla de bolsillo: dos descuentos seguidos siempre rebajan MENOS que su suma."
+    },
+    {
+      "id": "MAT-002",
+      "competencia": "Formulación y ejecución",
+      "componente": "Numérico-variacional",
+      "tema": "Proporcionalidad inversa",
+      "dificultad": 2,
+      "enunciado": "Seis obreros levantan un muro en 24 días. Trabajando al mismo ritmo, ¿en cuántos días levantan el mismo muro ocho obreros?",
+      "opciones": [
+        "16 días",
+        "18 días",
+        "20 días",
+        "32 días"
+      ],
+      "correcta": 1,
+      "explicacion": "El trabajo total es fijo: 6 × 24 = 144 días-obrero. Con 8 obreros: 144 ÷ 8 = 18 días. A más obreros, menos días, y el producto se mantiene constante: eso es proporcionalidad inversa.",
+      "trampa": "El distractor «32 días» sale de aplicar una regla de tres directa (24 × 8 ÷ 6) y da MÁS días con MÁS obreros, que es un absurdo. Antes de multiplicar en cruz, pregúntate: si aumenta lo uno, ¿lo otro sube o baja? Si baja, es inversa, y el resultado tiene que ser menor."
+    },
+    {
+      "id": "MAT-003",
+      "competencia": "Interpretación y representación",
+      "componente": "Numérico-variacional",
+      "tema": "Función lineal a partir de una tabla",
+      "dificultad": 3,
+      "contexto": "Un taxi cobra un valor fijo al iniciar la carrera (banderazo) más un valor por cada kilómetro recorrido. La tabla muestra lo que marca el taxímetro:\n\n| Kilómetros | Valor a pagar |\n|---|---|\n| 1 | $4.700 |\n| 2 | $5.900 |\n| 3 | $7.100 |",
+      "enunciado": "Si x es el número de kilómetros y y el valor a pagar, ¿cuál expresión representa la tarifa?",
+      "opciones": [
+        "y = 4.700x",
+        "y = 1.200 + 3.500x",
+        "y = 3.500 + 1.200x",
+        "y = 4.700 + 1.200x"
+      ],
+      "correcta": 2,
+      "explicacion": "Entre un kilómetro y el siguiente el valor sube siempre $1.200: ese es el costo por kilómetro (la pendiente). El banderazo es lo que se paga con 0 kilómetros: 4.700 − 1.200 = 3.500. Se comprueba con la tabla: 3.500 + 1.200(2) = 5.900.",
+      "trampa": "El distractor «y = 4.700 + 1.200x» toma el primer valor de la tabla como si fuera el banderazo, pero ese $4.700 ya incluye un kilómetro recorrido. El valor fijo siempre es el de x = 0."
+    },
+    {
+      "id": "MAT-004",
+      "competencia": "Interpretación y representación",
+      "componente": "Numérico-variacional",
+      "tema": "Lectura de una gráfica de movimiento",
+      "dificultad": 3,
+      "contexto": "La gráfica describe el recorrido de un bus en función del tiempo. La distancia recorrida se comporta así:\n\n- De 0 a 20 minutos: sube de forma constante de 0 km a 24 km.\n- De 20 a 35 minutos: se mantiene en 24 km.\n- De 35 a 60 minutos: sube de forma constante de 24 km a 54 km.",
+      "enunciado": "¿Qué ocurrió con el bus entre el minuto 20 y el minuto 35?",
+      "opciones": [
+        "Redujo su velocidad a la mitad.",
+        "Retrocedió 24 kilómetros.",
+        "Aumentó su velocidad.",
+        "Estuvo detenido."
+      ],
+      "correcta": 3,
+      "explicacion": "En una gráfica de distancia contra tiempo, un tramo horizontal significa que el tiempo pasa pero la distancia no cambia: el bus está quieto. La velocidad es la inclinación de la línea, y una línea plana tiene inclinación cero.",
+      "trampa": "El distractor «retrocedió» confunde «distancia recorrida constante» con «volver atrás». Para que el bus retrocediera, la línea tendría que bajar, no quedarse plana."
+    },
+    {
+      "id": "MAT-005",
+      "competencia": "Formulación y ejecución",
+      "componente": "Numérico-variacional",
+      "tema": "Planteamiento de una ecuación",
+      "dificultad": 3,
+      "enunciado": "Un padre reparte $450.000 entre sus dos hijos, de modo que el mayor recibe $50.000 más que el menor. ¿Cuánto recibe el menor?",
+      "opciones": [
+        "$200.000",
+        "$175.000",
+        "$225.000",
+        "$250.000"
+      ],
+      "correcta": 0,
+      "explicacion": "Si el menor recibe x, el mayor recibe x + 50.000. Entonces x + (x + 50.000) = 450.000, o sea 2x = 400.000 y x = 200.000. Se verifica: 200.000 + 250.000 = 450.000, con la diferencia de 50.000 pedida.",
+      "trampa": "El distractor «$225.000» es la mitad exacta de $450.000: es lo que uno responde si olvida que el reparto NO es en partes iguales. Siempre comprueba tu respuesta contra las dos condiciones del enunciado, no contra una sola."
+    },
+    {
+      "id": "MAT-006",
+      "competencia": "Argumentación",
+      "componente": "Numérico-variacional",
+      "tema": "Regla general de una sucesión",
+      "dificultad": 4,
+      "enunciado": "Una sucesión empieza así: 3, 7, 11, 15, 19, … Un estudiante afirma que el término que ocupa la posición n se calcula con 4n − 1. ¿La afirmación es válida?",
+      "opciones": [
+        "No, porque la sucesión no aumenta de forma constante.",
+        "Sí, porque suma 4 en cada paso y arranca en 3.",
+        "No, porque la regla correcta es 4n + 3.",
+        "Sí, pero solo funciona para los cinco primeros términos."
+      ],
+      "correcta": 1,
+      "explicacion": "La sucesión sube de 4 en 4, así que la regla tiene la forma 4n + algo. Para n = 1 debe dar 3: 4(1) + algo = 3, de donde ese algo es −1. Se comprueba con n = 4: 4(4) − 1 = 15, que coincide. Una regla verificada en la forma y en un caso vale para todos.",
+      "trampa": "El distractor «4n + 3» sale de tomar el primer término (3) como si fuera el valor de partida cuando n = 0. Comprueba SIEMPRE la fórmula con n = 1 antes de marcar."
+    },
+    {
+      "id": "MAT-007",
+      "competencia": "Formulación y ejecución",
+      "componente": "Numérico-variacional",
+      "tema": "Crecimiento exponencial",
+      "dificultad": 4,
+      "enunciado": "Un cultivo empieza con 500 bacterias y la población se duplica cada 3 horas. ¿Cuántas bacterias hay a las 12 horas?",
+      "opciones": [
+        "2.000",
+        "4.000",
+        "8.000",
+        "16.000"
+      ],
+      "correcta": 2,
+      "explicacion": "En 12 horas caben 12 ÷ 3 = 4 duplicaciones. Cada duplicación multiplica por 2, así que se multiplica por 2⁴ = 16: 500 × 16 = 8.000 bacterias.",
+      "trampa": "El distractor «2.000» sale de multiplicar 500 por 4 (las cuatro duplicaciones), que es tratar un crecimiento exponencial como si fuera lineal. Duplicarse cuatro veces no es multiplicar por cuatro: es multiplicar por dieciséis."
+    },
+    {
+      "id": "MAT-008",
+      "competencia": "Formulación y ejecución",
+      "componente": "Numérico-variacional",
+      "tema": "Sistema de dos ecuaciones",
+      "dificultad": 4,
+      "enunciado": "En una tienda, 3 panes y 2 jugos cuestan $9.400, y 2 panes y 1 jugo cuestan $5.600. ¿Cuánto cuesta un pan?",
+      "opciones": [
+        "$1.600",
+        "$2.200",
+        "$2.000",
+        "$1.800"
+      ],
+      "correcta": 3,
+      "explicacion": "De la segunda ecuación, un jugo cuesta 5.600 − 2p. Al reemplazar en la primera: 3p + 2(5.600 − 2p) = 9.400, es decir 3p + 11.200 − 4p = 9.400, luego −p = −1.800 y p = 1.800. El jugo vale $2.000, y se comprueba: 3(1.800) + 2(2.000) = 9.400.",
+      "trampa": "El distractor «$2.000» es el precio del jugo, no el del pan. En sistemas de ecuaciones, después de despejar vuelve al enunciado y confirma cuál de las dos incógnitas te pidieron."
+    },
+    {
+      "id": "MAT-009",
+      "competencia": "Formulación y ejecución",
+      "componente": "Numérico-variacional",
+      "tema": "Razones y proporciones",
+      "dificultad": 2,
+      "enunciado": "Una receta usa harina y azúcar en razón 5 : 2. Si se emplean 750 gramos de harina, ¿cuánta azúcar se necesita?",
+      "opciones": [
+        "300 g",
+        "200 g",
+        "150 g",
+        "375 g"
+      ],
+      "correcta": 0,
+      "explicacion": "La razón 5 : 2 significa que por cada 5 partes de harina van 2 de azúcar. Como 750 ÷ 5 = 150 gramos por parte, el azúcar son 2 partes: 2 × 150 = 300 gramos.",
+      "trampa": "El distractor «375 g» sale de dividir 750 entre 2, confundiendo la razón con «la mitad». Traduce siempre la razón a «cuánto vale una parte» antes de operar."
+    },
+    {
+      "id": "MAT-010",
+      "competencia": "Argumentación",
+      "componente": "Numérico-variacional",
+      "tema": "Variaciones porcentuales encadenadas",
+      "dificultad": 4,
+      "enunciado": "El precio de un artículo subió 10 % y al mes siguiente bajó 10 %. Un vendedor concluye: «quedó en el mismo precio del comienzo». ¿Es correcta la conclusión?",
+      "opciones": [
+        "Sí, porque subió y bajó el mismo porcentaje.",
+        "No, porque quedó 1 % más barato que al comienzo.",
+        "No, porque quedó 1 % más caro que al comienzo.",
+        "Sí, siempre que el precio inicial sea mayor a $100.000."
+      ],
+      "correcta": 1,
+      "explicacion": "El 10 % de subida y el 10 % de bajada se calculan sobre bases distintas: la bajada se aplica a un precio ya aumentado, que es mayor. En números: 1,10 × 0,90 = 0,99, o sea el 99 % del precio inicial, un 1 % menos.",
+      "trampa": "El distractor «quedó en el mismo precio» es la intuición natural y es falsa. Un porcentaje no significa nada sin saber sobre qué cantidad se aplica: ese es el error que más se cobra en el examen."
+    },
+    {
+      "id": "MAT-011",
+      "competencia": "Formulación y ejecución",
+      "componente": "Geométrico-métrico",
+      "tema": "Área de una figura compuesta",
+      "dificultad": 2,
+      "enunciado": "Un lote rectangular mide 20 m de largo por 12 m de ancho. Dentro se construyó una piscina rectangular de 6 m por 4 m. ¿Cuántos metros cuadrados quedan para el césped?",
+      "opciones": [
+        "240 m²",
+        "224 m²",
+        "216 m²",
+        "264 m²"
+      ],
+      "correcta": 2,
+      "explicacion": "El césped es el lote menos la piscina. Lote: 20 × 12 = 240 m². Piscina: 6 × 4 = 24 m². Césped: 240 − 24 = 216 m².",
+      "trampa": "El distractor «240 m²» es el área del lote completo: se marca cuando uno calcula bien pero olvida restar. Subraya en el enunciado qué te están pidiendo antes de operar."
+    },
+    {
+      "id": "MAT-012",
+      "competencia": "Formulación y ejecución",
+      "componente": "Geométrico-métrico",
+      "tema": "Teorema de Pitágoras",
+      "dificultad": 3,
+      "enunciado": "Una escalera de 13 metros se apoya contra una pared vertical. Su base está a 5 metros de la pared. ¿A qué altura de la pared llega la escalera?",
+      "opciones": [
+        "8 m",
+        "10 m",
+        "14 m",
+        "12 m"
+      ],
+      "correcta": 3,
+      "explicacion": "La escalera, la pared y el suelo forman un triángulo rectángulo donde la escalera es la hipotenusa. Entonces altura² = 13² − 5² = 169 − 25 = 144, y la altura es la raíz de 144, o sea 12 metros.",
+      "trampa": "El distractor «8 m» es restar 13 − 5, que es el error clásico de tratar la hipotenusa como si los lados se sumaran directamente. Los que se restan son los cuadrados, nunca los lados."
+    },
+    {
+      "id": "MAT-013",
+      "competencia": "Formulación y ejecución",
+      "componente": "Geométrico-métrico",
+      "tema": "Semejanza de triángulos",
+      "dificultad": 3,
+      "enunciado": "A la misma hora del día, un poste proyecta una sombra de 6 metros y una persona de 1,70 metros de estatura proyecta una sombra de 2 metros. ¿Cuál es la altura del poste?",
+      "opciones": [
+        "5,10 m",
+        "3,40 m",
+        "5,70 m",
+        "7,06 m"
+      ],
+      "correcta": 0,
+      "explicacion": "A la misma hora, los rayos del sol llegan con el mismo ángulo, así que los dos triángulos son semejantes y sus lados guardan la misma razón: altura ÷ sombra es igual para ambos. Entonces altura = 1,70 × 6 ÷ 2 = 5,10 metros.",
+      "trampa": "El distractor «3,40 m» sale de multiplicar 1,70 por 2 en vez de armar la proporción completa. Escribe la proporción antes de operar: altura del poste sobre 6 igual a 1,70 sobre 2."
+    },
+    {
+      "id": "MAT-014",
+      "competencia": "Formulación y ejecución",
+      "componente": "Geométrico-métrico",
+      "tema": "Volumen de un cilindro",
+      "dificultad": 4,
+      "enunciado": "Un tanque cilíndrico tiene 1,5 metros de radio y 4 metros de altura. Tomando π ≈ 3,14, ¿cuál es aproximadamente su volumen?",
+      "opciones": [
+        "18,8 m³",
+        "28,3 m³",
+        "37,7 m³",
+        "56,5 m³"
+      ],
+      "correcta": 1,
+      "explicacion": "El volumen de un cilindro es el área de la base por la altura: V = π r² h = 3,14 × 1,5² × 4 = 3,14 × 2,25 × 4 ≈ 28,3 m³.",
+      "trampa": "El distractor «37,7 m³» sale de usar el diámetro o de olvidar elevar el radio al cuadrado (3,14 × 3 × 4). En volúmenes, el radio SIEMPRE va al cuadrado antes de multiplicar por la altura."
+    },
+    {
+      "id": "MAT-015",
+      "competencia": "Interpretación y representación",
+      "componente": "Geométrico-métrico",
+      "tema": "Escalas en un plano",
+      "dificultad": 3,
+      "enunciado": "En un plano dibujado a escala 1 : 200, un muro mide 4,5 centímetros. ¿Cuánto mide el muro en la realidad?",
+      "opciones": [
+        "4,5 m",
+        "45 m",
+        "9 m",
+        "90 m"
+      ],
+      "correcta": 2,
+      "explicacion": "La escala 1 : 200 dice que 1 centímetro del plano equivale a 200 centímetros reales. Entonces 4,5 × 200 = 900 centímetros, que son 9 metros.",
+      "trampa": "El distractor «90 m» aparece cuando uno multiplica bien pero se equivoca al pasar de centímetros a metros. Un metro tiene 100 centímetros, no 10: haz la conversión aparte y en el papel."
+    },
+    {
+      "id": "MAT-016",
+      "competencia": "Argumentación",
+      "componente": "Geométrico-métrico",
+      "tema": "Relación entre perímetro y área",
+      "dificultad": 4,
+      "enunciado": "Dos terrenos rectangulares tienen el mismo perímetro de 40 metros. Un comprador afirma: «como tienen el mismo perímetro, tienen la misma área». ¿Qué se puede decir de esa afirmación?",
+      "opciones": [
+        "Es correcta para cualquier par de rectángulos.",
+        "Es correcta solo si los dos son cuadrados.",
+        "Es incorrecta, porque el perímetro y el área nunca se relacionan.",
+        "Es incorrecta: uno de 10 × 10 da 100 m² y uno de 15 × 5 da 75 m²."
+      ],
+      "correcta": 3,
+      "explicacion": "Para refutar una afirmación general basta un contraejemplo. Los rectángulos de 10 × 10 y de 15 × 5 tienen ambos perímetro 40 metros, pero áreas de 100 m² y 75 m². Un mismo perímetro admite muchas áreas distintas, y la mayor siempre es la del cuadrado.",
+      "trampa": "El distractor «nunca se relacionan» exagera al otro extremo: sí hay relación (el perímetro pone un tope al área), lo que no hay es igualdad. En Argumentación, la opción correcta suele ser la que trae el contraejemplo concreto."
+    },
+    {
+      "id": "MAT-017",
+      "competencia": "Interpretación y representación",
+      "componente": "Geométrico-métrico",
+      "tema": "Interpretación de un plano",
+      "dificultad": 3,
+      "contexto": "El plano de un apartamento muestra cuatro espacios rectangulares:\n\n| Espacio | Medidas |\n|---|---|\n| Sala-comedor | 5,0 m × 4,0 m |\n| Cocina | 3,0 m × 4,0 m |\n| Alcoba principal | 3,5 m × 4,0 m |\n| Alcoba auxiliar | 3,0 m × 3,0 m |",
+      "enunciado": "Se quiere enchapar el piso de la sala-comedor con baldosas cuadradas de 50 cm de lado. ¿Cuántas baldosas se necesitan como mínimo?",
+      "opciones": [
+        "80",
+        "60",
+        "40",
+        "100"
+      ],
+      "correcta": 0,
+      "explicacion": "La sala-comedor mide 5,0 × 4,0 = 20 m². Cada baldosa de 50 cm de lado es de 0,5 × 0,5 = 0,25 m². Entonces 20 ÷ 0,25 = 80 baldosas.",
+      "trampa": "El distractor «40» sale de dividir 20 entre 0,5, usando el lado de la baldosa en vez de su área. Cuando cubres una superficie, siempre se divide área entre área."
+    },
+    {
+      "id": "MAT-018",
+      "competencia": "Interpretación y representación",
+      "componente": "Aleatorio",
+      "tema": "Crecimiento absoluto y porcentual",
+      "dificultad": 4,
+      "contexto": "Una panadería registró sus ventas (en millones de pesos) durante cuatro meses:\n\n| Mes | Ventas |\n|---|---|\n| Enero | 40 |\n| Febrero | 60 |\n| Marzo | 84 |\n| Abril | 120 |",
+      "enunciado": "¿En cuál mes se registró el MAYOR crecimiento porcentual respecto al mes anterior?",
+      "opciones": [
+        "Marzo",
+        "Febrero",
+        "Abril",
+        "El crecimiento porcentual fue igual todos los meses."
+      ],
+      "correcta": 1,
+      "explicacion": "Hay que dividir el aumento entre el valor del mes anterior. Febrero: 20 ÷ 40 = 50 %. Marzo: 24 ÷ 60 = 40 %. Abril: 36 ÷ 84 ≈ 43 %. El mayor crecimiento porcentual fue el de febrero, aunque en pesos haya sido el aumento más pequeño.",
+      "trampa": "El distractor «Abril» es el mes que más subió en cifras (36 millones) y por eso se marca de afán. Crecer mucho sobre una base grande puede ser un porcentaje menor que crecer poco sobre una base pequeña: el examen pregunta esto todo el tiempo."
+    },
+    {
+      "id": "MAT-019",
+      "competencia": "Formulación y ejecución",
+      "componente": "Aleatorio",
+      "tema": "Probabilidad simple",
+      "dificultad": 2,
+      "enunciado": "En una bolsa hay 6 balotas rojas, 3 azules y 1 verde. Si se saca una balota al azar, ¿cuál es la probabilidad de que NO sea roja?",
+      "opciones": [
+        "3/10",
+        "1/2",
+        "2/5",
+        "3/5"
+      ],
+      "correcta": 2,
+      "explicacion": "En total hay 6 + 3 + 1 = 10 balotas, y las que no son rojas son 3 + 1 = 4. La probabilidad es 4/10, que simplificada es 2/5. También se puede hacer por el complemento: 1 − 6/10 = 4/10.",
+      "trampa": "El distractor «3/5» es la probabilidad de que SÍ sea roja (6/10): se marca cuando el ojo salta por encima del «NO» en mayúscula. Cada vez que veas una negación en el enunciado, calcula primero el caso directo y réstalo de 1."
+    },
+    {
+      "id": "MAT-020",
+      "competencia": "Argumentación",
+      "componente": "Aleatorio",
+      "tema": "Media contra mediana",
+      "dificultad": 4,
+      "enunciado": "En una empresa de 7 personas, seis empleados ganan $1.300.000 y el dueño gana $12.000.000. El dueño publica que «el salario promedio es de $2.828.571». ¿Qué medida describe mejor lo que gana un trabajador típico?",
+      "opciones": [
+        "El promedio, porque usa todos los datos.",
+        "Ninguna: con siete datos no se puede calcular nada.",
+        "El promedio, porque la mediana ignora los salarios altos.",
+        "La mediana, que es $1.300.000, porque el dato del dueño es extremo."
+      ],
+      "correcta": 3,
+      "explicacion": "El promedio se deja arrastrar por valores extremos: un solo salario de 12 millones sube la media muy por encima de lo que gana cualquiera de los seis empleados. La mediana, que es el valor del medio al ordenar los datos, se queda en $1.300.000 y describe mejor al trabajador típico.",
+      "trampa": "El distractor «el promedio, porque usa todos los datos» suena a rigor estadístico y es justo la trampa: usar todos los datos es una ventaja solo cuando no hay valores extremos que distorsionen."
+    },
+    {
+      "id": "MAT-021",
+      "competencia": "Formulación y ejecución",
+      "componente": "Aleatorio",
+      "tema": "Probabilidad condicional en tabla de doble entrada",
+      "dificultad": 4,
+      "contexto": "En un colegio se registró el resultado de 140 estudiantes en el examen de admisión:\n\n| | Aprobó | Reprobó | Total |\n|---|---|---|---|\n| Hombres | 45 | 15 | 60 |\n| Mujeres | 56 | 24 | 80 |\n| Total | 101 | 39 | 140 |",
+      "enunciado": "Si se escoge al azar un estudiante entre los que REPROBARON, ¿cuál es la probabilidad de que sea mujer?",
+      "opciones": [
+        "24/39",
+        "24/80",
+        "24/140",
+        "39/140"
+      ],
+      "correcta": 0,
+      "explicacion": "La condición «entre los que reprobaron» cambia el total: ya no son los 140 estudiantes sino los 39 que reprobaron. De esos 39, las mujeres son 24, así que la probabilidad es 24/39.",
+      "trampa": "El distractor «24/140» usa el total del colegio en vez del total del grupo condicionado. Cada vez que leas «entre los que…», enciérrale un círculo a la fila o columna que se vuelve el nuevo total."
+    },
+    {
+      "id": "MAT-022",
+      "competencia": "Interpretación y representación",
+      "componente": "Aleatorio",
+      "tema": "Porcentajes en un presupuesto",
+      "dificultad": 2,
+      "contexto": "Una familia con ingresos de $2.400.000 al mes distribuye su presupuesto así:\n\n| Rubro | Porcentaje |\n|---|---|\n| Arriendo | 35 % |\n| Alimentación | 25 % |\n| Transporte | 15 % |\n| Servicios | 10 % |\n| Otros | 15 % |",
+      "enunciado": "¿Cuánto dinero destina la familia al arriendo cada mes?",
+      "opciones": [
+        "$600.000",
+        "$840.000",
+        "$720.000",
+        "$960.000"
+      ],
+      "correcta": 1,
+      "explicacion": "El arriendo es el 35 % de $2.400.000. Como el 10 % son $240.000, el 35 % son tres veces eso más la mitad de una: 720.000 + 120.000 = $840.000.",
+      "trampa": "El distractor «$720.000» es el 30 %: aparece cuando uno calcula por décimas y olvida el 5 % que falta. Calcular el 10 % y armar el resto a partir de ahí es rápido, pero hay que completar todos los pedazos."
+    },
+    {
+      "id": "MAT-023",
+      "competencia": "Argumentación",
+      "componente": "Aleatorio",
+      "tema": "Sesgo en una muestra",
+      "dificultad": 4,
+      "enunciado": "Para saber cuántas horas hace ejercicio la gente de una ciudad, un estudiante encuesta a 300 personas a la salida de un gimnasio y concluye que «los habitantes hacen ejercicio 6 horas por semana en promedio». La principal objeción a su conclusión es que",
+      "opciones": [
+        "300 personas son muy pocas para una ciudad.",
+        "no preguntó por la edad de los encuestados.",
+        "encuestó donde solo hay gente que ya hace ejercicio.",
+        "el promedio no es la medida adecuada para horas."
+      ],
+      "correcta": 2,
+      "explicacion": "El problema no es el tamaño sino DÓNDE se tomó la muestra: a la salida de un gimnasio, todos los encuestados hacen ejercicio, así que la muestra no representa a la ciudad. Una muestra sesgada no se arregla encuestando a más gente en el mismo sitio.",
+      "trampa": "El distractor «300 personas son muy pocas» es la objeción que primero se le ocurre a todo el mundo, y es la equivocada: 300 personas bien escogidas alcanzan para una ciudad. El defecto está en cómo se escogieron, no en cuántas."
+    },
+    {
+      "id": "MAT-024",
+      "competencia": "Formulación y ejecución",
+      "componente": "Aleatorio",
+      "tema": "Probabilidad con dos dados",
+      "dificultad": 3,
+      "enunciado": "Se lanzan dos dados corrientes de seis caras. ¿Cuál es la probabilidad de que la suma de los dos resultados sea 7?",
+      "opciones": [
+        "1/12",
+        "1/3",
+        "7/36",
+        "1/6"
+      ],
+      "correcta": 3,
+      "explicacion": "Al lanzar dos dados hay 6 × 6 = 36 resultados posibles. La suma 7 se obtiene de seis formas: 1-6, 2-5, 3-4, 4-3, 5-2 y 6-1. Entonces la probabilidad es 6/36 = 1/6.",
+      "trampa": "El distractor «7/36» pone el 7 de la suma en el numerador, confundiendo el resultado buscado con el número de casos favorables. Lo que va arriba es CUÁNTAS formas hay, no el valor que se busca."
+    }
+  ]
+}

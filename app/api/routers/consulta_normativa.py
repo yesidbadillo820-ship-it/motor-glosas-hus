@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.models.db import UsuarioRecord
 
 router = APIRouter(prefix="/consulta-normativa", tags=["consulta-normativa"])
@@ -64,6 +64,18 @@ _STOPWORDS = {
 }
 
 
+# ⚠ 26-08-2026 — ESTA LISTA NO ESTÁ VERIFICADA CONTRA FUENTE OFICIAL.
+#
+# Son 132 entradas que alimentan la pantalla «Consulta Normativa» (no los
+# dictámenes: la IA usa el corpus de app/services/normativa_completa.py, que sí
+# se repasó el 25-08). Al auditar los dictámenes salió que una de ellas estaba
+# inventada: decía que el Art. 10 del Decreto 2423 de 1996 son «tarifas mínimas
+# SOAT para urgencias», y verificado contra el PDF oficial de MinSalud ese
+# artículo es la nomenclatura de las intervenciones quirúrgicas de PROCTOLOGÍA.
+# Se reemplazó por el Art. 87, que es el que de verdad sirve para tarifas.
+#
+# Las otras 131 no se han contrastado una por una. Mientras eso no se haga, lo
+# que se lea acá se verifica antes de usarlo en un documento que se radique.
 def _norm_txt(s: str) -> str:
     """Lowercase + sin tildes + solo alfanumérico/espacios."""
     if not s:
@@ -385,11 +397,15 @@ CATALOGO_NORMAS = [
         "keywords": ["habilitación", "estándares", "servicios"],
     },
     {
-        "clave": "RESOLUCION 1604 DE 2022",
-        "nombre": "Resolución 1604 de 2022",
-        "titulo": "Estándares de habilitación — actualización 2022",
+        # Corregida el 25-08-2026 contra fuente oficial. No es una resolución
+        # de habilitación: es el DECRETO 1604 de 2022, que adiciona artículos al
+        # Decreto 1072 de 2015 sobre las instituciones educativas de las Cajas
+        # de Compensación. Nada que ver con habilitación de servicios de salud.
+        "clave": "DECRETO 1604 DE 2022",
+        "nombre": "Decreto 1604 de 2022",
+        "titulo": "Instituciones educativas de las Cajas de Compensación Familiar",
         "vigente": True,
-        "keywords": ["habilitación", "estándares", "2022"],
+        "keywords": ["cajas de compensación", "instituciones educativas"],
     },
     {
         "clave": "RESOLUCION 1995 DE 1999",
@@ -427,25 +443,32 @@ CATALOGO_NORMAS = [
         "keywords": ["PPL", "privados de libertad", "penitenciaria"],
     },
     {
+        # Corregida el 25-08-2026 contra fuente oficial. No es de habilitación:
+        # es el instrumento con que las EPS reportan al Ministerio los servicios
+        # que NIEGAN. Y figura como no vigente.
         "clave": "RESOLUCION 3539 DE 2019",
         "nombre": "Resolución 3539 de 2019",
-        "titulo": "Procedimientos y condiciones de habilitación de servicios de salud — complementaria",
-        "vigente": True,
-        "keywords": ["habilitación", "condiciones", "servicios"],
+        "titulo": "Reporte de servicios negados por las EPS",
+        "vigente": False,
+        "keywords": ["servicios negados", "reporte", "EPS"],
     },
     {
+        # Derogada por la Resolución DIAN 000165 del 1 de noviembre de 2023
+        # (verificado el 25-08-2026: su artículo 70 la deroga expresamente).
         "clave": "RESOLUCION 042 DE 2020 DIAN",
         "nombre": "Resolución 042 de 2020 DIAN",
         "titulo": "Factura Electrónica de Venta (FEV) — Habilitación",
-        "vigente": True,
+        "vigente": False,
         "keywords": ["factura electrónica", "FEV", "DIAN", "facturación"],
     },
     {
-        "clave": "RESOLUCION 506 DE 2021 DIAN",
-        "nombre": "Resolución 506 de 2021 DIAN",
-        "titulo": "Factura Electrónica de Venta — Actualización",
-        "vigente": True,
-        "keywords": ["factura electrónica", "FEV", "DIAN"],
+        # Corregida el 25-08-2026 contra fuente oficial. NO es de la DIAN: la
+        # expidió el Ministerio de Salud el 19 de abril de 2021. Y ya no rige.
+        "clave": "RESOLUCION 506 DE 2021",
+        "nombre": "Resolución 506 de 2021 (MinSalud)",
+        "titulo": "Campos de datos adicionales del sector salud en la factura electrónica",
+        "vigente": False,
+        "keywords": ["factura electrónica", "FEV", "campos del sector salud"],
     },
     {
         "clave": "RESOLUCION 054 DE 2026 ESE HUS",
@@ -463,11 +486,48 @@ CATALOGO_NORMAS = [
     },
     # ─── CIRCULARES ───
     {
+        # 24-08-2026 — enriquecida con el texto de la circular real (49 pág,
+        # entregada por el auditor). Las keywords son lo que la pantalla
+        # muestra como "texto": frases con sustancia, no etiquetas sueltas.
         "clave": "CIRCULAR EXTERNA 047 DE 2025 MINSALUD",
         "nombre": "Circular Externa 047 de 2025 MinSalud",
-        "titulo": "Manual SOAT 2026 — indexación a UVB",
+        "titulo": "Indexación de tarifas del Manual de Régimen Tarifario a UVB — vigencia 2026 (30-dic-2025)",
         "vigente": True,
-        "keywords": ["SOAT", "UVB", "manual", "tarifas 2026"],
+        "keywords": [
+            "SOAT",
+            "UVB",
+            "manual tarifario",
+            "tarifas 2026",
+            "Art. 313 Ley 2294 de 2023 crea la Unidad de Valor Básico",
+            "para liquidar en pesos se multiplica el valor de la UVB vigente por la tarifa en UVB",
+            "UVB 2026 = $12.110 (Resolución MinHacienda)",
+            "aplica a aseguradoras SOAT, entidades responsables de pago, prestadores y transporte de pacientes",
+            "indexación",
+            "accidente de tránsito",
+        ],
+    },
+    {
+        # 24-08-2026 — cargada del PDF real (45 pág) entregado por el auditor.
+        # Defensa clave del HUS en glosas de medicamentos: el precio máximo es
+        # POR MERCADO RELEVANTE (mg/unidad) y el Parágrafo 2 del Art. 1 permite
+        # a las IPS ADICIONAR el margen del Art. 11 de la Circular 18 de 2024.
+        "clave": "CIRCULAR 19 DE 2024 CNPMDM",
+        "nombre": "Circular 19 de 2024 CNPMDM (MinSalud–MinCIT)",
+        "titulo": "Precio máximo de venta de medicamentos en control directo — deroga la Circular 13 de 2022",
+        "vigente": True,
+        "keywords": [
+            "precio máximo de venta",
+            "control directo de precios",
+            "medicamentos regulados",
+            "mercado relevante",
+            "CNPMDM",
+            "CUM",
+            "Parágrafo 2 Art. 1: la IPS puede adicionar al precio máximo el margen del Art. 11 de la Circular 18 de 2024",
+            "sanciona la SIC según Art. 132 Ley 1438 de 2011",
+            "rige desde el 30 de julio de 2024 y deroga la Circular 13 de 2022",
+            "transacción institucional",
+            "regulados",
+        ],
     },
     {
         "clave": "CIRCULAR 030 DE 2013 MINSALUD",
@@ -1015,11 +1075,11 @@ CATALOGO_NORMAS = [
         "keywords": ["glosas", "objeciones", "cuentas médicas"],
     },
     {
-        "clave": "DECRETO 2423 DE 1996 ART 10",
-        "nombre": "Decreto 2423 de 1996 — Art. 10",
-        "titulo": "Tarifas mínimas SOAT para urgencias",
+        "clave": "DECRETO 2423 DE 1996 ART 87",
+        "nombre": "Decreto 2423 de 1996 — Art. 87",
+        "titulo": "Procedimiento sin tarifa asignada: se reconoce por la tarifa de la institución",
         "vigente": True,
-        "keywords": ["SOAT", "urgencias", "tarifas mínimas"],
+        "keywords": ["SOAT", "sin tarifa", "tarifa institucional", "manual tarifario"],
     },
     {
         "clave": "RESOLUCION 1604 DE 2006",
@@ -1045,7 +1105,7 @@ CATALOGO_NORMAS = [
     {
         "clave": "LEY 1438 DE 2011 ART 105",
         "nombre": "Ley 1438 de 2011 — Art. 105",
-        "titulo": "Prohibición de intromisión en el acto médico por parte de las EPS",
+        "titulo": "Autonomía profesional (Art. 105 Ley 1438 de 2011)",
         "vigente": True,
         "keywords": ["acto médico", "intromisión", "autonomía", "Art. 105"],
     },
@@ -1125,7 +1185,7 @@ def exportar_normas(
 @router.post("")
 def consultar_biblioteca(
     data: ConsultaNormativaInput,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Busca normas en la biblioteca por una pregunta en lenguaje natural.
 

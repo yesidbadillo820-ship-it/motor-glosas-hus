@@ -22,6 +22,52 @@ El Motor de Glosas HUS es una aplicación web que automatiza la generación de r
 - **Alertas por correo** de glosas próximas a vencer
 - **Marco normativo completo** con 17 referencias (Leyes, Decretos, Resoluciones, Sentencias)
 - **Score dinámico** basado en calidad del argumento generado por IA
+- **Glosas ADRES**: el coordinador carga el `ReporteGlosasReclamPAQUETE` una
+  vez y el gestor **solo escribe el número de factura** para que la pantalla le
+  traiga las glosas clasificadas, el centro de costos, la sugerencia de
+  respuesta con su motivo, el detallado cruzado y el texto consolidado
+  ([docs/GLOSAS_ADRES_WEB.md](docs/GLOSAS_ADRES_WEB.md))
+
+## Módulo aparte: preparación ICFES Saber 11
+
+La carpeta `icfes/` contiene un sistema **independiente** de preparación para el
+examen Saber 11 del ICFES: banco de preguntas con explicaciones, plan de estudio
+por fases, repaso espaciado, simulacros cronometrados y cuaderno de errores.
+
+No depende de `app/` ni de librerías externas (solo Python 3.11 estándar).
+
+En Windows, doble clic en `tools\ICFES.cmd` (menú) o `tools\ICFES_APP.cmd`
+(genera la app web). Desde la consola, **hay que estar dentro de la carpeta del
+repositorio** o Python responde `No module named icfes`:
+
+```bash
+cd C:\temp-notas                                   # la carpeta del repositorio
+python -m icfes iniciar --examen 2027-08-08 --meta 400 --horas 12
+python -m icfes hoy
+python -m icfes exportar-web --salida ICFES.html   # app que funciona sin internet
+```
+
+Guía completa: [`docs/GUIA_SISTEMA_ICFES.md`](docs/GUIA_SISTEMA_ICFES.md).
+
+## Módulo aparte: curso de noruego
+
+La carpeta `noruego/` contiene una aplicación web para aprender **noruego
+(bokmål)** desde cero, pensada para hispanohablantes y para usarse desde el
+celular: se instala como aplicación (PWA) y funciona sin internet.
+
+Independiente de `app/` y sin librerías externas (solo Python 3.11 estándar).
+
+En Windows, doble clic en `tools\NORUEGO.cmd`. Desde la consola:
+
+```bash
+cd C:\temp-notas
+python -m noruego revisar          # valida el contenido del curso
+python -m noruego exportar         # genera la app en static/noruego/
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+# En el celular, mismo wifi: http://LA-IP:8000/static/noruego/index.html
+```
+
+Guía completa: [`docs/GUIA_CURSO_NORUEGO.md`](docs/GUIA_CURSO_NORUEGO.md).
 
 ## Requisitos
 
@@ -179,6 +225,7 @@ motor-glosas-hus/
 │   │   └── routers/
 │   │       ├── auth_router.py
 │   │       ├── glosas.py
+│   │       ├── glosas_adres.py   # Paquete de glosas del ADRES
 │   │       ├── contratos.py
 │   │       ├── plantillas.py
 │   │       └── analytics.py
@@ -191,8 +238,10 @@ motor-glosas-hus/
 │   ├── services/             # Lógica de negocio
 │   │   ├── glosa_service.py
 │   │   ├── pdf_service.py
+│   │   ├── preauditoria_adres.py  # Pre-auditoría del paquete ADRES
 │   │   └── glosa_ia_prompts.py
 │   └── main.py               # Punto de entrada
+├── tools/                    # Bots de escritorio (detallados, PDF, macro)
 ├── tests/                    # Suite de pruebas
 ├── static/                   # Frontend SPA
 ├── requirements.txt

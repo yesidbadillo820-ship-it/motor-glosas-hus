@@ -35,7 +35,6 @@ _PATRONES = (
         "Cita Sentencia T-760/2008 cuando aplique al PBS y obligaciones EPS.",
         "T-760",
     ),
-    (r"\bt-?1025\b", "Cita Sentencia T-1025/2002 (urgencias sin autorización previa).", "T-1025"),
     (
         r"\bt-?760(/?2008)?\b|sentencia\s+t-?760",
         "Cita Sentencia T-760/2008 cuando aplique al PBS y obligaciones EPS.",
@@ -104,7 +103,7 @@ _PATRONES = (
     ),
     (
         r"conciliaci[óo]n|art[íi]?culo\s+20\s+dec(reto)?\s*4747",
-        "Menciona la mesa de conciliación (Art. 20 Decreto 4747/2007).",
+        "Menciona la mesa de conciliación (Art. 23 Decreto 4747/2007).",
         "conciliación",
     ),
 )

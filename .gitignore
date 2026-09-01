@@ -64,8 +64,19 @@ htmlcov/
 deploy/cloudflared/config.yml
 deploy/cloudflared/*.json
 
-# Carpeta de datos generada por install.sh (excepto los catálogos versionados)
-data/
+# Suite Cartera HUS — contraseñas reales de los portales EPS (LOCAL, NUNCA al repo).
+# El .example SÍ se commitea (plantilla); el real y su respaldo NO.
+config/soportes_root.txt
+tools/suite_cartera_hus/config/entidades.credenciales.json
+tools/suite_cartera_hus/config/entidades.credenciales.json.bak
+# Salidas generadas por la Suite (evidencias, control, objeciones de pacientes)
+tools/suite_cartera_hus/SALIDAS/
+
+# Carpeta de datos generada por install.sh (excepto los catálogos versionados).
+# Va "data/*" y no "data/": con la barra sola, git no entra a la carpeta y las
+# tres excepciones de abajo nunca se aplicaban — al editar un catálogo había
+# que forzar el add, y era fácil dejarlo por fuera del commit sin notarlo.
+data/*
 !data/plantillas_hus_base.json
 !data/perfiles_radicacion.json
 !data/clausulas_contrato_base.json
@@ -75,6 +86,8 @@ data/
 # carpeta data/ raíz (runtime).
 !app/data/
 !app/data/cups_soat_homologacion.json.gz
+!app/data/soat_uvb_2026.json.gz
+!app/data/tarifas_propias_hus.json.gz
 
 # Reporte por defecto del radicador de facturación (artefacto generado)
 radicacion_reporte.csv
@@ -84,3 +97,12 @@ scratchpad/
 tests/benchmark/salidas/
 tests/benchmark/historial_live.jsonl
 tests/benchmark/historial.jsonl
+
+# Aplicación web del sistema ICFES: se genera con `python -m icfes exportar-web`
+# a partir del banco de preguntas. Es un archivo derivado, no se versiona.
+ICFES.html
+icfes-app.html
+
+# Aplicación del curso de noruego: se genera con `python -m noruego exportar`
+# a partir del léxico. Es un archivo derivado de ~1 MB, no se versiona.
+static/noruego/

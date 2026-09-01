@@ -12,6 +12,8 @@ Endpoints:
 
 from __future__ import annotations
 
+import time
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -38,6 +40,31 @@ from app.services.health_monitor import checar_salud
 router = APIRouter(prefix="/sistema", tags=["sistema"])
 
 
+@router.get("/ocupacion")
+def ocupacion():
+    """¿Hay alguien trabajando en el portal ahora mismo?
+
+    La pregunta el autodespliegue antes de apagar el motor para aplicar codigo
+    nuevo. Si hay gente trabajando, espera cinco minutos y vuelve a preguntar:
+    en una oficina de tres personas siempre aparece un hueco, y el cambio entra
+    sin que nadie note nada. Pedido de Yesid el 24-08-2026, textual: «necesito
+    que cada vez que hagamos cambios y demas no se les este cayendo la pagina a
+    los gestores a cada rato».
+
+    No pide sesion a proposito: la hace un bot local que no tiene clave. Y no
+    dice nada delicado — ni quien, ni que estaba haciendo, ni cuantos son. Solo
+    cuantos segundos lleva el portal en silencio.
+    """
+    from app.services import actividad
+
+    segundos = actividad.segundos_inactivo()
+    return {
+        "segundos_inactivo": int(segundos),
+        "hay_gente_trabajando": actividad.hay_gente_trabajando(),
+        "umbral_segundos": actividad.SEGUNDOS_DE_SILENCIO,
+    }
+
+
 @router.get("/salud")
 def salud_detallada(
     db: Session = Depends(get_db),
@@ -49,8 +76,14 @@ def salud_detallada(
 @router.get("/salud/publico")
 def salud_publica(db: Session = Depends(get_db)):
     """Healthcheck sin autenticación para monitores externos.
-    Devuelve solo el estado_general y la hora, sin métricas internas."""
-    r = checar_salud(db)
+
+    Devuelve solo el estado_general y la hora, sin métricas internas. Usa la
+    variante BÁSICA a propósito (E00): al ser público y sin límite de tasa, no
+    puede disparar el recorrido de 30 días ni la detección de anomalías.
+    """
+    from app.services.health_monitor import checar_salud_basico
+
+    r = checar_salud_basico(db)
     return {
         "estado": r["estado_general"],
         "generado_en": r["generado_en"],
@@ -77,7 +110,12 @@ def observabilidad(
     anthropic_ok = bool(os.getenv("ANTHROPIC_API_KEY"))
     groq_ok = bool(os.getenv("GROQ_API_KEY"))
     firma_rsa_ok = bool(os.getenv("FIRMA_DIGITAL_PRIVATE_KEY"))
-    cifrado_ok = bool(os.getenv("GLOSAS_ENCRYPTION_KEY"))
+    # E00: la clave configurada NO es lo mismo que datos cifrados. Se reporta
+    # el estado REAL (hay clave + hay campos cableados), no la intención.
+    from app.services.cifrado import cifrado_activo, hay_clave
+
+    cifrado_ok = cifrado_activo()
+    cifrado_clave_ok = hay_clave()
     digest_dest_ok = bool(os.getenv("DIGEST_DESTINATARIOS"))
     whatsapp_ok = bool(os.getenv("WHATSAPP_META_TOKEN") and os.getenv("WHATSAPP_META_PHONE_ID"))
     telegram_ok = bool(os.getenv("TELEGRAM_BOT_TOKEN"))
@@ -113,8 +151,10 @@ def observabilidad(
 
     # Recomendaciones según lo que falte configurar
     recomendaciones = []
-    if not sentry_ok:
-        recomendaciones.append("Configurar SENTRY_DSN para tracking de errores en producción.")
+    # Sentry ya no se recomienda desde acá: el hospital no logro crear la
+    # cuenta (sentry.io le exige entrar por Fly.io) y repetir la recomendacion
+    # cada vez solo hace ruido. La integracion sigue montada: basta poner
+    # SENTRY_DSN en el .env para que se active. 19-08-2026.
     if not (anthropic_ok or groq_ok):
         recomendaciones.append(
             "CRÍTICO: configurar ANTHROPIC_API_KEY o GROQ_API_KEY (sin IA, no hay análisis)."
@@ -124,9 +164,17 @@ def observabilidad(
             "Configurar FIRMA_DIGITAL_PRIVATE_KEY para firmas asimétricas (más seguras que HMAC)."
         )
     if not cifrado_ok:
-        recomendaciones.append(
-            "Configurar GLOSAS_ENCRYPTION_KEY para cifrar datos sensibles del paciente."
-        )
+        if cifrado_clave_ok:
+            recomendaciones.append(
+                "GLOSAS_ENCRYPTION_KEY está configurada pero NINGÚN campo se cifra todavía: "
+                "los datos del paciente están en texto plano en la base."
+            )
+        else:
+            recomendaciones.append(
+                "Los datos del paciente NO están cifrados en reposo. Configurar "
+                "GLOSAS_ENCRYPTION_KEY es el primer paso, pero por sí sola no cifra nada: "
+                "falta cablear los campos (ver CAMPOS_CIFRADOS en app/services/cifrado.py)."
+            )
     if not digest_dest_ok:
         recomendaciones.append(
             "Configurar DIGEST_DESTINATARIOS para envío automático del resumen diario."
@@ -842,6 +890,39 @@ def ia_presence_publica():
     }
 
 
+def _commit_del_repo() -> str:
+    """El commit que hay en disco, leído del `.git` del repositorio.
+
+    Se leen los archivos directamente en vez de llamar a `git`: no depende de
+    que git esté en el PATH del servicio y no lanza un proceso por consulta.
+    Devuelve "" si no se puede determinar — nunca revienta.
+    """
+    from pathlib import Path as _Path
+
+    try:
+        raiz = _Path(__file__).resolve().parents[3] / ".git"
+        cabeza = (raiz / "HEAD").read_text(encoding="utf-8").strip()
+        if cabeza.startswith("ref:"):
+            ref = cabeza.split(" ", 1)[1].strip()
+            destino = raiz / ref
+            if destino.exists():
+                return destino.read_text(encoding="utf-8").strip()
+            # Referencia empaquetada (packed-refs)
+            for linea in (raiz / "packed-refs").read_text(encoding="utf-8").splitlines():
+                if linea.endswith(" " + ref):
+                    return linea.split(" ", 1)[0].strip()
+            return ""
+        return cabeza  # HEAD suelto (detached)
+    except OSError:
+        return ""
+
+
+# Cuándo arrancó este proceso. Se sella al importar el módulo, que es lo más
+# cerca del arranque que se puede estar sin tocar el ciclo de vida.
+_ARRANQUE_EPOCH = time.localtime()
+_ARRANQUE_DEL_PROCESO = time.strftime("%Y-%m-%d %H:%M:%S", _ARRANQUE_EPOCH)
+
+
 @router.get("/version")
 def info_version():
     """R64 P1: información de versión PÚBLICA (sin auth).
@@ -871,9 +952,17 @@ def info_version():
 
     cfg = get_settings()
 
-    # Render expone RENDER_GIT_COMMIT con el hash del commit deployado.
-    # Localmente usamos "dev" como fallback.
-    commit_full = os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or "dev"
+    # Render expone RENDER_GIT_COMMIT con el hash del commit deployado. En el
+    # PC de cartera esa variable NO existe —no es Render—, así que esto
+    # respondía «dev» siempre y nadie podía saber qué versión estaba viva.
+    #
+    # 19-08-2026. Se perdieron horas por eso: el archivo en disco tenía un
+    # arreglo, el motor se comportaba como si no, y no había forma de saber si
+    # el proceso había recogido el código nuevo. Ahora se lee el commit del
+    # propio `.git` del repositorio, que es la verdad de lo que hay en disco.
+    commit_full = (
+        os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or _commit_del_repo() or "dev"
+    )
     commit_short = commit_full[:7] if len(commit_full) >= 7 else commit_full
 
     # Build time: lo más cercano disponible — Render no expone el timestamp
@@ -889,6 +978,15 @@ def info_version():
         "build_time": build_time,
         "python": sys.version.split()[0],
         "env": os.getenv("ENV", "development"),
+        # Cuándo arrancó ESTE proceso. Puesto al lado del commit responde la
+        # pregunta que hoy no se podía responder: «¿el motor que está
+        # respondiendo ya tiene el arreglo, o sigue con el código viejo en
+        # memoria?». Si el commit es nuevo pero el proceso es más viejo que
+        # él, falta reiniciar.
+        "proceso_arrancado_en": _ARRANQUE_DEL_PROCESO,
+        "proceso_lleva_segundos": round(time.time() - time.mktime(_ARRANQUE_EPOCH), 0)
+        if _ARRANQUE_EPOCH
+        else None,
     }
 
 
@@ -2819,6 +2917,12 @@ def info_feature_flags(
 
     cfg = get_settings()
 
+    # E00: el estado REAL del cifrado, no la mera presencia de la clave.
+    from app.services.cifrado import CAMPOS_CIFRADOS as _campos_cifrados
+    from app.services.cifrado import cifrado_activo as _cifrado_activo
+
+    _cifrado_real_activo = _cifrado_activo()
+
     flags = [
         {
             "nombre": "ia_anthropic",
@@ -2837,8 +2941,13 @@ def info_feature_flags(
         },
         {
             "nombre": "cifrado_simetrico",
-            "activo": bool(os.getenv("GLOSAS_ENCRYPTION_KEY")),
-            "descripcion": "Cifrado de campos sensibles",
+            "activo": _cifrado_real_activo,
+            "descripcion": (
+                f"Cifrado en reposo de campos sensibles "
+                f"({len(_campos_cifrados)} campo(s) cableado(s))"
+                if _cifrado_real_activo
+                else "Cifrado en reposo NO aplicado: ningún campo sensible está cifrado"
+            ),
         },
         {
             "nombre": "smtp_alertas",

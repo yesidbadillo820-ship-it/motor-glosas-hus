@@ -51,7 +51,11 @@ _BANCO_DEFENSAS: tuple[dict, ...] = (
             "1B en pacientes que cumplen criterios de refractariedad documentados "
             "en historia clínica."
         ),
-        "normas": "Sentencia T-553/2024 + Auto 037/2024 (acceso garantizado por tutela); Ley 1751/2015 Art. 8 (continuidad).",
+        # La "Sentencia T-553/2024" salio de aqui el 24-08-2026: NO EXISTE. Se
+        # comprobo contra la base de la Relatoria de la Corte (el autocompletado
+        # de "T-553/2" solo devuelve T-553/23) y contra las paginas vecinas. Queda
+        # el anclaje legal, que si es real y sostiene lo mismo.
+        "normas": "Ley 1751/2015 Art. 8 (continuidad); Ley 1751/2015 Art. 15 (exclusiones taxativas).",
     },
     {
         "key": "da_vinci",
@@ -94,7 +98,9 @@ _BANCO_DEFENSAS: tuple[dict, ...] = (
             "falla. Si el dispositivo tiene distribuidor único en Colombia, eso "
             "EXIME de las 3 cotizaciones (Decreto 1082/2015)."
         ),
-        "normas": "Ley 1388/2010 (niñez); Sentencia T-027/2020; Decreto 1082/2015 Art. 2.2.1.2.1.5.7 (proveedor único exime cotización).",
+        # La "Sentencia T-027/2020" salio de aqui el 24-08-2026: NO EXISTE. La
+        # numeracion de tutelas de 2020 salta de la T-019 a la T-030.
+        "normas": "Ley 1388/2010 (niñez); Decreto 1082/2015 Art. 2.2.1.2.1.5.7 (proveedor único exime cotización).",
     },
     {
         "key": "tms_psiquiatria",
@@ -158,12 +164,15 @@ _BANCO_DEFENSAS: tuple[dict, ...] = (
             "clínicamente insostenible: se contrapone a la evidencia y al deber "
             "de continuidad."
         ),
-        "normas": "Ley 1751/2015 Art. 8; Ley 1388/2010 (niñez); Sentencia T-027/2020.",
+        # Idem: la "Sentencia T-027/2020" no existe (verificado 24-08-2026).
+        "normas": "Ley 1751/2015 Art. 8 (continuidad); Ley 1388/2010 (niñez).",
     },
     {
         "key": "hemofilia_inhibidores",
         "patron": re.compile(
-            r"HEMOFILIA|FACTOR\s+VII|EPTACOG|FEIBA|INHIBIDOR(?:ES)?\b",
+            # Ronda 30: "INHIBIDOR" suelto disparaba defensa de hemofilia en
+            # glosas de "inhibidor de bomba de protones". Exige contexto factor.
+            r"HEMOFILIA|FACTOR\s+VII|EPTACOG|FEIBA|\bINHIBIDOR(?:ES)?\s+(?:DEL?\s+|CONTRA\s+EL\s+)?FACTOR\b",
             re.IGNORECASE,
         ),
         "titulo": "Hemofilia con inhibidores (Factor VIIa / aPCC)",
@@ -183,7 +192,8 @@ _BANCO_DEFENSAS: tuple[dict, ...] = (
     {
         "key": "iris_vih",
         "patron": re.compile(
-            r"\bIRIS\b|RECONSTITUCI[ÓO]N\s+INMUNE|VIH.{0,20}TARV|SIDA",
+            # Ronda 30: "SIDA" sin frontera matcheaba dentro de otras palabras.
+            r"\bIRIS\b|RECONSTITUCI[ÓO]N\s+INMUNE|VIH.{0,20}TARV|\bSIDA\b",
             re.IGNORECASE,
         ),
         "titulo": "Síndrome de Reconstitución Inmune (IRIS) post-TARV en VIH/SIDA",

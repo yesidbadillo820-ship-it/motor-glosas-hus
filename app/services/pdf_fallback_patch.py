@@ -72,7 +72,9 @@ def apply() -> bool:
 
         # ---- Nivel B: Gemini Flash con PDFs nativos ----
         gemini = getattr(self, "gemini", None)
-        gemini_model = getattr(self, "gemini_model", None) or "gemini-2.0-flash"
+        from app.core.config import modelo_gemini_vigente
+
+        gemini_model = modelo_gemini_vigente(getattr(self, "gemini_model", None))
         if gemini is not None:
             try:
                 texto, modelo = await gemini.completar_con_retry(

@@ -1,0 +1,43 @@
+{
+  "id_prueba": "ST-01",
+  "eps": "LA PREVISORA S A COMPAÑIA DE SEGUROS SOAT UVB",
+  "codigo_glosa": "TA0301",
+  "tipo_glosa": "TARIFAS",
+  "valor_facturado": 4180000,
+  "valor_glosado": 1254000,
+  "numero_factura": "HUS0000601447",
+  "fecha_radicacion": "2026-06-18",
+  "fecha_recepcion": "2026-07-02",
+  "informacion_deliberadamente_ausente": [
+    "La fecha de prestación del servicio (solo hay fechas de radicación y recepción)",
+    "El manual tarifario que el pagador dice aplicar (no lo nombra)",
+    "El contrato: NO se adjunta PDF y NO se menciona ninguno"
+  ],
+  "trampa": [
+    "El texto trae CUATRO números de 6 dígitos: 890201 (el CUPS real), 471120, 274101 y 890201-B. Solo el primero es un CUPS. 471120 es una referencia interna del pagador y 274101 una orden. Un modelo descuidado los toma todos como CUPS o confunde cuál es.",
+    "El aritmético: 1.254.000 / 4.180.000 = 30,0 % exacto. El motor debe poder decir el porcentaje glosado sin inventar la tarifa de referencia, que NO está.",
+    "Sin fecha de servicio, el motor no puede afirmar qué manual regía. La glosa dice «el manual aplicable» sin nombrarlo."
+  ],
+  "que_deberia_detectar": [
+    "Que 890201 es el único número que puede ser CUPS; los otros tres no lo son",
+    "Que la glosa NO nombra el manual tarifario, así que no puede rebatirse contra un valor de referencia concreto",
+    "Que sin fecha de prestación no puede determinarse qué manual regía",
+    "Que el 30 % glosado es un dato calculable y verificable"
+  ],
+  "que_no_debe_afirmar": [
+    "Que 471120, 274101 o 890201-B son CUPS",
+    "Que existe un contrato o una tarifa pactada (no se aportó ninguno)",
+    "Un valor de referencia SOAT concreto para 890201 sin haberlo consultado",
+    "Que la tarifa facturada es correcta o incorrecta: con lo aportado no se puede concluir"
+  ],
+  "resultado_esperado": "OBJETAR PARCIALMENTE o NO CONCLUYENTE. El dictamen debe exigirle al pagador que identifique el manual y el valor de referencia, y debe decir expresamente que sin la fecha de prestación no puede determinarse el manual aplicable.",
+  "soportes_entregados": [
+    "factura.pdf",
+    "rips_procedimientos.pdf"
+  ],
+  "soportes_deliberadamente_ausentes": [
+    "contrato",
+    "historia clínica",
+    "manual tarifario"
+  ]
+}

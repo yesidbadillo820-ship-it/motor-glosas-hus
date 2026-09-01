@@ -18,8 +18,9 @@ Caso de uso (Yesid mayo 2026):
   Gestor: "Necesito buscar si en los soportes cargados se encuentra
    la BACILOSCOPIA COLORACION ACIDO ALCOHOL-RESISTENTE [ZIEHL-NEELSEN]"
   IA:     [Lee los PDFs de la factura via PDF-nativo Claude]
-          "Según análisis: el servicio se encuentra en el FOLIO 25
-           de la historia clínica, fecha 28/02/2026 17:00-18:10..."
+          "Según análisis: el servicio se encuentra en la historia
+           clínica del 28/02/2026, 17:00-18:10 (folio, si el documento
+           viene foliado)..."
 
 Output estructurado en formato forense de 4 secciones:
   1. CONTEXTO DE LA GLOSA
@@ -35,6 +36,9 @@ Funciona via:
 """
 
 from __future__ import annotations
+
+from app.core.config import espera_maxima
+import asyncio
 import os
 import re
 import base64
@@ -51,7 +55,7 @@ Tu trabajo es leer los SOPORTES DOCUMENTALES de una factura específica (histori
 
 REGLAS DURAS:
 1. SOLO afirma cosas que pueden verificarse en los soportes provistos. Si no encuentras evidencia, dilo explícitamente.
-2. Cita SIEMPRE el folio o página específica donde está la evidencia (ej: "FOLIO 25", "página 4 de la historia clínica").
+2. Cita el folio o la página SOLO cuando el documento lo traiga escrito (número de folio, sello de foliación, o «Página N de M» impreso). Si el documento NO está foliado, nómbralo por su tipo y su fecha: «LA HOJA DE ATENCIÓN DE URGENCIAS DEL [fecha] REGISTRA...». Nunca escribas un número de folio que no hayas leído en el documento: la EPS busca ese folio, no lo encuentra y ratifica la glosa completa.
 3. Cuando cites textualmente lo que dice un soporte, usa COMILLAS DOBLES y mayúsculas si así está en el original.
 4. Si el gestor pregunta por un servicio/procedimiento específico, busca exhaustivamente: nombre del procedimiento, código CUPS, código FMQ, sinónimos clínicos.
 5. NO inventes folios, fechas, nombres ni datos clínicos.
@@ -90,6 +94,95 @@ FORMATO DE RESPUESTA OBLIGATORIO (HTML, español formal):
 Si en los soportes NO encuentras la información que pregunta el gestor, sé honesto: "No se encuentra evidencia documental del servicio X en los soportes anexados. Se requieren los siguientes folios adicionales para una defensa completa: {lista}."
 
 Devuelve SOLO el HTML, sin texto adicional ni markdown."""
+
+
+# ─── Qué soportes se le mandan a la IA ───────────────────────────────────────
+
+# Solo caben 5 documentos por consulta, así que el orden decide qué lee la IA
+# y qué no. Este orden NO es el mismo con el que la pantalla de Soportes lista
+# los archivos: allá manda la factura, acá manda la historia clínica, porque
+# las preguntas del gestor son clínicas («¿está la baciloscopia?», «¿qué
+# medicamentos se administraron?») y esas respuestas viven en la historia, la
+# epicrisis y los anexos escaneados — no en el comprobante de recibido de cobro.
+#
+# 19-08-2026. Antes se tomaban los 5 primeros del orden de pantalla. Con los
+# soportes reales de la factura HUS468334 eso mandaba el comprobante de
+# recibido de cobro y dejaba SIN ABRIR la epicrisis, la hoja de administración
+# de medicamentos, los otros procedimientos, el PDE y el PDX. La IA contestaba
+# «no encontré evidencia» sin haber mirado el documento donde estaba.
+_ORDEN_FORENSE = {
+    "historia_clinica": 0,  # HEV — el corazón del expediente
+    # 19-08-2026. Estos tres se veían como «otro» porque el indexador no
+    # conocía sus códigos, así que competían de últimas con cualquier archivo
+    # suelto. Son documentos clínicos de primera línea: en una glosa por
+    # «ausencia de soporte de la consulta de urgencias», el que la prueba es
+    # la HAU.
+    "hoja_atencion_urgencias": 0,  # HAU
+    "epicrisis": 1,  # EPI
+    "hoja_administracion_medicamentos": 1,  # HAM
+    "factura_electronica": 1,  # FEV — qué se cobró, para contrastar
+    # 2 = «otro»: epicrisis, hoja de administración de medicamentos y demás
+    #     anexos escaneados. Es donde más veces está la respuesta.
+    "otros_procedimientos": 3,  # OPF
+    "pde": 3,
+    "pdx": 3,
+    "resultados_msps": 4,
+    "furips": 5,
+    "comprobante_recibido_cobro": 6,  # solo dice que se radicó, no qué se hizo
+}
+_ORDEN_FORENSE_ANEXOS = 2
+
+# Documentos que NUNCA pueden ir en un bloque PDF de la IA. El RIPS es .json y
+# el CUFE es .xml: mandarlos declarados como «application/pdf» gasta un cupo en
+# un archivo que la IA no puede abrir.
+_TIPOS_NO_PDF = {"rips", "xml_cufe", "cuv"}
+
+
+def _es_pdf(ruta: str) -> bool:
+    """True si el archivo es un PDF de verdad, no solo de nombre.
+
+    Se mira la firma `%PDF` del principio: un archivo renombrado a `.pdf` o
+    un PDF truncado a la mitad de una copia por red rompe la consulta entera.
+    """
+    try:
+        with open(ruta, "rb") as fh:
+            return fh.read(5).startswith(b"%PDF")
+    except OSError:
+        return False
+
+
+def escoger_soportes_para_forense(
+    soportes: list[dict], maximo: int = 5
+) -> tuple[list[dict], list[dict]]:
+    """Reparte los soportes de una factura en (los que se leen, los que no).
+
+    Devuelve siempre las dos listas: lo que se dejó por fuera hay que
+    decírselo al gestor. Un «no encontré evidencia» sobre un expediente que se
+    leyó a medias es un dictamen falso, y con eso se acepta una glosa que
+    había que objetar.
+    """
+    candidatos: list[dict] = []
+    omitidos: list[dict] = []
+
+    for s in soportes:
+        ruta = s.get("ruta") or ""
+        tipo = s.get("tipo") or "otro"
+        if tipo in _TIPOS_NO_PDF or not str(ruta).lower().endswith(".pdf"):
+            omitidos.append({**s, "motivo": "no es un PDF"})
+        elif not _es_pdf(ruta):
+            omitidos.append({**s, "motivo": "no se pudo abrir o no es un PDF válido"})
+        else:
+            candidatos.append(s)
+
+    candidatos.sort(
+        key=lambda s: (
+            _ORDEN_FORENSE.get(s.get("tipo") or "otro", _ORDEN_FORENSE_ANEXOS),
+            s.get("nombre_archivo") or "",
+        )
+    )
+    for s in candidatos[maximo:]:
+        omitidos.append({**s, "motivo": f"solo caben {maximo} documentos por consulta"})
+    return candidatos[:maximo], omitidos
 
 
 _CACHE_TTL_DIAS_FORENSE = 14
@@ -189,7 +282,9 @@ async def auditar_forense(
     api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
     modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
     gemini_key = os.getenv("GEMINI_API_KEY", "")
-    gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    from app.core.config import modelo_gemini_vigente
+
+    gemini_model = modelo_gemini_vigente(os.getenv("GEMINI_MODEL"))
 
     if not api_key and not gemini_key:
         return {
@@ -214,7 +309,7 @@ async def auditar_forense(
                 "cache_hit": True,
             }
 
-    timeout = httpx.Timeout(connect=15.0, read=240.0, write=60.0, pool=10.0)
+    timeout = httpx.Timeout(connect=15.0, read=espera_maxima(240.0), write=60.0, pool=10.0)
     headers = {
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
@@ -307,7 +402,9 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
         try:
             from app.services.gemini_service import GeminiService
 
-            gem = GeminiService(api_key=gemini_key, default_model=gemini_model, timeout=240.0)
+            gem = GeminiService(
+                api_key=gemini_key, default_model=gemini_model, timeout=espera_maxima(240.0)
+            )
             texto, modelo_usado = await gem.completar(
                 system=SYSTEM_AUDITOR_FORENSE,
                 user=user_text,
@@ -347,9 +444,16 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
             from app.services.pdf_to_images import pdfs_a_imagenes_combinadas
             from app.services.gemini_service import GeminiService
 
-            imagenes = pdfs_a_imagenes_combinadas(pdfs_raw, max_imagenes_total=20, dpi=130)
+            # Ronda 30: la conversión PDF→PNG (hasta 20 páginas) es CPU-bound
+            # y corría síncrona dentro de esta corrutina, bloqueando el event
+            # loop en 1 vCPU. Se ejecuta en un thread aparte.
+            imagenes = await asyncio.to_thread(
+                pdfs_a_imagenes_combinadas, pdfs_raw, max_imagenes_total=20, dpi=130
+            )
             if imagenes:
-                gem = GeminiService(api_key=gemini_key, default_model=gemini_model, timeout=240.0)
+                gem = GeminiService(
+                    api_key=gemini_key, default_model=gemini_model, timeout=espera_maxima(240.0)
+                )
                 user_text_vision = (
                     f"FACTURA: {factura}\n\n"
                     f"Las imagenes adjuntas son las paginas escaneadas de los soportes "

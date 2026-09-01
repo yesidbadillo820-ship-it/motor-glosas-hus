@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
 from app.core.tz import a_utc, ahora_utc
+from app.models.schemas import ConciliacionesPagina
 from app.database import get_db
 from app.models.db import UsuarioRecord, GlosaRecord
 from app.repositories.conciliacion_repository import ConciliacionRepository
@@ -122,7 +123,7 @@ def crear_conciliacion(
     }
 
 
-@router.get("/")
+@router.get("/", response_model=ConciliacionesPagina)
 def listar_conciliaciones(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
@@ -412,10 +413,12 @@ def pdf_acta(
 <div class="box">{(c.observaciones or "—").strip()}</div>
 
 <p style="margin-top:30px;font-size:10pt;color:#475569">
-El presente documento se suscribe en cumplimiento del artículo 56 de la Ley 1438 de 2011,
-el Decreto 4747 de 2007 (artículo 20) y la Resolución 2175 de 2015. De no lograrse acuerdo,
-las partes podrán elevar el conflicto ante la Superintendencia Nacional de Salud según el
-artículo 126 de la Ley 1438 de 2011.
+El presente documento se suscribe en cumplimiento del artículo 57 de la Ley 1438 de 2011
+(trámite de glosas), el Decreto 4747 de 2007 (artículo 23, trámite de glosas) y la
+Resolución 2284 de 2023, Anexo Técnico 3 — Manual Único de Devoluciones, Glosas y
+Respuestas. De no lograrse acuerdo, las partes podrán elevar el conflicto ante la
+Superintendencia Nacional de Salud según el artículo 126 de la Ley 1438 de 2011
+(función jurisdiccional).
 </p>
 
 <div class="firmas">
@@ -437,7 +440,7 @@ artículo 126 de la Ley 1438 de 2011.
 @router.post("/acta-sinac/pdf")
 def pdf_acta_sinac(
     payload: ActaSinacInput,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Genera el acta de conciliación en formato SINAC (multi-glosa) como
     HTML imprimible. Replica la estructura del Excel ACTA_SINAC_N_XXX que
@@ -607,3 +610,278 @@ def pdf_acta_sinac(
 
 </body></html>"""
     return HTMLResponse(content=html)
+
+
+# ─── El acta que se trabaja en Excel: revisar, optimizar e imprimir ──────
+# La mesa diligencia un Excel (formato ACTA SINAC). Estos tres endpoints lo
+# reciben tal cual: «revisar» dice qué no cuadra, «optimizar» devuelve el
+# mismo libro con resultado por línea + hoja REVISION + indicadores, y
+# «pdf» arma el acta firmable. Lo escrito por el auditor nunca se toca.
+
+_MAX_BYTES_ACTA = 30_000_000
+
+
+async def _leer_upload_acta(archivo: UploadFile) -> tuple[bytes, bool]:
+    nombre = (archivo.filename or "").lower()
+    if not nombre.endswith((".xlsm", ".xlsx")):
+        raise HTTPException(400, "El acta debe ser el Excel de la mesa (.xlsm o .xlsx)")
+    contenido = await archivo.read()
+    if not contenido:
+        raise HTTPException(400, "El archivo llegó vacío")
+    if len(contenido) > _MAX_BYTES_ACTA:
+        raise HTTPException(413, "El archivo supera los 30 MB")
+    return contenido, nombre.endswith(".xlsm")
+
+
+def _acta_o_400(contenido: bytes):
+    from app.services import acta_conciliacion_excel as acta_x
+
+    try:
+        return acta_x.leer_acta(contenido)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception:
+        raise HTTPException(400, "No se pudo leer el Excel: ¿es el formato del acta de la mesa?")
+
+
+@router.post("/acta-excel/revisar")
+async def acta_excel_revisar(
+    archivo: UploadFile = File(...),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Cuadra el acta sin producir archivos: qué reparte de más, qué
+    pendiente no coincide, qué línea quedó conciliada sin texto. Es el
+    «ver qué sale» antes de descargar nada."""
+    from app.services import acta_conciliacion_excel as acta_x
+
+    contenido, _ = await _leer_upload_acta(archivo)
+    acta = _acta_o_400(contenido)
+    resumen = acta_x.revisar(acta)
+    return {
+        "entidad": acta.razon_social,
+        "nit": acta.nit,
+        "periodo": acta.periodo,
+        **resumen,
+        # Los primeros hallazgos alcanzan para saber por dónde empezar;
+        # el detalle completo va en la hoja REVISION del Excel optimizado.
+        "hallazgos": resumen["hallazgos"][:60],
+    }
+
+
+@router.post("/acta-excel/optimizar")
+async def acta_excel_optimizar(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Devuelve el MISMO libro (macros, logos y hojas intactas) con el
+    resultado de cada línea, la hoja REVISION con los hallazgos y los
+    indicadores recalculados."""
+    import io as _io
+    import json as _json
+
+    from fastapi.responses import StreamingResponse
+
+    from app.services import acta_conciliacion_excel as acta_x
+
+    contenido, es_xlsm = await _leer_upload_acta(archivo)
+    _acta_o_400(contenido)  # valida formato antes de trabajar
+    try:
+        salida, resumen = acta_x.optimizar(contenido, es_xlsm=es_xlsm)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, "No se pudo optimizar el acta: revisar el formato del libro.")
+
+    # Expediente: queda constancia de quién pasó el acta y cómo cuadró.
+    try:
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=current_user.rol,
+            accion="ACTA_EXCEL_OPTIMIZADA",
+            tabla="conciliaciones",
+            campo="LISTA" if resumen["lista_para_firmar"] else "CON_HALLAZGOS",
+            valor_nuevo=(archivo.filename or "acta")[:200],
+            detalle=_json.dumps(
+                {
+                    "resumen": {
+                        "facturas": resumen["facturas"],
+                        "lineas": resumen["lineas"],
+                        "glosado": resumen["glosado"],
+                        "levanta_entidad": resumen["levanta_entidad"],
+                        "ratificado": resumen["ratificado"],
+                        "pendiente": resumen["pendiente_calculado"],
+                        "hallazgos": len(resumen["hallazgos"]),
+                    }
+                },
+                ensure_ascii=False,
+            )[:1900],
+        )
+        db.commit()
+    except Exception:
+        pass
+
+    ext = "xlsm" if es_xlsm else "xlsx"
+    media = (
+        "application/vnd.ms-excel.sheet.macroEnabled.12"
+        if es_xlsm
+        else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    from app.api.routers.automatizaciones import _nombre_para_header
+
+    base = _nombre_para_header((archivo.filename or "acta").rsplit(".", 1)[0][:80])
+    return StreamingResponse(
+        _io.BytesIO(salida),
+        media_type=media,
+        headers={
+            "Content-Disposition": f'attachment; filename="{base}_OPTIMIZADA.{ext}"',
+            "X-Hallazgos": str(len(resumen["hallazgos"])),
+            "X-Lista-Para-Firmar": "1" if resumen["lista_para_firmar"] else "0",
+        },
+    )
+
+
+@router.post("/acta-excel/pdf")
+async def acta_excel_pdf(
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """El acta firmable, armada desde el Excel de la mesa: encabezado de la
+    entidad, las líneas con su resultado, totales, cláusula de mérito
+    ejecutivo y las firmas leídas del propio libro. El navegador la imprime
+    a PDF con Ctrl+P."""
+    import json as _json
+
+    from fastapi.responses import HTMLResponse
+
+    from app.services import acta_conciliacion_excel as acta_x
+
+    contenido, _ = await _leer_upload_acta(archivo)
+    acta = _acta_o_400(contenido)
+    resumen = acta_x.revisar(acta)
+    html_impreso = acta_x.html_acta(acta, resumen)
+
+    try:
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=current_user.rol,
+            accion="ACTA_EXCEL_PDF",
+            tabla="conciliaciones",
+            campo="LISTA" if resumen["lista_para_firmar"] else "CON_HALLAZGOS",
+            valor_nuevo=(archivo.filename or "acta")[:200],
+            detalle=_json.dumps(
+                {
+                    "entidad": acta.razon_social,
+                    "facturas": resumen["facturas"],
+                    "glosado": resumen["glosado"],
+                    "hallazgos": len(resumen["hallazgos"]),
+                },
+                ensure_ascii=False,
+            )[:1900],
+        )
+        db.commit()
+    except Exception:
+        pass
+
+    return HTMLResponse(content=html_impreso)
+
+
+class SimuladorConciliacionInput(BaseModel):
+    postura_hus: str
+
+
+@router.post("/{conciliacion_id}/simulador/")
+def simular_conciliacion(
+    conciliacion_id: int,
+    datos: SimuladorConciliacionInput,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Qué le va a contestar la EPS en la audiencia, y con qué responderle.
+
+    20-08-2026. El botón «Simular» del panel de conciliaciones existía en
+    pantalla desde hacía tiempo y llamaba a esta ruta, que NUNCA se
+    implementó: el auditor escribía su postura, esperaba, y le salía «No se
+    pudo simular». La función que hace el trabajo —`preparar_audiencia`— sí
+    estaba hecha y ya se usaba en otra pantalla; solo faltaba conectarla acá y
+    devolver los campos con los nombres que este panel espera.
+
+    Nada de esto lo inventa una IA: los contraargumentos salen del catálogo por
+    tipo de glosa y la probabilidad es la tasa REAL de levantamiento de esa EPS
+    en audiencias anteriores. Si no hay historia con esa EPS, la probabilidad
+    va vacía y en pantalla sale «—»: es preferible a poner un número inventado
+    del que después alguien tome una decisión de plata.
+    """
+    from app.services.conciliador_ia import preparar_audiencia
+
+    conc = ConciliacionRepository(db).obtener_por_id(conciliacion_id)
+    if not conc:
+        raise HTTPException(status_code=404, detail="La conciliación no existe.")
+
+    postura = (datos.postura_hus or "").strip()
+    if len(postura) < 20:
+        raise HTTPException(
+            status_code=400,
+            detail="Escriba la postura del HUS con al menos 20 caracteres.",
+        )
+
+    if not conc.glosa_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Esta conciliación no está ligada a una glosa, así que no hay "
+            "historia con la cual compararla.",
+        )
+
+    material = preparar_audiencia(db, conc.glosa_id)
+    if not material:
+        raise HTTPException(status_code=404, detail="No se encontró la glosa de esta conciliación.")
+
+    stats = material.get("estadistica_eps") or {}
+    tasa = stats.get("tasa_levantamiento_pct")
+    n_previas = stats.get("n_audiencias_previas") or 0
+
+    contras = []
+    for ca in material.get("contraargumentos") or []:
+        contras.append(
+            {
+                "titulo": ca.get("titulo", ""),
+                # El panel muestra `texto` como el argumento de la EPS y
+                # `respuesta_sugerida_hus` como la réplica del hospital.
+                "texto": ca.get("texto") or ca.get("titulo", ""),
+                "respuesta_sugerida_hus": ca.get("respuesta_sugerida", ""),
+                "frecuencia_estimada": ca.get("frecuencia_estimada", ""),
+            }
+        )
+
+    if n_previas:
+        origen = (
+            f"Histórico real: {n_previas} audiencia(s) previa(s) con esta EPS "
+            f"(no es una estimación de IA)."
+        )
+    else:
+        origen = (
+            "Sin audiencias previas registradas con esta EPS: no hay base para "
+            "estimar una probabilidad, y no se inventa una."
+        )
+
+    consejo = material.get("recomendacion_tactica") or ""
+    valor_min = material.get("valor_minimo_aceptable") or 0
+    if valor_min:
+        consejo = f"{consejo}\n\nValor mínimo aceptable sugerido: ${int(valor_min):,}".replace(
+            ",", "."
+        )
+    normas = material.get("normas_clave") or []
+    if normas:
+        consejo = f"{consejo}\n\nNormas clave: " + " · ".join(normas)
+
+    return {
+        "conciliacion_id": conciliacion_id,
+        "glosa_id": conc.glosa_id,
+        "probabilidad_exito_hus": tasa,
+        "_modelo": origen,
+        "contraargumentos": contras,
+        "consejo_estrategico": consejo.strip(),
+        "postura_hus_evaluada": postura[:2000],
+        "estadistica_eps": stats,
+    }

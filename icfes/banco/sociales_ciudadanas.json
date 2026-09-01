@@ -1,0 +1,350 @@
+{
+  "area": "sociales_ciudadanas",
+  "version": 1,
+  "nota": "Preguntas de práctica escritas para este sistema. Los datos normativos e históricos citados son verificables en la Constitución Política de 1991 y en fuentes históricas de acceso público. No son preguntas del ICFES.",
+  "preguntas": [
+    {
+      "id": "SOC-001",
+      "competencia": "Pensamiento social",
+      "componente": "Constitución Política y derechos",
+      "tema": "Acción de tutela",
+      "dificultad": 3,
+      "enunciado": "A una persona la EPS le niega un examen que su médico tratante ordenó y que ella necesita con urgencia. ¿Cuál es el mecanismo constitucional adecuado para exigir la protección inmediata de su derecho?",
+      "opciones": [
+        "La acción de tutela.",
+        "La acción de cumplimiento.",
+        "La acción popular.",
+        "El derecho de petición."
+      ],
+      "correcta": 0,
+      "explicacion": "La acción de tutela (artículo 86 de la Constitución) protege los derechos fundamentales cuando resultan vulnerados o amenazados y no hay otro medio judicial eficaz. Es el mecanismo diseñado para la urgencia: el juez debe resolver en un máximo de diez días.",
+      "trampa": "El distractor «acción popular» confunde derechos individuales con derechos colectivos. La acción popular protege lo que es de todos (ambiente sano, espacio público, salubridad pública); aquí el derecho a la salud es de una persona concreta."
+    },
+    {
+      "id": "SOC-002",
+      "competencia": "Interpretación y análisis de perspectivas",
+      "componente": "Constitución Política y derechos",
+      "tema": "Elección del mecanismo adecuado",
+      "dificultad": 4,
+      "enunciado": "Un ciudadano quiere que una alcaldía le entregue copia de un contrato público. No hay urgencia ni derecho fundamental en riesgo inmediato. Lo primero que debe hacer es",
+      "opciones": [
+        "presentar una acción de tutela ante un juez.",
+        "presentar un derecho de petición ante la alcaldía.",
+        "presentar una acción popular ante el tribunal.",
+        "esperar a que la alcaldía publique el contrato."
+      ],
+      "correcta": 1,
+      "explicacion": "El derecho de petición (artículo 23) permite pedir información a las autoridades y obliga a responder de fondo, por regla general dentro de los quince días hábiles siguientes. La tutela es subsidiaria: solo procede cuando no hay otro medio de defensa o cuando la respuesta se niega o se incumple.",
+      "trampa": "El distractor de la tutela atrae porque es el mecanismo más conocido del país, pero usarla de entrada es el error más frecuente. Primero se pide por el canal ordinario; si no responden o responden mal, entonces sí procede la tutela."
+    },
+    {
+      "id": "SOC-003",
+      "competencia": "Pensamiento social",
+      "componente": "Constitución Política y derechos",
+      "tema": "Estado Social de Derecho",
+      "dificultad": 4,
+      "enunciado": "Que Colombia se defina como un Estado Social de Derecho (artículo 1 de la Constitución) implica que el Estado",
+      "opciones": [
+        "se limita a garantizar el orden público y hacer cumplir las leyes.",
+        "puede desconocer la ley cuando busca el bienestar de la mayoría.",
+        "además de someterse a la ley, debe garantizar condiciones materiales de vida digna.",
+        "asume la propiedad de los medios de producción del país."
+      ],
+      "correcta": 2,
+      "explicacion": "La palabra «social» agrega algo al Estado de Derecho clásico: no basta con que el poder esté sometido a la ley, también debe asegurar condiciones mínimas de vida digna, como salud, educación, trabajo y seguridad social. De ahí que en Colombia derechos como la salud se puedan exigir ante un juez.",
+      "trampa": "El distractor de «desconocer la ley por el bienestar de la mayoría» invierte la idea: lo «social» amplía las obligaciones del Estado, nunca lo libera de someterse al derecho. Un Estado que se salta la ley por una buena causa deja de ser Estado de Derecho."
+    },
+    {
+      "id": "SOC-004",
+      "competencia": "Pensamiento reflexivo y sistémico",
+      "componente": "Constitución Política y derechos",
+      "tema": "Mecanismos de participación ciudadana",
+      "dificultad": 4,
+      "contexto": "En un municipio se discute un proyecto de minería a cielo abierto.\n\n**Vocero de la empresa:** «El proyecto traerá 1.200 empleos directos y regalías por $40.000 millones al año. El municipio necesita esos recursos para su hospital y sus vías».\n\n**Líder de la junta de acción comunal:** «Los empleos duran lo que dure la mina, quince años. El agua del páramo que se afecta la usamos nosotros y tres municipios más, y esa la necesitamos siempre».\n\n**Alcalde:** «Voy a convocar una consulta popular para que sean los habitantes quienes decidan».",
+      "enunciado": "La consulta popular que propone el alcalde es un mecanismo adecuado para este caso porque",
+      "opciones": [
+        "permite que la empresa y la comunidad negocien el monto de las regalías.",
+        "reemplaza las funciones del concejo municipal durante el proyecto.",
+        "obliga al Congreso a expedir una ley sobre minería en ese territorio.",
+        "somete a decisión de los habitantes un asunto de trascendencia para el municipio."
+      ],
+      "correcta": 3,
+      "explicacion": "La consulta popular es una pregunta de carácter general sobre un asunto de trascendencia que la autoridad somete a la decisión del pueblo, y lo decidido es obligatorio. Encaja aquí porque el conflicto es sobre el uso del territorio del municipio, que afecta a todos sus habitantes.",
+      "trampa": "El distractor de la negociación de regalías convierte un mecanismo de decisión colectiva en una mesa de negocios entre dos partes. La consulta no negocia: pregunta y la respuesta obliga."
+    },
+    {
+      "id": "SOC-005",
+      "competencia": "Pensamiento social",
+      "componente": "Constitución Política y derechos",
+      "tema": "Habeas corpus",
+      "dificultad": 3,
+      "enunciado": "Una persona lleva cuatro días detenida sin que se le haya puesto a disposición de un juez ni se le haya informado el motivo. El mecanismo que protege específicamente su libertad personal es",
+      "opciones": [
+        "el habeas corpus.",
+        "la acción de cumplimiento.",
+        "la acción de grupo.",
+        "el recurso de reposición."
+      ],
+      "correcta": 0,
+      "explicacion": "El habeas corpus (artículo 30) protege a quien está privado de la libertad de forma ilegal o cuya detención se prolonga indebidamente. Es especialmente rápido: debe resolverse en un plazo de treinta y seis horas.",
+      "trampa": "El distractor «acción de cumplimiento» suena a que sirve para que se cumpla la ley, pero esa acción se usa para exigir que una autoridad cumpla una ley o un acto administrativo concreto, no para recuperar la libertad."
+    },
+    {
+      "id": "SOC-006",
+      "competencia": "Pensamiento social",
+      "componente": "Constitución Política y derechos",
+      "tema": "Corte Constitucional",
+      "dificultad": 3,
+      "enunciado": "La función principal que la Constitución le confía a la Corte Constitucional es",
+      "opciones": [
+        "juzgar los delitos cometidos por altos funcionarios.",
+        "guardar la integridad y la supremacía de la Constitución.",
+        "resolver los conflictos entre empresas y trabajadores.",
+        "administrar el presupuesto de la rama judicial."
+      ],
+      "correcta": 1,
+      "explicacion": "El artículo 241 le confía a la Corte Constitucional «la guarda de la integridad y supremacía de la Constitución». Por eso decide si las leyes se ajustan o no a la Carta y revisa las sentencias de tutela.",
+      "trampa": "El distractor de juzgar altos funcionarios corresponde a otras autoridades (la Corte Suprema de Justicia y, según el caso, el Congreso). Es fácil confundir las altas cortes: cada una tiene un encargo distinto y el examen lo pregunta seguido."
+    },
+    {
+      "id": "SOC-007",
+      "competencia": "Pensamiento reflexivo y sistémico",
+      "componente": "Constitución Política y derechos",
+      "tema": "Órganos de control del Estado",
+      "dificultad": 4,
+      "enunciado": "Un ciudadano detecta que un alcalde gastó recursos públicos en obras que nunca se hicieron. El organismo encargado de vigilar el manejo de esos recursos es",
+      "opciones": [
+        "el Consejo Nacional Electoral.",
+        "la Defensoría del Pueblo.",
+        "la Contraloría General de la República.",
+        "la Corte Suprema de Justicia."
+      ],
+      "correcta": 2,
+      "explicacion": "La Contraloría ejerce el control fiscal: vigila cómo se administran y gastan los recursos públicos y puede exigir que se devuelva el dinero perdido. La Procuraduría investigaría la falta disciplinaria del alcalde y la Fiscalía el posible delito: son tres controles distintos sobre el mismo hecho.",
+      "trampa": "El distractor «Defensoría del Pueblo» se marca porque suena a la entidad que defiende a los ciudadanos, pero su tarea es promover y defender los derechos humanos, no auditar la plata pública."
+    },
+    {
+      "id": "SOC-008",
+      "competencia": "Pensamiento reflexivo y sistémico",
+      "componente": "El espacio, el territorio, el ambiente y la población",
+      "tema": "Urbanización y desplazamiento",
+      "dificultad": 4,
+      "enunciado": "Entre 1950 y 2020 Colombia pasó de ser un país mayoritariamente rural a uno mayoritariamente urbano. Una explicación que combina factores económicos y del conflicto armado es que",
+      "opciones": [
+        "el campo dejó de producir alimentos y el país tuvo que importarlos.",
+        "la población rural disminuyó porque la natalidad en el campo fue siempre menor.",
+        "el gobierno prohibió por ley que las familias vivieran en zonas rurales.",
+        "la violencia expulsó población mientras las ciudades concentraban empleo y servicios."
+      ],
+      "correcta": 3,
+      "explicacion": "La migración del campo a la ciudad tuvo dos motores que se refuerzan: uno de expulsión, el despojo y el desplazamiento forzado por la violencia, y uno de atracción, la concentración de empleo, educación y servicios en las ciudades. Ninguno de los dos por separado explica un cambio de esa magnitud.",
+      "trampa": "El distractor de la natalidad afirma lo contrario de lo ocurrido: históricamente la natalidad rural fue MÁS alta que la urbana. Cuando una opción invierte un hecho demográfico básico, se puede descartar sin dudar."
+    },
+    {
+      "id": "SOC-009",
+      "competencia": "Interpretación y análisis de perspectivas",
+      "componente": "El espacio, el territorio, el ambiente y la población",
+      "tema": "Transición demográfica",
+      "dificultad": 4,
+      "contexto": "La tabla muestra la población de un municipio colombiano en dos momentos:\n\n| Grupo de edad | Año 2005 | Año 2025 |\n|---|---|---|\n| 0 a 14 años | 32.000 | 21.000 |\n| 15 a 59 años | 54.000 | 62.000 |\n| 60 años o más | 9.000 | 24.000 |\n| **Total** | **95.000** | **107.000** |",
+      "enunciado": "¿Cuál conclusión se sostiene con los datos de la tabla?",
+      "opciones": [
+        "La población del municipio está envejeciendo.",
+        "El municipio perdió población entre 2005 y 2025.",
+        "La natalidad del municipio se mantuvo estable.",
+        "La mayoría de la población hoy tiene más de 60 años."
+      ],
+      "correcta": 0,
+      "explicacion": "Los menores de 14 años bajaron de 32.000 a 21.000 mientras los mayores de 60 pasaron de 9.000 a 24.000, casi triplicándose. Menos niños y más adultos mayores es exactamente lo que significa envejecer, y ocurre aunque la población total haya crecido.",
+      "trampa": "El distractor «la mayoría tiene más de 60» exagera el dato: 24.000 de 107.000 es apenas el 22 %. Envejecer no es lo mismo que ser mayoritariamente viejo; el examen castiga ese salto."
+    },
+    {
+      "id": "SOC-010",
+      "competencia": "Interpretación y análisis de perspectivas",
+      "componente": "El espacio, el territorio, el ambiente y la población",
+      "tema": "Conflictos por el uso del territorio",
+      "dificultad": 5,
+      "contexto": "En un municipio se discute un proyecto de minería a cielo abierto.\n\n**Vocero de la empresa:** «El proyecto traerá 1.200 empleos directos y regalías por $40.000 millones al año. El municipio necesita esos recursos para su hospital y sus vías».\n\n**Líder de la junta de acción comunal:** «Los empleos duran lo que dure la mina, quince años. El agua del páramo que se afecta la usamos nosotros y tres municipios más, y esa la necesitamos siempre».\n\n**Alcalde:** «Voy a convocar una consulta popular para que sean los habitantes quienes decidan».",
+      "enunciado": "La diferencia de fondo entre el argumento del vocero de la empresa y el del líder comunal está en",
+      "opciones": [
+        "la cantidad de dinero que dejaría el proyecto.",
+        "el horizonte de tiempo en que cada uno mide el beneficio.",
+        "quién tiene la competencia legal para autorizar la mina.",
+        "el número de empleos que se generarían en el municipio."
+      ],
+      "correcta": 1,
+      "explicacion": "El vocero mide en quince años de empleos y regalías; el líder responde que el agua «la necesitamos siempre». No discuten las cifras: discuten si lo que importa es el beneficio del periodo del proyecto o la sostenibilidad indefinida del recurso. Ese choque entre corto y largo plazo es el corazón de los conflictos ambientales.",
+      "trampa": "El distractor de la cantidad de dinero atrae porque las cifras son lo más visible del texto, pero el líder comunal nunca discute los montos. Cuando dos posturas usan datos distintos, casi siempre difieren en el criterio, no en los números."
+    },
+    {
+      "id": "SOC-011",
+      "competencia": "Pensamiento reflexivo y sistémico",
+      "componente": "El espacio, el territorio, el ambiente y la población",
+      "tema": "Consulta previa",
+      "dificultad": 4,
+      "enunciado": "Antes de ejecutar un proyecto que afecta el territorio de una comunidad indígena, el Estado colombiano está obligado a realizar una consulta previa. El fundamento de esa obligación es",
+      "opciones": [
+        "que las comunidades son dueñas del subsuelo del país.",
+        "que los proyectos en zonas rurales requieren permiso de los alcaldes.",
+        "el derecho de esos pueblos a participar en las decisiones que los afectan.",
+        "que ningún proyecto minero puede ejecutarse en Colombia."
+      ],
+      "correcta": 2,
+      "explicacion": "La consulta previa se sustenta en el derecho de los pueblos indígenas y las comunidades étnicas a participar en las decisiones que afecten su territorio y su cultura, reconocido en el Convenio 169 de la OIT, que Colombia incorporó mediante la Ley 21 de 1991. Es un derecho de participación, no un derecho de propiedad sobre el subsuelo.",
+      "trampa": "El distractor sobre la propiedad del subsuelo choca con la Constitución: el subsuelo es del Estado. Consultar no es lo mismo que ser dueño, y confundirlos lleva a marcar mal."
+    },
+    {
+      "id": "SOC-012",
+      "competencia": "Interpretación y análisis de perspectivas",
+      "componente": "El espacio, el territorio, el ambiente y la población",
+      "tema": "Migración y percepción social",
+      "dificultad": 4,
+      "enunciado": "En una ciudad aumentó la población migrante y también el número total de delitos registrados. Un concejal concluye que «la migración causó el aumento de la inseguridad». La principal debilidad de ese razonamiento es que",
+      "opciones": [
+        "la migración siempre reduce los índices de delito.",
+        "los delitos registrados nunca reflejan la realidad.",
+        "el concejal no tiene competencia para hablar de seguridad.",
+        "confunde que dos cosas ocurran juntas con que una cause la otra."
+      ],
+      "correcta": 3,
+      "explicacion": "Que dos cifras suban al mismo tiempo no prueba que una produzca la otra: la población total también creció, y con más habitantes suele haber más denuncias. Para sostener la afirmación habría que comparar tasas por cada cien mil habitantes y descartar otras causas.",
+      "trampa": "El distractor «la migración siempre reduce el delito» comete el mismo error del concejal pero al revés: afirma una relación general sin evidencia. La respuesta correcta no defiende una postura, señala la falla del razonamiento."
+    },
+    {
+      "id": "SOC-013",
+      "competencia": "Pensamiento reflexivo y sistémico",
+      "componente": "El poder, la economía y las organizaciones sociales",
+      "tema": "Inflación y poder adquisitivo",
+      "dificultad": 4,
+      "enunciado": "En un año la inflación fue del 9 % y el salario mínimo se aumentó un 6 %. Para un trabajador que gana ese salario, el efecto es que",
+      "opciones": [
+        "perdió poder adquisitivo, porque los precios subieron más que su salario.",
+        "ganó poder adquisitivo, porque su salario en pesos subió.",
+        "no hubo cambio, porque el aumento compensa la inflación.",
+        "ganó poder adquisitivo solo si ahorró parte del salario."
+      ],
+      "correcta": 0,
+      "explicacion": "Lo que importa no es cuántos pesos más se reciben sino cuánto se puede comprar con ellos. Si los precios suben 9 % y el salario solo 6 %, con el nuevo salario se compra menos que antes: hubo una pérdida real de cerca de 3 puntos.",
+      "trampa": "El distractor «ganó, porque su salario en pesos subió» es la trampa central del tema: mira el número nominal y olvida los precios. Salario real es salario comparado con lo que cuestan las cosas."
+    },
+    {
+      "id": "SOC-014",
+      "competencia": "Pensamiento social",
+      "componente": "El poder, la economía y las organizaciones sociales",
+      "tema": "Banco de la República",
+      "dificultad": 3,
+      "enunciado": "De acuerdo con la Constitución, el objetivo de la actividad del Estado a través del Banco de la República es",
+      "opciones": [
+        "financiar el gasto del Gobierno nacional.",
+        "velar por mantener la capacidad adquisitiva de la moneda.",
+        "fijar cada año el salario mínimo del país.",
+        "administrar los impuestos que recaudan los municipios."
+      ],
+      "correcta": 1,
+      "explicacion": "El artículo 373 establece que el Estado, a través del Banco de la República, debe velar por mantener la capacidad adquisitiva de la moneda: en la práctica, controlar la inflación. Por eso el Banco tiene autonomía frente al Gobierno.",
+      "trampa": "El distractor de financiar el gasto del Gobierno describe justamente lo que la Constitución quiso evitar al dar autonomía al Banco: un banco central que le presta al Gobierno termina emitiendo dinero e impulsando la inflación."
+    },
+    {
+      "id": "SOC-015",
+      "competencia": "Pensamiento reflexivo y sistémico",
+      "componente": "El poder, la economía y las organizaciones sociales",
+      "tema": "Separación de poderes",
+      "dificultad": 4,
+      "enunciado": "El Congreso puede citar a un ministro a un debate de control político y, si lo considera necesario, proponer una moción de censura. Esta facultad es un ejemplo de",
+      "opciones": [
+        "concentración del poder en la rama legislativa.",
+        "subordinación de la rama judicial a la legislativa.",
+        "control mutuo entre las ramas del poder público.",
+        "una función administrativa propia del Congreso."
+      ],
+      "correcta": 2,
+      "explicacion": "La separación de poderes no consiste solo en repartir funciones, sino en que cada rama pueda controlar a las otras. Que el Legislativo vigile al Ejecutivo, y que el Ejecutivo objete leyes o el Judicial las declare inexequibles, es el sistema de pesos y contrapesos.",
+      "trampa": "El distractor «concentración del poder» lee un control como si fuera una toma de poder. Controlar a otra rama es lo contrario de concentrar: es impedir que alguna quede sin vigilancia."
+    },
+    {
+      "id": "SOC-016",
+      "competencia": "Interpretación y análisis de perspectivas",
+      "componente": "El poder, la economía y las organizaciones sociales",
+      "tema": "Organizaciones sociales",
+      "dificultad": 3,
+      "enunciado": "Los trabajadores de una empresa se organizan en un sindicato para negociar colectivamente sus condiciones laborales. Desde el punto de vista de las organizaciones sociales, el sindicato les permite principalmente",
+      "opciones": [
+        "reemplazar al empleador en la dirección de la empresa.",
+        "obtener automáticamente los aumentos que solicitan.",
+        "evitar el pago de impuestos sobre sus salarios.",
+        "equilibrar la desigualdad de poder frente al empleador."
+      ],
+      "correcta": 3,
+      "explicacion": "Un trabajador solo negocia en desventaja frente a la empresa. Al agruparse, los trabajadores ganan capacidad de negociación: esa es la razón de ser de la asociación sindical, reconocida en el artículo 39 de la Constitución.",
+      "trampa": "El distractor de «obtener automáticamente los aumentos» confunde negociar con imponer. El sindicato da fuerza para negociar; no garantiza el resultado de la negociación."
+    },
+    {
+      "id": "SOC-017",
+      "competencia": "Pensamiento reflexivo y sistémico",
+      "componente": "El poder, la economía y las organizaciones sociales",
+      "tema": "Impuestos progresivos y regresivos",
+      "dificultad": 5,
+      "enunciado": "El IVA se cobra igual a todos los compradores de un producto. Por eso se dice que es un impuesto regresivo, lo que significa que",
+      "opciones": [
+        "representa una proporción mayor del ingreso de quien gana menos.",
+        "se cobra únicamente a las personas de menores ingresos.",
+        "disminuye cada año hasta desaparecer.",
+        "solo lo pagan las empresas y no los ciudadanos."
+      ],
+      "correcta": 0,
+      "explicacion": "Dos personas pagan el mismo IVA por el mismo producto, pero ese valor pesa muy distinto en cada bolsillo: para quien gana poco puede ser una parte grande de su ingreso, y para quien gana mucho es una parte mínima. Eso es regresividad. Un impuesto progresivo, como el de renta, cobra proporcionalmente más a quien más tiene.",
+      "trampa": "El distractor «se cobra únicamente a los de menores ingresos» toma «regresivo» como si significara «dirigido a los pobres». No se trata de a quién se le cobra, sino de qué proporción del ingreso representa."
+    },
+    {
+      "id": "SOC-018",
+      "competencia": "Pensamiento social",
+      "componente": "El tiempo y las culturas",
+      "tema": "Frente Nacional",
+      "dificultad": 3,
+      "enunciado": "El Frente Nacional (1958-1974) consistió en un acuerdo mediante el cual los partidos Liberal y Conservador",
+      "opciones": [
+        "se fusionaron en un solo partido político de gobierno.",
+        "se alternaron la Presidencia y repartieron los cargos públicos por mitades.",
+        "convocaron elecciones libres con participación de todos los partidos.",
+        "entregaron el poder a una junta militar por dieciséis años."
+      ],
+      "correcta": 1,
+      "explicacion": "El Frente Nacional fue un pacto para terminar la confrontación bipartidista de La Violencia: los dos partidos se turnaron la Presidencia cada cuatro años y repartieron por partes iguales los cargos del Estado, durante dieciséis años.",
+      "trampa": "El distractor de «elecciones libres con todos los partidos» describe lo contrario de lo ocurrido: el acuerdo cerró la competencia a terceras fuerzas, y esa exclusión es una de las causas que la historiografía señala en el origen de varias guerrillas."
+    },
+    {
+      "id": "SOC-019",
+      "competencia": "Interpretación y análisis de perspectivas",
+      "componente": "El tiempo y las culturas",
+      "tema": "Constitución de 1991",
+      "dificultad": 4,
+      "enunciado": "El movimiento estudiantil de la «séptima papeleta» en 1990 fue determinante porque",
+      "opciones": [
+        "logró que se derogara la Constitución de 1886 mediante una ley del Congreso.",
+        "obligó al presidente a renunciar antes de terminar su periodo.",
+        "impulsó la convocatoria de una Asamblea Nacional Constituyente.",
+        "consiguió que se aplazaran las elecciones presidenciales de ese año."
+      ],
+      "correcta": 2,
+      "explicacion": "Los estudiantes promovieron incluir una séptima papeleta en las elecciones de marzo de 1990 para pedir una asamblea constituyente. El respaldo ciudadano abrió el camino a la Asamblea Nacional Constituyente que expidió la Constitución de 1991.",
+      "trampa": "El distractor de «una ley del Congreso» desconoce el punto central del episodio: la Constitución de 1886 solo permitía reformarse por el Congreso, y esa vía estaba bloqueada. Precisamente por eso hubo que acudir a un camino distinto, el del constituyente primario."
+    },
+    {
+      "id": "SOC-020",
+      "competencia": "Pensamiento social",
+      "componente": "El tiempo y las culturas",
+      "tema": "La Violencia y el 9 de abril",
+      "dificultad": 3,
+      "enunciado": "El 9 de abril de 1948, el asesinato de Jorge Eliécer Gaitán desencadenó el llamado Bogotazo. Este hecho es considerado un punto de quiebre porque",
+      "opciones": [
+        "marcó el inicio del gobierno del Frente Nacional.",
+        "provocó la separación de Panamá de Colombia.",
+        "condujo a la firma de la Constitución de 1886.",
+        "intensificó el periodo conocido como La Violencia."
+      ],
+      "correcta": 3,
+      "explicacion": "El asesinato de Gaitán desató una revuelta en Bogotá y encendió una confrontación bipartidista que se extendió por buena parte del país durante los años cincuenta: el periodo conocido como La Violencia, que dejó cientos de miles de muertos.",
+      "trampa": "Los distractores mezclan hechos de otras épocas: Panamá se separó en 1903, la Constitución de 1886 es anterior en más de sesenta años y el Frente Nacional empezó en 1958, diez años después. Ubicar la fecha primero descarta tres opciones de una."
+    }
+  ]
+}

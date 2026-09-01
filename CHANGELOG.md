@@ -1,5 +1,1125 @@
 # Registro de cambios
 
+## Sesión 31-ago-2026 (noche 6) — Todos los botones 🔊 estaban mudos
+
+La causa de fondo de todo el enredo de la voz.
+
+- **El navegador cortaba el manejador a la mitad.** Los botones se armaban con
+  `onclick="decir(${JSON.stringify(texto)})"`. `JSON.stringify` devuelve el
+  texto entre comillas **dobles**, y el atributo HTML también va entre comillas
+  dobles: el navegador leía `onclick="decir("gå")"`, lo cortaba en la primera
+  comilla, y el atributo quedaba en `decir(` — con su «Unexpected end of input»
+  en la consola. **Los 12 botones de audio de la aplicación no hacían nada**:
+  «Toca para oír», «🐢 Más despacio», «🔊 Oír» y «🐢 Despacio» del veredicto, y
+  los 🔊 del diccionario, la gramática y las conversaciones.
+- **Por qué costó tanto verlo.** Lo único que sí hablaba era lo que no pasa por
+  un atributo: el audio al acertar (se llama desde JavaScript) y, desde el
+  arreglo anterior, el automático al aparecer (va por un atributo de datos).
+- **Una sola puerta: `alPulsarDecir()`.** Escapa el JavaScript para HTML (`esc`
+  convierte la comilla en `&quot;`) y todos los botones que hablan salen de
+  ahí. De paso, el 🔊 de los errores recientes dejó de borrar los apóstrofos
+  del texto, que era lo que hacía para esquivar el problema.
+- **3 pruebas nuevas** (208): que ningún `onclick` lleve un `JSON.stringify` sin
+  escapar, que todos los botones salgan del ayudante y que el ayudante escape.
+
+Comprobado en Chromium con voz simulada: hablan los cinco sitios probados
+—automático, «Toca para oír», «Más despacio», «Oír» del veredicto y el 🔊 del
+diccionario— y el `onclick` ya llega entero (`decir("øl")`), sin errores.
+
+## Sesión 31-ago-2026 (noche 5) — «Escucha y elige» no sonaba al aparecer
+
+Fallo real reportado desde el uso: en los ejercicios de escucha la palabra
+**no se oía al aparecer el ejercicio**, solo al pulsar «Comprobar».
+
+- **Era código muerto.** `tras()` buscaba un elemento con `data-autoaudio` para
+  decirlo al pintar la pantalla… y **ningún ejercicio ponía ese atributo**. Lo
+  único que hablaba solo era `comprobar()`, que dice la palabra al acertar.
+  Resultado: «escucha y elige» funcionaba como «lee y elige».
+- **`audioGrande()` ahora sí lo marca**, y con ello quedan cubiertos los tres
+  ejercicios de oído que lo usan: `escuchar_opcion`, `escuchar_escribir` y
+  `pronunciar` (este último dice «escúchalo y repítelo», así que también debe
+  sonar solo).
+- **Dos condiciones para no molestar:**
+  - `data-audio-clave` (sesión + número de ejercicio) impide que la palabra se
+    repita **en cada toque de opción** — tocar una opción vuelve a pintar la
+    pantalla entera.
+  - No suena con la respuesta ya revelada: ahí ya habla `comprobar()`, y sonaría
+    dos veces encima.
+- **4 pruebas nuevas** (205) y comprobación en Chromium con una voz noruega
+  simulada: al aparecer el ejercicio dice `['øl']`, tras tocar dos opciones
+  sigue en `['øl']`, y al pasar al siguiente ejercicio de oído vuelve a hablar.
+
+## Sesión 31-ago-2026 (noche 4) — Windows no deja instalar la voz en el PC del hospital
+
+El usuario llegó al sitio correcto (Hora e idioma → Voz → Agregar voces) y
+Windows respondió **«No se pudo instalar el paquete de voz»**. Los dos paquetes
+listados —el noruego y el español— aparecían con **0 MB**: ese equipo no está
+descargando contenido de idioma en absoluto.
+
+- **La causa no es la aplicación ni el usuario.** Es un equipo de dominio
+  (`esehus.loc`): las actualizaciones pasan por el servidor de Sistemas, que
+  normalmente bloquea las *características a petición* (paquetes de voz e
+  idioma). Se habilita con la directiva «Especificar la configuración para la
+  instalación y la reparación de componentes opcionales», permitiendo bajar de
+  Windows Update en vez de WSUS. Eso lo hace Sistemas, no el usuario.
+- **El aviso de la app lo dice ahora.** En Windows, después de los pasos,
+  advierte del error exacto y ofrece la salida que sí funciona: el celular,
+  donde Android e iPhone traen la voz noruega.
+- **1 prueba nueva** (201): que el tramo de Windows nombre el error literal y
+  ofrezca el celular.
+
+La aplicación sigue siendo usable sin voz: los ejercicios de escuchar muestran
+la palabra escrita y la pronunciación aproximada sigue debajo de cada palabra.
+
+## Sesión 31-ago-2026 (noche 3) — La casilla de la voz en Windows no se llama así
+
+Corrección de una instrucción equivocada que se entregó al usuario.
+
+- **El nombre estaba mal.** La app decía «marcando **Voz** entre las funciones
+  opcionales». En esa pantalla de Windows la casilla se llama **«Texto a voz»**
+  — «Voz» a secas no existe ahí, y «Reconocimiento de voz» es otra cosa
+  (dictado).
+- **Y ese camino es peligroso.** En la misma pantalla de *Idioma y región →
+  Agregar idioma* está **«Establecer como mi idioma de presentación de
+  Windows»**: marcarla por error deja **todo el PC del hospital en noruego**.
+- **Se cambió al camino corto:** *Configuración → Hora e idioma → **Voz** →
+  Administrar voces → Agregar voces → «Noruego (Bokmål)»*. Instala solo la voz
+  y no toca el idioma del sistema.
+- La guía documenta los dos caminos y advierte del riesgo del primero.
+
+Comprobado en Chromium con user-agent de Windows: el aviso muestra el camino
+nuevo y ya no nombra el de «Idioma y región».
+
+## Sesión 31-ago-2026 (noche 2) — La voz noruega: aviso sin salida y voces tardías
+
+En la prueba real la app dijo «este dispositivo no tiene voz noruega» y ahí
+quedó: el usuario no tenía cómo saber que eso se instala.
+
+- **Fallo real: las voces llegan tarde y la pantalla no se redibujaba.** Chrome
+  entrega `speechSynthesis.getVoices()` de forma asíncrona; la primera llamada
+  casi siempre devuelve una lista vacía. Como el aviso se cocina al dibujar,
+  un aparato **que sí tiene** la voz veía «no hay voz» hasta cambiar de
+  pantalla. Ahora `onvoiceschanged` vuelve a dibujar cuando el resultado
+  cambia, y se abstiene si el usuario está escribiendo en un campo.
+- **`comoInstalarVoz()`: instrucciones según el aparato.** Los avisos nombraban
+  solo Android e iPhone. Se agregaron **Windows** (Configuración → Hora e
+  idioma → Agregar idioma → Norsk bokmål, marcando «Voz», y cerrar el navegador
+  por completo) y **macOS**, más un texto genérico. Los tres avisos de audio
+  apagado —inicio, ejercicio de escucha y perfil— dicen ahora cómo arreglarlo.
+- **4 pruebas nuevas** (200): que la búsqueda acepte las tres etiquetas del
+  noruego (`nb`, `no`, `nn`), que la pantalla se redibuje al llegar las voces
+  sin borrar lo escrito, que estén los cuatro sistemas y que ningún aviso quede
+  sin salida.
+
+## Sesión 31-ago-2026 (noche) — La guía hacía copiar una dirección que no era
+
+Segunda vuelta del mismo problema, en la prueba real.
+
+- **Se quitó toda dirección de ejemplo** de la guía y del bot. La guía traía
+  `http://192.168.1.15:8000/...` como muestra, con la advertencia de no
+  copiarla; se copió igual (la máquina real era `172.17.80.25`). Antes había
+  pasado lo mismo con `LA-IP-DE-ARRIBA` y con `ESE-NUMERO`. La conclusión: una
+  dirección impresa como ejemplo termina escrita en el navegador, así que no
+  puede haber ninguna — la instrucción ahora es «copie **la línea que muestra
+  su ventana**».
+- **El bot explica el `ERR_CONNECTION_TIMED_OUT`.** Ese error no es del enlace
+  sino de la red: firewall de Windows (con el `New-NetFirewallRule` listo para
+  pegar), celular en otra red, o wifi y cable separados en el hospital.
+- **Salida por el túnel.** Como `app/` monta `/static` desde el disco, el
+  servidor que ya se ve desde fuera del hospital sirve también la aplicación:
+  la dirección de siempre con `/static/noruego/index.html` al final. Sin
+  firewall, sin wifi y sin reiniciar nada.
+- **3 pruebas nuevas** (196): un `re` rechaza cualquier `http://n.n.n.n:puerto/`
+  en la guía y en el bot, y se exige que el bot traiga la regla de firewall.
+
+## Sesión 31-ago-2026 (tarde) — El bot de noruego no mostraba la dirección
+
+Arreglo de la primera prueba real en el PC de cartera.
+
+- **`tools/NORUEGO.cmd` imprimía la ayuda de `ipconfig` en vez de la IP.** La
+  línea era `ipconfig ^| findstr /C:"IPv4"`: el `^|` solo va escapado dentro de
+  un `for /f`; suelto, el `|` le llega a `ipconfig` como argumento. Como no
+  salía la dirección, el bot igual mostraba el texto de relleno
+  `http://LA-IP-DE-ARRIBA:8000/...` — y eso fue literalmente lo que se escribió
+  en Chrome (`DNS_PROBE_FINISHED_NXDOMAIN`).
+- **Nuevo `noruego/red.py` + `python -m noruego direccion`.** La IP se averigua
+  abriendo un socket UDP hacia `8.8.8.8` sin enviar ningún byte (en UDP,
+  `connect()` solo fija la ruta local): funciona sin internet, no genera tráfico
+  y no depende del idioma de Windows ni de cuántos adaptadores tenga el equipo.
+  El comando imprime el **enlace completo**, listo para copiar; sin red no
+  imprime nada y devuelve 1.
+- **El bot y `exportar` ya no muestran texto de relleno** cuando pueden mostrar
+  el enlace real. El relleno que queda (`ESE-NUMERO`) solo aparece si de verdad
+  no hubo IP, y va acompañado de cómo conseguirla.
+- **Se explica dónde está «Agregar a la pantalla de inicio»:** Android (Chrome)
+  en los tres puntos, iPhone (Safari) en el botón de compartir. En el computador
+  no aplica — se abre `static\noruego\index.html` con doble clic. Se buscó esa
+  opción en el Chrome de escritorio, donde no existe con ese nombre.
+- **26 pruebas nuevas** (193 en `tests/test_noruego`): `test_red.py` comprueba
+  que no salga tráfico, que sin red no reviente y que nunca se ofrezca una IP de
+  loopback; `test_bots_windows.py` rechaza el `^|` fuera de un `for /f`, el
+  texto de relleno viejo, los finales de línea LF y los subcomandos inexistentes.
+
+## Sesión 31-ago-2026 — Curso de noruego (`noruego/`)
+
+Aplicación web para aprender noruego bokmål desde cero, para hispanohablantes,
+instalable en el celular (PWA) y funcional sin internet. Módulo independiente:
+no importa nada de `app/` ni de `tools/` y solo usa la librería estándar.
+
+### Contenido
+- **423 elementos de léxico** en JSON: 133 sustantivos con género y las cuatro
+  formas, 69 verbos con sus cuatro tiempos y su grupo, 40 adjetivos con las tres
+  formas, 85 frases de uso real, 42 números, 13 guías de pronunciación, 29
+  reglas de gramática (con ejemplo, error típico y comparación con el español) y
+  12 conversaciones de situaciones reales.
+- **18 módulos y 73 lecciones**, de nivel cero a B2, con la estructura definida
+  hasta C2.
+
+### Motor
+- Los ejercicios **se generan a partir de los datos**, no se escriben a mano:
+  de «bil es masculino y su definido es bilen» salen solos el ejercicio de
+  género, el de forma, el de traducción, el de escucha y el de parejas. 875
+  ejercicios por variante, 3 variantes por lección (2.625 en total).
+- 15 tipos de ejercicio: opción, completar, ordenar, traducir en las dos
+  direcciones, escuchar y elegir, escuchar y escribir, parejas, conjugar,
+  género, forma nominal, encontrar el error, diálogo, lectura y pronunciación.
+
+### Aplicación
+- Mobile first: barra inferior, botones de 52 px, zona segura del iPhone,
+  vibración, atajos de teclado.
+- Repetición espaciada que decide sola qué repasar, con detección de palabras
+  difíciles.
+- XP, niveles de jugador, racha, objetivo diario, corazones, estrellas, 10
+  logros y desbloqueo progresivo.
+- Audio con la voz del propio dispositivo (`nb-NO`). **Si no hay voz noruega,
+  muestra el texto y lo dice**, en vez de leer con acento español.
+- Diccionario buscable, gramática explicada, conversaciones, estadísticas con
+  calendario de constancia, copia de seguridad y panel para agregar contenido
+  sin tocar código.
+- PWA: manifest, service worker con caché e iconos generados.
+
+### Correcciones encontradas durante el desarrollo
+- `fuentes=("frases")` era una cadena, no una tupla: al recorrerla daba letras
+  sueltas y dejaba lecciones sin material.
+- El tipo de ejercicio rotaba con los ejercicios ya generados, así que un tipo
+  imposible de construir con ese material **bloqueaba el ciclo entero**: 27
+  lecciones quedaban casi vacías. Ahora rota con los intentos.
+- Sin voz noruega instalada, los ejercicios de escucha eran imposibles de
+  responder. Ahora muestran el texto como respaldo.
+
+### Pruebas
+167 pruebas en `tests/test_noruego/`; `ruff` limpio. Recorrido completo
+verificado en Chromium emulando un celular: alta de usuario, tres lecciones
+completas, XP, logros, diccionario, gramática, conversaciones, perfil, panel de
+contenido y **persistencia tras recargar**, sin errores de JavaScript y sin
+desbordamiento horizontal.
+
+## Sesión 26-ago-2026 (cierre 7) — un solo vocabulario de color
+
+Idea #12, decidida por el área. **Corrige lo que la propuesta afirmaba:** que
+`sinac-ds.css` «se carga y nadie usa» y que no había defecto visible. Al medir,
+las dos afirmaciones resultaron falsas.
+
+- **16 reglas de color de ese archivo aplican hoy**, todas sobre `#p-analizar`:
+  `.res-dictamen-body`, `.pa-cite.verified`, `.pa-cite.unverified`,
+  `.sidebar input/select/textarea`, `.sidebar .btn-primary`, `.res-actions button`.
+- Las paletas eran **colores distintos**, no alias: `--sds-success` `#16a34a`
+  contra `--c-green` `#2E7D32` (distancia RGB 51); `--sds-amber` `#d97706`
+  contra `--c-amber` `#E65100` (41); `--sds-rose` `#e11d48` contra `--c-red`
+  `#C62828` (43).
+
+**Arreglo: 13 líneas, no 2.072.** Los trece tokens de color de `--sds-*` pasan
+a `var(--sinac-*, #hex)`. El nombre que se escribe sigue siendo `--sds-*` —como
+pide CLAUDE.md— y el valor que devuelve es el corporativo. Ningún uso se tocó.
+
+**El fallback es obligatorio:** de las 6 páginas que cargan el archivo, 4 no
+definen `--sinac-*` (preauditoria, importar-masiva, presentacion-ia,
+terapia-fisica). Un alias sin fallback las dejaría con `var()` vacío → elemento
+transparente. El fallback es el hex corporativo, no el viejo, para unificarlas
+también.
+
+**Pruebas:** `test_un_solo_vocabulario_de_color.py`, 8 casos — ningún token de
+color se declara solo, ninguno queda sin fallback, ningún fallback conserva el
+hex viejo, y un guardia de ≥10 tokens para que no pase por vacía. 262 en
+`tests/test_frontend`.
+
+
+
+## Sesión 26-ago-2026 (cierre 6) — la ruta de «Mi día» pisaba una que ya existía
+
+Defecto que entró con el PR #506 y lo cazó el CI.
+
+`GET /mi-dia` ya existía en `health.py` (resumen personal del gestor: tareas,
+saludo, alertas). El router del tablero nuevo registró la misma ruta y, como se
+incluye antes que el de health, FastAPI se quedó con la nueva y la vieja quedó
+muerta en silencio — el modo de falla de «Salud Total».
+
+- El tablero se muda a `GET /mi-dia/tablero`; la pantalla llama la nueva.
+- `tests/test_api/test_ninguna_ruta_pisa_a_otra.py`: recorre `app.routes` y
+  falla si dos comparten (método, camino), nombrándolas. Más un guardia que
+  exige >100 rutas para que la prueba no pase por estar vacía.
+
+Ninguna pantalla del portal consumía la ruta vieja, así que no se rompió nada
+de cara al auditor. `tests/test_api/`: 2.783 en verde.
+
+
+
+## Sesión 26-ago-2026 (cierre 5) — las once ideas para el motor
+
+Se implementaron once de las doce ideas propuestas. La #12 (unificar los dos
+vocabularios de color) queda sin hacer: son 2.072 cambios sobre algo que
+funciona y sin defecto visible; está escrita en la bitácora para constancia y
+solo se hace si el área lo pide.
+
+**Antes de radicar**
+
+- **No radicar sin el soporte de la causal.** `catalogo_glosas.py` gana el mapa
+  `SOPORTE_QUE_PIDE_LA_CAUSAL` y `soportes_que_pide(codigo)`; el dictamen avisa
+  cuando falta.
+- **`agente_auditor_eps()`** en `multi_agente.py`: seis flancos sacados de
+  fallas reales de agosto. Se dispara **cuando `citation_verifier` no encuentra
+  nada** — el caso que quemó esta semana. Lee `verif_citas` (la revisión que sí
+  llevó evidencia) en vez de volver a revisar; volver a revisar ahí sería sin
+  evidencia y un folio inventado pasaría de largo. Tres pruebas fijan ese
+  cableado.
+- **El sello dice contra qué se verificó** — `_estado_del_corpus()`.
+- **`_cups_desde_dgh()`**: cuando el texto no trae CUPS, se lee el que DGH ya
+  registró para esa factura en `ConceptoRecord`.
+
+**Aprendizaje**
+
+- Las plantillas gold se escogen por `valor_recuperado` y no por `usos`
+  (tres sitios de selección en `plantillas_gold.py`).
+- `_notas_de_la_promocion()` guarda con la plantilla lo que el gestor contestó
+  a «¿cuál argumento la levantó?». Si no contestó, no se inventa nada.
+
+**Pantallas nuevas**
+
+- `app/services/plata_recuperada.py` + `GET /dashboard-ejecutivo/plata-recuperada`
+  + panel `p-plata`. Una sola consulta para todo el periodo. Lo que no tiene
+  dato va a `sin_dato` y sale avisado en pantalla; no se rellena con supuestos.
+- `app/services/mi_dia.py` + `GET /mi-dia` + panel `p-mi-dia`. Tres columnas,
+  cada glosa en una sola. **`dias_restantes` vale 0 por defecto**, así que un 0
+  sin `fecha_vencimiento` es ambiguo entre «vencida» y «nadie la calculó»: se
+  devuelve `None` y esa glosa va al final, no al principio.
+
+**Pruebas:** 87 nuevas en cinco archivos. `tests/test_services` +
+`tests/test_api`: 6.601 en verde. `tests/test_frontend`: 264 en verde — la
+prueba de tokens fantasma atajó cuatro colores inexistentes en la pantalla
+nueva antes del commit.
+
+
+
+## Sesión 26-ago-2026 (cierre 4) — el orden del folio de la factura, y sin índice
+
+Tres cosas que pidió el área al revisar el resultado:
+
+**1. El folio de la FACTURA no lleva índice.** Solo el clínico. Ya está.
+
+**2. El detallado tiene que ir de SEGUNDO, y quedaba de tercero.** El
+`..._FACTURA.pdf` que viene con el XML trae la factura y la representación
+gráfica **pegadas**; si el detallado llega aparte y solo se le pone detrás,
+queda después de las dos. Ahora `partes_de_la_factura()` mira página por página
+qué es cada pedazo y el bot **parte** el PDF para meter el detallado en la
+mitad:
+
+```
+antes:  factura(1-4) → representación gráfica(5-10) → detallado
+ahora:  factura(1-4) → detallado(5-8) → representación gráfica(9-14)
+```
+
+Si el PDF ya trae todo en orden —como la HUS311736, que trae los cuatro
+renglones— **se deja entero**: partirlo y volverlo a pegar no aporta y sí puede
+dañar algo.
+
+**3. La basura visual.** `sanar_temporales()` barre ahora los `.tmp` que deja
+una corrida caída, y el armado por pedazos limpia los suyos aunque falle.
+
+Comprobado con los dos archivos reales del paquete. 170 pruebas en el archivo,
+1784 en `tests/test_tools`.
+
+
+## Sesión 26-ago-2026 (cierre 3) — el aviso decía un nombre que no existe
+
+Armando el paquete completo (223 folios), CLAUDIA avisó de 11 archivos «que no
+se reconocieron», listándolos como «3 OTROS.pdf», «4 OTROS.pdf»… Pero
+`3 OTROS.pdf` SÍ se reconoce: ese es el nombre que el bot les acababa de poner.
+El nombre de verdad —el único que le diría al auditor qué archivo es— ya no
+estaba en el disco.
+
+O sea: los 11 archivos que hay que revisar salían avisados con un nombre
+inservible. Ahora el `Soporte` guarda con qué nombre llegó, y el aviso dice
+«3 OTROS.pdf (llegó como «FACOSTE.pdf»)». El reporte CSV lleva además una
+columna **LLEGO COMO**.
+
+Es el mismo defecto de la pantalla que mostraba dos veces «2 HISTORIA
+CLINICA.pdf»: el bot contaba lo que iba a hacer, no lo que hizo.
+
+1778 pruebas en `tests/test_tools`.
+
+
+## Sesión 26-ago-2026 (cierre 2) — el detallado convertido no se pierde de vista
+
+Al ir a repartir los 317 detallados del paquete —que salen del bot hermano con
+el número por todo nombre, `HUS388262.xlsx`— apareció que al pasarlos a PDF
+quedaban como `HUS388262.pdf`, y **con ese nombre el bot ya no sabe qué son**:
+en la corrida siguiente se iban a OTROS del folio CLÍNICO, cuando su sitio es el
+renglón 2 del folio de la FACTURA. (Peor: `HUS<num>.pdf` es también el nombre
+con que sale una nota crédito del CRRP, así que el nombre es genuinamente
+ambiguo.)
+
+Ahora la conversión los deja como `HUS388262 DETALLADO.pdf`. Si el nombre ya
+dice qué es, no se le agrega nada.
+
+Comprobado de punta a punta con un detallado real del paquete: se convierte,
+entra al folio de la factura como «2 DETALLADO.pdf», la carátula dice
+«2.DETALLADO → 13», y la segunda corrida deja exactamente lo mismo.
+
+1775 pruebas en `tests/test_tools`.
+
+
+## Sesión 26-ago-2026 (cierre) — la carátula del folio
+
+El área mandó la carátula que necesita: un índice de una página que abre el
+folio, con el renglón y la página donde empieza.
+
+```
+1.RESPUESTA A GLOSA ______________________________________  2
+2.HISTORIA CLINICA _______________________________________ 70
+3.AYUDAS DIAGNOSTICAS ___________________________________ 237
+```
+
+Una línea por **renglón**, no por archivo — que era lo que quería decir con
+«en la carátula solo quedaría 1. RESPUESTA — 2. HISTORIA CLINICA». Las dos
+historias clínicas son una sola línea y apunta a donde empieza la primera.
+
+Lo que se cuidó, porque un índice que miente es peor que no tener índice:
+
+- El número es la página **exacta** del folio ya armado, contando la carátula.
+- Un soporte que NO entró (un PDF dañado) no figura: si figurara, todas las
+  páginas de abajo quedarían corridas. Por eso la carátula se arma con las
+  páginas que de verdad escribió `unir_pdfs`, no con las que se esperaban.
+- Sin `reportlab` el folio se arma igual, sin índice, y se avisa.
+- No quedan archivos temporales en la carpeta.
+
+`unir_pdfs` acepta un parámetro `detalle` opcional que devuelve cuántas páginas
+puso cada archivo; los demás bots que lo usan no cambian. `UNIR_PDFS.cmd`
+regenerado (su prueba del motor embebido volvió a detectar el desfase).
+
+`--sin-caratula` la desactiva. 158 pruebas en el archivo, 1772 en `tests/test_tools`.
+
+
+## Sesión 26-ago-2026 (piloto) — el número es del renglón, y las copias de Windows en su sitio
+
+Dos cosas que salieron al correr el piloto sobre la HUS311371 de CAROLINA, que
+trae `HC.pdf` y `HC (2).pdf`:
+
+**1. El número es del RENGLÓN, no del archivo.** El área lo dijo claro: dos
+historias clínicas son las dos el renglón 2, y en la carátula del folio va un
+solo «2. HISTORIA CLINICA». Antes salían «2 HISTORIA CLINICA.pdf» y
+«3 HISTORIA CLINICA.pdf», que en la carátula se leían como dos renglones
+distintos. Ahora la segunda queda «2 HISTORIA CLINICA (2).pdf».
+
+**2. El original quedaba de último.** Windows nombra los repetidos `HC.pdf`,
+`HC (2).pdf`, `HC (3).pdf`, pero con el orden natural a secas «HC (2)» va antes
+que «HC.» —el espacio pesa menos que el punto— así que el orden salía
+`HC (2) → HC (3) → HC (10) → HC`. `clave_orden()` lo pone en su sitio.
+
+Las dos comprobadas con el caso real y estables en tres corridas seguidas.
+
+**3. La pantalla mentía sobre el nombre repetido.** En el piloto real, las dos
+historias clínicas salían listadas las dos como «2 HISTORIA CLINICA.pdf», como
+si la segunda hubiera pisado a la primera. En disco quedaban bien —
+«2 HISTORIA CLINICA.pdf» y «2 HISTORIA CLINICA (2).pdf»— porque el «(2)» lo
+resolvía `nombre_libre` al momento de renombrar, después de imprimir el
+listado. Ahora `nombres_en_orden()` calcula el nombre definitivo ANTES, así que
+la pantalla y el reporte muestran exactamente lo que va a quedar en la carpeta.
+
+153 pruebas en el archivo.
+
+
+## Sesión 26-ago-2026 (tarde) — la revisión adversarial: pérdida de datos y cuatro defectos más
+
+Se pasó el bot de folios por una revisión con cinco lentes distintas —colisiones
+de nombres, idempotencia, pérdida de archivos, Windows/SMB, contratos—, y cada
+hallazgo se puso a dos escépticos que tenían que reproducirlo contra el código
+real. Salieron 31; estos son los que se confirmaron y se arreglaron.
+
+**1. PÉRDIDA DE DATOS: el folio pisaba la epicrisis de verdad.** El folio se
+llama igual que el archivo del que sale (`..._EPICRIS.pdf`). Para distinguirlos
+el bot miraba si la carpeta traía archivos numerados; en una carpeta donde el
+auditor ya había numerado algo a mano —que es lo que pide la hoja del área— la
+epicrisis DE VERDAD se tomaba por folio viejo, se dejaba fuera del folio y se
+pisaba. Comprobado: epicrisis de 5 páginas → tras UNA corrida, esa ruta tenía un
+folio de 4 páginas sin la epicrisis y la epicrisis no existía. Sin respaldo.
+
+La heurística se reemplaza por un hecho: el bot **firma** los PDF que escribe
+(`/Producer`) y reconoce los suyos por esa firma. Lo que no la lleva es un
+soporte y se trata como tal — que era lo correcto: la epicrisis entra al folio y
+se renombra, y con eso queda libre el nombre. Se quitan `_RE_NUMERADO`,
+`_grupos_ya_numerados` y `folios_dudosos`. Candado extra: si en la ruta del
+folio hay algo sin firma, no se arma ese folio y se avisa.
+
+**2. Las notas crédito no se reconocían con el nombre del hospital.** Vienen
+como `NC_263272_HUS352904.pdf`; caían en OTROS del folio CLÍNICO y el reporte
+seguía diciendo que faltaban. Se agregan `NC` y `NOTA ELECTRONICA`, comprobando
+que no disparan falsos positivos (`HC`, `RESONANCIA`, `INCAPACIDAD`, `NTE-C`).
+
+**3. El folio cambiaba de orden entre corridas.** El nombre que escribe el
+propio bot, `3 HISTORIA CLINICA - TERAPIAS.pdf`, se releía como HISTORIA a
+secas, porque «HISTORIA CLINICA» es más larga que «TERAPIAS» y ganaba. El
+soporte cambiaba de grupo y se renumeraba. Ahora HISTORIA CLINICA es un grupo
+**genérico**: cualquier grupo más preciso le gana. Igual para curaciones,
+evoluciones y procedimientos.
+
+**4. El detallado del bot hermano no se reconocía.**
+`dividir_detallado_por_factura.py` lo deja como `HUS352904.xlsx`, el número y
+nada más: nunca se pasaba a PDF y no entraba al folio.
+
+**5. Un soporte dañado desaparecía del folio en silencio.** Se omitía, el folio
+se armaba sin él y en pantalla decía «armado». Ahora sale avisado: «OJO, N
+soporte(s) NO entraron al folio».
+
+Y dos candados más de robustez: una copia fallida de la factura, o un archivo
+bloqueado al renombrar con `--renombrar`, ya no tumban las otras 323 facturas.
+
+### Y seis más, de la misma revisión
+
+**6. Una FECHA pasaba por NIT.** `prefijo_del_nombre` solo pedía «números al
+principio y esta factura después», así que `20240913_HUS352904 EVOLUCION.pdf`
+daba NIT `20240913` y el folio salía llamándose `20240913_HUS352904_EPICRIS.pdf`.
+Ahora se exige el nombre completo del ADRES (`<NIT>_<FACTURA>_<TIPO>`) y nada
+más; un número de ingreso o una fecha ya no cuelan.
+
+**7. `--mapa-nombres` dependía del orden del JSON.** Con
+`{"TAC": …, "TAC DE TORAX": …}` ganaba la primera línea escrita, no la palabra
+más larga. Ahora gana la más larga, como en el diccionario de siempre.
+
+**8. El reporte abierto en Excel tumbaba la corrida.** En Windows el CSV no se
+deja escribir si está abierto; el traceback llegaba **después** de armar todos
+los folios. Ahora se avisa y el trabajo no se pierde.
+
+**9. `--renombrar` dejaba a medias la carpeta.** Numeraba el folio clínico pero
+no el de la factura, y el CSV prometía renglones que nadie armaba.
+
+**10. Las banderas que no hacen nada sin `--folio`** (`--carpeta-facturas`,
+`--prefijo`, `--convertir-detallado`) se ignoraban en silencio: el auditor creía
+que había traído las facturas. Ahora avisan.
+
+**11. Los archivos que no son PDF desaparecían sin avisar.** Una epicrisis en
+Word o una radiografía en JPG no entran al folio, pero tampoco pueden
+esfumarse: salen listadas en pantalla y en el reporte. La basura de Windows
+(`Thumbs.db`, `desktop.ini`) no se reporta.
+
+### Y el último grupo: lo que deja una corrida que se cae a mitad
+
+El renombrado va en dos vueltas —primero a un nombre de paso `~renombrando~…`,
+porque el nombre que le toca a un archivo puede ser el que todavía tiene otro—.
+Si la corrida se caía en medio, eso dejaba dos destrozos:
+
+**12. Un `~renombrando~HC.pdf` colgado se PERDÍA en la corrida siguiente.** El
+nombre de paso se armaba con `ruta.with_name(...)` a secas, así que al renombrar
+`HC.pdf` se pisaba el huérfano. Comprobado: un huérfano de 7 páginas
+desaparecía y la carpeta quedaba con un `~renombrando~~renombrando~HC.pdf` y sin
+folio. Ahora el nombre de paso se pide libre (`nombre_libre`), y
+`sanar_temporales()` le devuelve su nombre a lo que quedó colgado antes de
+empezar: el huérfano de 7 páginas se recupera y entra al folio.
+
+**13. No había vuelta atrás.** Si la segunda vuelta fallaba, los archivos
+quedaban como `~renombrando~…` para siempre y la factura sin folio. Ahora se
+deshace: cada uno vuelve al nombre que tenía, y la corrida siguiente arma el
+folio sin ayuda.
+
+**14. `--renombrar` borraba el NIT sin decirlo.** Al numerar, el nombre que lo
+traía (`680010079201_HUS######_EPICRIS.pdf`) desaparece, y después no hay de
+dónde sacarlo: los folios salían como `HUS######_EPICRIS.pdf`. Ahora avisa con
+el NIT que encontró, para pasarlo con `--prefijo`.
+
+En simulación los huérfanos no entran al folio pero sí salen en el reporte.
+
+149 pruebas en el archivo. Se comprobó además que quedaron cerrados los otros
+dos confirmados: `--renombrar` y después `--folio` ya no destruye el PDF de la
+factura (19 páginas intactas), y una carpeta con punto y espacios
+(`HUS379477_PEND. CARTA CORONEL`) da el mismo folio en tres corridas seguidas.
+
+
+## Sesión 26-ago-2026 — los DOS folios de cada factura (`--folio`)
+
+El área aclaró cómo es el folio completo, y son **dos PDF por factura**, no uno:
+
+- **`<NIT>_<FACTURA>_EPICRIS.pdf`** — el nombre que queda **después** de unir
+  los soportes numerados (`1 RESPUESTA A GLOSA`, `2 EPICRISIS`,
+  `3 HISTORIA CLINICA`, `4 AYUDAS DIAGNOSTICAS`, `5 OTROS`).
+- **`<NIT>_<FACTURA>_FACTURA.pdf`** — la factura sí entra al folio, con su
+  propio orden adentro: **1 FACTURA · 2 DETALLADO (el Excel pasado a PDF) ·
+  3 REPRESENTACIÓN GRÁFICA DIAN · 4 NOTAS CRÉDITO**.
+
+Lo que se agregó a `unir_soportes_adres.py`:
+
+- **`--folio`**: numera los soportes y arma los dos PDF. Numerar primero no es
+  adorno — es lo que **deja libre el nombre del folio**, porque ese nombre es
+  justo el que traían la epicrisis y la factura antes de renombrarlas.
+- **Cuatro renglones nuevos** (`GRUPOS_FACTURA`) con sus palabras: FACTURA,
+  DETALLADO, REPRESENTACIÓN GRÁFICA DIAN y NOTAS CRÉDITO. Los trece grupos
+  clínicos quedaron igual.
+- **`--carpeta-facturas`**: trae a cada carpeta su
+  `680010079201_HUS######_FACTURA.pdf` desde `4.FACTURAS CON XML\XML`. No pisa
+  la que ya estuviera.
+- **`--convertir-detallado`**: pasa a PDF el detallado que esté en Excel,
+  reusando el motor de `excel_a_pdf.py`. Si el equipo no tiene ni Excel ni
+  LibreOffice, lo deja anotado y sigue.
+- **`--prefijo`**: el NIT del nombre. **No se inventa**: sale del nombre de los
+  propios archivos; esta opción solo llena las carpetas donde ninguno lo trae.
+- **Las notas crédito quedan PENDIENTES a propósito** — todavía no las han
+  sacado, así que no se cuentan como falta. Cuando lleguen, se dejan en la
+  carpeta y se vuelve a correr: entran solas de cuartas.
+- **La simulación muestra el folio como va a quedar de verdad**, con la factura
+  y el detallado ya adentro, aunque todavía no los haya copiado ni convertido.
+
+Un defecto que apareció en la prueba de tres corridas seguidas y quedó cerrado:
+en una factura **sin epicrisis**, el `..._EPICRIS.pdf` de la primera corrida se
+colaba como si fuera una epicrisis y en la segunda el folio crecía metido dentro
+de sí mismo (10 → 13 páginas). Ahora el bot mira la carpeta, no el renglón: si
+ya hay archivos numerados, lo que quede con el nombre original es el folio
+viejo. El caso que no se puede distinguir (un `..._EPICRIS.pdf` suelto en una
+carpeta ya armada) no se adivina: se avisa para que el auditor lo mire.
+
+45 pruebas nuevas (104 en el archivo).
+
+### Revisión posterior: dos defectos más, encontrados antes del cargue real
+
+**1. Una factura bloqueada dejaba sin folio a las otras 323.** `aplicar_folios`
+llamaba a `renombrar_lista` sin candado, al contrario de `unir()`. Un PDF
+abierto en Acrobat —o el share cayéndose un momento— tumbaba la corrida entera.
+Ahora esa factura se salta con `ERROR` y su motivo, y las demás siguen.
+
+**2. El folio de la factura habría llevado el detallado dos veces.** Al abrir el
+`680010079201_HUS311736_FACTURA.pdf` que viene con el XML, resultó **no ser solo
+la factura**: son 19 páginas con los cuatro renglones ya pegados —factura con
+CUFE (1–7), detallado (8–9), representación gráfica DIAN (10–18) y nota crédito
+(19)—. El bot le habría agregado encima el detallado del Excel. Ahora
+`renglones_que_trae()` mira dentro del PDF antes de tocarlo: lo que ya viene
+pegado no se duplica ni se cuenta como faltante, y se avisa en pantalla.
+Comprobado sobre una sola factura; en las que vengan solo con la factura, el bot
+arma el folio con las partes sin configurar nada.
+
+Con esto: 111 pruebas en el archivo.
+
+
+## Sesión 25-ago-2026 (noche, 2) — `--renombrar`: el folio como lo nombra el área
+
+El PDF unido de la HUS352904 no se parecía a lo que pide la hoja del área. Al
+mirarlo con el auditor salieron dos cosas distintas:
+
+- **La hoja no pide un PDF pegado, pide los soportes numerados dentro del
+  folio**: `1 RESPUESTA A GLOSA.pdf`, `2 HISTORIA CLINICA.pdf`, `3 OTRO.pdf`.
+  Eso es `--renombrar`, nuevo. `nombre_numerado()` arma el nombre y
+  `renombrar_en_orden()` lo aplica **en dos vueltas** —primero a un nombre
+  temporal—: el nombre que le toca a un archivo puede ser el que todavía tiene
+  otro, y renombrando de una uno pisaría al otro. Idempotente.
+- **El contenido era corto porque la carpeta solo tenía dos soportes.** No es
+  defecto del bot: faltan la epicrisis y los demás.
+
+La unión en un solo PDF sigue como estaba, por defecto. Se pueden usar las dos.
+
+7 pruebas nuevas (59 en el archivo), incluida la del renombrado que se pisaría a
+sí mismo y la de correrlo dos veces.
+
+
+## Sesión 25-ago-2026 (noche) — repartir la respuesta a glosa por carpeta de factura
+
+`organizar_soportes_por_factura.py`:
+
+- **`carpetas_por_factura()`**: mapea el número de factura a la carpeta que ya
+  existe, aunque traiga una nota detrás (`HUS379477_PEND. CARTA CORONEL`,
+  `HUS367368 ACEPTADO`, `HUS378523_MAOS`). Antes se buscaba `carpeta / factura`
+  literal, así que a esas no las encontraba y **creaba una carpeta gemela
+  vacía**. Con dos carpetas para la misma factura gana la primera alfabética,
+  para que el resultado no dependa del orden del sistema de archivos.
+- **`--solo-carpetas-existentes`**: mueve solo lo que ya tiene carpeta, sin
+  crear ninguna. Hace falta al repartir un lote que abarca varios gestores: las
+  324 respuestas se sueltan en cada carpeta y solo caen las que corresponden;
+  las demás quedan listadas con el estado `SIN CARPETA PARA ESA FACTURA`.
+
+`unir_soportes_adres.py`: `_factura_de_carpeta` pasa a delegar en
+`factura_del_nombre` — la regla de cómo se saca el número de un nombre queda en
+un solo sitio.
+
+8 pruebas nuevas (54 en el archivo), y ensayo de punta a punta con el ZIP real.
+
+
+## Sesión 25-ago-2026 — `unir_soportes_adres.py` + arreglo del desglose huérfano
+
+### `unir_soportes_adres.py` (nuevo)
+Une los soportes de cada carpeta de factura en un solo `<FACTURA>_SOPORTES.pdf`,
+en el orden de la lista del área (13 grupos, de RESPUESTA A GLOSA a OTROS). El
+detallado queda fuera del PDF: la lista lo pide en Excel.
+
+Clasifica por nombre de archivo con dos reglas que evitan los falsos positivos:
+gana la **palabra más larga** («NOTAS DE ENFERMERIA» sobre «NOTAS»), y las
+abreviaturas cortas se buscan como **palabra completa** (`INS` no casa dentro de
+`INSTITUCIONAL`). Lo no reconocido va a OTROS y sale marcado en el reporte.
+`--mapa-nombres` agrega palabras sin tocar el código.
+
+Reusa `unir_pdfs` / `clave_natural` de `unir_pdfs_carpetas.py` — la unión y el
+orden natural ya estaban resueltos; aquí solo se agrega la capa de orden.
+
+Simula por defecto (`--aplicar` para escribir), se excluye a sí mismo de la
+entrada (idempotente) y un PDF ilegible se omite sin tumbar el lote. Avisa las
+facturas sin RESPUESTA A GLOSA o sin EPICRISIS.
+
+Incluye `UNIR_SOPORTES_ADRES.cmd` (CRLF), guía en español y 42 pruebas.
+
+### `ajustar_detallado_glosas.py` — desglose huérfano
+**Defecto:** cada ítem se decidía por separado. Cuando la entidad aprobaba el
+procedimiento (CUPS, que no aparece en el reporte del ADRES porque este glosa
+con códigos SOAT) pero seguía glosando sus componentes, el principal se quitaba
+y los componentes quedaban huérfanos: el detallado mostraba honorarios y
+derechos de sala sin decir de qué cirugía eran. El auditor tuvo que rehacer a
+mano la HUS383283.
+
+**Arreglo:** una pasada previa marca los principales cuyo desglose sobrevive y
+los conserva con la acción nueva `ACCION_ENCABEZADO` — se ven, pero no suman al
+subtotal, porque su valor ya está en los renglones de desglose. La condición de
+"no suma" de los hijos se corrigió en consecuencia (`id(padre) not in
+rescatados`), para que el valor no se pierda ni se cuente dos veces.
+
+2 pruebas nuevas: el principal se queda como encabezado y no suma; y si su
+desglose también se fue, se va como siempre.
+
+## Sesión 25-ago-2026 (noche) — 2.ª auditoría del lote: el Decreto 4747 tenía tres artículos inventados
+
+Un segundo auditor revisó las mismas 117 respuestas con otro método: contrastó
+las citas contra el texto publicado de las leyes y cruzó, código por código, el
+motivo real del pagador contra lo contestado. Encontró lo que la primera pasada
+no vio.
+
+### 1. `DECRETO 4747 DE 2007` — corpus corregido contra la fuente oficial
+
+Las 28 respuestas de ratificación (100 %) citaban el **Art. 20** como el del
+trámite de glosas. Verificado contra el texto de MinSalud: el Art. 20 es el del
+**RIPS**; el trámite está en el **23**. Y de los tres artículos que el corpus
+tenía cargados, **los tres** estaban mal, con epígrafe y texto fabricados:
+
+| Corpus decía | Texto oficial |
+|---|---|
+| Art. 11 — «Atención de urgencias» | «Verificación de derechos de los usuarios» |
+| Art. 20 — «Trámite de glosas — conciliación» | «Registro Individual de Prestaciones — RIPS» |
+| Art. 21 — «Pago durante trámite de glosas» | «Soportes de las facturas» |
+
+**El defecto estructural, no la cita:** `citation_verifier` contrasta contra ese
+mismo corpus, así que la cita fabricada **se autocertificaba** — el dictamen
+salía «citas verificadas · 0 hallazgos» con una norma que dice otra cosa. Misma
+clase de defecto que la jurisprudencia del 24-08.
+
+Se cargaron los cinco artículos con texto literal (11, 20, 21, 22, 23) y se
+repasaron las **17 citas** al decreto repartidas por `glosa_ia_prompts`,
+`multi_agente`, `conciliador_ia`, `validador_dictamen`, `memoria_gestor`,
+`contexto_contractual_enriquecido`, `salud_total_service` y `routers/glosas`.
+
+`TEXTO_RATIFICADA` ahora cita el Art. 23. `_corregir_articulo_mal_citado` es la
+malla: corrige «Art. 20 del Decreto 4747» → 23 **solo** cuando el contexto habla
+de glosas (el Art. 20 existe y citarlo para RIPS es correcto).
+
+Efecto colateral bueno: el Art. 11 real —verificación de derechos— es
+exactamente el fundamento de las glosas FA1605/FA1606. Estaba inutilizable
+porque el corpus lo tenía mal.
+
+### 2. Cita literal fabricada — se detecta sola al corregir el corpus
+
+Varias respuestas AU0202 atribuían al Art. 11 un texto entrecomillado sobre
+urgencias sin autorización previa. No está en el decreto. Corregido el corpus,
+`verificar_citas` la marca `CITA_LITERAL_FALSA` (ALTA) y
+`_descomillar_citas_falsas` la desactiva. No hizo falta regla nueva.
+
+### 3. `_avisar_si_contesta_la_forma` — responder la glosa que es
+
+De 79 códigos, **74 abordaban el motivo real**. Los 5 que no ($3.564.600)
+fallaban igual: contestaban validez de factura electrónica ante la DIAN cuando
+la glosa era de fondo.
+
+- **FA1606** (3, $2.571.800) — el pagador alega régimen del afiliado distinto al
+  del contrato. Lo resuelve la BDUA a la fecha de atención, no la DIAN.
+- **FA0703** (2, $992.800) — «insumo no facturable» con código del ítem. Lo
+  resuelve el anexo del paquete.
+
+`catalogo_glosas` gana la defensa central de ambos códigos (patrón ya usado en
+FA0202/FA0802). La red no reescribe el argumento: añade **«⚠ REVISAR ANTES DE
+RADICAR»** cuando el dictamen argumenta forma y no entró en el fondo. No dispara
+si el texto ya menciona BDUA/régimen/verificación de derechos (FA1606) o
+paquete/anexo (FA0703), ni en códigos que sí son de forma.
+
+### 4. Dos defectos de forma
+
+- **Etiqueta contradictoria** (HUS0000538289): «Contrato: SIN CONTRATO PACTADO»
+  junto a «Tarifa **pactada**: SOAT PLENO». Sin contrato no hay pacto — el SOAT
+  pleno es lo que se aplica *a falta* de pacto. La etiqueta pasa a «Tarifa
+  aplicada» cuando no hay contrato.
+- **Pseudo-norma en el cuerpo del argumento**:
+  `_neutralizar_art_168_fuera_de_contexto` sustituía la cita inaplicable por «LA
+  NORMATIVA DE CONTINUIDAD Y COBERTURA DEL SISTEMA GENERAL DE SALUD», que se lee
+  como el título de un documento inexistente. Ahora: «las reglas generales del
+  Sistema General de Seguridad Social en Salud». `_solo_normas_citables` sigue
+  de malla para la lista de FUNDAMENTO.
+
+### Nota de despliegue
+
+El filtro `_solo_normas_citables` (24-08) **sí estaba** en el commit desplegado
+y aun así la pseudo-norma salió en el FUNDAMENTO de las 117: se generaron antes
+de reiniciar el motor. Lo corregido no tiene efecto hasta el reinicio.
+
+### Lo que no se tocó
+
+Las 21 respuestas de ratificación usan una plantilla que no entra en el motivo
+concreto de la ratificación (0/44 códigos). El texto lo pidió el área y se
+sostiene jurídicamente; cambiarlo es decisión del auditor. Queda anotado en
+BITACORA con la mejora disponible: el Art. 23 prohíbe glosas nuevas sobre la
+misma factura salvo por hechos nuevos.
+
+### Pruebas
+
+`test_decreto_4747_articulos_reales.py` (16) ·
+`test_contestar_el_tema_de_la_glosa.py` (13). Reescritas para fijar la intención
+en vez de la redacción: `test_ronda13_fixes` (pseudo-norma) y `test_multi_agente`
+(anclaje de urgencias — tercer anclaje equivocado para lo mismo).
+
+## Sesión 25-ago-2026 (tarde) — Auditoría de las 117 respuestas del primer lote productivo
+
+Se pasaron por el revisor de citas las 117 respuestas que el motor generó con
+el archivo de recepción del día. Cinco defectos, cinco correcciones con prueba.
+
+### 1. CUPS que el motor nunca tuvo a la vista (12 respuestas)
+El archivo de recepción **no trae columna de CUPS**. La IA rellenaba el hueco
+con un número de seis cifras. La prueba de que era invento: el mismo `734101`
+nombró «radiografía de maxilar inferior» en un dictamen y «radiografía de
+pierna» en otro; el `730102`, «urgencias adultos» e «internación adultos
+complejidad alta».
+
+`_neutralizar_cups_sin_respaldo(texto, evidencia)` — misma regla que ya se
+aplicaba a los folios: si el código no está en lo que la IA leyó, no lo leyó.
+Se exige **además** que no se pueda verificar en el catálogo, para que un
+código real nunca se borre (lección de la Res. 2641 de 2024). Se retira solo el
+número; la descripción del servicio se conserva.
+
+### 2. El texto fijo del Dispensario declaraba vigente un contrato vencido (14)
+`TEXTO_DMBUG_TARIFAS` afirmaba «SE ENCUENTRA SUSCRITO Y **VIGENTE** EL CONTRATO
+440-DIGSA/DMBUG-2025 … CON PLAZO HASTA **30/07/2026**» — el 25 de agosto, 26
+días después del plazo. Frase autocontradictoria en un documento radicado.
+
+- El texto ancla la vigencia **a la fecha de prestación**, que es lo verificable
+  y además defiende mejor.
+- `_dmbug_cubierto_por_el_contrato(fecha_hecho)` lee el plazo de
+  `malla_contractual` (fuente única) y, si el servicio quedó fuera, el texto
+  canónico no se usa: la glosa va por el camino normal. Sin fecha se deja pasar
+  — una glosa siempre es de un servicio pasado.
+
+### 3. `LEY 1164 DE 2007` cargada al corpus (3 respuestas)
+El revisor la marcaba `NORMA_INEXISTENTE` (ALTA). Existe: Talento Humano en
+Salud, 3 de octubre de 2007. Se verificó contra el texto oficial de MinSalud y
+se cargaron sus artículos 26 («el acto profesional se caracteriza por la
+autonomía profesional») y 35.
+
+### 4. `_corregir_anio_de_norma` — la norma es real, el año no (2 respuestas)
+«Resolución 3100 de 2020» → es de **2019**. La resolución ya estaba en el
+corpus con el año correcto; faltaba corregir la cita. Tabla estrecha: solo
+pares número+año verificados contra la fuente.
+
+### 5. `_reponer_preposicion_comida` — el «de» que se come el modelo (11)
+«levantamiento **la** glosa», «artículo 17 **la** ley», y —dentro de comillas
+que citan textualmente el Art. 17— «los profesionales **la** salud». Se probó
+cada patrón del módulo contra la frase correcta: ninguna malla la toca, lo
+escribe así el modelo. Lista de tres fórmulas verificadas, no un corrector
+gramatical general.
+
+### Además
+- **Amenazas al pagador**: la regla 8.decies las prohibía por instrucción y el
+  modelo amenazaba igual (GL-118/GL-119). Ahora hay malla. Lo legítimo se
+  conserva: Art. 126 Ley 1438 (SuperSalud), Art. 57 (levantamiento por falta de
+  respuesta) y negarle a la EPS la facultad sancionatoria.
+- **`_completar_norma_derogada`** (Res. 2275/2023, 21 respuestas): no se
+  reemplaza — para un servicio anterior al 14-05-2026 esa ES la norma
+  aplicable. Se **completa** con la regla de fecha. `citation_verifier` deja de
+  avisar cuando el documento ya nombra la sucesora
+  (`_norma_sucesora_ya_nombrada`).
+
+### Resultado sobre el mismo lote de 117
+
+| Hallazgo | Antes | Después |
+|---|---|---|
+| `CUPS_INEXISTENTE` (ALTA) | 7 | **0** |
+| `CODIGO_NO_ES_CUPS` (ALTA) | 5 | **0** |
+| `NORMA_INEXISTENTE` (ALTA) | 2 | **0** |
+| `NORMA_DEROGADA` (MEDIA) | 21 | **2** |
+| Preposición comida | 11 | **0** |
+
+Pruebas nuevas: `test_cups_inventado_no_sale_en_el_dictamen.py` (17),
+`test_dmbug_no_dice_vigente_lo_vencido.py` (8),
+`test_el_dictamen_no_amenaza_al_pagador.py` (13),
+`test_normas_reales_que_faltaban.py` (14),
+`test_el_de_que_se_come_el_modelo.py` (11),
+`test_norma_derogada_dice_desde_cuando.py` (14).
+
+## Sesión 24-ago-2026 — `organizar_objeciones_adres.py`: cuadre contra el reporte del ADRES
+
+### El defecto que corrige
+El detalle del ADRES cuenta la misma plata varias veces, y la conversión la
+sumaba tal cual: el paquete 31068 salía en **$1.032.239.679** contra los
+**$646.908.552** que el ADRES reporta glosados. Cargado a DGH habría objetado
+hasta tres veces el mismo dinero.
+
+Dos fuentes de repetición, ambas del archivo del ADRES:
+- Filas de causal de reclamación (2102, 2103…) con el valor **completo** de la
+  reclamación, además del detalle por servicio.
+- El mismo servicio (mismo código, cantidad y valores) repetido por cada causal.
+
+### `--reporte-reclamaciones`
+Lee el `ReporteReclamPAQUETE_*.xlsx` (encabezado en la 2ª fila: encima va la de
+totales) y deja cada factura sumando **exactamente** su `Valor Glosado`:
+1. `conciliar_factura` quita las filas que repiten el total de la reclamación.
+2. Quita las repeticiones, mayor primero, **sin bajarse del valor reportado**.
+3. `cuadrar_con_reporte` corre **al final**, sobre los valores ya topados por el
+   guardián de DGH, y reparte el residuo desde el renglón mayor hacia abajo sin
+   dejar valores negativos. También reescribe el `$<valor>` del `CRDOBSERV`.
+
+Resultado 31068: **324/324 facturas cuadradas**, $646.908.553 (Δ $1 por redondeo
+a pesos enteros), 169 renglones quitados, 65 facturas ajustadas.
+
+### `--completar-servicios`
+Ningún `SLNSERPRO` queda vacío: se usa el candidato del cruce y, si no hay,
+`servicio_principal` (el servicio de más peso de la factura en DGH). No es
+homologación — cada fila así queda en `REVISAR` con `CODIGO DE SERVICIO
+ASIGNADO` y su procedencia. En el 31068: 1.856 vacíos → **0**, con 1.768 filas
+marcadas.
+
+### Otros
+- `_hoja_con` acepta `max_filas` para encabezados que no están en la 1ª fila.
+- Motivos nuevos en REVISAR: `REV_REPITE_TOTAL`, `REV_DUPLICADO`,
+  `REV_AJUSTE_REPORTE`, `REV_FACTURA_SIN_REPORTE`, `REV_SERVICIO_ASIGNADO`.
+- El resumen del CLI imprime el cuadre contra el reporte y las facturas que no
+  cuadren.
+
+### Pruebas
+16 nuevas (65 en total en el archivo): que se quite el renglón que repite el
+total, que las repeticiones se quiten de mayor a menor, que **nunca se baje del
+valor reportado**, que el cuadre mande sobre el tope de DGH, que el ajuste se
+reparta si no cabe en un renglón, que ningún valor quede negativo, y que el
+lector tolere el encabezado en la 2ª fila.
+
+
+## Sesión 21-ago-2026 — `organizar_objeciones_adres.py`: glosas del ADRES → OBJECIONES de DGH
+
+Bot nuevo (`tools/organizar_objeciones_adres.py` + `OBJECIONES_ADRES.cmd` +
+`README_organizar_objeciones_adres.md`) que convierte el Excel de glosas del
+ADRES al layout de 16 columnas que recibe Dinámica Gerencial.
+
+### Homologación del código de servicio (`SLNSERPRO`)
+Seis pasos, siempre dentro de la misma factura, parando en el primero que
+acierta: código directo (igualando ceros de relleno), SOAT→CUPS con el
+Homologador Gold Standard, descripción igual, descripción por prefijo, valor
+exacto + ≥50 % de palabras en común, y similitud ≥0,85. Lo que no se resuelve
+sale con la casilla **vacía** y con su mejor candidato listado en `REVISAR` —
+nunca se escribe un código deducido.
+
+En el paquete 31068: 2.763 de 3.262 renglones con servicio (84,7 %).
+
+### Reglas del formato
+- `CDCONSEC` y `GENUSUARIO4` como TEXTO, `CROCLAOBJ=0`, `GENUSUARIO4=999`.
+- `CRNCXC` en formato largo (`HUS311371` → `HUS0000311371`).
+- `CROTIPOBJ` por factura: administrativas `0`, pertinencia `1`, mezcla `2`.
+- **Guardián de valores** (el mismo de `cruces_dgh.generar_objeciones`): la
+  objeción no supera el valor del servicio en DGH ni el saldo de la factura.
+- **Lotes de 300 facturas** (tope de DGH), sin partir ninguna factura.
+
+### Detalles que costaron
+- El libro del ADRES trae una tabla dinámica con las mismas columnas pero los
+  valores sumados (`Suma de Valor Glosado`); detectar la hoja de glosas por dos
+  columnas dejaba todas las objeciones en cero. Ahora se exigen cuatro.
+- El texto de la causal viene repetido detrás de su código en la misma celda;
+  se corta en la última aparición de `<código>-`.
+- `CRNCONOBJ`: el ADRES usa códigos numéricos de 4 dígitos y DGH los de 6 del
+  Manual Único, y **no existe tabla oficial que los equipare**. Se escribe el
+  del ADRES tal cual y se entrega la hoja `CODIGOS` + `--mapa-codigos` para que
+  el auditor defina la equivalencia.
+
+### Pruebas
+`tests/test_tools/test_organizar_objeciones_adres.py` — 49 pruebas, incluida
+una de punta a punta que arma los tres libros de entrada y verifica el archivo
+de salida celda por celda.
+
+## Sesión 20-ago-2026 (noche) — Rediseño de la aplicación web del ICFES
+
+De cuatro pantallas planas a un panel con el plan de estudio adentro.
+
+### Funcionalidad nueva
+- **El plan de estudio ahora vive en la aplicación**: Inicio abre en «qué te
+  toca hoy» con los bloques del día y un botón para empezar cada uno; la
+  pantalla **Plan** muestra las cuatro fases y el detalle de cualquier semana.
+- **Estudiar** (pantalla nueva): repaso del día, cuaderno de errores, las
+  competencias más flojas con botón para practicarlas, y práctica libre con
+  filtros de área, competencia, dificultad y procedencia.
+- **Progreso**: proyección al día del examen, línea del año, una mini gráfica
+  por área, competencias ordenadas, causas de error con su remedio, calendario
+  de constancia y preguntas reincidentes.
+- **Durante las preguntas**: cronómetro con el ritmo real del examen y semáforo
+  de ritmo, atajos de teclado (A-D y Enter), marcar preguntas para revisar y
+  lecturas largas en serif.
+- Barra lateral en pantallas grandes; barra inferior en celular.
+
+### Una sola fuente de verdad
+- La política del plan (fases, mezclas, piso por área, minutos por bloque) y las
+  escalas de puntaje se **exportan** desde `icfes/plan.py` y `icfes/puntaje.py`
+  en vez de reescribirse en JavaScript.
+- **`tests/test_icfes/test_nucleo_web.py`** extrae el núcleo de cálculo de la
+  plantilla, lo corre con node y lo compara contra Python: metas por área,
+  reparto de horas, puntaje, repaso espaciado y el plan completo **bloque por
+  bloque** en tres escenarios. Se salta si node no está instalado.
+
+### Color y accesibilidad
+- Paleta de gráficas validada con el script de la guía de visualización: rampa
+  secuencial monótona en claro y oscuro, y contraste ≥ 3:1 en las dos
+  superficies.
+- La primera versión coloreaba cada barra por estado; el validador la rechazó
+  (verde y rojo se confunden para daltonismo, ΔE 4,1). Se corrigió por diseño:
+  una sola serie, un solo tono, y el estado en una etiqueta con texto.
+- Tres estados de tema (claro, oscuro por sistema, oscuro elegido) con una
+  prueba que verifica que ningún color viva solo dentro de un bloque de tema.
+
+### Correcciones encontradas probando en navegador
+- Dos simulacros el mismo día se superponían en la gráfica de línea y sus zonas
+  de hover se tapaban. Ahora la serie deja un punto por día (el último) y el
+  ancho de la zona sensible se calcula desde la separación real entre puntos.
+- El calendario de constancia solo miraba hacia atrás desde hoy: con avance
+  importado decía «199 días con estudio» y salía vacío.
+- En práctica el cronómetro estaba congelado y el semáforo de ritmo siempre en
+  verde.
+
+### Pruebas
+266 en total (27 nuevas). `ruff check` y `ruff format` limpios sobre 1.229
+archivos. Recorrido completo verificado en Chromium: escritorio y celular, tema
+claro y oscuro, sin errores de JavaScript y sin desbordamiento horizontal.
+
+## Sesión 20-ago-2026 (cierre) — Bot de doble clic del ICFES y guías corregidas
+
+**Falla del primer uso real:** los comandos de la guía se corrieron desde
+`C:\Users\cartera` y Python respondió `No module named icfes`. `python -m icfes`
+requiere que la consola esté dentro de la carpeta del repositorio, y ninguna de
+las tres guías lo decía.
+
+### Cambios
+- **`tools/ICFES.cmd`** (nuevo): bot de doble clic con menú completo — hoy,
+  practicar, repasar, simulacro, progreso, plan, configurar y exportar la app.
+  Hace `cd /d "%~dp0.."` antes de llamar a Python, así que el error no puede
+  ocurrir; y verifica que Python esté instalado antes de intentar nada.
+- **`docs/GUIA_SISTEMA_ICFES.md`**, **`docs/ESTRATEGIA_ICFES_400.md`** y
+  **`README.md`**: el doble clic va primero, el `cd` aparece como paso cero y se
+  explica qué significa `No module named icfes`.
+
+### Pruebas (`tests/test_icfes/test_bots_windows.py`, 12 nuevas)
+- Los bots del ICFES se paran en la carpeta del repositorio y avisan si falta
+  Python.
+- El menú no llama a ningún subcomando que no exista en el CLI (se valida
+  contra el parser real).
+- Los bots no traen credenciales.
+- **Todos los `.cmd` del repositorio conservan finales de línea CRLF.** Esta
+  regla estaba en `.gitattributes` y en CLAUDE.md pero no tenía prueba; con LF
+  la ventana se cierra en Windows sin ejecutar nada.
+
+Total del módulo: 251 pruebas.
+
+## Sesión 20-ago-2026 — Sistema de preparación para el ICFES Saber 11 (`icfes/`)
+
+Módulo **independiente** del Motor de Glosas: no importa nada de `app/` ni de
+`tools/`, y solo usa la librería estándar de Python 3.11, así que la carpeta
+`icfes/` se puede copiar a cualquier computador y funciona.
+
+### Qué trae
+- **`icfes/dominio.py`** — el examen modelado con datos oficiales: 254 preguntas
+  calificables (41/50/50/58/55), 24 de pilotaje, pesos 3-3-3-3-1, dos sesiones
+  de 4 h 30, y las 17 competencias de las cinco áreas.
+- **`icfes/puntaje.py`** — puntaje global 0-500 con la fórmula oficial
+  (`(3·LC+3·MAT+3·SOC+3·CN+1·ING)/13 × 5`); estimación de área 0-100 con curva
+  declarada y editable (`CURVA_PUNTAJE`), siempre rotulada como estimación;
+  reparto de una meta global en metas por área; corrección por azar.
+- **`icfes/banco/`** — 110 preguntas de práctica en JSON (una por área), todas
+  con explicación y con el distractor principal identificado. Cubre las 17
+  competencias. Textos de Lectura Crítica en dominio público.
+- **`icfes/plan.py`** — plan de 50 semanas en cuatro fases, con reparto de horas
+  por peso oficial × brecha, piso del 8 % por área, día de descanso semanal,
+  última semana aliviada y 11 simulacros completos.
+- **`icfes/repaso.py`** — SM-2 adaptado; nunca programa un repaso posterior al
+  examen; deduce la calidad del repaso de acierto, tiempo y causa del error.
+- **`icfes/simulacro.py`** — simulacros con la estructura y los segundos por
+  pregunta reales; a escala cuando el banco no alcanza, avisándolo.
+- **`icfes/progreso.py`** — dominio ponderado por recencia, cuaderno de errores
+  por causa con su remedio, racha y proyección por mínimos cuadrados que declara
+  cuándo no es confiable.
+- **`icfes/almacen.py`** — SQLite local (`~/.icfes/progreso.db`).
+- **`icfes/cli.py`** — `python -m icfes iniciar|hoy|plan|practicar|simulacro|
+  repaso|progreso|banco|exportar-web`.
+- **`icfes/exportar_web.py`** + **`plantilla_web.html`** — aplicación web de un
+  solo archivo, sin red, adaptable a celular, con tema claro/oscuro y avance en
+  `localStorage`.
+- **`tools/ICFES_APP.cmd`** — bot de doble clic para Windows (CRLF).
+
+### Correcciones hechas durante el desarrollo
+- **Simulacro**: reconstruía las respuestas desde la base de datos, así que una
+  pregunta acertada en una práctica del mismo día contaba como acertada en el
+  simulacro. La ronda ahora devuelve las respuestas reales, traducidas del orden
+  barajado al orden original de la pregunta.
+- **Exportación web**: la plantilla dejaba su objeto por defecto pegado al JSON
+  inyectado (`const DATOS = {…}{…};`) y la página no cargaba. Se detectó abriendo
+  la app en Chromium. Corregido con marcas de apertura/cierre y cubierto por
+  prueba.
+- **Banco**: la primera versión concentraba el 65 % de las respuestas correctas
+  en la letra B. Como las opciones se barajan en cada práctica, el validador
+  ahora exige que ninguna explicación nombre letras y verifica el reparto.
+
+### Pruebas
+239 pruebas en `tests/test_icfes/`; `ruff check` y `ruff format` limpios.
+Recorrido completo de la app web verificado en Chromium (práctica, explicación,
+cronómetro, resultado, progreso, persistencia tras recargar) sin errores de
+JavaScript.
+
+### Documentación
+`docs/GUIA_SISTEMA_ICFES.md` y `docs/ESTRATEGIA_ICFES_400.md`.
+
+## Sesión 10-jul-2026 — Suite Cartera HUS: herramienta multifuncional (GUI + CLI)
+
+Integra en `tools/suite_cartera_hus/` la Suite de Cartera/Auditoría (menú
+único de radicación, glosas y cruces masivos: reemplaza Power Query +
+BUSCARV) con correcciones de fondo, endurecimiento y pruebas.
+
+### Correcciones (verificadas con pruebas)
+- **`a_numero`**: `'50.000'` se leía como `50` y no `50000` — corrompía
+  TODOS los importes (glosado/servicio/saldo/copago y el guardián de
+  valores). Ahora resuelve miles/decimales en formato colombiano, UE y US.
+- **`generar_objeciones`**: `KeyError` si el Excel elegido no traía
+  `valor_servicio/saldo/copago`; ahora da un error claro o tolera la falta.
+- **`consolidar`**: renglones sin factura (celda vacía y sin factura en el
+  nombre) se perdían en silencio en el `groupby`; ahora sobreviven visibles.
+- **`consolidar`**: si no hay columna propia de código de servicio ya no se
+  confunde con la de glosa (evita agrupar/sumar por la clave equivocada);
+  además depura renglones byte-idénticos (duplicados de exportación).
+- **`extraer_factura`**: reconoce facturas numéricas pegadas a `_` y da
+  prioridad al formato HUS aunque una fecha aparezca antes en el nombre.
+- **`leer_tabla`**: acepta listas de una sola columna (facturas ya
+  objetadas) y CSV en latin-1 (Windows), que antes reventaban.
+- **`extraer_zip_recursivo`**: los ZIP anidados ya no se pisan entre sí, y
+  una entrada insegura (`../`) se omite sin abortar todo el ZIP.
+
+### Seguridad
+- Las contraseñas de los portales salen de `entidades.json` a un archivo
+  **local no versionado** (`entidades.credenciales.json`, en `.gitignore`).
+  La Suite las vuelve a unir en memoria al abrir. Incluye
+  `herramientas/separar_credenciales.py` y una plantilla `.example`.
+
+### Nuevo
+- **`suite_cli.py`**: la misma Suite por línea de comandos (`entidades`,
+  `organizar`, `consolidar`, `objeciones`, `evidencias`, `todo`) para
+  automatizar sin ventana.
+- **`tests/test_tools/test_suite_cartera_hus.py`**: 40 pruebas del núcleo
+  (las que requieren pandas se saltan si no está, como el resto de tools).
+
 ## Sesión 1–2-jul-2026 — El expediente: contratos + soportes + precedentes
 
 Diagnóstico que disparó la sesión (del usuario): *"la IA se rehúsa a

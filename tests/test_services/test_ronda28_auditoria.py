@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import datetime as dt
+
 import re
 
 
@@ -10,42 +12,117 @@ import re
 
 
 def test_aurora_factor_y_tarifa_del_contrato_firmado():
+    """Los términos pactados con AURORA, para una atención DENTRO de la vigencia.
+
+    01-09-2026 — esta prueba llamaba a `get_contrato("AURORA")` sin fecha, o
+    sea contra el día de hoy, y eso la ató al calendario: los contratos
+    GID-ARL-0090 y GID-AP-0090 vencieron el 31-08-2026 y desde el día
+    siguiente la ficha —con toda la razón— responde «CONTRATO CON VIGENCIA
+    TERMINADA» y factor 1.00.
+
+    Lo que la prueba vigila no es qué día es hoy: es que el catálogo conserve
+    los términos reales del contrato firmado (TARIFAS PROPIAS + SOAT −3%) y no
+    se vuelva a caer a SOAT pleno. Eso se pregunta con una fecha dentro de la
+    vigencia. La ruta de contrato vencido tiene su propia prueba abajo.
+    """
     from app.services.glosa_ia_prompts import get_contrato
 
-    ficha = get_contrato("AURORA")
+    ficha = get_contrato("AURORA", dt.date(2026, 5, 1))
     assert ficha["factor"] == 0.97, "el catálogo volvió a SOAT pleno"
     assert "PROPIAS" in ficha["tarifa"] and "3%" in ficha["tarifa"]
     assert "GID-ARL-0090" in ficha["numero"]
 
 
+def test_aurora_vencida_avisa_y_no_afirma_tarifa():
+    """Después del 31-08-2026 el contrato de AURORA ya no rige.
+
+    Sin fecha de prestación no se puede afirmar qué tarifa aplica, así que la
+    ficha lo dice en vez de inventarla. Y nombra el factor que estaba en juego
+    (0.97) para que el gestor vea qué se discute.
+    """
+    from app.services.glosa_ia_prompts import get_contrato
+
+    # SIN fecha: es el caso real del formulario —«Fechas no ingresadas»— y es
+    # la única rama que emite la advertencia. Con una fecha explícita posterior
+    # al vencimiento la ficha responde «SIN CONTRATO PACTADO», que para ESE día
+    # es cierto: no había contrato.
+    ficha = get_contrato("AURORA", None)
+    assert ficha.get("_vigencia_vencida") is True
+    assert "VIGENCIA TERMINADA" in ficha["numero"]
+    assert "2026-08-31" in ficha["numero"], "no dice cuándo venció"
+    assert ficha["tarifa"].startswith("TARIFA NO DETERMINADA")
+    assert "0.97" in ficha["tarifa"], "no nombra el factor que estaba en juego"
+    assert "SIN CONTRATO PACTADO" not in ficha["numero"], (
+        "negar un contrato que sí existió también es mentir"
+    )
+
+
 # ─── POLICÍA: la entrada de oncología ya es alcanzable ───────────────
+
+
+# La fecha va fija dentro de la vigencia, igual que en COMPENSAR más abajo.
+# Lo que se comprueba acá es que el NOMBRE resuelva al contrato correcto —que
+# "POLICIA NACIONAL" no eclipse a "POLICIA NACIONAL ONCOLOGIA"—, no si el
+# contrato sigue vigente hoy. Según la malla al 28-07-2026 el 068-5-200004-26
+# rigió hasta el 15-08-2026 y el de oncología hasta el 31-07-2026: sin fecha
+# fija, estas pruebas empezaron a fallar solas al vencerse los contratos.
+_DIA_POLICIA = dt.date(2026, 6, 1)
 
 
 def test_policia_oncologia_resuelve_su_contrato():
     from app.services.glosa_ia_prompts import get_contrato
 
-    ficha = get_contrato("POLICIA NACIONAL ONCOLOGIA")
+    ficha = get_contrato("POLICIA NACIONAL ONCOLOGIA", _DIA_POLICIA)
     assert "068-5-200006-26" in ficha["numero"]
 
 
 def test_policia_oncologia_con_razon_social_larga():
     from app.services.glosa_ia_prompts import get_contrato
 
-    ficha = get_contrato("DIRECCION DE SANIDAD POLICIA NACIONAL - SERVICIO ONCOLOGIA")
+    ficha = get_contrato("DIRECCION DE SANIDAD POLICIA NACIONAL - SERVICIO ONCOLOGIA", _DIA_POLICIA)
     assert "068-5-200006-26" in ficha["numero"]
 
 
 def test_policia_mediana_alta_no_regresa():
     from app.services.glosa_ia_prompts import get_contrato
 
-    ficha = get_contrato("POLICIA NACIONAL")
+    ficha = get_contrato("POLICIA NACIONAL", _DIA_POLICIA)
     assert "068-5-200004-26" in ficha["numero"]
 
 
 def test_match_generico_no_regresa():
+    """COMPENSAR sigue resolviendo a SU contrato, no a uno ajeno.
+
+    Cambió el cómo: ahora se resuelve por la FECHA DEL HECHO. El contrato
+    CSS009-2024 rigió del 4-abr-2025 al 3-abr-2026 según la malla oficial, así
+    que se comprueba dentro de ese rango.
+    """
+    import datetime as dt
+
     from app.services.glosa_ia_prompts import get_contrato
 
-    assert "CSS009-2024" in get_contrato("COMPENSAR")["numero"]
+    ficha = get_contrato("COMPENSAR", dt.date(2025, 9, 15))
+    assert "CSS009-2024" in ficha["numero"]
+
+
+def test_compensar_sin_contrato_despues_de_abril_2026():
+    """Y después de que venció, el sistema lo dice en vez de inventarlo.
+
+    Antes devolvía siempre la misma ficha con factor 0,90 —que además no
+    coincidía con el 0,85 de la malla—. Ahora, sin contrato vigente, se
+    defiende a tarifa SOAT plena, que es lo que corresponde jurídicamente y
+    además es más favorable al hospital que el descuento pactado.
+    """
+    import datetime as dt
+
+    from app.services.glosa_ia_prompts import get_contrato
+
+    ficha = get_contrato("COMPENSAR", dt.date(2026, 7, 29))
+    assert ficha["numero"] == "SIN CONTRATO PACTADO"
+    assert ficha["factor"] == 1.00
+    assert "no había contrato vigente" in ficha["nota"]
+    # Y dice cuál existió, para que el auditor sepa qué pasó.
+    assert "CSS009-2024" in ficha["nota"]
     assert get_contrato("EPS")["numero"] == "SIN CONTRATO PACTADO"
 
 

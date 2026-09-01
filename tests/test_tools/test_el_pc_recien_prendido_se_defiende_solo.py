@@ -1,0 +1,304 @@
+"""Con el PC recién prendido y nadie adentro, el motor tiene que subir igual
+(21-08-2026, tarde).
+
+QUÉ PASÓ. Se reinició el PC de cartera y el portal contestó «Bad gateway 502».
+El túnel subió; el motor no. Y la **red de seguridad** —la parte del
+autodespliegue que arranca el motor directo cuando no vuelve solo, la que ha
+salvado el portal varias veces— no se enteró de nada.
+
+POR QUÉ NO SE ENTERÓ. La tarea del autodespliegue se creó sin decirle a
+Windows con qué cuenta corre. Cuando no se dice, Windows la deja en «solo
+cuando el usuario haya iniciado sesión». O sea: la red de seguridad dormía
+justo en el único momento para el que se construyó.
+
+LO QUE ESTAS PRUEBAS CUIDAN, y que solo se nota con el PC recién prendido:
+
+1. Que el autodespliegue quede puesto para trabajar **sin sesión iniciada**.
+2. Que las esperas de los bots aguanten esa situación. `timeout` necesita una
+   consola de verdad; sin ella contesta «Input redirection is not supported» y
+   sigue de largo **sin esperar**, con lo que un bucle de reintentos se vuelve
+   una tormenta de procesos. `ping` a uno mismo espera igual en todos lados.
+3. Que la pantalla de estado lo DIGA. Una tarea que existe pero duerme se ve
+   igual de bien que una que trabaja, y esa es exactamente la trampa en la que
+   se cayó.
+4. Que la contraseña la siga pidiendo Windows y no quede escrita en ningún
+   archivo del repositorio.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+TOOLS = Path(__file__).resolve().parents[2] / "tools"
+INSTALADOR = TOOLS / "ARRANQUE_AUTOMATICO_MOTOR.cmd"
+ESTADO = TOOLS / "estado_motor.ps1"
+
+# Los bots que ahora corren también sin sesión iniciada.
+SIN_SESION = [
+    TOOLS / "servidor_motor_local.cmd",
+    TOOLS / "tunel_motor_local.cmd",
+    TOOLS / "autodeploy_motor_local.cmd",
+]
+
+
+def _texto(ruta: Path) -> str:
+    return ruta.read_bytes().decode("utf-8", errors="replace")
+
+
+class TestLasEsperasAguantanElArranqueDelPC:
+    def test_ningun_bot_espera_con_timeout(self):
+        for ruta in SIN_SESION:
+            assert "timeout /t" not in _texto(ruta), (
+                f"{ruta.name} espera con `timeout`. Sin sesión iniciada eso "
+                f"puede no esperar nada y el bucle se vuelve una tormenta de "
+                f"procesos. Use `ping -n N 127.0.0.1 >nul`."
+            )
+
+    def test_todos_esperan_con_ping(self):
+        for ruta in SIN_SESION:
+            assert re.search(r"ping -n \d+ 127\.0\.0\.1 >nul", _texto(ruta)), (
+                f"{ruta.name} se quedó sin ninguna espera: un bucle sin pausa "
+                f"consume el equipo entero."
+            )
+
+    def test_los_bucles_de_reintento_esperan_lo_de_siempre(self):
+        """`ping -n N` manda N paquetes con un segundo entre uno y otro: la
+        espera real son N-1 segundos.
+
+        El vigilante y el túnel reintentan cada 5 segundos, y eso no cambió.
+        El autodespliegue es otra cosa y se comprueba aparte: dejó de esperar
+        un tiempo fijo y ahora pregunta repetidamente."""
+        esperados = {
+            "servidor_motor_local.cmd": [5, 5],
+            "tunel_motor_local.cmd": [5],
+        }
+        for ruta in SIN_SESION:
+            if ruta.name not in esperados:
+                continue
+            n = [int(x) for x in re.findall(r"ping -n (\d+) 127\.0\.0\.1 >nul", _texto(ruta))]
+            assert [x - 1 for x in n] == esperados[ruta.name], (
+                f"{ruta.name}: las esperas quedaron en {[x - 1 for x in n]} segundos"
+            )
+
+    def test_el_autodespliegue_le_da_al_motor_tiempo_de_arrancar(self):
+        """El motor del hospital carga una base de 133 MB. Con una espera fija
+        de 12 segundos se daba por muerto estando vivo, y se arrancaba un
+        SEGUNDO motor encima del que estaba subiendo: los dos peleaban por el
+        puerto y el registro decía «ALERTA: el motor sigue caido» con el portal
+        funcionando. Pasó el 24-08 a las 9:22.
+
+        Lo que se cuida es el plazo TOTAL antes de darlo por muerto, no cada
+        pausa suelta."""
+        t = _texto(TOOLS / "autodeploy_motor_local.cmd")
+        pausa = [int(x) - 1 for x in re.findall(r"ping -n (\d+) 127\.0\.0\.1 >nul", t)]
+        vueltas = [int(x) for x in re.findall(r"%INTENTOS%\s+(?:GEQ|LSS)\s+(\d+)", t)]
+        assert pausa and vueltas, "el autodespliegue ya no pregunta repetidamente"
+        total = min(pausa) * min(vueltas)
+        assert total >= 60, (
+            f"solo espera {total} segundos antes de dar el motor por muerto: "
+            f"con una base de 133 MB eso alcanza para declararlo caído estando "
+            f"vivo y levantarle otro encima."
+        )
+
+    def test_explica_por_que_no_usa_timeout(self):
+        """Sin la explicación, el próximo que lea el archivo lo 'arregla' de
+        vuelta a `timeout`, que es lo que se lee más natural."""
+        for ruta in SIN_SESION:
+            t = _texto(ruta)
+            assert "timeout" in t and "sesion" in t.lower(), (
+                f"{ruta.name} no explica por qué espera con ping"
+            )
+
+
+class TestNingunComentarioRompeUnBloque:
+    """Trampa vieja de los .cmd de Windows: un `rem` con paréntesis metido
+    DENTRO de un bloque `( ... )`. El intérprete cuenta esos paréntesis igual
+    que si fueran código, así que un comentario puede cerrar el bloque antes de
+    tiempo y dejar de ejecutar las órdenes que venían después — sin un solo
+    mensaje de error.
+
+    Casi pasa el 21-08-2026: la nota que explica por qué se espera con `ping`
+    quedó, al insertarla, dentro del bloque que reintenta el bucle."""
+
+    def _revisar(self, ruta: Path) -> list[tuple[int, str]]:
+        nivel, malos = 0, []
+        for n, linea in enumerate(_texto(ruta).splitlines(), 1):
+            pelada = linea.strip()
+            if pelada.lower().startswith("rem") or pelada.startswith("::"):
+                if nivel > 0 and ("(" in pelada or ")" in pelada):
+                    malos.append((n, pelada[:70]))
+                continue
+            nivel = max(0, nivel + linea.count("(") - linea.count(")"))
+        return malos
+
+    def test_en_los_bots_del_arranque(self):
+        for ruta in SIN_SESION + [INSTALADOR]:
+            malos = self._revisar(ruta)
+            assert not malos, (
+                f"{ruta.name}: un `rem` con paréntesis dentro de un bloque. "
+                f"Puede cerrar el bloque antes de tiempo y el bot deja de hacer "
+                f"lo que sigue, en silencio.\n" + "\n".join(f"  línea {n}: {s}" for n, s in malos)
+            )
+
+    def test_y_en_TODOS_los_bots_del_repositorio(self):
+        """La trampa no es de estos cuatro archivos: es de los .cmd de Windows.
+        Cualquiera de los bots de doble clic del auditor puede caer en ella, y
+        cuando cae no avisa: simplemente deja de hacer parte de su trabajo.
+
+        Los 51 que hay hoy están limpios; esta prueba es para que el número 52
+        no entre con el defecto puesto."""
+        raiz = Path(__file__).resolve().parents[2]
+        archivos = [
+            f for patron in ("*.cmd", "*.bat") for f in raiz.rglob(patron) if ".git" not in f.parts
+        ]
+        assert len(archivos) >= 40, "se perdieron bots: ¿cambió la estructura?"
+
+        problemas = {f: self._revisar(f) for f in archivos}
+        problemas = {f: m for f, m in problemas.items() if m}
+        assert not problemas, "comentarios con paréntesis dentro de un bloque:\n" + "\n".join(
+            f"  {f.relative_to(raiz)} línea {n}: {s}"
+            for f, malos in problemas.items()
+            for n, s in malos
+        )
+
+
+class TestElAutodespliegueTrabajaSinSesionIniciada:
+    def _linea(self) -> str:
+        t = _texto(INSTALADOR)
+        m = re.search(r"^schtasks /Create[^\n]*MotorGlosas_Autodeploy.*?\n[^\n]*\n", t, re.M)
+        assert m, "el instalador ya no vuelve a crear la tarea del autodespliegue"
+        return m.group(0)
+
+    def test_se_vuelve_a_crear_con_una_cuenta(self):
+        assert "/RU " in self._linea(), (
+            "Sin /RU, Windows deja la tarea en «solo con sesión iniciada» y la "
+            "red de seguridad duerme cuando más hace falta."
+        )
+
+    def test_con_la_misma_cuenta_del_arranque(self):
+        assert "%CUENTA%" in self._linea()
+
+    def test_sigue_corriendo_cada_cinco_minutos(self):
+        linea = self._linea()
+        assert "/SC MINUTE" in linea and "/MO 5" in linea
+
+    def test_sigue_apuntando_al_mismo_bot(self):
+        assert "autodeploy_motor_local.cmd" in self._linea()
+
+    def test_la_contrasena_la_pide_windows(self):
+        assert "/RP *" in self._linea()
+
+    def test_si_falla_lo_dice_y_no_deja_el_motor_peor(self):
+        """Que el autodespliegue no se pueda cambiar NO puede hacer creer que
+        el arranque tampoco quedó: son dos cosas distintas."""
+        t = _texto(INSTALADOR)
+        # Se ancla en la ORDEN que crea la tarea, no en la primera vez que
+        # aparece su nombre: el instalador también lo nombra antes, cuando
+        # averigua con qué cuenta trabaja hoy el motor.
+        i = t.index('schtasks /Create /F /TN "MotorGlosas_Autodeploy"')
+        despues = t[i : i + 900]
+        assert "No se rompio nada" in despues or "no se rompio nada" in despues.lower()
+        assert "SI quedo puesto" in despues or "arranque" in despues.lower()
+
+
+class TestNingunaContrasenaEnElRepositorio:
+    def test_ni_una_sola_contrasena_escrita(self):
+        t = _texto(INSTALADOR)
+        # /RP seguido de algo que no sea el asterisco sería una clave escrita.
+        for m in re.finditer(r"/RP\s+(\S+)", t):
+            assert m.group(1) == "*", f"hay una contraseña escrita: {m.group(0)}"
+
+    def test_dice_que_la_guarda_windows_y_no_el_repositorio(self):
+        t = _texto(INSTALADOR).lower()
+        assert "boveda de windows" in t
+        assert "repositorio" in t
+
+
+class TestLaPantallaDeEstadoLoDelata:
+    """Una tarea que existe pero duerme se ve igual de bien que una que
+    trabaja. Esa fue la trampa; la pantalla tiene que distinguirlas."""
+
+    def test_mira_tambien_la_tarea_de_arranque(self):
+        assert "MotorGlosas_Arranque" in _texto(ESTADO), (
+            "La pantalla de estado no revisa la tarea que arranca el motor al "
+            "prender el PC: el auditor no tiene cómo saber si quedó puesta."
+        )
+
+    def test_distingue_la_que_duerme_de_la_que_trabaja(self):
+        t = _texto(ESTADO)
+        assert "LogonType" in t
+        assert "S4U" in t and "Password" in t
+
+    def test_lo_dice_en_cristiano(self):
+        t = _texto(ESTADO)
+        assert "SOLO con sesion iniciada" in t
+        assert "aunque nadie inicie sesion" in t
+
+    def test_avisa_como_arreglarlo(self):
+        assert "ARRANQUE_AUTOMATICO_MOTOR.cmd" in _texto(ESTADO)
+
+    def test_cuenta_como_le_fue_la_ultima_vez(self):
+        """Una tarea puesta que termina en error todos los días es peor que no
+        tenerla: da tranquilidad falsa."""
+        t = _texto(ESTADO)
+        assert "LastTaskResult" in t
+        assert "TERMINO CON ERROR" in t
+
+    def test_no_confunde_estar_corriendo_con_haber_fallado(self):
+        """267009 es «va corriendo ahora mismo», no un error. El
+        autodespliegue arranca cada 5 minutos: verlo así es lo normal."""
+        assert "267009" in _texto(ESTADO)
+
+    def test_delata_una_tarea_atascada(self):
+        """Una tarea ATASCADA se ve igual que una sana: dice «corriendo» y ya.
+
+        Fue justo lo que escondió el problema del 21-08. El autodespliegue
+        arrancaba el motor de una forma que no soltaba la salida de la tarea,
+        Windows no la daba nunca por terminada, y como está puesta en no abrir
+        dos a la vez, **dejó de correr durante horas**. El portal no recibió
+        cuatro correcciones ya fusionadas, y todo «se veía bien».
+
+        Una tarea que corre cada 5 minutos no puede llevar media hora
+        corriendo.
+        """
+        t = _texto(ESTADO)
+        assert "esta atascada" in t, (
+            "La pantalla de estado no distingue una tarea que trabaja de una "
+            "atascada: es el defecto que costó una tarde entera de no saber "
+            "por qué el código no llegaba."
+        )
+        assert "TotalMinutes" in t, "no se mide cuánto lleva corriendo"
+
+    def test_y_dice_que_hacer_con_ella(self):
+        t = _texto(ESTADO)
+        assert "Programador de tareas" in t
+
+    def test_no_confunde_una_pasada_normal_con_un_atasco(self):
+        """El autodespliegue corre cada 5 minutos: verlo «corriendo» recién
+        arrancado es lo normal. Solo se avisa pasado un buen rato."""
+        t = _texto(ESTADO)
+        assert "$minutos -gt 20" in t
+
+    def test_sigue_en_ascii(self):
+        """Windows PowerShell lee este archivo como ANSI: con tildes, los
+        mensajes salen rotos en pantalla."""
+        for n, linea in enumerate(_texto(ESTADO).splitlines(), 1):
+            assert all(ord(c) < 128 for c in linea), f"línea {n} tiene tildes"
+
+
+class TestNoSeRompioLoQueYaFuncionaba:
+    def test_los_cmd_conservan_los_finales_de_linea_de_windows(self):
+        for ruta in SIN_SESION + [INSTALADOR]:
+            b = ruta.read_bytes()
+            assert b.count(b"\n") == b.count(b"\r\n"), f"{ruta.name}: saltos sueltos"
+
+    def test_el_arranque_al_prender_el_pc_sigue_puesto(self):
+        t = _texto(INSTALADOR)
+        assert "/SC ONSTART" in t
+        assert "/DELAY 0001:00" in t
+
+    def test_la_red_de_seguridad_del_autodespliegue_sigue_ahi(self):
+        t = _texto(TOOLS / "autodeploy_motor_local.cmd")
+        assert "el motor NO volvio solo: se arranca directo" in t
+        assert "-m uvicorn app.main:app" in t

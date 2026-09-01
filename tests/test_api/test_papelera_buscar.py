@@ -47,11 +47,13 @@ def usuario_coord(db_session):
 
 @pytest.fixture
 def client(db_session, usuario_coord):
-    from app.api.deps import get_coordinador_o_admin
+    from app.api.deps import get_usuario_actual
     from app.main import app
 
     app.dependency_overrides[get_db] = lambda: iter([db_session]).__next__()
-    app.dependency_overrides[get_coordinador_o_admin] = lambda: usuario_coord
+    # Se suplanta la identidad, no el permiso: desde el 31-08-2026 MIRAR la
+    # papelera es de AUDITOR o superior, y el chequeo de rol corre de verdad.
+    app.dependency_overrides[get_usuario_actual] = lambda: usuario_coord
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

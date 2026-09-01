@@ -178,6 +178,12 @@ class ResetDatosRequest(BaseModel):
     confirmar: str  # debe ser exactamente CONFIRMACION_REQUERIDA
     borrar_historial: bool = True
     borrar_conciliaciones: bool = True
+    # E00: el campo se conserva por compatibilidad con clientes existentes,
+    # pero ya NO borra nada. El audit_log es la única fuente legal de quién
+    # hizo qué: un endpoint que lo destruye deja al hospital sin cómo
+    # sostener su propia trazabilidad ante una auditoría o la SuperSalud.
+    # Depurarlo, si algún día hace falta, es una tarea de retención con
+    # respaldo previo, no un efecto colateral de limpiar datos de prueba.
     borrar_audit_log: bool = False
 
 
@@ -230,15 +236,8 @@ def reset_datos(
             ),
         )
 
-        if data.borrar_audit_log:
-            # Borramos TODO el audit_log excepto el registro recién creado (el del reset)
-            # para mantener al menos la trazabilidad de este mismo reset.
-            ultimo = db.query(AuditLogRecord).order_by(AuditLogRecord.id.desc()).first()
-            q = db.query(AuditLogRecord)
-            if ultimo:
-                q = q.filter(AuditLogRecord.id != ultimo.id)
-            resumen["audit_log"] = q.delete(synchronize_session=False)
-            db.commit()
+        # El audit_log NO se borra nunca desde acá (E00): resumen["audit_log"]
+        # queda en 0 y la respuesta lo declara entre lo preservado.
 
     except Exception as e:
         db.rollback()
@@ -250,8 +249,14 @@ def reset_datos(
     return {
         "message": "Datos transaccionales eliminados correctamente",
         "registros_borrados": resumen,
-        "preservado": ["usuarios", "contratos", "plantillas"],
+        "preservado": ["usuarios", "contratos", "plantillas", "audit_log"],
         "ejecutado_por": current_user.email,
+        "nota_audit_log": (
+            "El registro de auditoría es la fuente legal de trazabilidad y no se "
+            "borra desde este endpoint, aunque se solicite."
+        )
+        if data.borrar_audit_log
+        else None,
     }
 
 
@@ -5342,3 +5347,238 @@ def descargar_backup_db(
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────
+#  PROBAR EL CORREO — 20-08-2026
+#
+#  Yesid importó dos veces sin que saliera un solo correo. El motivo real era
+#  que el `.env` del servidor no tiene NADA de correo —ni usuario, ni
+#  contraseña—, pero no había forma de comprobarlo sin volver a importar todo
+#  el archivo y mirar el resultado. Cinco minutos por intento, para averiguar
+#  algo que se responde en dos segundos.
+#
+#  Este botón manda un correo de prueba al buzón de quien lo aprieta y dice
+#  exactamente qué pasó, traduciendo los errores de SMTP —que son crípticos—
+#  a algo que el auditor pueda accionar.
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def _explicar_error_smtp(error: str, host: str = "", puerto: int = 0) -> str:
+    """Traduce el error del servidor de correo a algo accionable.
+
+    OJO CON EL ORDEN DE LAS PREGUNTAS (25-08-2026). La primera versión
+    preguntaba por «auth» ANTES que nada y remataba con «el servidor rechazó el
+    envío… la causa más común es que SMTP_PASSWORD no sea una contraseña de
+    aplicación». Ese remate se llevó una mañana entera del hospital: el correo
+    rebotaba con «550 5.7.1 Command rejected» —que NO es autenticación— y el
+    panel insistía en culpar a la contraseña. Se probó el login a mano y entraba
+    perfecto; lo que faltaba era la fecha en el encabezado del mensaje.
+
+    Por eso ahora el rechazo del mensaje se pregunta PRIMERO, se dice
+    explícitamente que no es la clave, y el mensaje por defecto ya no acusa a
+    nadie: dice que no se pudo interpretar y dónde mirar.
+    """
+    e = (error or "").lower()
+    donde = f"{host or 'el servidor de correo'}:{puerto}" if puerto else (host or "el servidor")
+    # El servidor ACEPTÓ la conexión y el usuario, pero rechazó el mensaje.
+    if "550" in e or "5.7.1" in e or "command rejected" in e or "not allowed" in e:
+        return (
+            "El servidor aceptó la conexión pero RECHAZÓ el mensaje. Esto NO es "
+            "la contraseña: si fuera la clave, ni siquiera habría dejado entrar. "
+            "Suele ser que al mensaje le falte un encabezado que el servidor "
+            "exige, o que la dirección del remitente no coincida con la cuenta "
+            "con que se conecta."
+        )
+    if "authentication" in e or "535" in e or "credentials" in e or "not accepted" in e:
+        return (
+            "El servidor NO aceptó el usuario o la contraseña. Si el correo es de "
+            "Gmail o Google Workspace, la contraseña normal no sirve: hay que "
+            "generar una «contraseña de aplicación» de 16 letras. Si es un "
+            "servidor propio, es la contraseña del buzón tal cual."
+        )
+    if "timed out" in e or "timeout" in e or "unreachable" in e or "refused" in e:
+        return (
+            f"No se pudo conectar a {donde}. Suele ser el firewall del hospital "
+            "bloqueando la salida, o el puerto equivocado."
+        )
+    if "name or service not known" in e or "getaddrinfo" in e:
+        return "No se pudo resolver el nombre del servidor de correo. Revise SMTP_HOST."
+    return (
+        "El envío falló y el mensaje del servidor no se pudo interpretar. El "
+        "texto exacto queda abajo, en «detalle técnico»."
+    )
+
+
+def _ultimo_error_de_envio(destinatario: str) -> str:
+    """El error que quedó anotado del último intento a esa dirección.
+
+    Existe porque el panel decía «el detalle exacto queda en el log del
+    servidor», y eso obliga al auditor a entrar por consola a un archivo de
+    3 MB. El error YA se guarda en la base con cada intento: se lee de ahí.
+    """
+    try:
+        from app.database import SessionLocal
+        from app.models.db import EnvioCorreoRecord
+
+        db = SessionLocal()
+        try:
+            fila = (
+                db.query(EnvioCorreoRecord)
+                .filter(EnvioCorreoRecord.destinatario == destinatario)
+                .order_by(EnvioCorreoRecord.id.desc())
+                .first()
+            )
+            return (fila.error or "") if fila else ""
+        finally:
+            db.close()
+    except Exception:  # pragma: no cover - defensivo: nunca romper el panel
+        return ""
+
+
+@router.post("/probar-correo")
+async def probar_correo(
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Manda un correo de prueba al buzón de quien aprieta el botón.
+
+    No toca ninguna glosa: solo comprueba que el motor pueda enviar.
+    """
+    from app.core.config import get_settings
+    from app.services.email_service import enviar_email
+
+    cfg = get_settings()
+    if not cfg.smtp_user or not cfg.smtp_password:
+        faltan = [
+            nombre
+            for nombre, valor in (
+                ("SMTP_USER", cfg.smtp_user),
+                ("SMTP_PASSWORD", cfg.smtp_password),
+            )
+            if not valor
+        ]
+        return {
+            "ok": False,
+            "destinatario": current_user.email,
+            "titulo": "El servidor no tiene correo configurado",
+            "detalle": (
+                f"Falta {' y '.join(faltan)} en el archivo .env del servidor. "
+                "Mientras eso falte, NINGÚN correo del motor sale — ni el de "
+                "recepción, ni las alertas de vencimiento."
+            ),
+            "config": {
+                "smtp_host": cfg.smtp_host,
+                "smtp_port": cfg.smtp_port,
+                "smtp_user": cfg.smtp_user or "(vacío)",
+                "smtp_password": "(vacío)" if not cfg.smtp_password else "(configurada)",
+            },
+        }
+
+    asunto = "Prueba de correo — Motor de Glosas HUS"
+    cuerpo = (
+        "<p>Si está leyendo esto, el motor <b>sí puede enviar correos</b>.</p>"
+        "<p>Este mensaje lo generó el botón «Probar correo» del panel de "
+        "Diagnóstico. No modificó ninguna glosa.</p>"
+    )
+    try:
+        enviado = await enviar_email(current_user.email, asunto, cuerpo)
+    except Exception as e:  # pragma: no cover - el envío ya captura lo suyo
+        return {
+            "ok": False,
+            "destinatario": current_user.email,
+            "titulo": "El envío falló",
+            "detalle": _explicar_error_smtp(str(e), cfg.smtp_host, cfg.smtp_port),
+            "error_tecnico": str(e)[:300],
+        }
+
+    if enviado:
+        return {
+            "ok": True,
+            "destinatario": current_user.email,
+            "titulo": "Correo enviado",
+            "detalle": (
+                f"Salió un mensaje de prueba a {current_user.email}. Si no llega en "
+                "un par de minutos, revise la carpeta de correo no deseado: el "
+                "motor ya hizo su parte."
+            ),
+        }
+    # El error real ya quedó anotado en la base con el intento: se lee de ahí
+    # en vez de mandar al auditor a bucear en el log del servidor.
+    crudo = _ultimo_error_de_envio(current_user.email)
+    return {
+        "ok": False,
+        "destinatario": current_user.email,
+        "titulo": "El envío falló",
+        "detalle": _explicar_error_smtp(crudo, cfg.smtp_host, cfg.smtp_port),
+        "error_tecnico": crudo[:300] or "(sin detalle: revise data/servidor.log)",
+        "config": {
+            "smtp_host": cfg.smtp_host,
+            "smtp_port": cfg.smtp_port,
+            "smtp_user": cfg.smtp_user,
+        },
+    }
+
+
+@router.get("/correos-recientes")
+def correos_recientes(
+    limite: int = 100,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Los últimos intentos de envío del motor, con su resultado.
+
+    20-08-2026. Yesid configuró el correo y preguntó «¿cómo miro eso acá?».
+    Hasta ahora no se podía: cada correo salía sin dejar rastro en el portal.
+
+    IMPORTANTE, y va en la respuesta para que la pantalla lo diga: acá queda
+    si el servidor de correo ACEPTÓ el mensaje. Que LLEGUE al buzón del gestor
+    es otra cosa — si la dirección no existe, el rebote llega minutos después
+    a la cuenta que envía y no se ve desde acá. Prometer entrega sería mentir.
+    """
+    from app.models.db import EnvioCorreoRecord
+
+    limite = max(1, min(int(limite or 100), 500))
+    filas = (
+        db.query(EnvioCorreoRecord)
+        .order_by(EnvioCorreoRecord.creado_en.desc(), EnvioCorreoRecord.id.desc())
+        .limit(limite)
+        .all()
+    )
+
+    envios = [
+        {
+            "id": f.id,
+            "destinatario": f.destinatario,
+            "asunto": f.asunto,
+            "contexto": f.contexto,
+            "aceptado": bool(f.aceptado),
+            "error": f.error,
+            "cuando": f.creado_en.isoformat() if f.creado_en else None,
+        }
+        for f in filas
+    ]
+
+    # Cuántos por buzón: sirve para ver de una que una dirección concentra los
+    # fallos, que es lo que pasa cuando el correo no existe.
+    por_destinatario: dict[str, dict] = {}
+    for e in envios:
+        d = por_destinatario.setdefault(
+            e["destinatario"], {"destinatario": e["destinatario"], "aceptados": 0, "fallidos": 0}
+        )
+        d["aceptados" if e["aceptado"] else "fallidos"] += 1
+
+    return {
+        "envios": envios,
+        "por_destinatario": sorted(
+            por_destinatario.values(), key=lambda d: -(d["aceptados"] + d["fallidos"])
+        ),
+        "total": len(envios),
+        "aceptados": sum(1 for e in envios if e["aceptado"]),
+        "fallidos": sum(1 for e in envios if not e["aceptado"]),
+        "advertencia": (
+            "Esta lista dice si el servidor de correo ACEPTÓ el mensaje, "
+            "no si llegó al buzón. Cuando una dirección no existe, "
+            "el rebote «Address not found» llega minutos después "
+            "a la cuenta que envía los correos, y ahí sí hay que mirarlo."
+        ),
+    }

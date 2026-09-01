@@ -10,3 +10,8 @@
 
 pytest==9.0.3
 pytest-asyncio==1.3.0
+
+# Motor de la caja de herramientas PDF de la Suite Cartera HUS
+# (tools/suite_cartera_hus). Necesario para tests/test_pdf_tools.py; si falta,
+# esas pruebas se saltan solas (pytest.importorskip), no fallan.
+pymupdf>=1.24

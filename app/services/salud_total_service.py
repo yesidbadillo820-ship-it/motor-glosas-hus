@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
 from app.services.glosa_service import _suavizar_tono
+from app.utils.moneda import parse_valor_cop
 
 NIT_HUS = "900006037"
 DIAS_LIMITE = 20
@@ -22,10 +23,17 @@ CONCEPTOS = {
 OBS_MAX_CARACTERES = 500
 
 MOTIVOS_SALUD_TOTAL = {
-    "TARIFA": "ESE HUS RECHAZA LA GLOSA POR TARIFAS. LA LIQUIDACIÓN SE REALIZÓ CONFORME AL CONTRATO VIGENTE Y AL MANUAL TARIFARIO SOAT 2026 (CIRCULAR EXTERNA 047 DE 2025 MINSALUD — UVB 2026 $12.110). LA EPS NO PUEDE APLICAR DESCUENTOS UNILATERALES SIN SOPORTE CONTRACTUAL. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
-    "SOPORTE": "ESE HUS RECHAZA LA GLOSA POR SOPORTES. LOS DOCUMENTOS EXIGIDOS POR LA RES. 3047/2008 OBRAN EN LA HISTORIA CLÍNICA (RES. 1995/1999), PLENA PRUEBA MÉDICO-LEGAL. LOS ERRORES FORMALES SON SUBSANABLES (CIRCULAR 030/2013). SE EXIGE EL LEVANTAMIENTO INMEDIATO. CARTERA@HUS.GOV.CO",
-    "AUTORIZACION": "ESE HUS RECHAZA LA GLOSA POR AUTORIZACIÓN. LA ATENCIÓN PRESTADA CUMPLIÓ CON LOS PROTOCOLOS ESTABLECIDOS. ART. 168 LEY 100/1993 Y T-1025/2002. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
-    "PERTINENCIA": "ESE HUS RECHAZA LA GLOSA POR PERTINENCIA. EL CRITERIO MÉDICO ES AUTÓNOMO (ART. 17 LEY 1751/2015 - T-478/1995). LA HISTORIA CLÍNICA DOCUMENTA LA INDICACIÓN. EL AUDITOR DE LA EPS NO REEMPLAZA AL MÉDICO TRATANTE. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
+    # Texto REAL que radica el HUS para Salud Total (archivo OK del 10-08-2026).
+    # ANTES decía "CONFORME AL CONTRATO VIGENTE": era falso — con Salud Total
+    # NO hay contrato, y afirmarlo en un documento que se radica le regala a la
+    # entidad el argumento de que sí lo había. Ahora dice la verdad: sin
+    # contrato, se factura a SOAT vigente y los insumos a tarifas institucionales.
+    "TARIFA": "ESE HUS NO ACEPTA GLOSA INJUSTIFICADA POR MVC EN TARIFAS, ENTIDAD SALUD TOTAL SIN CONTRATO VIGENTE ENTRE LAS PARTES AL MOMENTO DE LA ATENCION, POR LO TANTO, SE FACTURA A SOAT VIGENTE Y LOS INSUMOS Y O MEDICAMENTOS SE FACTURAN A TARIFAS INSTITUCIONALES. NOTA: SEGÚN NORMATIVIDAD VIGENTE DE NO OBTENERSE RATIFICACIÓN DE LA GLOSA EN LOS TÉRMINOS LEGALES, SE DARÁ POR LEVANTADA LA OBJECIÓN DE ACUERDO ARTÍCULO 57 DE LA LEY 1438 DE 2011",
+    # Texto REAL del HUS para soportes (archivo OK). Postura de subsanación:
+    # los soportes van adjuntos a la factura, se soportan de nuevo → RE9901.
+    "SOPORTE": "ESE HUS NO ACEPTA GLOSA SE REVISA Y SE EVIDENCIA SOPORTES ADJUNTOS A LA FACTURA RADICADA A LA ENTIDAD SE SOPORTA NUEVAMENTE PARA LA SUBSANACION DE LA GLOSA. NOTA: DE ACUERDO AL ARTÍCULO 57 DE LA LEY 1438 DE 2011, DE NO OBTENERSE RATIFICACIÓN DE LA RESPUESTA A LA GLOSA EN LOS TÉRMINOS ESTABLECIDOS, SE DARÁ POR LEVANTADA LA RESPECTIVA OBJECIÓN",
+    "AUTORIZACION": "ESE HUS RECHAZA LA GLOSA POR AUTORIZACIÓN. LA ATENCIÓN PRESTADA CUMPLIÓ CON LOS PROTOCOLOS ESTABLECIDOS. ART. 168 LEY 100/1993 Y ART. 20 DECRETO 4747/2007. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
+    "PERTINENCIA": "ESE HUS RECHAZA LA GLOSA POR PERTINENCIA. EL CRITERIO MÉDICO ES AUTÓNOMO (ART. 17 LEY 1751/2015). LA HISTORIA CLÍNICA DOCUMENTA LA INDICACIÓN. EL AUDITOR DE LA EPS NO REEMPLAZA AL MÉDICO TRATANTE. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
     "COBERTURA": "ESE HUS RECHAZA LA GLOSA POR COBERTURA. EL SERVICIO ESTÁ INCLUIDO EN EL PLAN DE BENEFICIOS (RES. 5269/2017). LAS EXCLUSIONES SON TAXATIVAS. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
     "FACTURACION": "ESE HUS RECHAZA LA GLOSA POR FACTURACIÓN. LOS ERRORES FORMALES SON SUBSANABLES Y NO CONSTITUYEN CAUSAL DE GLOSA (CIRCULAR 030/2013). LA PRESTACIÓN DEL SERVICIO GENERA LA OBLIGACIÓN DE PAGO. SE EXIGE EL PAGO ÍNTEGRO. CARTERA@HUS.GOV.CO",
 }
@@ -47,7 +55,7 @@ def _detectar_tipo_motivo(descripcion_motivo: str, motv_glosa: str) -> str:
     return "FACTURACION"
 
 
-OBS_EXTEMPORANEA = "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. CONFORME AL MARCO CONTRACTUAL VIGENTE Y A LA RES. 3047/2008, EL PLAZO APLICABLE PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES DESDE LA RECEPCIÓN DE LA FACTURA (CRITERIO INSTITUCIONAL HUS). CONFORME AL ART. 57 LEY 1438/2011 OPERACIONALIZADO POR EL MANUAL ÚNICO RES. 2284/2023 (20 DÍAS EPS FORMULAR | 15 DÍAS IPS RESPONDER | 10 DÍAS EPS DECIDIR), LA GLOSA ES EXTEMPORÁNEA AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CARTERA@HUS.GOV.CO."
+OBS_EXTEMPORANEA = "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. CONFORME AL MARCO CONTRACTUAL VIGENTE, EL PLAZO APLICABLE PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES DESDE LA RECEPCIÓN DE LA FACTURA (CRITERIO INSTITUCIONAL HUS). CONFORME AL ART. 57 LEY 1438/2011 OPERACIONALIZADO POR EL MANUAL ÚNICO RES. 2284/2023 (20 DÍAS EPS FORMULAR | 15 DÍAS IPS RESPONDER | 10 DÍAS EPS DECIDIR), LA GLOSA ES EXTEMPORÁNEA AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CARTERA@HUS.GOV.CO."
 
 # Version COMPACTA del texto de ratificadas para Salud Total (≤500 chars).
 # El texto canonico completo (TEXTO_RATIFICADA, 883 chars) se usa en PDF y
@@ -55,7 +63,7 @@ OBS_EXTEMPORANEA = "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. 
 # Observacion IPS del TXT que exige max 500 chars.
 # Mantiene los 4 puntos clave:
 #   1. No acepta la glosa ratificada, mantiene respuesta inicial.
-#   2. Cita normativa (Art. 57 Ley 1438, Art. 20 Dec. 4747, Res. 2284/2023).
+#   2. Cita normativa (Art. 57 Ley 1438, Art. 23 Dec. 4747, Res. 2284/2023).
 #   3. Solicita mesa de conciliacion.
 #   4. Advierte levantamiento tacito + correo institucional.
 OBS_RATIFICADA = (
@@ -70,8 +78,8 @@ OBS_RATIFICADA = (
 )
 
 OBS_TA_POR_TIPO = {
-    "TA": "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. CONFORME AL MARCO CONTRACTUAL VIGENTE Y A LA RES. 3047/2008, EL PLAZO APLICABLE PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES DESDE LA RECEPCIÓN DE LA FACTURA (CRITERIO INSTITUCIONAL HUS). CONFORME AL ART. 57 LEY 1438/2011 OPERACIONALIZADO POR EL MANUAL ÚNICO RES. 2284/2023 (20 DÍAS EPS FORMULAR | 15 DÍAS IPS RESPONDER | 10 DÍAS EPS DECIDIR), LA GLOSA ES EXTEMPORÁNEA AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CARTERA@HUS.GOV.CO.",
-    "FA": "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. CONFORME AL MARCO CONTRACTUAL VIGENTE Y A LA RES. 3047/2008, EL PLAZO APLICABLE PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES DESDE LA RECEPCIÓN DE LA FACTURA (CRITERIO INSTITUCIONAL HUS). CONFORME AL ART. 57 LEY 1438/2011 OPERACIONALIZADO POR EL MANUAL ÚNICO RES. 2284/2023 (20 DÍAS EPS FORMULAR | 15 DÍAS IPS RESPONDER | 10 DÍAS EPS DECIDIR), LA GLOSA ES EXTEMPORÁNEA AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CARTERA@HUS.GOV.CO.",
+    "TA": "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. CONFORME AL MARCO CONTRACTUAL VIGENTE, EL PLAZO APLICABLE PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES DESDE LA RECEPCIÓN DE LA FACTURA (CRITERIO INSTITUCIONAL HUS). CONFORME AL ART. 57 LEY 1438/2011 OPERACIONALIZADO POR EL MANUAL ÚNICO RES. 2284/2023 (20 DÍAS EPS FORMULAR | 15 DÍAS IPS RESPONDER | 10 DÍAS EPS DECIDIR), LA GLOSA ES EXTEMPORÁNEA AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CARTERA@HUS.GOV.CO.",
+    "FA": "ESE HUS RECHAZA LA GLOSA COMO EXTEMPORÁNEA E IMPROCEDENTE. CONFORME AL MARCO CONTRACTUAL VIGENTE, EL PLAZO APLICABLE PARA QUE LA EPS FORMULE GLOSAS ES DE 20 DÍAS HÁBILES DESDE LA RECEPCIÓN DE LA FACTURA (CRITERIO INSTITUCIONAL HUS). CONFORME AL ART. 57 LEY 1438/2011 OPERACIONALIZADO POR EL MANUAL ÚNICO RES. 2284/2023 (20 DÍAS EPS FORMULAR | 15 DÍAS IPS RESPONDER | 10 DÍAS EPS DECIDIR), LA GLOSA ES EXTEMPORÁNEA AL HABERSE SUPERADO ESTE PLAZO (HAN TRANSCURRIDO {DIAS} DÍAS HÁBILES). SE EXIGE EL LEVANTAMIENTO INMEDIATO Y DEFINITIVO DE LA TOTALIDAD DE LAS GLOSAS. CARTERA@HUS.GOV.CO.",
     "IN": "ESE HUS RECHAZA LA GLOSA COMO IMPROCEDENTE. NO SE EVIDENCIA INCUMPLIMIENTO DEL CONTRATO O LA NORMATIVA VIGENTE. SE REQUIERE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO.",
     "AU": "ESE HUS RECHAZA LA GLOSA COMO IMPROCEDENTE. NO SE EVIDENCIA AUTORIZACIÓN DEFICIENTE O INSUFICIENTE. SE REQUIERE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO.",
     "NA": "ESE HUS RECHAZA LA GLOSA COMO IMPROCEDENTE. NO SE EVIDENCIA NO AFILIACIÓN O PROBLEMAS DE AFILIACIÓN. SE REQUIERE EL LEVANTAMIENTO INMEDIATO DE LA GLOSA. CUALQUIER INFORMACIÓN AL CORREO ELECTRÓNICO INSTITUCIONAL: CARTERA@HUS.GOV.CO.",
@@ -161,16 +169,46 @@ class GlosaSaludTotal:
         self.valor_bruto_factura = self._parse_float(campos[23]) if len(campos) > 23 else 0
 
     def _parse_float(self, valor: str) -> float:
-        if not valor:
-            return 0
-        return float(valor.replace(",", ""))
+        """Lee un valor en pesos del TXT con el lector único del repo.
+
+        18-08-2026. Antes hacía `float(valor.replace(",", ""))`. Eso solo
+        sirve para el formato gringo (280000.00). Si el portal manda el valor
+        a la colombiana leía mal o se caía:
+            "280.000"      -> 280.0        (mil veces menos)
+            "1.589.100,00" -> se reventaba
+        Y esos valores alimentan los totales de la pantalla y el archivo que
+        se radica. `parse_valor_cop` entiende los dos formatos y deja el
+        actual igual (280000.00 -> 280000.0)."""
+        return parse_valor_cop(valor)
+
+    @property
+    def sin_fecha_recepcion(self) -> bool:
+        """No hay con qué contar el plazo del Art. 57 de la Ley 1438/2011.
+
+        El plazo corre desde que la EPS RECIBE la factura hasta que radica
+        la glosa. Sin la fecha de recepción no existe el punto de partida.
+        """
+        if not (self.fecha_recepcion and self.fecha_rad):
+            return True
+        # La EPS no puede glosar una factura antes de recibirla. Si las dos
+        # fechas vienen al revés, el dato está mal digitado y no sirve para
+        # contar el plazo: se trata igual que si no estuviera.
+        return self.fecha_recepcion > self.fecha_rad
 
     def dias_transcurridos(self) -> int:
-        if self.fecha_recepcion and self.fecha_rad:
-            return calcular_dias_habiles(self.fecha_recepcion, self.fecha_rad)
-        if not self.fecha_rad:
+        """Días hábiles entre la recepción de la factura y la radicación.
+
+        Si falta la fecha de recepción devuelve 0 y NO se alega
+        extemporaneidad. Antes se contaba desde la radicación de la glosa
+        hasta HOY, que es un intervalo que no mide ningún plazo legal: una
+        notificación de julio respondida en agosto daba «han transcurrido
+        X días hábiles» y con eso se afirmaba en un documento radicable un
+        hecho que nadie había comprobado. Cuando no hay evidencia, no se
+        afirma: se responde de fondo.
+        """
+        if self.sin_fecha_recepcion:
             return 0
-        return calcular_dias_habiles(self.fecha_rad, datetime.now())
+        return calcular_dias_habiles(self.fecha_recepcion, self.fecha_rad)
 
     def es_extemporanea(self) -> bool:
         return self.dias_transcurridos() > DIAS_LIMITE
@@ -253,8 +291,9 @@ class GlosaSaludTotal:
                 f"ESE HUS NO ACEPTA {cal} POR SOPORTES {codigo_glosa} SOBRE {servicio}, "
                 "evidenciado en historia clínica, RIPS y evoluciones médicas del "
                 "expediente clínico, donde consta la prestación efectiva del "
-                "servicio y todos los soportes requeridos conforme a la Resolución "
-                "3047/2008. Se solicita el levantamiento de la glosa. "
+                "servicio y todos los soportes requeridos conforme a la "
+                "Res. 2284/2023, Anexo Técnico 1 (sust. Res. 1885/2024). "
+                "Se solicita el levantamiento de la glosa. "
                 "CARTERA@HUS.GOV.CO"
             ),
             "AU": (
@@ -298,8 +337,9 @@ class GlosaSaludTotal:
                 "evidenciado en notas de enfermería, kardex de medicamentos y "
                 "evoluciones médicas del expediente clínico, donde consta la "
                 "prescripción, preparación y aplicación del servicio facturado, "
-                "conforme a Resolución 3047/2008. Se solicita el levantamiento "
-                "de la glosa. CARTERA@HUS.GOV.CO"
+                "conforme a la Res. 2284/2023, Anexo Técnico 1 (sust. "
+                "Res. 1885/2024). Se solicita el levantamiento de la glosa. "
+                "CARTERA@HUS.GOV.CO"
             ),
             "IN": (
                 # INSUMOS — nota operatoria + kardex
@@ -335,38 +375,56 @@ class GlosaSaludTotal:
         }
         return plantillas.get(mapeo.get(tipo_detectado, "FA"), plantillas["FA"])
 
+    def _familia(self) -> str:
+        """Familia del motivo de glosa: TA, FA, SO, CL, AU, CO (Res. 2284/2023).
+        Se toma del código general, y si no viene, del específico."""
+        cg = (self.cod_motv_glosa_general or "").upper().strip()
+        ce = (self.cod_motv_glosa_espc or "").upper().strip()
+        return cg[:2] or ce[:2] or "FA"
+
+    def _respuesta_de_fondo(self) -> tuple[str, str]:
+        """La respuesta de fondo de Salud Total (entidad SIN contrato), por
+        familia de motivo. Reproduce lo que el HUS radica de verdad
+        (archivo OK del 10-08-2026):
+
+          • TA (tarifas) y FA (facturación) → RE9602 «injustificada al 100%»:
+            sin contrato, se factura a SOAT vigente / tarifas institucionales.
+          • SO (soportes) y CL (pertinencia) → RE9901 «subsanada»: los soportes
+            van adjuntos, se soporta de nuevo.
+          • AU/CO: sin ejemplo real; se mantienen como subsanables (RE9901).
+
+        El texto sale por familia de MOTIVOS_SALUD_TOTAL, SIN pegarle el nombre
+        del servicio: el archivo real no lo lleva y el campo tiene tope de 500.
+        """
+        fam = self._familia()
+        codigo = "RE9602" if fam in ("TA", "FA") else "RE9901"
+        clave_texto = {
+            "TA": "TARIFA",
+            "FA": "FACTURACION",
+            "SO": "SOPORTE",
+            "CL": "PERTINENCIA",
+            "AU": "AUTORIZACION",
+            "CO": "COBERTURA",
+        }.get(fam, "FACTURACION")
+        observacion = MOTIVOS_SALUD_TOTAL.get(clave_texto, MOTIVOS_SALUD_TOTAL["FACTURACION"])
+        return codigo, observacion
+
     def generar_respuesta(self) -> Dict[str, Any]:
         dias = self.dias_transcurridos()
+        valor_aceptado = 0
 
-        # REGLA SALUD TOTAL: NO hay contrato vigente con Salud Total EPS, por lo
-        # que las glosas por TARIFAS (TA*) son INJUSTIFICADAS al 100% → RE9602.
-        cod_general = (self.cod_motv_glosa_general or "").upper().strip()
-        cod_espc = (self.cod_motv_glosa_espc or "").upper().strip()
-        es_tarifa = cod_general.startswith("TA") or cod_espc.startswith("TA")
-
-        if self.tipo_respuesta == "extemporanea":
-            if dias > DIAS_LIMITE:
-                codigo_respuesta = "RE9502"
-                observacion = self.obtener_observacion()
-                valor_aceptado = 0
-            else:
-                codigo_respuesta = "RE9602"
-                observacion = self.obtener_observacion()
-                valor_aceptado = 0
+        if self.tipo_respuesta == "extemporanea" and dias > DIAS_LIMITE:
+            # Solo cuando hay evidencia del plazo vencido se alega extemporaneidad.
+            codigo_respuesta = "RE9502"
+            observacion = self.obtener_observacion()
         elif self.tipo_respuesta == "ratificada":
             codigo_respuesta = "RE9602"
             observacion = self.obtener_observacion()
-            valor_aceptado = 0
-        elif es_tarifa:
-            # Tarifas sin contrato → injustificada al 100%
-            codigo_respuesta = "RE9602"
-            observacion = self._argumento_tecnico_por_codigo(codigo_respuesta)
-            valor_aceptado = 0
         else:
-            # Otros tipos → glosa subsanada en su totalidad con argumento
-            codigo_respuesta = "RE9901"
-            observacion = self._argumento_tecnico_por_codigo(codigo_respuesta)
-            valor_aceptado = 0
+            # Respuesta de fondo por familia: es lo que el HUS radica de verdad
+            # para Salud Total. Cubre la opción "extemporánea" cuando no se puede
+            # sustentar el plazo (sin fecha o dentro de términos).
+            codigo_respuesta, observacion = self._respuesta_de_fondo()
 
         concepto = CONCEPTOS[codigo_respuesta]
         observacion = _suavizar_tono(observacion)
@@ -397,6 +455,9 @@ class GlosaSaludTotal:
             "Observacion_IPS": observacion,
             "TipoRespuesta": self.tipo_respuesta,
             "DiasTranscurridos": dias,
+            # Para que la pantalla avise: sin este dato no se puede alegar
+            # extemporaneidad, y la respuesta salió argumentada de fondo.
+            "SinFechaRecepcion": self.sin_fecha_recepcion,
         }
 
 
@@ -464,6 +525,28 @@ def procesar_glosas_salud_total(
     return respuestas
 
 
+def _pesos(valor: Any) -> str:
+    """Escribe un valor de peso como lo escribe la entidad: sin el «.0».
+
+    La notificación trae «93340» y Python venía escribiendo «93340.0» por ser
+    float. Se mantiene el decimal solo cuando el valor de verdad lo tiene.
+    """
+    try:
+        n = float(valor or 0)
+    except (TypeError, ValueError):
+        return str(valor or "")
+    return str(int(n)) if n == int(n) else f"{n:.2f}"
+
+
+def _una_linea(texto: Any) -> str:
+    """Aplana el texto a una sola línea.
+
+    Un salto de línea dentro de la Observación parte la fila en dos y la
+    entidad recibe un archivo con más filas que glosas.
+    """
+    return " ".join(str(texto or "").split())
+
+
 def generar_txt_respuesta(respuestas: List[Dict[str, Any]]) -> str:
     if not respuestas:
         return ""
@@ -478,19 +561,55 @@ def generar_txt_respuesta(respuestas: List[Dict[str, Any]]) -> str:
                 str(r.get("PrefijoFac", "")),
                 str(r.get("NumeroFac", "")),
                 str(r.get("NUMREG", "")),
-                str(r.get("NombreServicio", "")),
-                str(r.get("ValorGlosaTotalxServ", "")),
+                _una_linea(r.get("NombreServicio", "")),
+                _pesos(r.get("ValorGlosaTotalxServ", "")),
                 str(r.get("CodMotvGlosaGeneral", "")),
                 str(r.get("CodMotvGlosaEspc", "")),
-                str(r.get("ValorAceptadoIPS", "")),
+                _pesos(r.get("ValorAceptadoIPS", "")),
                 str(r.get("Codigo_Respuesta_a_glosas", "")),
-                str(r.get("ConceptoRespuesta", "")),
-                str(r.get("Observacion_IPS", "")),
+                _una_linea(r.get("ConceptoRespuesta", "")),
+                _una_linea(r.get("Observacion_IPS", "")),
             ]
         )
         lineas.append(linea)
 
     return "\n".join(lineas)
+
+
+# Signos Unicode que NO existen en Windows-1252 y que la IA suele meter
+# (guiones largos, comillas curvas, puntos suspensivos). Se transliteran para
+# no perder el signo cuando se pasa a ANSI.
+_TRANSLIT_PORTAL = {
+    "\u2014": "-",
+    "\u2013": "-",
+    "\u2012": "-",
+    "\u2011": "-",
+    "\u2010": "-",
+    "\u2018": "'",
+    "\u2019": "'",
+    "\u201c": '"',
+    "\u201d": '"',
+    "\u2026": "...",
+    "\u2022": "-",
+    "\u00a0": " ",
+}
+
+
+def a_bytes_portal(texto: str) -> bytes:
+    """Codifica la respuesta como la espera el portal de Salud Total.
+
+    18-08-2026. El portal lee el TXT en ANSI (Windows-1252): el archivo que el
+    HUS sube y que SÍ funciona está en ese formato. El sistema venía enviando
+    UTF-8, así que en el portal los acentos salían rotos: «clínica» se veía
+    «clÃ­nica» y «CÓDIGO» «CÃDIGO», en un documento que se radica.
+
+    Se transliteran primero los signos Unicode que no existen en 1252 (los que
+    mete la IA: guiones largos, comillas curvas) y lo que aún no encaje se
+    reemplaza en vez de reventar la descarga.
+    """
+    for uni, ascii_ in _TRANSLIT_PORTAL.items():
+        texto = texto.replace(uni, ascii_)
+    return texto.encode("cp1252", errors="replace")
 
 
 def generar_nombre_archivo(tipo_respuesta: str = "extemporanea") -> str:
@@ -500,3 +619,88 @@ def generar_nombre_archivo(tipo_respuesta: str = "extemporanea") -> str:
         "1" if tipo_respuesta == "extemporanea" else "2" if tipo_respuesta == "ratificada" else "3"
     )
     return f"RTAGLOSA_{NIT_HUS}_{fecha_str}_{sufijo}.txt"
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Lectura de la notificación a diccionarios (OT-045)
+#
+# El camino por plantilla lee el TXT por posición y va directo a la
+# respuesta. El camino por IA necesita algo distinto: cada glosa como un
+# diccionario con nombre y apellido, para armar con ella el texto que el
+# motor analiza. Se lee UNA vez y se reparte, en vez de abrir el archivo dos
+# veces con dos lectores que podrían separarse.
+# ─────────────────────────────────────────────────────────────────────────
+
+CABECERA_ESPERADA = ("NumeroRad_", "Numreg")
+
+
+def leer_notificacion_dict(contenido: bytes) -> tuple[List[Dict[str, Any]], List[str]]:
+    """Lee el TXT de la notificación y devuelve (glosas, avisos).
+
+    Las notificaciones de Salud Total vienen en latin-1: leerlas como UTF-8
+    parte las tildes de los nombres y de los motivos.
+
+    El radicado y el registro viajan como TEXTO de principio a fin.
+    Convertirlos a número fue lo que produjo «3,5E+14» en el archivo del
+    13-08 y lo dejó inservible: la entidad no puede casar ninguna respuesta
+    con su glosa.
+    """
+    avisos: List[str] = []
+    texto = None
+    for enc in ("utf-8-sig", "latin-1"):
+        try:
+            texto = contenido.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if texto is None:
+        return [], ["El archivo no se pudo leer: no está en UTF-8 ni en latin-1."]
+
+    lineas = [ln for ln in texto.splitlines() if ln.strip()]
+    if len(lineas) < 2:
+        return [], ["El archivo no tiene filas de glosa debajo del encabezado."]
+
+    sep = _detectar_separador(lineas[0])
+    cabecera = [c.strip() for c in lineas[0].split(sep)]
+    if not all(c in cabecera for c in CABECERA_ESPERADA):
+        return [], [
+            "El encabezado no corresponde a una notificación de Salud Total "
+            "(faltan NumeroRad_ o Numreg)."
+        ]
+
+    def _num(v) -> float:
+        try:
+            return float(str(v or "0").replace(",", "").strip() or 0)
+        except ValueError:
+            return 0.0
+
+    glosas: List[Dict[str, Any]] = []
+    for n, linea in enumerate(lineas[1:], start=2):
+        campos = linea.split(sep)
+        if len(campos) < 14:
+            avisos.append(f"Línea {n}: tiene {len(campos)} campos y se esperaban 14 o más.")
+            continue
+        f = dict(zip(cabecera, campos))
+        glosas.append(
+            {
+                "FechaRad": (f.get("FechaRad_") or "").strip(),
+                "NumeroRad": (f.get("NumeroRad_") or "").strip(),
+                "PrefijoFac": (f.get("PrefijoFac_") or "").strip(),
+                "NumeroFac": (f.get("NumeroFac_") or "").strip(),
+                "NUMREG": (f.get("Numreg") or "").strip(),
+                "NumeroDocAfl": (f.get("NumeroDocAfl_") or "").strip(),
+                "NombreServicio": (f.get("NombreServicio") or "").strip(),
+                "ValorTotalServ": _num(f.get("ValorTotalServ")),
+                # El valor de la glosa es ValorGlosaTotalxServ, NO el valor
+                # total del servicio, y NO se reescala.
+                "ValorGlosaTotalxServ": _num(f.get("ValorGlosaTotalxServ")),
+                "ValorBrutoFactura": _num(f.get("ValorBrutoFactura")),
+                # El código es la sigla (TA), no la descripción (Tarifas).
+                "CodMotvGlosaGeneral": (f.get("CodMotvGlosaGeneral") or "").strip(),
+                "MotvGlosaGeneral": (f.get("MotvGlosaGeneral") or "").strip(),
+                "CodMotvGlosaEspc": (f.get("CodMotvGlosaEspc") or "").strip(),
+                "MotvGlosaEspc": (f.get("MotvGlosaEspc") or "").strip(),
+                "DescripcionMotivo": (f.get("DescripcionMotivo") or "").strip(),
+            }
+        )
+    return glosas, avisos

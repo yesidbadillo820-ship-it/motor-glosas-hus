@@ -42,9 +42,18 @@ def listar_contratos(
 def crear_o_actualizar_contrato(
     data: ContratoInput,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
-    """Crea un nuevo contrato o actualiza uno existente si la EPS ya existe."""
+    """Crea un nuevo contrato o actualiza uno existente si la EPS ya existe.
+
+    Acceso: AUDITOR o superior. Subir el contrato firmado es trabajo diario del
+    gestor —la propia pantalla se lo pide—, así que el auditor conserva el
+    permiso; lo que cambia es que el VIEWER deja de tenerlo. Antes bastaba con
+    estar autenticado.
+
+    **Borrar** el contrato o sus cláusulas sí exige COORDINADOR: eso deja sin
+    base todos los dictámenes de esa EPS.
+    """
     repo = ContratoRepository(db)
     return repo.upsert(data)
 
@@ -452,7 +461,7 @@ def historial_contrato(
 def eliminar_contrato(
     eps: str,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
     """Elimina el contrato de una EPS específica."""
     repo = ContratoRepository(db)
@@ -475,7 +484,7 @@ async def subir_pdf_contrato(
     eps: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
     """Sube el PDF del contrato vigente para la EPS y extrae cláusulas.
 
@@ -644,7 +653,7 @@ def listar_clausulas_contrato(
 def borrar_clausulas_contrato(
     eps: str,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
 ):
     """Borra todas las cláusulas extraídas (no borra el PDF guardado).
 
@@ -684,7 +693,7 @@ def cargar_clausulas_manual(
     eps: str,
     batch: ClausulasManualBatch,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Inserta cláusulas escritas a mano (no requiere subir PDF ni gastar
     tokens IA). El gestor copia el texto literal del contrato firmado.

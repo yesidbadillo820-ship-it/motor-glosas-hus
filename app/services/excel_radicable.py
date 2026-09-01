@@ -42,6 +42,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.worksheet.worksheet import Worksheet
 
 from app.core.logging_utils import logger
+from app.utils.excel_seguro import sanear_celda_excel
 from app.core.tz import ahora_utc
 from app.models.db import (
     ClausulaContrato,
@@ -537,7 +538,9 @@ def _armar_hoja_respuesta(ws: Worksheet, ctx: _ContextoLote, filas: list[dict]) 
             f["respuesta"],
         ]
         for col, valor in enumerate(valores, start=1):
-            celda = ws.cell(row=fila_excel, column=col, value=valor)
+            # Ronda 30: sanear texto de EPS/dictamen (inyección de fórmulas
+            # Excel + caracteres de control). Los números pasan intactos.
+            celda = ws.cell(row=fila_excel, column=col, value=sanear_celda_excel(valor))
             celda.border = _BORDE_FINO
             if col in (5, 9):  # VR FACTURA / VR GLOSADO
                 celda.font = fuente_dato
@@ -756,7 +759,7 @@ def _secciones_fundamento(ctx: _ContextoLote, filas: list[dict]) -> list[tuple[s
     if cita6:
         s6 += f"{cita6} DEL CONTRATO; "
     s6 += (
-        "DECRETO 4747 DE 2007; RESOLUCIÓN 3047 DE 2008; ART. 57 DE LA LEY 1438 DE 2011 — "
+        "DECRETO 4747 DE 2007; RESOLUCIÓN 2284 DE 2023; ART. 57 DE LA LEY 1438 DE 2011 — "
         "QUINCE (15) DÍAS HÁBILES SIGUIENTES A LA RECEPCIÓN DE LA GLOSA), CON LOS "
         "SOPORTES DOCUMENTALES PERTINENTES. SE SOLICITA EL LEVANTAMIENTO TOTAL DE LAS "
         "GLOSAS Y EL PAGO DE LOS VALORES FACTURADOS; EN SU DEFECTO, SE SOLICITA MESA DE "
@@ -804,10 +807,44 @@ def _armar_hoja_fundamento(ws: Worksheet, ctx: _ContextoLote, filas: list[dict])
 # ─── API pública ─────────────────────────────────────────────────────────────
 
 
+def entidades_del_lote(db, recepcion_import_id: int | None = None, glosa_ids=None) -> list[dict]:
+    """Qué entidades hay en el lote y cuántas facturas de cada una.
+
+    20-08-2026. Sirve para no radicarle a una EPS las facturas de otra: el
+    panel ofrece un archivo por entidad en vez de uno solo con todo mezclado.
+    """
+    ids = _ids_del_lote(db, recepcion_import_id, glosa_ids)
+    if not ids:
+        return []
+    glosas = db.query(GlosaRecord).filter(GlosaRecord.id.in_(ids)).all()
+    cuenta = Counter((g.eps or "").strip() for g in glosas if (g.eps or "").strip())
+    return [
+        {"eps": eps, "glosas": n, "sigla": _entidad_corta(eps)} for eps, n in cuenta.most_common()
+    ]
+
+
+def _ids_del_lote(db, recepcion_import_id: int | None, glosa_ids) -> list[int]:
+    """Los IDs de glosa del lote, vengan de una importación o de una lista."""
+    if recepcion_import_id is not None:
+        rec = (
+            db.query(ImportacionRecepcionRecord)
+            .filter(ImportacionRecepcionRecord.id == recepcion_import_id)
+            .first()
+        )
+        if rec is None:
+            raise LookupError(f"Importación {recepcion_import_id} no encontrada")
+        try:
+            return [int(x) for x in json.loads(rec.glosa_ids or "[]")]
+        except (ValueError, TypeError):
+            return []
+    return list(glosa_ids or [])
+
+
 def generar_excel_radicable_con_nombre(
     db,
     recepcion_import_id: int | None = None,
     glosa_ids: list[int] | None = None,
+    eps_filtro: str | None = None,
 ) -> tuple[bytes, str]:
     """Construye el Excel radicable y su nombre de archivo institucional.
 
@@ -820,21 +857,21 @@ def generar_excel_radicable_con_nombre(
     Returns:
       (bytes del .xlsx, nombre tipo RESPUESTA_GLOSAS_DMBUG_10JUN2026_HUS.xlsx)
     """
-    if recepcion_import_id is not None:
-        rec = (
-            db.query(ImportacionRecepcionRecord)
-            .filter(ImportacionRecepcionRecord.id == recepcion_import_id)
-            .first()
-        )
-        if rec is None:
-            raise LookupError(f"Importación {recepcion_import_id} no encontrada")
-        try:
-            glosa_ids = [int(x) for x in json.loads(rec.glosa_ids or "[]")]
-        except (ValueError, TypeError):
-            glosa_ids = []
-
-    glosa_ids = glosa_ids or []
+    glosa_ids = _ids_del_lote(db, recepcion_import_id, glosa_ids)
     glosas = db.query(GlosaRecord).filter(GlosaRecord.id.in_(glosa_ids)).all() if glosa_ids else []
+
+    # 20-08-2026 (caso real de Yesid). El lote del 19 de agosto traía 29
+    # facturas de COOSALUD y 6 del DISPENSARIO MÉDICO / EJÉRCITO. El archivo
+    # se rotulaba con la entidad MÁS FRECUENTE —COOSALUD, y su contrato
+    # 68001C00060340-24 en el encabezado— pero adentro iban LAS 35. Es decir,
+    # se le radicaban a COOSALUD $10.290.042 en facturas de otro pagador,
+    # bajo un contrato que nada tiene que ver con ellas.
+    #
+    # Un Excel radicable se presenta ante UNA entidad. Si el lote trae varias,
+    # cada una necesita el suyo: no se mezclan ni se descartan en silencio.
+    if eps_filtro:
+        objetivo = eps_filtro.strip().upper()
+        glosas = [g for g in glosas if (g.eps or "").strip().upper() == objetivo]
     conceptos_por_glosa: dict[int, list[ConceptoGlosaRecord]] = {}
     if glosas:
         conceptos = (

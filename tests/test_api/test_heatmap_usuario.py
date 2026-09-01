@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -80,8 +80,13 @@ class TestHeatmapUsuario:
         assert d["total_eventos"] == 0
 
     def test_filtra_por_usuario(self, client, db_session):
-        _seed(db_session, "alice@x", datetime(2026, 4, 20, 10, tzinfo=timezone.utc))
-        _seed(db_session, "bob@x", datetime(2026, 4, 20, 10, tzinfo=timezone.utc))
+        # La fecha va relativa a hoy, no clavada en el calendario. Estaba
+        # escrita 20-04-2026 con ventana de 120 días: el 18-08-2026 el evento
+        # salió de la ventana por unas horas y la prueba empezó a fallar sola,
+        # sin que nadie tocara el código.
+        hace_un_mes = datetime.now(timezone.utc) - timedelta(days=30)
+        _seed(db_session, "alice@x", hace_un_mes)
+        _seed(db_session, "bob@x", hace_un_mes)
 
         r = client.get("/admin/heatmap-usuario?usuario_email=alice@x&dias=120")
         d = r.json()

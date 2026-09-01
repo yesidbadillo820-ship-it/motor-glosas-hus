@@ -193,7 +193,7 @@ def predecir_glosa(
     # Tipo de servicio: urgencias suelen glosarse menos si hay HC
     if "URGENCIA" in (tipo_servicio or "").upper() and tiene_historia_clinica:
         score -= 0.08
-        motivos.append("Urgencia con HC: menos riesgo de cobertura (T-1025/2002).")
+        motivos.append("Urgencia con HC: menos riesgo de cobertura (Art. 168 Ley 100/1993).")
 
     # Normalizar score a [0, 1]
     score = max(0.0, min(1.0, score))

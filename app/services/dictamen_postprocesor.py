@@ -31,6 +31,15 @@ _CIERRE_ANCLA = re.compile(
 # Ronda 21 (caso MEDIMÁS): marcadores de CODA PROCESAL que la IA encadena
 # tras el cierre con una CONJUNCIÓN (sin punto), por lo que el truncado por
 # "primer punto" no los recortaba ("...de la glosa Y, de persistir
+# Punto que de verdad cierra una oración. NO el separador de miles de
+# «$ 12.300.000», NO el de una sigla pegada («E.S.E.») y NO el de una
+# abreviatura seguida de número («ART. 87», «NO. 12345»). Los cuatro casos
+# salieron cortados en dictámenes reales.
+# El lookbehind cubre el punto FINAL de una sigla («E.S.E. HOSPITAL»): por
+# su forma es idéntico a un fin de oración, y solo se distingue por venir
+# detrás de otra letra abreviada.
+_RE_FIN_ORACION = re.compile(r"(?<!\.\w)\.(?!\w)(?!\s*\d)", re.UNICODE)
+
 # discrepancias, se invita a mesa de conciliación..."). Si un marcador
 # aparece ANTES del primer punto de la cola, se corta en el ancla.
 _MARCADORES_CODA = re.compile(
@@ -81,7 +90,15 @@ def truncar_despues_de_levantamiento(texto: str) -> str:
     # hasta 200 chars de continuación legítima ("Y EL RECONOCIMIENTO
     # ÍNTEGRO DEL VALOR PACTADO EN EL ANEXO N° 1 DEL CONTRATO 440...").
     cola = texto[m.end() : m.end() + 200]
-    rel = cola.find(".")
+    # El punto que cierra la oración, no cualquier punto. Buscar el primero
+    # a secas cortaba dentro de los separadores de miles: el 05-08-2026 un
+    # dictamen salió terminando en «…EL RECONOCIMIENTO ÍNTEGRO DEL VALOR
+    # $ 12.» — el punto de «12.300.000». No era el modelo truncando, era
+    # este corte. Con el mismo regex se arreglan tres hermanos del mismo
+    # defecto: «…A LA E.» (de E.S.E.), «…CONFORME AL ART.» (ART. 87) y
+    # «…FACTURA NO.» (NO. 12345).
+    _mp = _RE_FIN_ORACION.search(cola)
+    rel = _mp.start() if _mp else -1
     # Ronda 21: si una coda procesal arranca ANTES del primer punto (típico
     # cuando se une por conjunción: "...de la glosa Y, de persistir..."),
     # cortar en el ancla. La continuación legítima ("Y EL RECONOCIMIENTO
@@ -178,6 +195,21 @@ def _extraer_componentes_cita(cita: str) -> tuple[str, str, str]:
       'Art. 10 DECRETO 780/2016' → ('10', '780', '2016')
       'Resolución 1552/2019' → ('', '1552', '2019')
     """
+    # OJO ANTES DE "ARREGLAR" ESTA EXPRESION (24-08-2026). Reconoce
+    # "RESOLUCION 1552/2019" pero NO "Resolución 1552 de 2019", que es
+    # justamente el formato con que el verificador escribe las citas de
+    # NORMA_INEXISTENTE. O sea que una norma inventada nunca llego a esta
+    # lista y nunca se borro por este camino.
+    #
+    # Se deja asi A PROPOSITO. Ampliarla para que acepte " de " haria que se
+    # borren oraciones enteras por cada norma que no este en el corpus, y el
+    # corpus tiene 131 normas de las miles que existen: una resolucion real
+    # que no hayamos cargado saldria del documento radicado sin que nadie se
+    # entere. Ese es exactamente el dano que se acaba de corregir con los
+    # articulos (ver el aviso ARTICULO_NO_VERIFICABLE en citation_verifier).
+    #
+    # El aviso igual le llega al gestor: sale en rojo en el panel de
+    # verificacion de citas, que es donde debe decidirlo una persona.
     c = cita.upper()
     m_art = re.search(r"ART\.?\s*(\d+)", c)
     m_norma = re.search(r"(?:LEY|DECRETO|RESOLUCI[ÓO]N)\s+(\d+)\s*[/\s]\s*(\d{4})", c)
@@ -223,6 +255,21 @@ def quitar_citas_invalidas_dinamico(texto: str, eps: str | None = None) -> str:
     # Extraer componentes (art, num_norma, año) de cada cita problemática
     componentes_invalidos: list[tuple[str, str, str]] = []
     for i in issues:
+        # ATRIBUCION_FALSA no se trata aquí (24-08-2026). Los demás hallazgos
+        # con forma de norma dicen «esta cita no existe», y borrar la frase
+        # entera es lo correcto. Ese dice algo distinto: el artículo SÍ existe,
+        # lo que está mal es el contenido que se le atribuyó. Si se borrara por
+        # componentes, se llevaría por delante también las frases donde ese
+        # mismo artículo está bien citado en el mismo dictamen. El hallazgo se
+        # le muestra al auditor y hace que el Quality Gate mande a rehacer.
+        if i.get("tipo") in ("ATRIBUCION_FALSA", "NORMA_DEROGADA"):
+            # Ninguno de los dos habla de una cita que no exista, que es lo
+            # unico que justifica borrarle una oracion al documento radicado.
+            # ATRIBUCION_FALSA: el articulo existe y puede estar bien citado en
+            # otra parte. NORMA_DEROGADA: la norma existe y, si el servicio se
+            # presto mientras regia, citarla es lo correcto. Los dos se le
+            # muestran al gestor, que es quien sabe la fecha del servicio.
+            continue
         if i.get("severidad") in ("ALTA", "MEDIA") and i.get("cita"):
             comps = _extraer_componentes_cita(i["cita"])
             # Solo agregar si tiene al menos núm norma + año (para evitar false positives)

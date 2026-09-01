@@ -191,7 +191,7 @@ def check_invitacion_conciliacion(texto: str) -> dict:
         "mensaje": msg,
         "sugerencia": ""
         if tiene
-        else "Incluye invitación a mesa de conciliación (Art. 20 Dec. 4747/2007)",
+        else "Incluye invitación a mesa de conciliación (Art. 23 Dec. 4747/2007)",
     }
 
 
@@ -263,6 +263,13 @@ def check_contrato_mencionado(texto: str, eps: str) -> dict:
 
         contrato = get_contrato(eps)
         numero = contrato.get("numero", "")
+        # 20-08-2026: cuando el contrato existió pero su vigencia terminó, la
+        # ficha nombra el contrato vencido en vez de mentir con «SIN CONTRATO
+        # PACTADO». Acá NO se puede exigir que el dictamen lo cite: no se sabe
+        # si el servicio cae dentro de la vigencia, y obligar a citarlo sería
+        # empujar a afirmar una cobertura que nadie verificó.
+        if contrato.get("_vigencia_vencida"):
+            numero = ""
     except Exception:
         numero = ""
     if numero and numero != "SIN CONTRATO PACTADO":
@@ -490,6 +497,7 @@ def detectar_defectos_criticos(
     codigo_respuesta: str = "",
     texto_glosa: str = "",
     codigos_validos_extra: Optional[list] = None,
+    evidencia: Optional[str] = None,
 ) -> list[dict]:
     """Detecta defectos CRÍTICOS que justifican retry de la IA.
 
@@ -505,6 +513,11 @@ def detectar_defectos_criticos(
       - resultado vacío [] significa que el dictamen es usable
       - email_contacto NO se exige en defensas normales (directiva
         Yesid mayo 2026): solo para RATIFICADAS / EXTEMPORÁNEAS.
+
+    `evidencia` (20-08-2026) es el texto que la IA tuvo a la vista para
+    redactar: contexto de los PDF más el texto de la glosa. Sirve para el
+    check 11 (folios inventados). Si no se pasa, ese check no corre — sin
+    saber qué leyó la IA no se puede afirmar que inventó nada.
     """
     defectos: list[dict] = []
     if not dictamen_xml or not dictamen_xml.strip():
@@ -902,6 +915,97 @@ def detectar_defectos_criticos(
                 ),
             }
         )
+
+    # 11. Folios inventados (20-08-2026). El dictamen no puede afirmar
+    #     «SEGÚN CONSTA EN EL FOLIO 25» si en el expediente que se leyó no
+    #     hay ningún folio 25 — y menos aún si no se leyó ningún soporte.
+    #     Es la afirmación que la EPS verifica primero y la que tumba la
+    #     defensa entera. La revisión es confiable porque la IA y este
+    #     validador leen EL MISMO texto: lo que no esté ahí, la IA no lo
+    #     leyó. Se corrige por reintento —no reescribiendo el dictamen a
+    #     mano— para que la redacción jurídica la rehaga la IA.
+    if evidencia is not None:
+        try:
+            from app.services.extractor_folios import folios_inventados
+
+            _inventados = folios_inventados(arg, evidencia)
+        except Exception:  # pragma: no cover - sin extractor no se inventa un fallo
+            _inventados = []
+        if _inventados:
+            _lista = ", ".join(str(f) for f in _inventados[:8])
+            _plural = "s" if len(_inventados) > 1 else ""
+            defectos.append(
+                {
+                    "regla": "folio_inventado",
+                    "mensaje": (
+                        f"El dictamen cita el{'os' if _plural else ''} folio{_plural} "
+                        f"{_lista}, que no aparece{'n' if _plural else ''} en los "
+                        "soportes leídos."
+                        if (evidencia or "").strip()
+                        else (
+                            f"El dictamen cita el{'os' if _plural else ''} folio{_plural} "
+                            f"{_lista} y en este caso NO se leyó ningún soporte."
+                        )
+                    ),
+                    "sugerencia": (
+                        (
+                            "NO cites números de folio. Refiérete al documento por su "
+                            "nombre ('LA HISTORIA CLÍNICA ACREDITA...', 'LA EPICRISIS "
+                            "REGISTRA...') sin inventar en qué folio consta. Un folio "
+                            "que la EPS busca y no encuentra ratifica la glosa completa."
+                        )
+                        if (evidencia or "").strip()
+                        # 20-08-2026: sin un solo soporte leído, mandar a escribir
+                        # «LA HISTORIA CLÍNICA ACREDITA…» es cambiar una afirmación
+                        # sin respaldo por otra. Acá la salida es no afirmar.
+                        else (
+                            "NO cites números de folio NI afirmes qué dice la "
+                            "historia clínica: en este caso no se leyó ningún "
+                            "soporte. Fundamenta en el "
+                            "contrato, la normativa y la carga de la prueba, y exige a "
+                            "la EPS que precise qué documento echa de menos."
+                        )
+                    ),
+                }
+            )
+
+    # 12. Afirmaciones documentales sin respaldo (20-08-2026). Hermano del
+    #     check 11, para la mentira que va SIN número. Caso real de Yesid
+    #     (CL0801, AXA COLPATRIA), analizada sin adjuntar un solo soporte:
+    #
+    #         «…CUMPLE CON LOS CRITERIOS CLÍNICOS DEL MÉDICO TRATANTE, QUIEN
+    #          DOCUMENTÓ LA INDICACIÓN EN LA HISTORIA CLÍNICA INTEGRAL.»
+    #
+    #     Sin folio que verificar, el check 11 la deja pasar. Pero el hospital
+    #     está certificando el contenido de una historia clínica que nadie
+    #     abrió, y en una glosa de pertinencia eso ES el punto en disputa.
+    #     Solo se mira cuando no se leyó expediente: con soportes a la vista
+    #     haría falta leerlos para saber si la frase es fiel.
+    if evidencia is not None:
+        try:
+            from app.services.extractor_folios import afirmaciones_documentales_sin_respaldo
+
+            _sin_respaldo = afirmaciones_documentales_sin_respaldo(arg, evidencia)
+        except Exception:  # pragma: no cover - sin extractor no se inventa un fallo
+            _sin_respaldo = []
+        if _sin_respaldo:
+            defectos.append(
+                {
+                    "regla": "afirmacion_sin_soporte",
+                    "mensaje": (
+                        "El dictamen afirma qué dice un documento clínico, pero en "
+                        "este caso NO se leyó ningún soporte. Frase: "
+                        f"«{_sin_respaldo[0][:160]}»"
+                    ),
+                    "sugerencia": (
+                        "NO afirmes qué dice la historia clínica, la epicrisis ni "
+                        "ningún otro documento: no se leyó ninguno. Fundamenta en el "
+                        "contrato, la normativa y la carga de la prueba; ofrece el "
+                        "soporte y exige a la EPS que precise qué echa de menos, "
+                        "pero sin decir qué contiene."
+                    ),
+                }
+            )
 
     return defectos
 

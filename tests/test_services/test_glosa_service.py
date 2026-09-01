@@ -165,6 +165,23 @@ class TestDiasHabilesFechasInvalidas:
         from app.models.schemas import GlosaInput
 
         monkeypatch.setattr(glosa_service, "_calcular_dias_habiles", lambda f1, f2: None)
+
+        # Desde el incidente 04-08-2026 la IA sin claves LANZA (un fallo de
+        # proveedor no es un dictamen), así que acá se stubea con un texto
+        # real: lo que este test verifica es el mensaje de tiempo, no la IA.
+        async def _ia_stub(
+            system, user, eps="", codigo="", modelo_override=None, bypass_cache=False
+        ):
+            return (
+                "<argumento>ESE HUS NO ACEPTA LA GLOSA POR CONCEPTO DE FALTA DE "
+                "SOPORTE DE ENTREGA SOBRE EL CODIGO FA0101, TODA VEZ QUE LA "
+                "FACTURA FUE RADICADA EN TERMINOS Y CONSTA EL ACUSE DE RECIBO "
+                "EN EL EXPEDIENTE. SE SOLICITA EL LEVANTAMIENTO DE LA "
+                "GLOSA.</argumento>",
+                "stub",
+            )
+
+        monkeypatch.setattr(glosa_service, "_llamar_ia", _ia_stub)
         data = GlosaInput(
             eps="FAMISANAR EPS",
             etapa="RESPUESTA A GLOSA",
@@ -295,14 +312,44 @@ class TestExtraccionValor:
     """Tests for value extraction from glosa text."""
 
     def test_extraer_valor_formato_colombiano(self, glosa_service):
-        """Should extract Colombian peso format."""
+        """Un millón y medio, escrito como se escribe en Colombia.
+
+        21-08-2026. Esta prueba se llama «formato_colombiano» y su descripción
+        decía «Should extract Colombian peso format»… pero exigía
+        «1,500,000» CON COMAS, que es formato gringo. El nombre decía una cosa
+        y la comprobación la contraria.
+
+        En Colombia la coma es el separador decimal: «1,500,000» se lee mal.
+        La glosa puede venir escrita con comas —eso no se controla—, pero lo
+        que el motor DEVUELVE, y que termina en el documento que se radica
+        ante la EPS, va con punto de miles.
+        """
         result = glosa_service._extraer_valor("Glosa por $1,500,000")
-        assert "$ 1,500,000" in result or "1,500,000" in result
+        assert result == "$ 1.500.000"
 
     def test_extraer_valor_sin_signo(self, glosa_service):
-        """Should handle value without $ sign - returns default when not found."""
+        """Un valor sin «$» SÍ es un valor.
+
+        21-08-2026. Esta prueba exigía «$ 0.00» y su docstring lo llamaba
+        «returns default when not found» — o sea, daba por correcto NO
+        encontrarlo. Estaba fijando el defecto.
+
+        Yesid pegó «CL0801 - ... - valor 279900» y el dictamen salió declarando
+        ante la EPS un valor objetado de CERO PESOS. Eso no es un detalle de
+        formato: es una cifra falsa en un documento que se radica.
+        """
         result = glosa_service._extraer_valor("Valor 500000 sin pesos")
-        assert "$ 0.00" in result
+        assert result == "$ 500.000"
+        # Contra el centinela exacto, no una subcadena: «0.00» SÍ está dentro
+        # de «500.000» —es 5·00.00·0— y una comprobación así se cumple sola.
+        assert result != "$ 0.00"
+
+    def test_un_porcentaje_no_es_plata(self, glosa_service):
+        """El otro lado: «valor 100%» no puede leerse como cien pesos."""
+        assert "$ 0.00" in glosa_service._extraer_valor("glosa aceptada al valor 100%")
+
+    def test_un_numero_suelto_despues_de_valor_no_basta(self, glosa_service):
+        assert "$ 0.00" in glosa_service._extraer_valor("se detectaron valor 2 conceptos")
 
     def test_extraer_valor_inexistente(self, glosa_service):
         """Should return default $0.00 when no value found."""

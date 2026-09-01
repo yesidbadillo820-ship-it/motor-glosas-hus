@@ -168,6 +168,65 @@ def _fmt_cop(valor) -> str:
         return "$0"
 
 
+def _plan_de(
+    *,
+    codigo_glosa,
+    tipo_glosa,
+    dias_restantes,
+    dias_radicacion,
+    estado,
+    valor,
+    profesional_medico,
+) -> dict:
+    """El plan de trabajo de una glosa, en forma de diccionario simple.
+
+    Se devuelve como dict —no como objeto— porque este resumen viaja al correo
+    y a la pantalla tal cual, sin pasar por la base de datos.
+    """
+    from app.services.glosa_service import TEXTO_RATIFICADA
+    from app.services.plan_de_trabajo import construir_plan
+
+    p = construir_plan(
+        codigo_glosa=codigo_glosa,
+        tipo_glosa=tipo_glosa,
+        dias_restantes=dias_restantes,
+        dias_radicacion=dias_radicacion,
+        ratificada=(estado == "RATIFICADA"),
+        extemporanea=(estado == "EXTEMPORANEA"),
+        valor_objetado=valor,
+        profesional_medico=profesional_medico,
+        texto_ratificada=TEXTO_RATIFICADA,
+    )
+    return {
+        "prioridad": p.prioridad,
+        "urgencia": p.urgencia,
+        "titular": p.titular,
+        "ruta": p.ruta,
+        "respuesta_sugerida": p.respuesta_sugerida,
+        "avisos": p.avisos,
+        "con_medico": p.con_medico,
+        "texto_listo": p.texto_listo,
+        # 20-08-2026: QUÉ doctora lleva esta glosa. El Excel lo trae en la
+        # columna PROFESIONAL(MEDICO) y hasta ahora solo se usaba para armar
+        # el texto del plan. Con el nombre acá, el resumen le puede llegar a
+        # la doctora que de verdad la tiene, y no a las tres.
+        "profesional_medico": (profesional_medico or "").strip(),
+    }
+
+
+def _dias_desde_texto(vence: str | None):
+    """«03/09/2026» → días que faltan. None si no se puede leer."""
+    from datetime import date, datetime
+
+    if not vence or vence == "N/A":
+        return None
+    try:
+        d = datetime.strptime(str(vence), "%d/%m/%Y").date()
+    except ValueError:
+        return None
+    return (d - date.today()).days
+
+
 def componer_texto_desde_conceptos(db, glosa) -> str:
     """Compila el texto de la glosa desde sus ConceptoGlosaRecord.
 
@@ -752,6 +811,26 @@ class ResumenImportacion:
         self.gestores_asignados: dict[str, str] = {}
         self.gestores_sin_usuario: list[str] = []
         self.advertencias: list[str] = []
+        # 31-08-2026 — PEDIR EL DATO QUE FALTA, DONDE FALTA.
+        # En el export real de la base del hospital, 59 de las 135 glosas
+        # salieron SIN CÓDIGO DE CAUSAL — el 44 %. Sin causal el motor no sabe
+        # contra qué está defendiendo, así que redacta a ciegas: contesta la
+        # forma cuando la glosa era de fondo, o alega soportes cuando le
+        # objetaron la tarifa.
+        #
+        # Eso NO lo arregla ningún cambio de código: el dato no viene en el
+        # archivo. Lo que sí se puede hacer es dejar de importarlo en silencio
+        # y decir CUÁNTAS son y CUÁLES, para que el reclamo a quien manda el
+        # archivo salga con evidencia y no con una impresión.
+        self.sin_causal: int = 0
+        self.sin_causal_detalle: list[dict] = []
+
+    def registrar_sin_causal(self, factura: str, entidad: str = "") -> None:
+        self.sin_causal += 1
+        if len(self.sin_causal_detalle) < 50:
+            self.sin_causal_detalle.append(
+                {"factura": factura or "(sin número)", "entidad": entidad or ""}
+            )
 
     def registrar_omitida(self, fila: int, motivo: str) -> None:
         self.filas_omitidas += 1
@@ -779,6 +858,8 @@ class ResumenImportacion:
             "gestores_asignados": self.gestores_asignados,
             "gestores_sin_usuario": self.gestores_sin_usuario,
             "advertencias": self.advertencias,
+            "sin_causal": self.sin_causal,
+            "sin_causal_detalle": self.sin_causal_detalle,
         }
 
 
@@ -946,7 +1027,104 @@ class RecepcionService:
                 "Ninguna hoja tiene columnas reconocibles. El parser busca hojas "
                 "tipo RECEPCION (con FACTURA+VENCE) o CONCEPTOS (con ListadoConceptos.*)."
             )
+
+        # Las hojas de resumen (INICIAL/RATIFICADA) no traen la causal: esa vive
+        # en las hojas de detalle, que se leen después. Acá, ya con todo dentro,
+        # se completa el plan de cada glosa con su causal real — que es lo que
+        # convierte «causal por clasificar» en «Soportes: relacione los que SÍ
+        # están en el expediente». 20-08-2026.
+        try:
+            self._completar_planes_con_causal(resumen)
+        except Exception as e:  # noqa: BLE001 - el resumen vale igual sin esto
+            logger.warning(f"No se pudo completar el plan con las causales: {e}")
         return resumen
+
+    def _completar_planes_con_causal(self, resumen) -> None:
+        """Rellena la causal en el plan de cada glosa del resumen.
+
+        Se toma la causal del concepto de MÁS VALOR: si una factura viene
+        glosada por soportes y por tarifa, la que manda para saber cómo
+        trabajarla es la que tiene más plata detrás.
+        """
+        from app.models.db import ConceptoGlosaRecord, GlosaRecord
+
+        ids = list(resumen.glosas_ids_todas or [])
+        if not ids:
+            return
+        conceptos = (
+            self.db.query(ConceptoGlosaRecord).filter(ConceptoGlosaRecord.glosa_id.in_(ids)).all()
+        )
+        # glosa_id -> causal del concepto de más valor
+        mayor: dict[int, tuple[float, str]] = {}
+        for c in conceptos:
+            cod = (getattr(c, "codigo_glosa", "") or "").strip()
+            if not cod:
+                continue
+            val = float(getattr(c, "valor_objetado", 0) or 0)
+            if val >= mayor.get(c.glosa_id, (-1.0, ""))[0]:
+                mayor[c.glosa_id] = (val, cod)
+
+        # factura -> causal, para encontrarlas desde `por_gestor`
+        por_factura: dict[str, str] = {}
+        # factura -> médica que lleva la glosa (columna PROFESIONAL(MEDICO) del
+        # Excel). Se saca de la MISMA consulta que ya se está haciendo: no hay
+        # una segunda vuelta a la base.
+        medico_por_factura: dict[str, str] = {}
+        for g in self.db.query(GlosaRecord).filter(GlosaRecord.id.in_(ids)).all():
+            dato = mayor.get(g.id)
+            clave_fac = str(g.factura).strip().upper() if g.factura else ""
+            if dato and clave_fac:
+                por_factura[clave_fac] = dato[1]
+            if clave_fac and getattr(g, "profesional_medico", None):
+                medico_por_factura[clave_fac] = str(g.profesional_medico).strip()
+
+        for glosas in (resumen.por_gestor or {}).values():
+            for item in glosas:
+                clave_fac = str(item.get("factura") or "").strip().upper()
+                cod = por_factura.get(clave_fac)
+                if not cod:
+                    # AQUÍ ES DONDE SE PIERDE LA CAUSAL, y hasta hoy se seguía
+                    # de largo sin decir nada. En el export real del hospital
+                    # esto pasó en 59 de 135 glosas — el 44 %.
+                    # Sin causal el motor redacta a ciegas: contesta la forma
+                    # cuando la glosa era de fondo, o alega soportes cuando lo
+                    # que objetaron fue la tarifa. No se puede arreglar desde
+                    # el código —el dato no viene en el archivo— pero sí se
+                    # puede dejar de importarlo en silencio.
+                    resumen.registrar_sin_causal(
+                        str(item.get("factura") or ""), str(item.get("entidad") or "")
+                    )
+                    continue
+                item["causal"] = cod
+                # LA MÉDICA NO SE PIERDE AL REHACER EL PLAN (25-08-2026).
+                #
+                # Acá el plan se vuelve a armar con la causal, y antes se le
+                # pasaba `profesional_medico=None`: eso borraba el nombre que
+                # SÍ se había leído del Excel unas líneas antes y que sí queda
+                # guardado en la glosa.
+                #
+                # No era cosmético. El correo de recepción usa ese campo para
+                # saber a qué doctora mandarle sus glosas: sin nombre, la lista
+                # de médicas salía vacía y a las auditoras NO les llegaba nada.
+                # Se vio el 25-08 con el lote de 117 glosas: los seis gestores
+                # recibieron su correo y las tres médicas no, aunque doce
+                # glosas venían marcadas «Mixta» o «Medico» con su nombre en la
+                # columna PROFESIONAL(MEDICO).
+                item["plan"] = _plan_de(
+                    codigo_glosa=cod,
+                    tipo_glosa=item.get("tipo_glosa"),
+                    dias_restantes=_dias_desde_texto(item.get("vence")),
+                    dias_radicacion=None,
+                    estado=item.get("estado"),
+                    valor=item.get("valor"),
+                    profesional_medico=medico_por_factura.get(clave_fac),
+                )
+                # No se pierden los avisos que ya se habían calculado con los
+                # datos de la hoja de resumen (días de radicación, médico).
+                previos = [a for a in (item.get("_avisos_previos") or [])]
+                for a in previos:
+                    if a not in item["plan"]["avisos"]:
+                        item["plan"]["avisos"].append(a)
 
     def _procesar_filas_hoja(
         self,
@@ -1060,12 +1238,10 @@ class RecepcionService:
                     estado = "RATIFICADA"
                     texto_ref = radicado_info or referencia
                     dictamen = _dictamen_ratificada(eps_canonica, factura, texto_ref)
-                    resumen.ratificadas += 1
                     requiere_ia = False
                 elif es_extemporanea:
                     estado = "EXTEMPORANEA"
                     dictamen = _dictamen_extemporanea(eps_canonica, factura, dias_transcurridos)
-                    resumen.extemporaneas += 1
                     requiere_ia = False
                 else:
                     estado = "RADICADA"
@@ -1097,7 +1273,8 @@ class RecepcionService:
                     eps_codigo=eps_codigo or None,
                     paciente="N/A",
                     factura=factura,
-                    numero_radicado=numero_radicado_real,
+                    numero_radicado=(numero_radicado_real or None)
+                    and str(numero_radicado_real)[:50],
                     consecutivo_dgh=consecutivo or None,
                     gestor_nombre=gestor,
                     tecnico_recepcion=tecnico_recepcion or None,
@@ -1173,6 +1350,21 @@ class RecepcionService:
                         resumen.glosas_ids_todas.append(nueva.id)
 
                 resumen.total += 1
+                # 20-08-2026. Estos dos se contaban arriba, al clasificar la
+                # fila — ANTES de saber si la fila iba a entrar. Una fila que
+                # después resultaba duplicada hacía `continue` y se saltaba el
+                # `total`, pero su extemporaneidad YA estaba contada.
+                #
+                # Yesid resubió el mismo archivo y la pantalla mostró «0 glosas
+                # detectadas» junto a «29 EXTEMPORÁNEAS»: dos números que no
+                # pueden ser ciertos a la vez. Peor: el aviso le sugería revisar
+                # la hoja y los encabezados del Excel, mandándolo a buscar un
+                # problema que no existía. Lo que pasaba era que las 35 ya
+                # estaban importadas.
+                if estado == "EXTEMPORANEA":
+                    resumen.extemporaneas += 1
+                elif estado == "RATIFICADA":
+                    resumen.ratificadas += 1
                 resumen.semaforo[semaforo] = resumen.semaforo.get(semaforo, 0) + 1
                 resumen.por_gestor.setdefault(gestor, []).append(
                     {
@@ -1188,10 +1380,30 @@ class RecepcionService:
                         "estado": estado,
                         "tipo_glosa": tipo_glosa_excel or "-",
                         "radicado": numero_radicado_real or "-",
+                        # 20-08-2026. El correo al gestor decía QUÉ llegó pero
+                        # no QUÉ HACER. El plan sale de datos que este mismo
+                        # archivo ya trae: causal, tipo de glosa, médico y los
+                        # días entre radicación y notificación.
+                        "plan": _plan_de(
+                            codigo_glosa=None,
+                            tipo_glosa=tipo_glosa_excel,
+                            dias_restantes=dias_restantes,
+                            dias_radicacion=dias_transcurridos,
+                            estado=estado,
+                            valor=valor,
+                            profesional_medico=profesional_medico,
+                        ),
                     }
                 )
 
             except Exception as e:
+                # Ronda 30: sanear la sesión — un flush fallido la deja
+                # envenenada y TODAS las filas siguientes (y el commit final)
+                # fallan, perdiendo el lote entero.
+                try:
+                    self.db.rollback()
+                except Exception:
+                    pass
                 resumen.errores.append(f"Fila {num_fila}: {e}")
                 logger.warning(f"Error procesando fila {num_fila}: {e}")
                 continue

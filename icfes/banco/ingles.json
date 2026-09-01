@@ -1,0 +1,403 @@
+{
+  "area": "ingles",
+  "version": 1,
+  "nota": "Preguntas de práctica escritas para este sistema siguiendo el formato de la prueba de Inglés del Saber 11 (avisos, diálogos, texto informativo y uso del idioma). Las explicaciones van en español a propósito. No son preguntas del ICFES.",
+  "preguntas": [
+    {
+      "id": "ING-001",
+      "competencia": "Comprensión de textos cortos y avisos",
+      "componente": "Avisos y frases cotidianas",
+      "tema": "Avisos públicos",
+      "dificultad": 2,
+      "contexto": "You see this sign at the entrance of a building:\n\n**NO PARKING AT ANY TIME**",
+      "enunciado": "What does the sign mean?",
+      "opciones": [
+        "You cannot park here, ever.",
+        "You can park here only at night.",
+        "Parking is free at this time.",
+        "You must pay before parking."
+      ],
+      "correcta": 0,
+      "explicacion": "«No parking» es «prohibido parquear» y «at any time» significa «a ninguna hora». Juntas dicen que la prohibición no tiene excepciones de horario.",
+      "trampa": "El distractor «solo de noche» aparece porque el estudiante ve «time» y asume que el aviso habla de un horario permitido. «At any time» en una frase negativa refuerza la prohibición: es «nunca», no «a veces»."
+    },
+    {
+      "id": "ING-002",
+      "competencia": "Comprensión de textos cortos y avisos",
+      "componente": "Avisos y frases cotidianas",
+      "tema": "Avisos de servicio",
+      "dificultad": 2,
+      "contexto": "You see this notice on an elevator door:\n\n**OUT OF ORDER — PLEASE USE THE STAIRS**",
+      "enunciado": "According to the notice, the elevator",
+      "opciones": [
+        "is only for employees.",
+        "is not working.",
+        "is being cleaned right now.",
+        "goes only to the first floor."
+      ],
+      "correcta": 1,
+      "explicacion": "«Out of order» es una expresión fija que significa «fuera de servicio», «dañado». La segunda parte lo confirma: si piden usar las escaleras, es porque el ascensor no sirve.",
+      "trampa": "El distractor «lo están limpiando» inventa una razón que el aviso no da. En los avisos, respondes solo con lo que está escrito: no completes la historia."
+    },
+    {
+      "id": "ING-003",
+      "competencia": "Comprensión de textos cortos y avisos",
+      "componente": "Avisos y frases cotidianas",
+      "tema": "Avisos comerciales",
+      "dificultad": 2,
+      "contexto": "You see this sign in a shop window:\n\n**BUY ONE, GET ONE FREE**",
+      "enunciado": "If you buy one shirt, you",
+      "opciones": [
+        "pay half the price of the shirt.",
+        "get a discount on your next visit.",
+        "receive a second shirt at no cost.",
+        "must buy two shirts to get the offer."
+      ],
+      "correcta": 2,
+      "explicacion": "«Buy one, get one free» significa «compre uno y lleve otro gratis»: se paga una prenda y la segunda no cuesta nada. «Free» aquí es «gratis», no «libre».",
+      "trampa": "El distractor «paga la mitad» da casi el mismo resultado en plata y por eso engaña, pero no es lo que dice el aviso: usted paga el precio completo de una y recibe dos."
+    },
+    {
+      "id": "ING-004",
+      "competencia": "Comprensión de textos cortos y avisos",
+      "componente": "Avisos y frases cotidianas",
+      "tema": "Notas y mensajes cortos",
+      "dificultad": 3,
+      "contexto": "You find this note on the kitchen table:\n\n«Mom, I've gone to Ana's house to finish the science project. I'll be back at seven. There's soup in the fridge if you're hungry. Love, Sara»",
+      "enunciado": "Why did Sara leave the house?",
+      "opciones": [
+        "To have dinner with Ana.",
+        "To buy something for the kitchen.",
+        "To visit her mother at work.",
+        "To work on a school project."
+      ],
+      "correcta": 3,
+      "explicacion": "La nota lo dice directamente: «to finish the science project». «To + verbo» expresa el propósito, que es exactamente lo que pregunta «why».",
+      "trampa": "El distractor «cenar con Ana» junta dos datos sueltos del texto (Ana y la sopa) que no van juntos: la sopa es para la mamá, en la casa. Cuidado con mezclar información de partes distintas del mensaje."
+    },
+    {
+      "id": "ING-005",
+      "competencia": "Comprensión de conversaciones",
+      "componente": "Diálogos cortos",
+      "tema": "Ofrecimientos",
+      "dificultad": 2,
+      "contexto": "**Andrea:** Would you like some coffee?\n**Julián:** ______________",
+      "enunciado": "Choose the best answer to complete the dialogue.",
+      "opciones": [
+        "No, thanks. I've just had one.",
+        "Yes, I did it yesterday.",
+        "No, I don't know him.",
+        "Yes, it is very far."
+      ],
+      "correcta": 0,
+      "explicacion": "«Would you like…?» es un ofrecimiento y se responde aceptando o rechazando. «No, thanks. I've just had one» rechaza y además explica por qué, que es lo natural en una conversación.",
+      "trampa": "El distractor «Yes, I did it yesterday» arranca con «yes» y por eso parece encajar, pero responde a una pregunta sobre algo que se hizo, no a un ofrecimiento. Lee la respuesta completa, no la primera palabra."
+    },
+    {
+      "id": "ING-006",
+      "competencia": "Comprensión de conversaciones",
+      "componente": "Diálogos cortos",
+      "tema": "Preguntas con how long",
+      "dificultad": 3,
+      "contexto": "**Teacher:** How long have you been studying English?\n**Student:** ______________",
+      "enunciado": "Choose the best answer to complete the dialogue.",
+      "opciones": [
+        "In my school, near the park.",
+        "For about three years.",
+        "Because I want to travel.",
+        "Yes, I study every afternoon."
+      ],
+      "correcta": 1,
+      "explicacion": "«How long» pregunta por duración, y la respuesta natural empieza con «for» (por un periodo) o «since» (desde un momento). «For about three years» responde exactamente eso.",
+      "trampa": "El distractor «Because I want to travel» responde a «why», y «In my school» responde a «where». El examen mide si reconoces la palabra interrogativa: cada una pide un tipo de dato distinto."
+    },
+    {
+      "id": "ING-007",
+      "competencia": "Comprensión de conversaciones",
+      "componente": "Diálogos cortos",
+      "tema": "Disculpas",
+      "dificultad": 2,
+      "contexto": "**Camilo:** I'm really sorry. I broke your cup.\n**Valeria:** ______________",
+      "enunciado": "Choose the best answer to complete the dialogue.",
+      "opciones": [
+        "You're welcome. See you later.",
+        "Congratulations! That's great news.",
+        "Don't worry, it doesn't matter.",
+        "Of course, here you are."
+      ],
+      "correcta": 2,
+      "explicacion": "Ante una disculpa, la respuesta habitual es quitarle importancia: «Don't worry, it doesn't matter». Son fórmulas fijas que conviene aprender como bloque.",
+      "trampa": "El distractor «You're welcome» responde a un agradecimiento («thank you»), no a una disculpa («I'm sorry»). Son dos rutinas parecidas que el examen confunde a propósito."
+    },
+    {
+      "id": "ING-008",
+      "competencia": "Comprensión de conversaciones",
+      "componente": "Diálogos cortos",
+      "tema": "Pedir indicaciones",
+      "dificultad": 3,
+      "contexto": "**Tourist:** Excuse me, could you tell me where the library is?\n**Local:** ______________",
+      "enunciado": "Choose the best answer to complete the dialogue.",
+      "opciones": [
+        "It opens at eight in the morning.",
+        "Yes, I read a book last night.",
+        "No, I don't like libraries very much.",
+        "Sure. It's next to the bank, on your right."
+      ],
+      "correcta": 3,
+      "explicacion": "La pregunta es por una ubicación («where»), así que la respuesta debe indicar un lugar. «Next to the bank, on your right» es exactamente una indicación de dónde queda.",
+      "trampa": "El distractor «It opens at eight» responde a «when», no a «where». Es información sobre la biblioteca y suena útil, pero no es lo que el turista preguntó."
+    },
+    {
+      "id": "ING-009",
+      "competencia": "Comprensión de conversaciones",
+      "componente": "Conversación",
+      "tema": "Comprensión de una conversación",
+      "dificultad": 3,
+      "contexto": "Read the conversation.\n\n**Laura:** Hi, Daniel. You look worried. What's wrong?\n**Daniel:** I have my English exam next week and I haven't started studying yet.\n**Laura:** Don't panic. How much time do you have every day?\n**Daniel:** About an hour, maybe two on weekends.\n**Laura:** That's enough if you use it well. I'd start with the parts you always get wrong.\n**Daniel:** That would be the long readings. I never finish them in time.\n**Laura:** Then practise those with a clock. Reading faster comes with practice, not with luck.",
+      "enunciado": "What is Daniel's problem?",
+      "opciones": [
+        "He has not begun to prepare for his exam.",
+        "He failed his English exam last week.",
+        "He does not have any free time at all.",
+        "He cannot find someone to study with."
+      ],
+      "correcta": 0,
+      "explicacion": "Daniel lo dice al comienzo: «I have my English exam next week and I haven't started studying yet». «Haven't started… yet» significa que todavía no ha empezado.",
+      "trampa": "El distractor «no tiene nada de tiempo libre» exagera lo que él mismo dice después: tiene una hora diaria y dos los fines de semana. Poco tiempo no es lo mismo que ningún tiempo."
+    },
+    {
+      "id": "ING-010",
+      "competencia": "Comprensión de conversaciones",
+      "componente": "Conversación",
+      "tema": "Identificar un consejo",
+      "dificultad": 4,
+      "contexto": "Read the conversation.\n\n**Laura:** Hi, Daniel. You look worried. What's wrong?\n**Daniel:** I have my English exam next week and I haven't started studying yet.\n**Laura:** Don't panic. How much time do you have every day?\n**Daniel:** About an hour, maybe two on weekends.\n**Laura:** That's enough if you use it well. I'd start with the parts you always get wrong.\n**Daniel:** That would be the long readings. I never finish them in time.\n**Laura:** Then practise those with a clock. Reading faster comes with practice, not with luck.",
+      "enunciado": "What does Laura advise Daniel to do first?",
+      "opciones": [
+        "To study for more hours every day.",
+        "To start with the parts he usually gets wrong.",
+        "To take the exam on another date.",
+        "To read only on weekends."
+      ],
+      "correcta": 1,
+      "explicacion": "Laura dice: «I'd start with the parts you always get wrong». La forma «I'd» («I would») se usa justamente para dar consejos en inglés, y la palabra «first» de la pregunta apunta a por dónde empezar.",
+      "trampa": "El distractor «estudiar más horas al día» es lo contrario de lo que ella plantea: Laura dice que el tiempo que él tiene «is enough if you use it well». El consejo es sobre cómo usarlo, no sobre aumentarlo."
+    },
+    {
+      "id": "ING-011",
+      "competencia": "Comprensión de conversaciones",
+      "componente": "Conversación",
+      "tema": "Inferencia en una conversación",
+      "dificultad": 4,
+      "contexto": "Read the conversation.\n\n**Laura:** Hi, Daniel. You look worried. What's wrong?\n**Daniel:** I have my English exam next week and I haven't started studying yet.\n**Laura:** Don't panic. How much time do you have every day?\n**Daniel:** About an hour, maybe two on weekends.\n**Laura:** That's enough if you use it well. I'd start with the parts you always get wrong.\n**Daniel:** That would be the long readings. I never finish them in time.\n**Laura:** Then practise those with a clock. Reading faster comes with practice, not with luck.",
+      "enunciado": "From the conversation, it can be inferred that Laura believes that",
+      "opciones": [
+        "long readings are impossible to finish on time.",
+        "Daniel should change to an easier English course.",
+        "improving at reading depends on practice, not on chance.",
+        "exams are not a good way to measure English."
+      ],
+      "correcta": 2,
+      "explicacion": "La última frase lo resume: «Reading faster comes with practice, not with luck». Inferir es sacar la idea general que sostiene lo que la persona dice, y aquí está casi explícita.",
+      "trampa": "El distractor «las lecturas largas son imposibles de terminar» toma la queja de Daniel y la pone en boca de Laura. En preguntas de inferencia, fíjate SIEMPRE de quién es la idea que te preguntan."
+    },
+    {
+      "id": "ING-012",
+      "competencia": "Uso del idioma en contexto",
+      "componente": "Vocabulario en contexto",
+      "tema": "Phrasal verbs",
+      "dificultad": 4,
+      "contexto": "The doctor told my uncle to ______ smoking if he wanted to feel better.",
+      "enunciado": "Choose the option that best completes the sentence.",
+      "opciones": [
+        "turn on",
+        "look for",
+        "take off",
+        "give up"
+      ],
+      "correcta": 3,
+      "explicacion": "«Give up» significa dejar o abandonar un hábito, que es justo lo que un médico recomienda con el cigarrillo. Los verbos con partícula cambian de sentido por completo según la partícula, así que se memorizan enteros.",
+      "trampa": "El distractor «take off» se traduce como «quitar» y por eso parece cercano a «dejar», pero se usa para prendas de ropa o para el despegue de un avión. Nunca traduzcas la partícula por separado."
+    },
+    {
+      "id": "ING-013",
+      "competencia": "Uso del idioma en contexto",
+      "componente": "Vocabulario en contexto",
+      "tema": "Adverbios de intensidad",
+      "dificultad": 3,
+      "contexto": "After running the marathon, she was ______ tired and slept for ten hours.",
+      "enunciado": "Choose the option that best completes the sentence.",
+      "opciones": [
+        "extremely",
+        "hardly",
+        "rarely",
+        "nearly"
+      ],
+      "correcta": 0,
+      "explicacion": "El contexto («durmió diez horas») pide un intensificador fuerte, y «extremely tired» significa «extremadamente cansada». El resto de la oración es la pista que decide.",
+      "trampa": "El distractor «hardly» se parece a «hard» (duro) y muchos lo leen como «muy». En realidad significa «apenas» o «casi no», así que «hardly tired» diría lo contrario de lo que la oración necesita."
+    },
+    {
+      "id": "ING-014",
+      "competencia": "Uso del idioma en contexto",
+      "componente": "Vocabulario en contexto",
+      "tema": "Colocaciones con make y do",
+      "dificultad": 3,
+      "contexto": "I need to ______ an appointment with the dentist for next Monday.",
+      "enunciado": "Choose the option that best completes the sentence.",
+      "opciones": [
+        "do",
+        "make",
+        "take",
+        "put"
+      ],
+      "correcta": 1,
+      "explicacion": "En inglés la cita se «hace» con «make»: «make an appointment». Estas combinaciones fijas se llaman colocaciones y no siguen una regla lógica: se aprenden de memoria en bloque (make a decision, do homework, take a shower).",
+      "trampa": "El distractor «do» es el que escoge quien traduce «hacer» literalmente. «Do» se usa para tareas y trabajos (do the dishes, do homework); «make» para lo que se crea o se acuerda."
+    },
+    {
+      "id": "ING-015",
+      "competencia": "Uso del idioma en contexto",
+      "componente": "Vocabulario en contexto",
+      "tema": "Conectores de causa",
+      "dificultad": 4,
+      "contexto": "The flight was delayed ______ the heavy rain over the airport.",
+      "enunciado": "Choose the option that best completes the sentence.",
+      "opciones": [
+        "because",
+        "so that",
+        "because of",
+        "although"
+      ],
+      "correcta": 2,
+      "explicacion": "«Because of» va seguido de un sustantivo («the heavy rain»), mientras que «because» exige una oración completa con sujeto y verbo («because it was raining»). Lo que sigue al espacio decide cuál va.",
+      "trampa": "El distractor «because» es correcto en significado y por eso se marca casi siempre. La diferencia es puramente gramatical: mira si después viene un sustantivo o una oración completa antes de escoger."
+    },
+    {
+      "id": "ING-016",
+      "competencia": "Comprensión de textos largos",
+      "componente": "Texto informativo",
+      "tema": "Idea general de un texto",
+      "dificultad": 3,
+      "contexto": "Read the text.\n\n**The Lost City**\n\nDeep in the Sierra Nevada de Santa Marta, in northern Colombia, lies an archaeological site known as Ciudad Perdida, or the Lost City. It was built by the Tayrona people around 800 AD, which makes it roughly 650 years older than Machu Picchu. The site was abandoned during the Spanish conquest and remained hidden by the jungle until 1972, when a group of treasure hunters found its stone stairway by accident.\n\nToday the only way to reach the city is on foot. The trek takes four days and covers about 46 kilometres through humid forest, with several river crossings. Visitors must go with an authorised guide, and the indigenous communities that still live in the area close the path for one month every year so that the site can rest.\n\nTourism has brought income to nearby villages, but it has also brought concern. Local leaders argue that the mountain is sacred and that the number of visitors should stay limited, even if that means earning less money.",
+      "enunciado": "What is the text mainly about?",
+      "opciones": [
+        "The history of the Spanish conquest in Colombia.",
+        "How to become an authorised tourist guide.",
+        "The best hiking routes in South America.",
+        "An ancient site in Colombia and the debate about its tourism."
+      ],
+      "correcta": 3,
+      "explicacion": "El texto presenta Ciudad Perdida, explica cómo se llega y termina con la discusión sobre cuántos visitantes debería recibir. La idea principal tiene que cubrir el texto completo, incluido el último párrafo.",
+      "trampa": "El distractor de la conquista española toma un dato que aparece en una sola línea y lo convierte en el tema. Un dato mencionado de paso casi nunca es la idea principal."
+    },
+    {
+      "id": "ING-017",
+      "competencia": "Comprensión de textos largos",
+      "componente": "Texto informativo",
+      "tema": "Detalle específico",
+      "dificultad": 3,
+      "contexto": "Read the text.\n\n**The Lost City**\n\nDeep in the Sierra Nevada de Santa Marta, in northern Colombia, lies an archaeological site known as Ciudad Perdida, or the Lost City. It was built by the Tayrona people around 800 AD, which makes it roughly 650 years older than Machu Picchu. The site was abandoned during the Spanish conquest and remained hidden by the jungle until 1972, when a group of treasure hunters found its stone stairway by accident.\n\nToday the only way to reach the city is on foot. The trek takes four days and covers about 46 kilometres through humid forest, with several river crossings. Visitors must go with an authorised guide, and the indigenous communities that still live in the area close the path for one month every year so that the site can rest.\n\nTourism has brought income to nearby villages, but it has also brought concern. Local leaders argue that the mountain is sacred and that the number of visitors should stay limited, even if that means earning less money.",
+      "enunciado": "According to the text, how was the Lost City rediscovered?",
+      "opciones": [
+        "A group of treasure hunters found it by chance.",
+        "The Tayrona people showed it to archaeologists.",
+        "It was found during the construction of a road.",
+        "Scientists located it using satellite images."
+      ],
+      "correcta": 0,
+      "explicacion": "El texto dice: «remained hidden by the jungle until 1972, when a group of treasure hunters found its stone stairway by accident». «By accident» equivale a «by chance», por casualidad.",
+      "trampa": "El distractor de los satélites suena moderno y verosímil, pero el texto da una fecha, 1972, y una forma concreta de hallazgo. Ubica primero el dato en el texto y después compara con las opciones."
+    },
+    {
+      "id": "ING-018",
+      "competencia": "Comprensión de textos largos",
+      "componente": "Texto informativo",
+      "tema": "Comprensión de cifras en un texto",
+      "dificultad": 4,
+      "contexto": "Read the text.\n\n**The Lost City**\n\nDeep in the Sierra Nevada de Santa Marta, in northern Colombia, lies an archaeological site known as Ciudad Perdida, or the Lost City. It was built by the Tayrona people around 800 AD, which makes it roughly 650 years older than Machu Picchu. The site was abandoned during the Spanish conquest and remained hidden by the jungle until 1972, when a group of treasure hunters found its stone stairway by accident.\n\nToday the only way to reach the city is on foot. The trek takes four days and covers about 46 kilometres through humid forest, with several river crossings. Visitors must go with an authorised guide, and the indigenous communities that still live in the area close the path for one month every year so that the site can rest.\n\nTourism has brought income to nearby villages, but it has also brought concern. Local leaders argue that the mountain is sacred and that the number of visitors should stay limited, even if that means earning less money.",
+      "enunciado": "According to the text, Ciudad Perdida",
+      "opciones": [
+        "can be reached by car in four hours.",
+        "is about 650 years older than Machu Picchu.",
+        "was built after the Spanish conquest.",
+        "is closed to visitors for six months a year."
+      ],
+      "correcta": 1,
+      "explicacion": "El texto afirma que fue construida hacia el año 800 d. C., «which makes it roughly 650 years older than Machu Picchu». Las demás opciones contradicen datos explícitos: se llega a pie, fue abandonada durante la conquista y el cierre es de un mes al año.",
+      "trampa": "El distractor del cierre de seis meses cambia una cifra que sí está en el texto («one month every year»). El examen suele alterar números reales del texto: verifica cada cifra volviendo al párrafo."
+    },
+    {
+      "id": "ING-019",
+      "competencia": "Comprensión de textos largos",
+      "componente": "Texto informativo",
+      "tema": "Punto de vista del autor",
+      "dificultad": 5,
+      "contexto": "Read the text.\n\n**The Lost City**\n\nDeep in the Sierra Nevada de Santa Marta, in northern Colombia, lies an archaeological site known as Ciudad Perdida, or the Lost City. It was built by the Tayrona people around 800 AD, which makes it roughly 650 years older than Machu Picchu. The site was abandoned during the Spanish conquest and remained hidden by the jungle until 1972, when a group of treasure hunters found its stone stairway by accident.\n\nToday the only way to reach the city is on foot. The trek takes four days and covers about 46 kilometres through humid forest, with several river crossings. Visitors must go with an authorised guide, and the indigenous communities that still live in the area close the path for one month every year so that the site can rest.\n\nTourism has brought income to nearby villages, but it has also brought concern. Local leaders argue that the mountain is sacred and that the number of visitors should stay limited, even if that means earning less money.",
+      "enunciado": "What is the main concern of the local leaders mentioned in the text?",
+      "opciones": [
+        "That tourists do not pay enough for the trek.",
+        "That the trek is too dangerous for visitors.",
+        "That too many visitors could harm a sacred place.",
+        "That the guides are not properly trained."
+      ],
+      "correcta": 2,
+      "explicacion": "El último párrafo lo dice: los líderes sostienen que la montaña es sagrada y que el número de visitantes debe mantenerse limitado, «even if that means earning less money». Su preocupación es proteger el lugar, no cobrar más.",
+      "trampa": "El distractor de que «los turistas no pagan lo suficiente» es lo contrario de lo que plantea el texto: los líderes están dispuestos a ganar MENOS. Ojo con las opciones que invierten la postura de quien habla."
+    },
+    {
+      "id": "ING-020",
+      "competencia": "Uso del idioma en contexto",
+      "componente": "Gramática en contexto",
+      "tema": "Presente perfecto con since",
+      "dificultad": 4,
+      "contexto": "My family ______ in Bucaramanga since 2019, and we are still living there.",
+      "enunciado": "Choose the option that best completes the sentence.",
+      "opciones": [
+        "lived",
+        "is living",
+        "will live",
+        "has lived"
+      ],
+      "correcta": 3,
+      "explicacion": "«Since 2019» marca una acción que empezó en el pasado y continúa hasta hoy, y eso en inglés se expresa con presente perfecto: «has lived». La segunda parte de la oración confirma que siguen viviendo allí.",
+      "trampa": "El distractor «lived» (pasado simple) se usaría si la acción ya hubiera terminado, como en «We lived there in 2019». La palabra «since» es la señal que obliga al presente perfecto."
+    },
+    {
+      "id": "ING-021",
+      "competencia": "Uso del idioma en contexto",
+      "componente": "Gramática en contexto",
+      "tema": "Comparativos",
+      "dificultad": 3,
+      "contexto": "Cartagena is much ______ than Bogotá, so people wear light clothes there.",
+      "enunciado": "Choose the option that best completes the sentence.",
+      "opciones": [
+        "hotter",
+        "hot",
+        "hottest",
+        "more hot"
+      ],
+      "correcta": 0,
+      "explicacion": "La palabra «than» indica una comparación entre dos elementos, y los adjetivos cortos forman el comparativo con «-er»: hot se vuelve «hotter» (se dobla la t). «Hottest» sería el superlativo, para comparar contra todos.",
+      "trampa": "El distractor «more hot» aplica la regla de los adjetivos largos a uno corto. La regla práctica: una sílaba lleva «-er»; tres o más llevan «more»."
+    },
+    {
+      "id": "ING-022",
+      "competencia": "Uso del idioma en contexto",
+      "componente": "Gramática en contexto",
+      "tema": "Primer condicional",
+      "dificultad": 4,
+      "contexto": "If it ______ tomorrow, we will cancel the trip to the lake.",
+      "enunciado": "Choose the option that best completes the sentence.",
+      "opciones": [
+        "will rain",
+        "rains",
+        "rained",
+        "would rain"
+      ],
+      "correcta": 1,
+      "explicacion": "En el primer condicional, la parte del «if» va en presente simple y la otra en futuro con «will», aunque las dos hablen del futuro: «If it rains…, we will cancel…». Es una de las reglas más preguntadas del examen.",
+      "trampa": "El distractor «will rain» es el error más común, porque la oración habla de mañana y uno quiere poner futuro en las dos partes. Después de «if» nunca va «will» en este tipo de condicional."
+    }
+  ]
+}

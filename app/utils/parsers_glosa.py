@@ -21,6 +21,18 @@ import re
 from typing import Optional
 
 
+def _pesos(valor) -> str:
+    """`2072200` → `$2.072.200`. Punto de miles, como se escribe en Colombia.
+
+    21-08-2026. Acá se escribía `f"{_pesos(x)}"`, que produce `$2,072,200` — con
+    COMA. En Colombia la coma es el separador decimal: eso se lee como dos con
+    setenta y dos milésimas. Yesid lo vio en el panel de tarifa pactada y en la
+    línea de «Valor en disputa». Una cifra mal escrita en una respuesta de
+    glosa es una discusión que nadie quiere tener con la EPS.
+    """
+    return "$" + f"{int(round(float(valor or 0))):,}".replace(",", ".")
+
+
 def _detectar_servicio_desde_texto(texto_glosa: str, contexto_pdf: str = "") -> Optional[str]:
     """Intenta extraer el nombre del servicio/procedimiento y el CUPS desde el texto
     de la glosa y/o los soportes adjuntos.
@@ -32,9 +44,25 @@ def _detectar_servicio_desde_texto(texto_glosa: str, contexto_pdf: str = "") -> 
         return None
     fuente = f"{texto_glosa}\n{contexto_pdf}".upper()
 
-    # 1. Buscar CUPS (código numérico de 5-6 dígitos)
-    cups_match = re.search(r"\b(\d{5,6})\b", fuente)
-    cups = cups_match.group(1) if cups_match else None
+    # 1. Buscar CUPS — reusando el extractor endurecido de este mismo módulo.
+    #
+    # 20-08-2026 (caso real de Yesid, COMPAÑIA MUNDIAL DE SEGUROS). Acá vivía
+    # un `re.search(r"\b(\d{5,6})\b", fuente)` a secas: CUALQUIER número de
+    # 5-6 dígitos quedaba como CUPS. La glosa decía "SO5801 - ausencia total de
+    # soporte de la curacion, VALOR GLOSADO 100000" y el dictamen se radicaba
+    # afirmando «SERVICIO FACTURADO CUPS 100000» — cien mil pesos convertidos
+    # en un código de procedimiento.
+    #
+    # Había DOS extractores de CUPS en este archivo: `_extraer_cups_servicio`,
+    # endurecido durante meses (descarta códigos de glosa, fechas sueltas,
+    # fechas yyyymmdd, números de factura HUS/FE/FAC, colas de contratos como
+    # "…-04958" y montos), y este de una línea, sin ningún filtro. El dictamen
+    # que se radica ante la EPS usaba el de una línea.
+    #
+    # No se reescribe nada: se borra el duplicado y se apunta al bueno, así los
+    # filtros que ya se ganaron a punta de errores reales valen también acá.
+    cups, _desc_ignorada = _extraer_cups_servicio(texto_glosa, contexto_pdf)
+    cups = cups or None
 
     # 2. Buscar una descripción de servicio después de palabras clave comunes
     desc = None
@@ -245,7 +273,7 @@ def _facturado_linea_cups(texto: str, cups: str) -> float:
 
     # Filtrar ceros ($0,00) y quedarnos con valores significativos.
     def _tof(s):
-        s = re.sub(r"[^\d,\.]", "", s)
+        s = re.sub(r"[^\d,\.]", "", s).strip(".,")  # ronda 30: recorta puntuación colgante
         if "," in s and "." in s:
             if s.rfind(",") > s.rfind("."):
                 s = s.replace(".", "").replace(",", ".")
@@ -296,6 +324,9 @@ def _extraer_valores_glosa(texto: str, cups: Optional[str] = None) -> dict:
         if not raw:
             return 0.0
         s = re.sub(r"[^\d,\.]", "", raw)
+        # Ronda 30: puntuación pegada al monto ("$114.900,00,") dejaba una
+        # coma/punto colgando que rompía el parseo → 0. Se recorta.
+        s = s.strip(".,")
         if not s:
             return 0.0
         # Normalizar formato COP: si hay ambos . y , tratar como miles/decimal
@@ -329,7 +360,9 @@ def _extraer_valores_glosa(texto: str, cups: Optional[str] = None) -> dict:
         r"FACTURAD[OA]S?\s+(?:POR\s+(?:\w+\s+){0,3})?\$?\s*([\d][\d\.,]{3,})",
         r"VALOR\s+(?:UNITARIO\s+)?FACTURADO[:\s]+(?:POR\s+(?:\w+\s+){0,3})?\$?\s*([\d][\d\.,]{3,})",
         r"COBRAD[OA]\s+(?:POR\s+(?:\w+\s+){0,3})?\$?\s*([\d][\d\.,]{3,})",
-        r"FACTURA[:\s]+\$?\s*([\d][\d\.,]{3,})",
+        # Ronda 30: '$' OBLIGATORIO — sin él "FACTURA 90228637" capturaba el
+        # NÚMERO de factura como valor facturado ($90.228.637).
+        r"FACTURA[:\s]+\$\s*([\d][\d\.,]{3,})",
     ]
     patrones_rec = [
         # Patrón Famisanar/similar: "VALOR UNITARIO CONTRATADO PARA LA FECHA
@@ -379,6 +412,49 @@ def _extraer_valores_glosa(texto: str, cups: Optional[str] = None) -> dict:
     }
 
 
+def extraer_aceptacion_ips(texto: str, valor_objetado: float = 0.0) -> float:
+    """Lo que el propio hospital declara ACEPTAR dentro del texto de la glosa.
+
+    Prueba real del 05-08-2026. El texto decía: «SE OBJETA LA TOTALIDAD DE
+    $2.100.000 POR FALTA DE AUTORIZACIÓN. LA IPS ACEPTA $340.000
+    CORRESPONDIENTES A DOS INSUMOS NO SOPORTADOS Y CONTROVIERTE EL RESTO».
+    El motor recomendó DEFENDER EL 100%: nadie leía esa frase. La aceptación
+    parcial existía en el sistema, pero solo se activaba si el auditor
+    escribía el monto en el formulario.
+
+    Devuelve 0.0 cuando no hay señal, y también cuando el monto declarado
+    iguala o supera lo objetado —eso ya no es parcial, es aceptación total,
+    y esa decisión no se infiere de un texto—.
+
+    OJO: esto es una SEÑAL, no una decisión. Quien mueve la plata es el
+    auditor con el campo «Valor aceptado»; el sistema solo avisa. Mismo
+    criterio que la extemporaneidad inferida del texto.
+    """
+    if not texto:
+        return 0.0
+    t = texto.upper()
+    patrones = (
+        r"(?:LA\s+)?(?:IPS|E\.?S\.?E\.?|HUS|INSTITUCION|INSTITUCIÓN|PRESTADOR)\s+"
+        r"ACEPTA(?:MOS)?\b[^$\d]{0,60}\$?\s*([\d][\d\.,]{3,})",
+        r"SE\s+ACEPTA(?:N)?\s+PARCIALMENTE\b[^$\d]{0,60}\$?\s*([\d][\d\.,]{3,})",
+        r"ACEPTA(?:MOS)?\s+(?:EL\s+VALOR\s+DE|LA\s+SUMA\s+DE|PARCIALMENTE)\s*"
+        r"\$?\s*([\d][\d\.,]{3,})",
+    )
+    from app.utils.moneda import parse_valor_cop
+
+    for pat in patrones:
+        m = re.search(pat, t)
+        if not m:
+            continue
+        try:
+            valor = parse_valor_cop(m.group(1))
+        except Exception:
+            continue
+        if valor > 0 and (valor_objetado <= 0 or valor < valor_objetado):
+            return valor
+    return 0.0
+
+
 def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
     """Construye un banner HTML con los datos de la tarifa pactada y
     la recomendación de acción para el auditor. Se prepend al dictamen.
@@ -411,11 +487,11 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
     if tipo == "SOAT_PORCENTAJE":
         signo = "+" if factor > 0 else ""
         if val_pact > 0:
-            pact_txt = f"SOAT {signo}{factor:.0f}% (pactado ${val_pact:,.0f})"
+            pact_txt = f"SOAT {signo}{factor:.0f}% (pactado {_pesos(val_pact)})"
         else:
             pact_txt = f"SOAT {signo}{factor:.0f}% (SOAT base no cargado)"
     else:
-        pact_txt = f"${val_pact:,.0f}"
+        pact_txt = f"{_pesos(val_pact)}"
 
     import html as _html
 
@@ -425,17 +501,23 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
     filas_tabla = [
         ("Tarifa pactada en contrato", f'<b style="color:#059669;">{pact_txt}</b>'),
     ]
-    if val_fact > 0:
-        filas_tabla.append(("Valor facturado HUS", f"${val_fact:,.0f}"))
+    # LO QUE FALTA TAMBIEN SE MUESTRA (24-08-2026). Antes, cuando un valor
+    # llegaba en cero, la fila simplemente no se pintaba. Y en este motor el
+    # cero no significa "cero pesos": significa "no se pudo leer la cifra".
+    # Asi que el auditor veia la caja verde con "Tarifa pactada $915.051" y
+    # "Defender 100%" sin ver de donde salia esa conclusion — porque el dato
+    # que la origino era justamente el que estaba escondido. Paso en el
+    # dictamen GL-204. Ahora la fila se pinta igual y dice que falta.
+    _FALTA = '<span style="color:#b45309;">no registrado en el caso</span>'
+    filas_tabla.append(("Valor facturado HUS", _pesos(val_fact) if val_fact > 0 else _FALTA))
     if val_rec > 0:
-        filas_tabla.append(("Valor reconocido EPS", f"${val_rec:,.0f}"))
-    if val_obj > 0:
-        filas_tabla.append(
-            (
-                "Valor objetado EPS",
-                f'<b style="color:#b91c1c;">${val_obj:,.0f}</b>',
-            )
+        filas_tabla.append(("Valor reconocido EPS", f"{_pesos(val_rec)}"))
+    filas_tabla.append(
+        (
+            "Valor objetado EPS",
+            f'<b style="color:#b91c1c;">{_pesos(val_obj)}</b>' if val_obj > 0 else _FALTA,
         )
+    )
 
     tabla_html = (
         '<table style="width:100%;border-collapse:collapse;font-size:.85rem;'
@@ -455,6 +537,23 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
         )
     tabla_html += "</table>"
 
+    # EL AVISO DE MODALIDAD, DONDE EL GESTOR LO VEA (24-08-2026). Cuando la
+    # fila del catálogo se contradice a sí misma —la modalidad anuncia un
+    # descuento y la fila lo declara en cero— no se puede saber si el valor
+    # guardado ya lo trae aplicado. Es lo que produjo la contradicción entre
+    # expedientes que encontró la auditoría: el mismo contrato y el mismo CUPS
+    # leídos como «SOAT pleno» en uno y «SOAT −15 %» en otros dos. El dictamen
+    # ya deja de afirmar la modalidad; acá se le dice al gestor por qué.
+    aviso_html = ""
+    _aviso = (info_tarifa.get("aviso_modalidad") or "").strip()
+    if _aviso:
+        aviso_html = (
+            '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;'
+            'padding:.55rem .7rem;margin-bottom:.6rem;font-size:.8rem;color:#92400e;">'
+            "⚠️ <b>Revise la modalidad antes de radicar.</b> " + esc(_aviso) + "</div>"
+        )
+    tabla_html += aviso_html
+
     # Interpretación SOAT base (si aplica)
     interp_html = ""
     if tipo == "SOAT_PORCENTAJE":
@@ -466,10 +565,10 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
                 "font-size:.82rem;color:#1e3a8a;margin-bottom:.5rem;"
                 'border-left:3px solid #3b82f6;">'
                 "<b>🔍 Interpretación SOAT base del CUPS (calculada):</b><br>"
-                f"• <b>HUS</b>: asumiendo ${val_fact:,.0f} × {1 + factor / 100:.3f} "
-                f"→ SOAT base = <b>${soat_hus:,.0f}</b><br>"
-                f"• <b>EPS</b>: asumiendo ${val_rec:,.0f} × {1 + factor / 100:.3f} "
-                f"→ SOAT base = <b>${soat_eps:,.0f}</b><br>"
+                f"• <b>HUS</b>: asumiendo {_pesos(val_fact)} × {1 + factor / 100:.3f} "
+                f"→ SOAT base = <b>{_pesos(soat_hus)}</b><br>"
+                f"• <b>EPS</b>: asumiendo {_pesos(val_rec)} × {1 + factor / 100:.3f} "
+                f"→ SOAT base = <b>{_pesos(soat_eps)}</b><br>"
                 "→ Verificar el valor SOAT oficial del CUPS en el <i>Manual "
                 "Tarifario SOAT 2026 — Circular Externa 047 de 2025 MinSalud "
                 "(UVB 2026 = $12.110)</i>. Fórmula: valor_pesos = Tarifa_UVB × "
@@ -508,7 +607,9 @@ def _generar_banner_tarifa_html(info_tarifa: dict) -> str:
 """
 
 
-def _extraer_cups_servicio(texto_glosa: str, contexto_pdf: str = "") -> tuple[str, str]:
+def _extraer_cups_servicio(
+    texto_glosa: str, contexto_pdf: str = "", montos_excluir=None
+) -> tuple[str, str]:
     """Extrae tupla (CUPS, descripción_servicio) desde el texto de la glosa/PDF.
 
     PRIORIDAD para el CUPS:
@@ -526,7 +627,22 @@ def _extraer_cups_servicio(texto_glosa: str, contexto_pdf: str = "") -> tuple[st
     cups = ""
     # Códigos de glosa (NO son CUPS) — TA0801, SO0101, FA0202, CO0301, etc.
     # Si el regex captura uno de estos, lo descartamos y seguimos buscando.
-    GLOSA_CODES = re.compile(r"^(TA|SO|FA|CO|CL|PE|AU|IN|ME|SE|EX)\d{2,4}$")
+    #
+    # 05-08-2026: la tabla estaba incompleta y por ahí entraba el defecto.
+    # Faltaban DE (devoluciones), RE (códigos de respuesta) y SA (acuerdos),
+    # así que "DE1601 FACTURA DEVUELTA…" dejaba "DE1601" en la ranura del
+    # CUPS ANTES de que la IA escribiera una palabra: después el dictamen
+    # hablaba del «servicio facturado con CUPS DE1601». También entraba la
+    # variante mutilada de una sola letra —"O0201" es "SO0201" al que se le
+    # perdió la S al copiar y pegar—.
+    #
+    # Efecto en cadena, que vale la mitad del arreglo: al quedar el CUPS
+    # vacío, el servicio pasa a «NO IDENTIFICADO» y el prompt vuelve a
+    # encender solo el aviso que ya existía para ese caso.
+    GLOSA_CODES = re.compile(
+        r"^(?:TA|SO|FA|CO|CL|PE|AU|IN|ME|SE|EX|DE|RE|SA)\d{2,4}$"
+        r"|^[A-Z]\d{4}$"
+    )
 
     # Ronda 2 (12-jun-2026): fechas y facturas se colaban como CUPS.
     # Evidencia real: "CUPS 2026-04" (el regex del paso 1 capturaba "2026"
@@ -544,10 +660,66 @@ def _extraer_cups_servicio(texto_glosa: str, contexto_pdf: str = "") -> tuple[st
         r"\b\d{4}-\d{1,2}-\d{1,2}\b|\b\d{1,2}/\d{1,2}/\d{4}\b", texto_glosa or ""
     )
 
+    # 05-08-2026 (OT-006): la glosa de AURORA no traía ningún CUPS y el
+    # dictamen salió con "CUPS 04958" — la cola del contrato que citaba la
+    # propia EPS, "S-13-1-03-1-04958". Un número que vive DENTRO de un código
+    # compuesto por guiones o barras (contratos, actas, radicados) es un
+    # pedazo de ese código, no un procedimiento.
+    CODIGOS_COMPUESTOS = re.compile(r"\b[A-Z0-9]+(?:[-/][A-Z0-9]+){2,}\b", re.IGNORECASE)
+    compuestos_en_texto = [
+        c.upper() for c in CODIGOS_COMPUESTOS.findall(f"{texto_glosa or ''} {contexto_pdf or ''}")
+    ]
+
+    # Ronda 30: montos del formulario (valor objetado/aceptado) que NUNCA
+    # deben confundirse con un CUPS. En glosas sin CUPS explícito, un valor
+    # suelto entre guiones ("... - 149000 - ...") entraba como CUPS "149000".
+    _montos_norm = set()
+    for _m in montos_excluir or ():
+        try:
+            _mi = int(round(float(_m)))
+            if _mi > 0:
+                _montos_norm.add(str(_mi))
+        except (TypeError, ValueError):
+            pass
+
+    # 20-08-2026 (caso real de Yesid, COMPAÑIA MUNDIAL DE SEGUROS): la glosa
+    # decía "SO5801 - existe ausencia total de soporte de la curacion, VALOR
+    # GLOSADO 100000" y el dictamen salió afirmando «SERVICIO FACTURADO CUPS
+    # 100000». Cien mil pesos convertidos en un código de procedimiento.
+    #
+    # El filtro de arriba (montos_excluir) solo cubre las cifras que el gestor
+    # escribió en el formulario. Esta cifra venía DENTRO del texto de la glosa,
+    # y el formulario traía otra distinta ($40.000 aceptados), así que no
+    # coincidía con nada y pasaba derecho.
+    #
+    # Si la propia glosa dice que ese número es plata, es plata. No hay que
+    # adivinarlo: lo dice el renglón.
+    _PALABRA_DE_PLATA = re.compile(
+        r"(?:valor(?:es)?|monto|cuant[íi]a|suma|importe|total|glosad[oa]|"
+        r"objetad[oa]|aceptad[oa]|facturad[oa]|pagad[oa]|descontad[oa]|"
+        r"pesos|cop|\$)\s*(?:de\s+|por\s+|en\s+)?[:\s]*$",
+        re.IGNORECASE,
+    )
+
+    def _lo_llaman_plata(token: str) -> bool:
+        """¿El texto presenta ese número como un valor en pesos?"""
+        for cuerpo in (texto_glosa or "", contexto_pdf or ""):
+            for m in re.finditer(re.escape(token), cuerpo):
+                antes = cuerpo[max(0, m.start() - 40) : m.start()]
+                if _PALABRA_DE_PLATA.search(antes):
+                    return True
+        return False
+
     def _es_cups_valido(token: str) -> bool:
         if not token or GLOSA_CODES.match(token):
             return False
         tu = token.upper()
+        # (0) coincide EXACTO con un valor monetario del caso → es plata, no CUPS
+        if tu in _montos_norm:
+            return False
+        # (0') el propio texto lo presenta como plata ("valor glosado 100000")
+        if _lo_llaman_plata(token):
+            return False
         # (a) fecha "2026-04" / "2026-04-15" y (c) año suelto 19xx/20xx
         if FECHA_COMO_CUPS.match(tu) or ANIO_COMO_CUPS.match(tu):
             return False
@@ -561,6 +733,11 @@ def _extraer_cups_servicio(texto_glosa: str, contexto_pdf: str = "") -> tuple[st
                 return False
         # (d) fragmento de una fecha del texto ("2026-04" ⊂ "2026-04-15")
         if any(tu in f for f in fechas_en_texto):
+            return False
+        # (e) pedazo de un código compuesto: contrato, acta o radicado
+        # ("04958" ⊂ "S-13-1-03-1-04958"). El token completo sí puede serlo
+        # —hay CUPS con sufijo del HUS—, lo que se descarta es el fragmento.
+        if any(tu != c and tu in c for c in compuestos_en_texto):
             return False
         # Debe tener al menos 4 dígitos (CUPS reales son 4-8 dígitos)
         digitos = sum(1 for c in token if c.isdigit())
@@ -635,12 +812,30 @@ def _descripcion_servicio(codigo_glosa: str, texto_glosa: str = "", contexto_pdf
     # Fallback neutro según el tipo de glosa (sin ejemplos entre paréntesis)
     if not codigo_glosa:
         return "AL SERVICIO FACTURADO"
+
+    # 20-08-2026 (caso real de Yesid, COOSALUD). Esta frase entra SIEMPRE en un
+    # dictamen de ACEPTACIÓN —es el único que llama a esta función—, justo
+    # antes del motivo por el que se acepta. Y el motivo dice lo contrario:
+    #
+    #   «ACEPTA GLOSA TOTAL POR VALOR DE $200, CORRESPONDIENTE AL SERVICIO
+    #    CUBIERTO. SE ACEPTA POR CORRESPONDER A UN SERVICIO NO CUBIERTO…»
+    #
+    # Cubierto y no cubierto en el mismo renglón. Lo mismo pasaba en AU
+    # («AL PROCEDIMIENTO AUTORIZADO … SE ACEPTA POR NO ACREDITARSE LA
+    # AUTORIZACIÓN») y en SO («… Y SUS SOPORTES DOCUMENTALES … SE ACEPTA POR
+    # NO APORTARSE EL SOPORTE»).
+    #
+    # El complemento solo tiene que decir a QUÉ se le acepta la glosa. Cuando
+    # el hospital está concediendo que algo falta, no puede afirmar en la misma
+    # frase que ese algo está. Se dejan las descripciones que son un hecho
+    # —el cargo se facturó, el procedimiento se prestó, el medicamento se
+    # dispensó— y se quitan las que califican justo lo que está en discusión.
     prefijo = codigo_glosa[:2].upper()
     return {
         "TA": "AL SERVICIO FACTURADO",
-        "SO": "AL SERVICIO FACTURADO Y SUS SOPORTES DOCUMENTALES",
-        "AU": "AL PROCEDIMIENTO AUTORIZADO",
-        "CO": "AL SERVICIO CUBIERTO",
+        "SO": "AL SERVICIO FACTURADO",
+        "AU": "AL PROCEDIMIENTO FACTURADO",
+        "CO": "AL SERVICIO FACTURADO",
         "CL": "AL PROCEDIMIENTO MÉDICO PRESTADO",
         "PE": "AL PROCEDIMIENTO MÉDICO PRESTADO",
         "FA": "AL CARGO FACTURADO",

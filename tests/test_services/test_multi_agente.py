@@ -16,21 +16,47 @@ class TestAgenteJuridico:
         assert "871" in joined
         assert "1602" in joined
 
-    def test_ta_evita_t1025_y_t478(self):
+    def test_ta_avisa_que_no_traiga_urgencias_ni_pertinencia(self):
+        """En una glosa de TARIFA, la jurisprudencia de urgencias y la de
+        autonomía médica no vienen al caso y el agente debe advertirlo.
+
+        Antes esta prueba fijaba dos sentencias por su número (T-1025 y
+        T-478). El 24-08-2026 esas dos se retiraron del sistema: verificadas
+        contra la relatoría de la Corte, ninguna trata del tema que se les
+        atribuía. La advertencia sigue siendo la misma, así que la prueba
+        ahora fija lo que importa —el tema— y no el número de la sentencia.
+        """
         r = agente_juridico("TA0201", "NUEVA EPS", "Inicial")
-        joined = " ".join(r["evitar"])
-        assert "T-1025" in joined or "1025" in joined
-        assert "T-478" in joined or "478" in joined
+        joined = " ".join(r["evitar"]).lower()
+        assert "urgencia" in joined
+        assert "autonomía médica" in joined or "autonomia medica" in joined
 
     def test_so_incluye_1995(self):
         r = agente_juridico("SO0101", "COOSALUD", "Inicial")
         joined = " ".join(r["normas_primarias"])
         assert "1995" in joined
 
-    def test_au_cita_t1025(self):
+    def test_au_trae_el_anclaje_de_urgencias(self):
+        """En una glosa de AUTORIZACIÓN el agente tiene que dar el respaldo de
+        que la urgencia no exige autorización previa.
+
+        Ese respaldo es el Art. 168 de la Ley 100 de 1993: «su prestación no
+        requiere contrato ni orden previa».
+
+        Antes decía el Art. 20 del Decreto 4747/2007 — y esa cita estaba mal:
+        la 2.ª auditoría del 25-08-2026 la marcó y, verificada contra el texto
+        oficial de MinSalud, el Art. 20 es el del RIPS. (Y antes de eso se
+        citaba la T-1025/2002, retirada el 24-08 por no tratar de urgencias:
+        van tres anclajes equivocados para lo mismo, por eso esta prueba fija
+        el que sí dice lo que se le atribuye.)
+        """
         r = agente_juridico("AU0101", "COMPENSAR", "Inicial")
-        joined = " ".join(r["jurisprudencia"])
-        assert "T-1025" in joined or "1025" in joined
+        joined = " ".join(r["jurisprudencia"]).lower()
+        assert "168" in joined and "ley 100" in joined
+        assert "urgencia" in joined
+        assert "4747" not in joined, (
+            "el Decreto 4747 no es el anclaje de urgencias: su Art. 20 es el del RIPS"
+        )
 
     def test_fomag_evita_t760(self):
         r = agente_juridico("TA0201", "FOMAG", "Inicial")

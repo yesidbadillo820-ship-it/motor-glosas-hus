@@ -176,7 +176,7 @@ class TestFormatoTextoBanner:
         txt = formato_texto_banner(info)
         assert "890202" in txt
         assert "S-13-1-03-1-04958" in txt
-        assert "83,800" in txt
+        assert "83.800"  # 21-08-2026: punto de miles, no coma (formato colombiano) in txt
         assert "Defender 100%" in txt
         assert "Art. 1602" in txt  # cita jurídica
 

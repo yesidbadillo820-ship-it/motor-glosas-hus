@@ -11,13 +11,14 @@ Extraído de app/main.py (era ~365 LOC). Maneja:
 
 import os
 import re
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
-from app.api.deps import get_usuario_actual
+from app.api.deps import get_usuario_actual, get_auditor_o_superior
 from app.core.config import get_settings
 from app.core.logging_utils import logger, set_request_id
 from app.core.rate_limit import limiter
@@ -27,7 +28,12 @@ from app.models.schemas import GlosaInput, GlosaResult
 from app.repositories.contrato_repository import ContratoRepository
 from app.repositories.glosa_repository import GlosaRepository
 from app.services.glosa_ia_prompts import get_contrato
-from app.services.glosa_service import GlosaService
+from app.services.glosa_service import (
+    DictamenSinArgumentoError,
+    GlosaService,
+    IANoDisponibleError,
+    texto_con_error_de_proveedor,
+)
 from app.utils.moneda import parse_valor_cop
 from app.utils.parsers_glosa import (
     _concepto_glosa,
@@ -50,6 +56,119 @@ MAX_CHARS_POR_SOPORTE = 5_000
 # Tipos prioritarios de soportes (orden de preferencia):
 # HEV (historia clínica) > RIPS > FEV (factura electrónica) > el resto.
 PRIORIDAD_TIPOS_SOPORTE = ["HEV", "RIPS", "FEV", "OPF", "PDE", "PDX", "CRC", "AD"]
+
+
+def _inventario_de_soportes(numero_factura: Optional[str], req_id: str) -> str:
+    """La lista EXACTA de soportes del expediente, para el prompt del dictamen.
+
+    19-08-2026, segunda vuelta. La tabla «RELACIÓN DE SOPORTES APORTADOS» ya
+    sale del expediente real, pero la ARGUMENTACIÓN —que es el texto que se
+    radica— seguía inventando. En la factura HUS468334, respondiendo una glosa
+    por «ausencia de soportes de la CONSULTA DE URGENCIAS», la IA escribió:
+
+        «LA FACTURA HUS468334 INCLUYE LA FACTURA ELECTRÓNICA, AUTORIZACIÓN
+         PREVIA, EPICRISIS, ..., DESCRIPCIÓN QUIRÚRGICA, RIPS JSON Y CUV»
+
+    Ni la autorización previa ni la descripción quirúrgica están en ese
+    expediente — y era una consulta de urgencias, no hubo cirugía. El propio
+    dictamen se contradecía: el texto afirmaba documentos que su tabla no
+    listaba. Si la EPS lo revisa, la glosa se ratifica.
+
+    El prompt ya prohíbe inventar normas y estimar tarifas, pero no decía nada
+    de los soportes. En vez de tocar el prompt global, se le pasa el inventario
+    verificado como DATO DEL CASO, que es lo que es.
+
+    Devuelve "" si no hay factura o no hay expediente indexado — y ahí el
+    dictamen no puede afirmar nada, que es lo correcto.
+    """
+    if not numero_factura:
+        return ""
+    try:
+        from app.services.soportes_autodiscovery_service import get_indexer
+
+        soportes = get_indexer().lookup(numero_factura) or []
+    except Exception as e:  # noqa: BLE001 - sin índice se sigue, solo sin lista
+        logger.warning(f"[{req_id}] No se pudo listar soportes para el prompt: {e}")
+        return ""
+    if not soportes:
+        return ""
+
+    from app.services.glosa_service import GlosaService
+
+    nombres: list[str] = []
+    for sop in soportes:
+        documento = GlosaService._MARCO_LEGAL_SOPORTE.get(sop.get("tipo") or "", (None,))[0]
+        etiqueta = (
+            f"{documento} ({sop.get('nombre_archivo')})"
+            if documento
+            else str(sop.get("nombre_archivo") or "")
+        )
+        if etiqueta and etiqueta not in nombres:
+            nombres.append(etiqueta)
+
+    listado = "\n".join(f"  {i}. {n}" for i, n in enumerate(nombres, 1))
+    return (
+        "═══ SOPORTES QUE DE VERDAD OBRAN EN EL EXPEDIENTE ═══\n"
+        f"Verificado en el servidor de radicación para la factura {numero_factura}. "
+        f"Son estos {len(nombres)}, ni uno más:\n"
+        f"{listado}\n\n"
+        "REGLA DE ESTE CASO: cuando enumeres los soportes aportados, nombra "
+        "ÚNICAMENTE los de esta lista, con estas palabras. NO menciones ningún "
+        "otro documento —ni autorización previa, ni descripción quirúrgica, ni "
+        "registro anestésico, ni ningún otro— porque NO se aportó. Afirmar que "
+        "se remitió un documento que no está es lo que hace que la EPS ratifique "
+        "la glosa.\n"
+        "═══ FIN DEL INVENTARIO ═══\n"
+    )
+
+
+async def _pdfs_del_servidor_para_forense(
+    numero_factura: Optional[str],
+    req_id: str,
+) -> list[tuple[str, bytes]]:
+    """Los PDF del expediente de la factura, en crudo, para el auditor forense.
+
+    19-08-2026. Yesid: «que el auditor forense esté anclado en analizar glosa,
+    porque es exactamente lo que se le pide que haga».
+
+    El pre-pass forense ya existía, pero solo miraba los PDF que el auditor
+    subía a mano. Los soportes que el indexador encuentra en el servidor de
+    radicación se leían como TEXTO plano y nunca llegaban al forense — que es
+    justo el que sabe citar folios. Con esto, responder una glosa de una
+    factura radicada ya no depende de que alguien busque los PDF y los adjunte.
+
+    Devuelve lista vacía —nunca revienta— si no hay factura, no hay índice o
+    no hay ningún PDF legible.
+    """
+    if not numero_factura:
+        return []
+    try:
+        from app.services.auditor_forense import escoger_soportes_para_forense
+        from app.services.soportes_autodiscovery_service import get_indexer
+
+        soportes = get_indexer().lookup(numero_factura) or []
+    except Exception as e:  # noqa: BLE001 - sin soportes se sigue, solo sin folios
+        logger.warning(f"[{req_id}] Indexador soportes no disponible para forense: {e}")
+        return []
+    if not soportes:
+        return []
+
+    elegidos, omitidos = escoger_soportes_para_forense(soportes)
+    crudos: list[tuple[str, bytes]] = []
+    for sop in elegidos:
+        try:
+            if os.path.getsize(sop["ruta"]) > MAX_BYTES_PDF:
+                continue
+            with open(sop["ruta"], "rb") as fh:
+                crudos.append((sop.get("nombre_archivo") or "soporte.pdf", fh.read()))
+        except OSError as e:
+            logger.warning(f"[{req_id}] No se pudo leer {sop.get('ruta')}: {e}")
+    if crudos:
+        logger.info(
+            f"[{req_id}] Forense: {len(crudos)} PDF del servidor "
+            f"({len(omitidos)} sin abrir de {len(soportes)} soportes)"
+        )
+    return crudos
 
 
 async def _extraer_soportes_del_servidor(
@@ -250,6 +369,20 @@ def _obtener_few_shots(
         tabla_excel.upper(),
     )
     cod_pref = codigo_match.group(0) if codigo_match else ""
+
+    # A una ARL no se le sirven respuestas ganadoras del régimen de salud.
+    # 05-08-2026: la glosa de POSITIVA por accidente de trabajo salió
+    # argumentada con Ley 1438, Resolución 2284 y «plan de beneficios» —
+    # marco del SGSSS— pese a que el motor tiene un bloque ARL correcto.
+    # Una de las razones era esta: cuando no hay plantilla de esa
+    # aseguradora, el banco cae a las genéricas, y esas están escritas para
+    # EPS (PBS, UPC). El modelo copia el ejemplo que tiene delante. Mejor
+    # sin ejemplo que con ejemplo del régimen equivocado.
+    from app.services.glosa_ia_prompts import _es_pagador_arl
+
+    if _es_pagador_arl(eps, tabla_excel):
+        return [], [], cod_pref
+
     plantillas_gold = (
         obtener_few_shot(db, eps=eps, codigo_glosa=cod_pref, limite=2) if cod_pref else []
     )
@@ -295,7 +428,9 @@ def _agregar_banner_tarifa_post(
     es_ta = (resultado.codigo_glosa or "").upper().startswith("TA")
     if not es_ta:
         return
-    cups_ext, _ = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+    cups_ext, _ = _extraer_cups_servicio(
+        tabla_excel or "", contexto_pdf, montos_excluir=[val_obj, val_ac]
+    )
     if not cups_ext:
         return
     try:
@@ -338,7 +473,7 @@ def _agregar_banner_tarifa_post(
                         "titulo": "✅ Valor oficial HUS/SOAT conocido — defender",
                         "razon": (
                             f"El valor oficial publicado para este CUPS es "
-                            f"${oficial['valor_pactado']:,.0f} según {oficial['contrato_numero']}. "
+                            f"{_pesos_col(oficial['valor_pactado'])} según {oficial['contrato_numero']}. "
                             "Defender este valor citando la norma institucional."
                         ),
                         "valor_a_defender": val_obj,
@@ -377,6 +512,70 @@ def _decidir_estado_y_codigo(
     return val_obj, "RADICADA", None, None
 
 
+# ─── Por qué se acepta una glosa ─────────────────────────────────────────────
+#
+# 20-08-2026. Yesid respondió una glosa «FA0102 — se glosa insumo no facturable
+# dentro de estancias», la aceptó, y el documento que se radica salió diciendo:
+#
+#   «ESE HUS ACEPTA GLOSA TOTAL POR VALOR DE $10.000 … ESTO CORRESPONDE A UN
+#    MAYOR VALOR COBRADO SEGÚN CONTRATO S-13-1-03-1-04958 PACTADO ENTRE LAS
+#    PARTES. SE AJUSTAN LOS VALORES DANDO CUMPLIMIENTO A ESTAS TARIFAS.»
+#
+# «Mayor valor cobrado» es un motivo de TARIFA. La glosa no era de tarifa: era
+# de facturación —un insumo que no se cobra aparte porque ya va dentro de la
+# estancia—. El texto estaba escrito a mano, igual para TODAS las causales, así
+# que en cualquier glosa que no fuera TA el hospital estaba radicando un motivo
+# que no corresponde. Y citaba un número de contrato que ahí no venía al caso.
+#
+# Cada familia dice lo suyo, y ninguna afirma nada que no se pueda sostener.
+_MOTIVO_ACEPTACION: dict[str, str] = {
+    "TA": (
+        "ESTO CORRESPONDE A UN MAYOR VALOR COBRADO FRENTE A LA TARIFA PACTADA "
+        "EN {contrato}. SE AJUSTAN LOS VALORES DANDO CUMPLIMIENTO A ESAS TARIFAS."
+    ),
+    "FA": ("SE ACEPTA LA OBSERVACIÓN DE FACTURACIÓN Y SE PROCEDE AL AJUSTE DEL CARGO OBSERVADO."),
+    "SO": (
+        "SE ACEPTA POR NO APORTARSE EL SOPORTE REQUERIDO DENTRO DEL TÉRMINO, Y "
+        "SE PROCEDE AL AJUSTE CORRESPONDIENTE."
+    ),
+    "AU": (
+        "SE ACEPTA POR NO ACREDITARSE LA AUTORIZACIÓN EXIGIDA PARA EL SERVICIO, "
+        "Y SE PROCEDE AL AJUSTE CORRESPONDIENTE."
+    ),
+    "CO": (
+        "SE ACEPTA POR CORRESPONDER A UN SERVICIO NO CUBIERTO PARA EL USUARIO, "
+        "Y SE PROCEDE AL AJUSTE CORRESPONDIENTE."
+    ),
+    "CL": ("SE ACEPTA LA OBSERVACIÓN DE PERTINENCIA Y SE PROCEDE AL AJUSTE CORRESPONDIENTE."),
+    "PE": ("SE ACEPTA LA OBSERVACIÓN DE PERTINENCIA Y SE PROCEDE AL AJUSTE CORRESPONDIENTE."),
+}
+
+# Cuando la causal no se reconoce NO se inventa un motivo: se acepta y ya. Un
+# dictamen que no explica de más es mejor que uno que explica mal.
+_MOTIVO_ACEPTACION_GENERICO = "SE PROCEDE AL AJUSTE CORRESPONDIENTE."
+
+
+def _motivo_de_aceptacion(codigo_glosa: str, num_contrato: str) -> str:
+    """El porqué de la aceptación, acorde con la causal de la glosa."""
+    from app.services.plan_de_trabajo import familia_de
+
+    plantilla = _MOTIVO_ACEPTACION.get(familia_de(codigo_glosa))
+    if not plantilla:
+        return _MOTIVO_ACEPTACION_GENERICO
+    return plantilla.format(contrato=num_contrato)
+
+
+def _pesos_col(valor: float) -> str:
+    """`10000` → `$10.000`. Con punto de miles, como se escribe en Colombia.
+
+    20-08-2026. Salía «$ 10,000» —con coma— en el documento que se radica ante
+    la EPS. En Colombia esa coma es el separador decimal: «10,000» se lee como
+    diez. Un valor mal escrito en una respuesta de glosa es una discusión que
+    nadie quiere tener.
+    """
+    return "$" + f"{int(round(valor or 0)):,}".replace(",", ".")
+
+
 def _construir_dictamen_aceptacion(
     eps: str,
     codigo_glosa: str,
@@ -407,10 +606,8 @@ def _construir_dictamen_aceptacion(
         <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:20px;margin:15px 0;border-radius:8px;">
             <h4 style="color:#15803d;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
             <p style="font-size:13px;line-height:1.8;color:#166534;">
-                ESE HUS ACEPTA GLOSA TOTAL POR VALOR DE <strong>${val_ac:,.0f}</strong>,
-                CORRESPONDIENTE {servicio_descr}. ESTO CORRESPONDE A UN MAYOR VALOR COBRADO
-                SEGÚN <strong>{num_contrato}</strong> PACTADO ENTRE LAS PARTES. SE AJUSTAN LOS VALORES
-                DANDO CUMPLIMIENTO A ESTAS TARIFAS.
+                ESE HUS ACEPTA GLOSA TOTAL POR VALOR DE <strong>{_pesos_col(val_ac)}</strong>,
+                CORRESPONDIENTE {servicio_descr}. {_motivo_de_aceptacion(codigo_glosa, num_contrato)}
             </p>
         </div>"""
         val_en_disputa = 0.0
@@ -420,14 +617,12 @@ def _construir_dictamen_aceptacion(
         <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:20px;margin:15px 0;border-radius:8px;">
             <h4 style="color:#92400e;margin:0 0 10px 0;">RESPUESTA A GLOSA</h4>
             <p style="font-size:13px;line-height:1.8;color:#78350f;">
-                ESE HUS ACEPTA GLOSA PARCIAL POR VALOR DE <strong>${val_ac:,.0f}</strong>,
-                CORRESPONDIENTE {servicio_descr}. ESTO CORRESPONDE A UN MAYOR VALOR COBRADO
-                SEGÚN <strong>{num_contrato}</strong> PACTADO ENTRE LAS PARTES. SE AJUSTAN LOS VALORES
-                DANDO CUMPLIMIENTO A ESTAS TARIFAS.
+                ESE HUS ACEPTA GLOSA PARCIAL POR VALOR DE <strong>{_pesos_col(val_ac)}</strong>,
+                CORRESPONDIENTE {servicio_descr}. {_motivo_de_aceptacion(codigo_glosa, num_contrato)}
             </p>
             <p style="font-size:13px;line-height:1.8;color:#78350f;">
-                EL VALOR RESTANTE DE <strong>${val_en_disputa:,.0f}</strong> NO SE ACEPTA POR LA ESE HUS
-                YA QUE SE EVIDENCIA QUE ESTE VALOR CORRESPONDE AL VALOR PACTADO ENTRE LAS PARTES.
+                EL VALOR RESTANTE DE <strong>{_pesos_col(val_en_disputa)}</strong> NO SE ACEPTA POR LA
+                ESE HUS Y SE SUSTENTA EN LA ARGUMENTACIÓN TÉCNICA Y JURÍDICA QUE SE ANEXA.
             </p>
         </div>"""
 
@@ -443,7 +638,7 @@ def _construir_dictamen_aceptacion(
         <tbody>
             <tr>
                 <td style="padding:10px;text-align:center;font-weight:700;border-bottom:1px solid #e2e8f0;">{codigo_glosa}</td>
-                <td style="padding:10px;text-align:center;font-weight:700;color:#0f172a;border-bottom:1px solid #e2e8f0;">$ {val_obj:,.0f}</td>
+                <td style="padding:10px;text-align:center;font-weight:700;color:#0f172a;border-bottom:1px solid #e2e8f0;">{_pesos_col(val_obj)}</td>
                 <td style="padding:10px;text-align:center;border-bottom:1px solid #e2e8f0;">
                     <b>{cod_resp}</b><br>
                     <span style="font-size:10px;color:#64748b;">{desc_resp}</span>
@@ -458,17 +653,17 @@ def _construir_dictamen_aceptacion(
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <tr>
                 <td style="padding:6px 8px;color:#475569;">Valor objetado</td>
-                <td style="padding:6px 8px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">$ {val_obj:,.0f}</td>
+                <td style="padding:6px 8px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">{_pesos_col(val_obj)}</td>
             </tr>
             <tr>
                 <td style="padding:6px 8px;color:#047857;">Valor aceptado</td>
-                <td style="padding:6px 8px;text-align:right;font-weight:700;color:#047857;font-variant-numeric:tabular-nums;">$ {val_ac:,.0f}</td>
+                <td style="padding:6px 8px;text-align:right;font-weight:700;color:#047857;font-variant-numeric:tabular-nums;">{_pesos_col(val_ac)}</td>
             </tr>"""
     if estado == "PARCIALMENTE_ACEPTADA":
         tabla_valores += f"""
             <tr>
                 <td style="padding:6px 8px;color:#b91c1c;">Valor en disputa</td>
-                <td style="padding:6px 8px;text-align:right;font-weight:700;color:#b91c1c;font-variant-numeric:tabular-nums;">$ {val_en_disputa:,.0f}</td>
+                <td style="padding:6px 8px;text-align:right;font-weight:700;color:#b91c1c;font-variant-numeric:tabular-nums;">{_pesos_col(val_en_disputa)}</td>
             </tr>"""
     tabla_valores += """
         </table>
@@ -493,12 +688,100 @@ async def _persistir_y_responder(
 ):
     """Cierra el flujo: aplica banner de tarifa, decide estado, construye
     dictamen final, persiste GlosaRecord, guarda snapshot de versión."""
+    # Cinturón (incidente 04-08-2026): un texto con firma de error del
+    # proveedor de IA jamás se persiste como dictamen, venga de donde venga
+    # (caché envenenado, camino viejo, lo que sea).
+    # ── ÚLTIMA MILLA: la causal de la glosa no sale como código del servicio ──
+    # 01-09-2026, pedido del auditor tras cinco corridas: «el LLM es terco con
+    # el código; bórralo a la fuerza por backend».
+    #
+    # Ya hay dos redes que lo hacen dentro del motor —una sobre el campo
+    # <servicio> del modelo y otra sobre el cuerpo del dictamen— y ambas
+    # funcionan. Esta es la tercera y va acá a propósito: en el ÚLTIMO punto
+    # por el que pasa el texto antes de persistirse y de viajar al navegador.
+    # Así deja de depender de en qué orden corran las redes de adentro, de si
+    # mañana se agrega un camino nuevo, o de si el dictamen llega armado desde
+    # otra parte. Es idempotente: si las redes de adentro ya limpiaron, no
+    # encuentra nada que hacer.
+    try:
+        from app.services.glosa_service import _quitar_causal_propia_del_cuerpo
+
+        _cod_glosa = str(getattr(resultado, "codigo_glosa", "") or "")
+        _limpio = _quitar_causal_propia_del_cuerpo(
+            getattr(resultado, "dictamen", "") or "", _cod_glosa
+        )
+        if _limpio != (getattr(resultado, "dictamen", "") or ""):
+            resultado.dictamen = _limpio
+            logger.info(
+                f"[{req_id}] [ULTIMA-MILLA] se retiró la causal {_cod_glosa} "
+                "del dictamen: es el código de la objeción, no el del servicio"
+            )
+    except Exception as _e_um:  # una limpieza cosmética jamás tumba un dictamen
+        logger.debug(f"[ULTIMA-MILLA] no aplicada: {_e_um}")
+
+    _dictamen_txt = getattr(resultado, "dictamen", "") or ""
+    if "ARGUMENTACIÓN JURÍDICA" in _dictamen_txt:
+        _cuerpo = _dictamen_txt.split("ARGUMENTACIÓN JURÍDICA", 1)[1]
+        import re as _re
+
+        _visible = _re.sub(r"\s+", " ", _re.sub(r"<[^>]+>", " ", _cuerpo)).strip()
+        if len(_visible) < 60:
+            raise HTTPException(
+                503,
+                "El dictamen salió sin argumentación jurídica; NO se guardó. "
+                "Reintentá el análisis y si persiste avisá a administración.",
+            )
+
+    if texto_con_error_de_proveedor(getattr(resultado, "dictamen", "") or "") or (
+        texto_con_error_de_proveedor(getattr(resultado, "resumen", "") or "")
+    ):
+        raise HTTPException(
+            503,
+            "El resultado traía un error del proveedor de IA en el cuerpo; NO se "
+            "guardó. Reintentá el análisis y si persiste avisá a administración.",
+        )
+
     glosa_repo = GlosaRepository(db)
     # parse_valor_cop entiende formato colombiano ("7.700,00" → 7700.0).
     # El patrón anterior float(re.sub(r"[^\d]","",x)) inflaba 100× los
     # valores con decimales (auditoría jun-2026, P0 #1).
+    # La factura que digitó el auditor viaja de vuelta con el dictamen.
+    #
+    # 19-08-2026. El esquema traía `factura: Optional[str] = "N/A"` y NADIE lo
+    # llenaba nunca. En pantalla, el recuadro del Auditor Forense salía como
+    # «Auditor Forense IA · N/A» y su botón quedaba inservible: preguntaba por
+    # una factura llamada «N/A». El dato estaba ahí desde el principio — el
+    # auditor lo había escrito en el formulario.
+    if numero_factura and (not resultado.factura or resultado.factura == "N/A"):
+        resultado.factura = numero_factura
+
     val_obj = parse_valor_cop(resultado.valor_objetado)
     val_ac = parse_valor_cop(valor_aceptado)
+
+    # 20-08-2026 (caso real de Yesid, COMPAÑIA MUNDIAL DE SEGUROS). La glosa
+    # decía "SO5801 - ausencia total de soporte de la curacion, VALOR GLOSADO
+    # 100000" y el gestor aceptó $40.000 en el formulario. El dictamen salió:
+    #
+    #     GLOSA ACEPTADA AL 100%  ·  RE9702  ·  Valor objetado $40.000
+    #
+    # Era una aceptación PARCIAL: se objetaron cien mil y se aceptaron
+    # cuarenta. Al no traer la IA el valor objetado, quedaba en cero, y el
+    # respaldo de abajo lo daba por aceptación total igualando objetado a
+    # aceptado. Radicado así, el hospital renuncia a los $60.000 que sí estaba
+    # defendiendo, y encima lo certifica con un RE9702 «aceptada al 100%».
+    #
+    # El dato estaba escrito en la propia glosa. `_extraer_valores_glosa` ya
+    # sabía leerlo —"valor glosado 100000" → objetado 100000—; nadie le
+    # preguntaba. Solo se consulta cuando la IA no trajo el valor, así que
+    # cuando sí lo trae manda la IA y esto no cambia nada.
+    if val_obj <= 0:
+        objetado_en_texto = _extraer_valores_glosa(tabla_excel or "").get("objetado", 0.0)
+        if objetado_en_texto > 0:
+            val_obj = objetado_en_texto
+            logger.info(
+                f"[{req_id}] valor objetado tomado del texto de la glosa: "
+                f"{_pesos_col(objetado_en_texto)} (la IA no lo extrajo)"
+            )
 
     _agregar_banner_tarifa_post(
         db,
@@ -531,7 +814,9 @@ async def _persistir_y_responder(
         )
 
     tipo_final = f"RESPUESTA {cod_resp_acept}" if cod_resp_acept else resultado.tipo
-    cup_ext, servicio_ext = _extraer_cups_servicio(tabla_excel or "", contexto_pdf)
+    cup_ext, servicio_ext = _extraer_cups_servicio(
+        tabla_excel or "", contexto_pdf, montos_excluir=[val_obj, val_ac]
+    )
     cod_resp_m = re.search(r"\bRE\d{4}\b", tipo_final or "")
     cod_resp = cod_resp_m.group(0) if cod_resp_m else (cod_resp_acept or "")
 
@@ -618,6 +903,66 @@ async def _persistir_y_responder(
         )
 
     logger.info(f"[{req_id}] Glosa guardada ID={glosa.id} | estado={estado}")
+
+    # ── Expediente: la verificación contractual queda REGISTRADA ─────────
+    # Regla del Contrato de Construcción: nada está terminado si no queda en
+    # el expediente. El dictamen ya se arma con el contrato del día del hecho;
+    # acá queda la constancia consultable —qué contrato se usó, si estaba
+    # vigente ese día y con qué factor— en la línea de tiempo de la glosa.
+    # Un fallo aquí no puede tumbar un análisis ya hecho.
+    try:
+        import json as _json
+
+        from app.repositories.audit_repository import AuditRepository
+        from app.services import malla_contractual as _mc
+
+        _fecha_hecho = getattr(data, "fecha_radicacion", None) or getattr(
+            data, "fecha_recepcion", None
+        )
+        _dia = _fecha_hecho or date.today()
+        _vig = _mc.vigente(eps, _dia)
+        _conocidos = _mc.contratos_de(eps)
+        if _vig is not None:
+            _veredicto = "VIGENTE"
+            _resumen_v = (
+                f"Contrato {_vig.numero or 'sin número'} vigente el {_dia.isoformat()} "
+                f"(factor {_vig.factor if _vig.factor is not None else 1.0})"
+            )
+        elif _conocidos:
+            _veredicto = "SIN_CONTRATO_VIGENTE"
+            _resumen_v = (
+                f"Ningún contrato de {eps} regía el {_dia.isoformat()}: se defendió a SOAT pleno"
+            )
+        else:
+            _veredicto = "PAGADOR_FUERA_DE_MALLA"
+            _resumen_v = f"{eps} no está en la malla contractual"
+        _constancia = {
+            "veredicto": _veredicto,
+            "resumen": _resumen_v,
+            "fecha_hecho": _dia.isoformat(),
+            "fecha_es_del_formulario": _fecha_hecho is not None,
+            "contrato": _vig.como_dict() if _vig else None,
+            "malla_al": _mc.FECHA_MALLA.isoformat(),
+        }
+        _detalle = _json.dumps(_constancia, ensure_ascii=False)
+        if len(_detalle) > 1900:
+            # Cortar a ciegas dejaría un JSON ilegible: mejor sin la ficha
+            # completa del contrato (el número ya va en valor_nuevo).
+            _constancia["contrato"] = None
+            _detalle = _json.dumps(_constancia, ensure_ascii=False)[:1900]
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=current_user.rol,
+            accion="VERIFICACION_CONTRACTUAL",
+            tabla="historial",
+            registro_id=glosa.id,
+            campo=_veredicto,
+            valor_nuevo=(_vig.numero if _vig else "")[:200] or _veredicto,
+            detalle=_detalle,
+        )
+        db.commit()
+    except Exception:
+        logger.warning(f"[{req_id}] verificación contractual no registrada", exc_info=True)
     # R56 P1: ahora que la glosa existe en BD, los siguientes calls IA
     # de este request quedan trazados a su id (caso de glosas que disparen
     # un análisis adicional, ej. evaluación de riesgo).
@@ -684,7 +1029,7 @@ async def analizar(
     archivos: Optional[list[UploadFile]] = File(None),
     db: Session = Depends(get_db),
     service: GlosaService = Depends(get_glosa_service),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     from app.services.progreso_analisis import publicar as _publicar_progreso
 
@@ -702,6 +1047,27 @@ async def analizar(
         f"[{req_id}] Análisis solicitado por: {current_user.email} | "
         f"eps={eps} | tono={tono} | modo={modo_respuesta}"
     )
+
+    # ── El selector y el texto tienen que hablar de la misma EPS ──────────
+    #
+    # 24-08-2026. Una auditoría independiente encontró el defecto más caro de
+    # nueve dictámenes: el selector había quedado en POSITIVA de un caso
+    # anterior, el texto pegado decía «EPS: PPL», y el motor defendió a PPL
+    # CITANDO EL CONTRATO DE POSITIVA. Pasó dos veces en el mismo lote.
+    #
+    # Se corta antes de gastar un solo token: un dictamen con el contrato de
+    # otra entidad no es un dictamen flojo, es uno falso, y se radica ante la
+    # EPS como un error del hospital.
+    from app.services.eps_del_texto import choque_de_eps, mensaje_de_choque
+
+    _eps_texto = choque_de_eps(eps, tabla_excel)
+    if _eps_texto:
+        logger.warning(
+            f"[{req_id}] [EPS-CRUZADA] selector={eps!r} vs texto={_eps_texto!r} — "
+            f"análisis detenido antes de generar el dictamen"
+        )
+        _publicar_progreso(_tid, "error", {"detalle": "EPS del selector no coincide"})
+        raise HTTPException(status_code=400, detail=mensaje_de_choque(eps, _eps_texto))
 
     try:
         data = GlosaInput(
@@ -819,26 +1185,45 @@ async def analizar(
             # que hay soportes disponibles y referencie en el dictamen.
             archivos_procesados += contexto_soportes_auto.count("═══ SOPORTE AUTO")
 
-        # Fase 2b Soportes (jul-2026): PRE-PASS del Auditor Forense (OPT-IN).
-        # Lee los PDFs nativos y antepone al contexto un MAPA DE FOLIOS
-        # (folios + fechas + hallazgos) para que el dictamen cite folios
-        # REALES en vez de argumentar a ciegas. Es una llamada Claude extra
-        # (cacheada 14 días) → default OFF; corre solo en casos que ya
-        # escalan a Claude (mismo criterio que capturar_raw), para no
-        # convertir cada glosa en doble costo.
-        if (
-            os.getenv("GLOSA_AUDITOR_FORENSE_PREPASS", "0").strip().lower()
-            not in ("0", "false", "no")
-            and pdfs_raw
-            and _capturar_raw
-        ):
+        # El inventario verificado de soportes, para que la argumentación no
+        # nombre documentos que no están (ver `_inventario_de_soportes`).
+        _inventario = _inventario_de_soportes(numero_factura, req_id)
+        if _inventario:
+            contexto_pdf = _inventario + "\n" + (contexto_pdf or "")
+
+        # PRE-PASS del Auditor Forense. Lee los PDF del expediente y antepone
+        # al contexto un MAPA DE FOLIOS (folios + fechas + hallazgos) para que
+        # el dictamen cite folios REALES en vez de argumentar a ciegas.
+        #
+        # 19-08-2026. Antes venía APAGADO y, aun prendido, solo miraba los PDF
+        # que el auditor subía a mano: los soportes que el indexador ya tiene
+        # del servidor de radicación nunca llegaban al forense. Yesid pidió que
+        # esto sea parte de responder la glosa, no un botón aparte —«es
+        # exactamente lo que se le pide que haga»—, así que ahora:
+        #   · viene PRENDIDO (se puede apagar con GLOSA_AUDITOR_FORENSE_PREPASS=0);
+        #   · si el auditor no adjuntó PDF, los saca del servidor de radicación.
+        # Es una llamada extra a la IA, cacheada 14 días: la misma factura con
+        # la misma glosa no se vuelve a cobrar.
+        _forense_on = os.getenv("GLOSA_AUDITOR_FORENSE_PREPASS", "1").strip().lower() not in (
+            "0",
+            "false",
+            "no",
+        )
+        _pdfs_forense = pdfs_raw or []
+        if _forense_on and not _pdfs_forense:
+            _pdfs_forense = await _pdfs_del_servidor_para_forense(numero_factura, req_id)
+        if _forense_on and _pdfs_forense:
             try:
                 from app.services.auditor_forense import evidencia_para_dictamen
 
+                # Leer los folios tarda 1-2 minutos. Sin avisar ANTES, el
+                # auditor se queda mirando una pantalla quieta y cree que se
+                # colgó. El aviso de «listo» va después, con el resultado.
+                _publicar_progreso(_tid, "auditor_forense_inicio", {"pdfs": len(_pdfs_forense)})
                 _ev = await evidencia_para_dictamen(
                     factura=numero_factura or "s/n",
                     texto_glosa=tabla_excel or "",
-                    pdfs_raw=pdfs_raw,
+                    pdfs_raw=_pdfs_forense,
                     contexto_pdf_texto=contexto_pdf or "",
                 )
                 if _ev.get("evidencia"):
@@ -921,6 +1306,17 @@ async def analizar(
         return respuesta
     except HTTPException:
         raise
+    except DictamenSinArgumentoError as e:
+        # Carátula sin argumentación = no hay dictamen. 503 y nada guardado.
+        logger.error(f"[{req_id}] dictamen sin argumento: {e.mensaje}")
+        _publicar_progreso(_tid, "error", {"mensaje": e.mensaje[:200]})
+        raise HTTPException(status_code=503, detail=e.mensaje)
+    except IANoDisponibleError as e:
+        # Incidente 04-08-2026: la IA caída NO es un dictamen — es un 503
+        # con causa legible, y no queda nada guardado.
+        logger.error(f"[{req_id}] IA no disponible: {e.mensaje}")
+        _publicar_progreso(_tid, "error", {"mensaje": e.mensaje[:200]})
+        raise HTTPException(status_code=503, detail=e.mensaje)
     except Exception as e:
         logger.error(f"[{req_id}] Error en análisis: {e}", exc_info=True)
         _publicar_progreso(_tid, "error", {"mensaje": str(e)[:200]})
@@ -936,7 +1332,7 @@ async def analizar(
 async def preview_glosa(
     request: Request,
     payload: dict,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
     db: Session = Depends(get_db),
 ):
     """Detecta automaticamente desde el texto crudo de la glosa:
@@ -1049,7 +1445,7 @@ async def preview_glosa(
 async def extraer_de_correo(
     request: Request,
     payload: dict,
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Recibe el texto crudo de un correo de EPS y extrae los campos
     estructurados (EPS, codigo, valor, factura, radicado, motivo).
@@ -1374,7 +1770,7 @@ def _fundir_extracciones(extraidos: list[dict]) -> dict:
 async def extraer_soportes(
     request: Request,
     archivos: list[UploadFile] = File(default=[]),
-    current_user: UsuarioRecord = Depends(get_usuario_actual),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Auto-extrae metadata de los PDFs ANTES de "Analizar con IA".
 

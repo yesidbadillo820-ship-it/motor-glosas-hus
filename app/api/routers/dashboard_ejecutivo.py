@@ -25,11 +25,12 @@ from __future__ import annotations
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_coordinador_o_admin
-from app.core.tz import ahora_utc
+from app.core.tz import a_utc, ahora_utc
 from app.database import get_db
 from app.models.db import GlosaRecord, UsuarioRecord
 
@@ -419,3 +420,115 @@ def detector_actividad(
             "alto_valor_riesgo": len(alto_valor_riesgo),
         },
     }
+
+
+@router.get("/operacion")
+def panel_operacional(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Dónde se atasca el trabajo y quién tiene cuánto encima.
+
+    Dos cosas que ninguna pantalla mostraba: los CUELLOS DE BOTELLA (en
+    qué estado están las glosas abiertas, cuánta plata hay ahí y hace
+    cuánto no se mueve lo más viejo) y la CARGA POR AUDITOR (cuántas
+    abiertas lleva cada quien, cuántas ya vencidas y por cuánto valor).
+
+    Un montón parado en un estado no se ve en los totales: se ve acá.
+    """
+    from app.services.motor_vencimientos import ESTADOS_CERRADOS
+
+    ahora = ahora_utc()
+    abiertas = db.query(GlosaRecord).filter(GlosaRecord.estado.notin_(ESTADOS_CERRADOS)).all()
+
+    por_estado: dict[str, dict] = {}
+    por_auditor: dict[str, dict] = {}
+    for g in abiertas:
+        estado = g.estado or "SIN ESTADO"
+        e = por_estado.setdefault(
+            estado, {"estado": estado, "cantidad": 0, "valor": 0.0, "mas_vieja_dias": 0}
+        )
+        e["cantidad"] += 1
+        e["valor"] += float(g.valor_objetado or 0)
+        if g.creado_en:
+            dias = (ahora - a_utc(g.creado_en)).days
+            e["mas_vieja_dias"] = max(e["mas_vieja_dias"], dias)
+
+        quien = g.auditor_email or "(sin asignar)"
+        a = por_auditor.setdefault(
+            quien, {"auditor": quien, "abiertas": 0, "vencidas": 0, "valor": 0.0}
+        )
+        a["abiertas"] += 1
+        a["valor"] += float(g.valor_objetado or 0)
+        if (g.dias_restantes or 0) <= 0 and g.dias_restantes is not None:
+            a["vencidas"] += 1
+
+    cuellos = sorted(por_estado.values(), key=lambda x: -x["valor"])
+    carga = sorted(por_auditor.values(), key=lambda x: (-x["vencidas"], -x["abiertas"]))
+
+    return {
+        "generado_en": ahora.isoformat(),
+        "total_abiertas": len(abiertas),
+        "valor_abierto": round(sum(c["valor"] for c in cuellos), 0),
+        "cuellos_por_estado": cuellos,
+        "carga_por_auditor": carga[:15],
+        "sin_asignar": next((a["abiertas"] for a in carga if a["auditor"] == "(sin asignar)"), 0),
+    }
+
+
+class SinDatoOut(BaseModel):
+    """Lo que el tablero NO puede afirmar, contado aparte."""
+
+    levantadas_sin_valor: int = 0
+    sin_fecha_vencimiento: int = 0
+    sin_fecha_radicacion: int = 0
+
+
+class CasillaPlataOut(BaseModel):
+    """Una fila del tablero — sirve igual para un mes que para una EPS."""
+
+    glosas: int = 0
+    glosado: float = 0
+    levantado: float = 0
+    ratificado: float = 0
+    aceptado: float = 0
+    sin_decision: float = 0
+    respondido_a_tiempo: float = 0
+    respondido_tarde: float = 0
+    perdido_por_vencimiento: float = 0
+    tasa_levantado_pct: float = 0
+    sin_dato: SinDatoOut = SinDatoOut()
+    mes: str = ""
+    etiqueta: str = ""
+    eps: str = ""
+
+
+class PlataRecuperadaOut(BaseModel):
+    desde: str
+    hasta: str
+    meses_pedidos: int
+    eps_filtrada: str = ""
+    meses: list[CasillaPlataOut] = []
+    eps: list[CasillaPlataOut] = []
+    total: CasillaPlataOut
+    nota: str = ""
+
+
+@router.get("/plata-recuperada", response_model=PlataRecuperadaOut)
+def plata_recuperada(
+    meses: int = 6,
+    eps: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Cuánta plata se glosó y en qué terminó — mes a mes y EPS por EPS.
+
+    El número que pide la gerencia, en una sola pantalla: glosado,
+    respondido a tiempo, levantado, ratificado y perdido por vencimiento.
+
+    Todo sale de columnas de la base. Lo que no tiene dato se cuenta aparte
+    en `sin_dato` y no se rellena con supuestos.
+    """
+    from app.services.plata_recuperada import resumen_plata_recuperada
+
+    return resumen_plata_recuperada(db, meses=meses, eps=eps)

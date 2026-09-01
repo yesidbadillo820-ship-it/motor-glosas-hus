@@ -276,7 +276,29 @@ async def procesar_glosa_id(glosa_id: int) -> dict:
         if _IA_SOLO_COMPLEJAS or _AUTO_RESPONDER_REUSAR_GEMELOS:
             gemelo = _buscar_dictamen_gemelo(db, g, texto_glosa_ia)
             if gemelo is not None:
-                g.dictamen = gemelo["dictamen"]
+                _dict_gemelo = gemelo["dictamen"] or ""
+                # Ronda 30: el dictamen gemelo trae la factura y (a veces)
+                # nombres de archivos de soporte del OTRO expediente. Copiar
+                # verbatim metía datos de otro paciente en esta glosa.
+                #  (1) Si referencia un archivo de soporte concreto de otra
+                #      factura, NO se puede reasignar sin inventar → se
+                #      rechaza el reuso y sigue el flujo normal (a IA).
+                _ref_soporte_ajeno = re.search(r"\w+_HUS\d{6,}\.pdf", _dict_gemelo, re.IGNORECASE)
+                if _ref_soporte_ajeno:
+                    logger.info(
+                        f"[auto-responder] glosa={glosa_id} descarta gemela "
+                        f"#{gemelo['glosa_id']}: cita soporte de otro expediente"
+                    )
+                    gemelo = None
+            if gemelo is not None:
+                #  (2) Reasignar la factura del gemelo por la de esta glosa,
+                #      solo cuando ambas tienen formato HUS###### (evita
+                #      fabricar una referencia documental inexistente).
+                if g.factura and re.fullmatch(r"HUS\d{6,}", str(g.factura).strip().upper()):
+                    _dict_gemelo = re.sub(
+                        r"\bHUS\d{6,}\b", str(g.factura).strip().upper(), _dict_gemelo
+                    )
+                g.dictamen = _dict_gemelo
                 g.codigo_respuesta = gemelo["codigo_respuesta"] or g.codigo_respuesta
                 g.modelo_ia = f"cache_gemela/{gemelo['glosa_id']}"
                 g.estado = "RESPONDIDA"
@@ -300,11 +322,18 @@ async def procesar_glosa_id(glosa_id: int) -> dict:
         if _IA_SOLO_COMPLEJAS:
             try:
                 from app.services.ia_router import enrutar
-                from app.utils.moneda import parse_valor_cop
+                from app.utils.parsers_glosa import _extraer_valores_glosa
 
+                # Ronda 30: NO usar parse_valor_cop sobre el texto completo —
+                # concatenaba TODOS los dígitos (código+CUPS+contrato+valores)
+                # y devolvía cifras de 10^27, enrutando TODO como COMPLEJA.
+                # _extraer_valores_glosa aísla el valor objetado rotulado.
+                _valor = float(g.valor_objetado or 0) or (
+                    _extraer_valores_glosa(texto_glosa_ia).get("objetado") or 0.0
+                )
                 d = enrutar(
                     eps=g.eps or "",
-                    valor=float(g.valor_objetado or 0) or parse_valor_cop(texto_glosa_ia),
+                    valor=_valor or None,
                     texto_glosa=texto_glosa_ia,
                     codigo_glosa=g.codigo_glosa or "",
                 )
@@ -585,7 +614,20 @@ def _actualizar_estado_recepcion(rec_id: int | None, envio: dict) -> None:
 
         enviados = int(envio.get("enviados", 0) or 0)
         sin_email = envio.get("gestores_sin_email") or []
-        if enviados <= 0:
+        motivo = envio.get("motivo") or ""
+        if enviados <= 0 and motivo == "SIN_CORREO_CONFIG":
+            # 20-08-2026: no es que no hubiera a quién mandarle. Es que el
+            # servidor no tiene correo configurado. Decirlo distinto evita
+            # que el auditor busque el problema en la lista de gestores.
+            nuevo = "SIN_CORREO_CONFIG"
+        elif enviados <= 0 and motivo == "SIN_ARCHIVO_ORIGINAL":
+            nuevo = "SIN_ARCHIVO_ORIGINAL"
+        elif enviados <= 0 and motivo == "FALLO_ENVIO":
+            # Sí había a quién mandarle: el servidor de correo rechazó el
+            # envío. Decirlo distinto evita mandar al auditor a revisar la
+            # lista de gestores, que está bien.
+            nuevo = "FALLO_ENVIO"
+        elif enviados <= 0:
             nuevo = "SIN_DESTINATARIOS"
         elif sin_email:
             nuevo = "PARCIAL"
@@ -599,7 +641,14 @@ def _actualizar_estado_recepcion(rec_id: int | None, envio: dict) -> None:
                 .first()
             )
             # No pisar SIN_ARCHIVO (prune) — solo si sigue en LISTO.
-            if rec and rec.estado in ("LISTO", "PARCIAL", "SIN_DESTINATARIOS"):
+            if rec and rec.estado in (
+                "LISTO",
+                "PARCIAL",
+                "SIN_DESTINATARIOS",
+                "FALLO_ENVIO",
+                "SIN_CORREO_CONFIG",
+                "SIN_ARCHIVO_ORIGINAL",
+            ):
                 rec.estado = nuevo
                 s.commit()
                 logger.info(

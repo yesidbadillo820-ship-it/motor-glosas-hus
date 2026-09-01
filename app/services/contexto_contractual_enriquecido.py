@@ -266,7 +266,7 @@ class ContextoContractual:
                 "actos propios del pagador (autorizaciones emitidas, remisiones, uso de su plataforma "
                 "SALUD.SIS o equivalente) reconocen la vigencia del vínculo y activan el art. 83 C.P. + "
                 "arts. 1602 y 1603 C.C. + art. 871 C.Co.; (iii) en gracia de discusión, AÚN sin contrato "
-                "vigente, las atenciones se reconocen a SOAT pleno (Art. 20 Decreto 4747/2007, "
+                "vigente, las atenciones se reconocen a SOAT pleno (Decreto 2423 de 1996, "
                 "compilado en Decreto 780/2016), NUNCA a valores impuestos unilateralmente — so pena de "
                 "enriquecimiento sin justa causa de la entidad que recibió y autorizó el servicio."
             )
@@ -657,9 +657,9 @@ def _soportes_por_familia(familia: str, cups: list[str]) -> list[str]:
     if fam == "SO":
         s = [
             "Historia clínica institucional con folios completos",
-            "RIPS radicados (JSON Res. 2275/2023)",
+            "RIPS radicados (JSON Res. 948/2026; Res. 2275/2023 si el servicio es anterior al 14-05-2026)",
             "Factura electrónica de venta + CUV MinSalud",
-            "Anexo técnico nº 5 Res. 3047/2008 cumplido",
+            "Anexo Técnico 1 Res. 2284/2023 (sust. Anexo 1 Res. 1885/2024) cumplido",
         ]
     elif fam == "TA":
         s = [
