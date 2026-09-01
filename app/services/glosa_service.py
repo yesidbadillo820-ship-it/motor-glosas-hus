@@ -4741,6 +4741,116 @@ def _borrar_documentos_no_aportados(argumento: str, contexto_pdf: str) -> "tuple
     return limpio, borrados
 
 
+# ── Abstención: cuando no hay con qué responder (01-09-2026, prueba 5) ──
+# Glosa FA0205, factura HUS0000603118, Dirección de Sanidad del Ejército:
+# «DIFERENCIA EN CANTIDADES FACTURADAS FRENTE A LO REGISTRADO. SE GLOSA.»
+# Sin servicio, sin CUPS, sin cantidades, sin fechas, sin un solo soporte.
+#
+# El motor produjo una defensa de manual: inventó una consulta médica, una
+# historia clínica que «muestra que la consulta se realizó una sola vez», unos
+# «informes de validación de cargos», dos cláusulas y una ley del subsistema
+# militar. Todo bien redactado. Todo falso. Y pidió el levantamiento.
+#
+# Un modelo entrenado en plantillas no sabe abstenerse: ante el vacío rellena.
+# Por eso la abstención no se le pide a la IA — se decide ANTES de llamarla, en
+# código, y la llamada no se hace. Es la regla del proyecto desde el primer
+# día: «sin evidencia, el dictamen dice "no existe evidencia suficiente"».
+#
+# Qué NO hace esta regla: no se abstiene por falta de soportes a secas. Una
+# glosa que nombra el servicio, el CUPS, una cantidad con su unidad, una fecha,
+# un contrato, una cláusula o el documento que echa de menos tiene con qué
+# discutirse aunque no traiga PDF. Se abstiene solo cuando faltan LAS DOS cosas:
+# los soportes y los elementos materiales de la objeción.
+#
+# Al probarla contra las cinco glosas de estrés, la primera versión se abstenía
+# también en la prueba 3 (AU0201): esa glosa no nombra un servicio, pero sí un
+# contrato, una cláusula y una autorización. Eso es discutible. Por eso la
+# lista de elementos incluye lo contractual y lo documental, no solo lo
+# clínico.
+_RE_ELEMENTOS_MATERIALES = re.compile(
+    r"\bCUPS\b|\b\d{2,}\b"  # un CUPS explícito, o cualquier número de dos cifras o más
+    r"|\b\d{1,4}\s+(?:DOSIS|UNIDADES?|SESIONES|D[IÍ]AS|CONSULTAS?|PROCEDIMIENTOS?|"
+    r"AMPOLLAS?|TABLETAS?|FRASCOS?|ESTANCIAS?|HORAS?)\b"  # una cantidad con su unidad
+    r"|\b(?:CONSULTA|PROCEDIMIENTO|CIRUG[IÍ]A|MEDICAMENTO|INSUMO|ESTANCIA|"
+    r"LABORATORIO|IMAGEN|RADIOGRAF|TOMOGRAF|ECOGRAF|HEMOGRAMA|TERAPIA|"
+    r"HONORARIOS?|MATERIAL|OSTEOS[IÍ]NTESIS|INTERCONSULTA|URGENCIA|URGENTE)\w*\b"  # un servicio
+    r"|\bCONTRATO\s+[A-Z0-9][A-Z0-9\-/\.]{3,}|\bCL[ÁA]USULA\b"  # lo contractual
+    r"|\b(?:AUTORIZACI|SOPORTE|HISTORIA\s+CL[IÍ]NICA|EPICRISIS|RIPS|KARDEX|"
+    r"TARIFA|UVB|SOAT|PERTINENCIA|ATENCI[OÓ]N)\w*\b",  # la causal o el documento
+    re.IGNORECASE,
+)
+_RE_FECHA_EN_TEXTO = re.compile(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b")
+
+
+def _glosa_sin_elementos(texto_glosa: str, contexto_pdf: str, cups: str = "") -> bool:
+    """True cuando no hay con qué pronunciarse de fondo.
+
+    Las dos condiciones a la vez —las dos, no una—:
+      1. NINGÚN soporte adjunto (ni marca «DOCUMENTO:» ni texto de PDF, ni un
+         CUPS verificado), y
+      2. el texto de la glosa no identifica el servicio, ni el CUPS, ni una
+         cantidad con su unidad, ni una fecha, ni un contrato, ni una cláusula,
+         ni la causal o el documento que echa de menos.
+
+    La línea de valores («VALOR FACTURADO: $… VALOR GLOSADO: $…») y el
+    encabezado «CÓDIGO | FACTURA | ENTIDAD» no cuentan como elementos: los
+    trae cualquier glosa, hasta la más vacía. Se quitan antes de mirar.
+    """
+    if (contexto_pdf or "").strip() or (cups or "").strip():
+        return False
+    # Se quita el ENCABEZADO y las CIFRAS de dinero, no la línea entera. La
+    # primera versión descartaba cualquier línea que dijera «VALOR FACTURADO»,
+    # y una glosa escrita en un solo renglón —«…SANCIÓN DEL 10 % AL VALOR
+    # FACTURADO conforme a la Cláusula 18 del contrato…»— se borraba completa
+    # y quedaba «vacía». Se abstenía de una glosa llena de elementos.
+    cuerpo = re.sub(
+        r"^\s*[A-Z]{2}\d{2,4}\s*\|\s*[A-Z0-9\-]+\s*\|[^\n]*$",  # «FA0205 | HUS… | ENTIDAD»
+        " ",
+        texto_glosa or "",
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    cuerpo = re.sub(
+        r"VALOR\s+(?:FACTURADO|GLOSADO|OBJETADO)\s*:?\s*\$?\s*[\d.,]+",
+        " ",
+        cuerpo,
+        flags=re.IGNORECASE,
+    )
+    cuerpo = re.sub(r"\s+", " ", cuerpo).strip()
+    if not cuerpo:
+        return True
+    if _RE_FECHA_EN_TEXTO.search(cuerpo):
+        return False
+    if _RE_ELEMENTOS_MATERIALES.search(cuerpo):
+        return False
+    # Una causal reconocible —mayor valor, sin autorización, falta tal
+    # documento, cantidad de más— también es algo con qué discutir.
+    try:
+        from app.services.glosa_ia_prompts import FAMILIAS_DE_OBJECION
+
+        if any(fam[2].search(cuerpo.upper()) for fam in FAMILIAS_DE_OBJECION):
+            return False
+    except Exception:  # noqa: BLE001 — sin tabla, se decide con lo de arriba
+        pass
+    return True
+
+
+# El texto lo pidió el auditor palabra por palabra; se le agregó solo lo que
+# hace falta para que quede claro qué se le pide a la entidad y que la
+# respuesta se presenta en término.
+ARGUMENTO_ABSTENCION = (
+    "DEVOLUCIÓN ADMINISTRATIVA. NO EXISTE EVIDENCIA SUFICIENTE PARA PRONUNCIARSE "
+    "DE FONDO. LA GLOSA INTERPUESTA POR LA ENTIDAD NO IDENTIFICA EL SERVICIO "
+    "OBJETADO, NI LAS CANTIDADES EN CONFLICTO, NI APORTA SOPORTES DOCUMENTALES O "
+    "FECHAS QUE PERMITAN EL ANÁLISIS DE PERTINENCIA O EL CÁLCULO DE "
+    "EXTEMPORANEIDAD. SE SOLICITA AL ENTE PAGADOR PRECISAR LOS ELEMENTOS "
+    "MATERIALES DE LA OBJECIÓN —SERVICIO, CANTIDAD FACTURADA, CANTIDAD "
+    "REGISTRADA Y SOPORTE EN QUE SE FUNDA— PARA EMITIR UN CONCEPTO DE FONDO. "
+    "ESTA RESPUESTA NO CONSTITUYE ACEPTACIÓN NI RECHAZO DE LA OBJECIÓN, Y SE "
+    "PRESENTA DENTRO DEL TÉRMINO LEGAL PARA PRESERVAR EL DERECHO DE CONTRADICCIÓN "
+    "DEL PRESTADOR."
+)
+
+
 def _parrafo_contrato_ajeno(texto_glosa: str, ficha_contrato: Optional[dict], eps: str = "") -> str:
     """Refuta el contrato ajeno en el que la entidad funda su glosa.
 
@@ -8088,6 +8198,27 @@ class GlosaService:
         # texto genérico de soportes, sin contestar ninguna de las cuatro.
         # Misma decisión que ya se tomó con el texto fijo del Dispensario.
         usa_plantilla = plantilla is not None and len(self._subconceptos_actuales) < 2
+        # 01-09-2026 (PRUEBA 5) — ¿hay con qué responder? Se decide acá, antes
+        # de elegir camino, porque la abstención es un camino más: sin IA.
+        _abstenerse = False
+        try:
+            # El formulario también trae evidencia: fechas (con ellas la
+            # extemporaneidad SÍ se calcula), una tabla de Excel del
+            # expediente, o una decisión ya tomada por el gestor (aceptar,
+            # ratificar). Con cualquiera de esas, hay con qué responder.
+            _hay_algo_mas = bool(
+                getattr(data, "fecha_radicacion", None)
+                or getattr(data, "fecha_recepcion", None)
+                or (locals().get("tabla_excel") or "").strip()
+                or es_ratificacion
+                or es_extemporanea
+                or modo_resp != "defender"
+            )
+            _abstenerse = (not _hay_algo_mas) and _glosa_sin_elementos(
+                texto_base, contexto_pdf or "", str(locals().get("cups_verificado") or "")
+            )
+        except Exception as _e_ab:
+            logger.debug(f"[ABSTENCION] predicado no evaluado: {_e_ab}")
         arg_limpio = ""
         normas_clave = ""
         modelo_usado = "desconocido"
@@ -8152,6 +8283,30 @@ class GlosaService:
             contrato_ia = ""
             tarifa_ia = ""
             normas_clave = ""
+        elif _abstenerse:
+            # 01-09-2026 (PRUEBA 5, FA0205) — SIN EVIDENCIA NO SE LLAMA A LA IA.
+            # Ver _glosa_sin_elementos. El texto es fijo: lo único que puede
+            # decir un dictamen sin elementos es que no hay elementos.
+            pac_ia = "NO IDENTIFICADO"
+            arg_ia = ARGUMENTO_ABSTENCION
+            arg_limpio = arg_ia
+            modelo_usado = "abstencion"
+            servicio_ia = ""
+            contrato_ia = ""
+            tarifa_ia = ""
+            normas_clave = ""
+            # No existe en el Manual Único un código de «pídame precisión»: la
+            # respuesta formal sigue siendo NO ACEPTADA (RE99), pero el rótulo
+            # dice lo que de verdad pasa, para que nadie lea «subsanada».
+            cod_res, desc_res = (
+                "RE9901",
+                "GLOSA NO ACEPTADA - OBJECIÓN IMPRECISA: SE SOLICITA A LA ENTIDAD "
+                "PRECISAR LOS ELEMENTOS MATERIALES DE LA OBJECIÓN",
+            )
+            logger.warning(
+                f"[ABSTENCION] glosa {codigo_det} sin soportes ni elementos "
+                "materiales: no se llama a la IA, dictamen no concluyente"
+            )
         elif usa_plantilla:
             pac_ia = "N/A (PLANTILLA)"
             arg_ia = _suavizar_tono(plantilla["plantilla"])

@@ -90,6 +90,62 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 01-09-2026 — Se cerró el ciclo de las cinco pruebas de estrés
+
+**En una frase:** el motor ya no le cree a la IA en lo que no es redacción.
+Lo que es un dato —qué servicio se facturó, qué contrato rige, cuánta plata
+se defiende y cuánta se acepta, y si hay o no con qué responder— lo decide el
+programa con números, y la IA solo escribe el argumento.
+
+**Lo que se hizo hoy, prueba por prueba.**
+
+- **Prueba 3 (AU0201, «la cláusula que no existe»).** FAMISANAR glosó
+  invocando el contrato 440-DIGSA. Ese contrato existe, pero es del
+  Dispensario Médico del Ejército, no de FAMISANAR. Ahora el dictamen abre
+  diciendo eso, con el nombre del verdadero dueño del contrato y el número
+  del que sí nos vincula, y pide que la entidad precise la cláusula en la
+  que se apoya. Se arreglaron además dos cosas que hacían que ese párrafo no
+  llegara al dictamen (el «refinar con IA» lo borraba) y que la IA pudiera
+  transcribir cláusulas que nadie le mostró.
+
+- **Prueba 4 (SO0102, «el soporte que dice lo contrario»).** La entidad dijo
+  que no había registro de las 18 dosis de meropenem; el kardex sí lo tenía,
+  pero de 15. La IA lo leyó bien y aun así recomendó defender todo. Ahora el
+  programa hace la cuenta: $110.000 por dosis, se objetan $1.650.000 (las 15
+  probadas) y se aceptan $330.000 (las 3 sin registro), con código de
+  aceptación parcial. Y si el escrito enumera un documento que no se
+  adjuntó, se lo quita de la lista.
+
+- **Prueba 5 (FA0205, «sin nada»).** Una glosa que no dice qué servicio, ni
+  qué cantidades, sin fechas ni soportes. La IA inventó una consulta, una
+  historia clínica y dos cláusulas para defenderla. Ahora, cuando no hay ni
+  soportes ni elementos en el texto, el programa **no llama a la IA**:
+  responde que no existe evidencia suficiente y le pide a la entidad precisar
+  qué objeta. No pide levantamiento, porque no hay fondo que defender.
+
+- **Lo que quedó en el camino (se probó y se retiró):** la salida en formato
+  JSON. La corrida de prueba no mejoró nada y no valía la pena seguir
+  peleando con el formato. Se volvió al camino de siempre.
+
+**Algo que aprendimos a la fuerza.** Varias veces hoy el código correcto no
+se veía en pantalla porque el programa del servidor seguía cargado en
+memoria con la versión vieja. Un `git pull` no basta: hay que reiniciar
+uvicorn. Y hay una huella para comprobarlo en la propia pantalla: el bloque de
+anexos debe decir «la hace el índice del servidor de radicación, aparte».
+
+**PENDIENTE (no es de programación).**
+- Los contratos de AURORA/ARL vencieron el 31 de agosto. Hay que avisar en
+  Cartera y cargar la prórroga si existe; mientras tanto esas glosas salen
+  con la advertencia de vigencia terminada.
+- Confirmar con `tools\verificar_glosas.py` que las 148 glosas de agosto
+  siguen en la base (el contador del encabezado se reinicia cada mes; no se
+  perdió nada).
+
+**PARA MAÑANA.**
+- Desplegar la PR de cierre (pull + reiniciar uvicorn) y correr de nuevo las
+  pruebas 3, 4 y 5 en la pantalla real para verlas con todo puesto.
+- Sacar la matriz de resultados final de las cinco pruebas.
+
 ### 01-09-2026 — Guardar una glosa ya no lo devuelve al inicio de la página (y la base maestra de servicios)
 
 **Lo que reportó Yesid.** En Glosas ADRES, cada vez que marcaba una decisión
