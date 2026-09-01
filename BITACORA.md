@@ -9041,6 +9041,37 @@ una firma ya guardada dejando rastro.
 
 ---
 
+### 01-09 — «Que los gestores puedan mirar sus espacios»
+
+Yesid pidió que todos los gestores (rol AUDITOR) tengan permiso para **mirar**:
+Conciliación, Papelera, Glosas ADRES, Contratos, Consulta Normativa,
+Importación masiva y Pre-auditoría.
+
+**Se revisó ruta por ruta quién exige qué**, y salió esto: de toda la lista, la
+única pantalla que de verdad les negaba el mirar era la **Papelera** — hasta
+los listados exigían rol de coordinación, así que el gestor que no encontraba
+una glosa no tenía cómo saber si alguien la había eliminado: abría la pantalla
+y recibía un «no tiene permiso». Las demás ya estaban abiertas para consulta.
+
+**Lo que quedó:**
+
+1. **La Papelera ya se puede mirar** (listar, buscar y estadísticas) con rol
+   AUDITOR o superior. **Restaurar y purgar siguen siendo solo de
+   coordinación** — eso ya no es mirar: revive o destruye registros — y a los
+   gestores la pantalla les muestra «solo lectura» en vez de botones que iban
+   a rebotar.
+2. **Una prueba que deja la directiva escrita**: recorre la consulta principal
+   de las siete pantallas con un usuario gestor y falla si alguna vuelve a
+   contestar «no tiene permiso». Es la lección de Salud Total: lo que no tiene
+   prueba se rompe en silencio.
+
+El rol VIEWER sigue sin ver la papelera: mirar es de los gestores, no de
+cualquier sesión.
+
+10 + 10 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
 
 ### Curso de noruego (31-08, noche)

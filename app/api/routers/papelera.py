@@ -1,4 +1,14 @@
-"""Papelera con soft-delete y restauración dentro de 30 días."""
+"""Papelera con soft-delete y restauración dentro de 30 días.
+
+Quién puede qué (31-08-2026, directiva de Yesid: «que los gestores tengan
+permisos para mirar»):
+
+  · MIRAR la papelera (listar, buscar, estadísticas) — AUDITOR o superior.
+    El gestor necesita saber si una glosa que no encuentra fue eliminada,
+    cuándo y por quién, sin tener que llamar a coordinación.
+  · RESTAURAR y ELIMINAR DEFINITIVAMENTE — solo COORDINADOR o SUPER_ADMIN.
+    Eso ya no es mirar: revive o destruye registros, y se queda donde estaba.
+"""
 
 import json
 from datetime import datetime, timedelta, timezone
@@ -8,7 +18,7 @@ from sqlalchemy import inspect
 
 from app.database import get_db
 from app.models.db import GlosaEliminadaRecord, GlosaRecord, UsuarioRecord
-from app.api.deps import get_coordinador_o_admin
+from app.api.deps import get_auditor_o_superior, get_coordinador_o_admin
 from app.repositories.audit_repository import AuditRepository
 
 router = APIRouter(prefix="/papelera", tags=["papelera"])
@@ -56,7 +66,7 @@ def buscar_papelera(
     glosa_id_original: int = None,
     eliminado_por: str = None,
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """R171 P1: búsqueda en papelera por glosa_id_original o usuario.
 
@@ -96,7 +106,7 @@ def buscar_papelera(
 @router.get("/stats")
 def stats_papelera(
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """R128 P2: métricas agregadas de la papelera (soft-delete).
 
@@ -166,7 +176,7 @@ def stats_papelera(
 @router.get("/")
 def listar(
     db: Session = Depends(get_db),
-    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
     """Lista glosas eliminadas que aún pueden restaurarse (< 30 días)."""
     ahora = _ahora_utc()

@@ -8617,7 +8617,7 @@ async function cargarPapelera(){
   try{
     var r = await fetch('/papelera/', {headers: authH()});
     if(!r.ok){
-      if(r.status === 403){ body.innerHTML = '<tr><td colspan="8" style="color:#b45309;padding:2rem;text-align:center">Solo COORDINADOR/SUPER_ADMIN puede ver la papelera</td></tr>'; }
+      if(r.status === 403){ body.innerHTML = '<tr><td colspan="8" style="color:#b45309;padding:2rem;text-align:center">Su usuario no tiene permiso para ver la papelera (se requiere rol AUDITOR o superior)</td></tr>'; }
       else { body.innerHTML = '<tr><td colspan="8" style="color:#b91c1c;padding:2rem;text-align:center">Error ' + r.status + '</td></tr>'; }
       return;
     }
@@ -8639,8 +8639,10 @@ async function cargarPapelera(){
         '<td>'+fecha+'</td>' +
         '<td class="cell-center">'+badge+'</td>' +
         '<td class="cell-center">' +
-          '<button class="btn-sm" onclick="restaurarGlosa('+p.id+')">Restaurar</button> ' +
-          '<button class="btn-sm ghost" style="color:#b91c1c" onclick="purgarGlosa('+p.id+')">Purgar</button>' +
+          (esDeCoordinacion()
+            ? '<button class="btn-sm" onclick="restaurarGlosa('+p.id+')">Restaurar</button> ' +
+              '<button class="btn-sm ghost" style="color:#b91c1c" onclick="purgarGlosa('+p.id+')">Purgar</button>'
+            : '<span style="font-size:.72rem;color:var(--text3)" title="Restaurar o purgar es de coordinación">solo lectura</span>') +
         '</td></tr>';
     }).join('');
   }catch(e){ body.innerHTML = '<tr><td colspan="8" style="color:#b91c1c;padding:2rem;text-align:center">'+escHtml(e.message)+'</td></tr>'; }
