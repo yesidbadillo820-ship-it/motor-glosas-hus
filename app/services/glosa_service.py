@@ -4370,6 +4370,47 @@ _RE_DEFENSA_TARIFARIA_REAL = re.compile(
 )
 
 
+def _la_glosa_objeta_plata(texto_glosa: str) -> bool:
+    """True si la glosa objeta tarifa, tope o mayor valor."""
+    if not texto_glosa:
+        return False
+    from app.services.glosa_ia_prompts import FAMILIAS_DE_OBJECION
+
+    fam = next((f for f in FAMILIAS_DE_OBJECION if f[0] == "tarifa"), None)
+    return bool(fam and fam[2].search(texto_glosa.upper()))
+
+
+# ── Lo que la IA no debía escribir y escribió (01-09-2026, GL-149) ──
+# El system prompt le prohíbe tocar cifras, tarifas, factores, UVB y topes: esa
+# defensa la arma el motor con los datos de la malla. Si aun así aparecen en la
+# argumentación, es una afirmación que NADIE calculó y que la entidad tumba
+# pidiendo la liquidación. No se borra sola —borrar una frase a ciegas puede
+# dejar el párrafo sin sentido— pero el gestor se entera por su nombre.
+_RE_MODELO_HABLANDO_DE_PLATA = re.compile(
+    r"\bUVB\b|FACTOR\s+0[.,]\d|SOAT\s+(?:PLEN[AO]|[-−]\s*\d)|"
+    r"NO\s+SUPERA\s+EL\s+TOPE|ES\s+COMPATIBLE\s+CON\s+LA|"
+    r"SE\s+AJUSTA\s+A\s+LA\s+TARIFA|CONFORME\s+A\s+LA\s+TARIFA\s+PACTADA",
+    re.IGNORECASE,
+)
+
+
+def _afirmacion_financiera_del_modelo(argumento: str) -> list[str]:
+    """Frases de dinero que la IA escribió pese a tenerlo prohibido.
+
+    Devuelve los fragmentos encontrados, para nombrárselos al gestor. Lista
+    vacía = la IA respetó la prohibición y la defensa económica es la que
+    inyectó el motor con los datos de la malla.
+    """
+    if not argumento:
+        return []
+    vistos: list[str] = []
+    for m in _RE_MODELO_HABLANDO_DE_PLATA.finditer(argumento):
+        frag = m.group(0).strip()
+        if frag.upper() not in {v.upper() for v in vistos}:
+            vistos.append(frag)
+    return vistos[:5]
+
+
 def _objecion_de_dinero_sin_resolver(texto_glosa: str, argumento: str) -> bool:
     """True si la glosa objeta plata y la argumentación no la contesta.
 
@@ -4490,6 +4531,127 @@ def _parrafo_tarifario_determinista(
             "QUE LO SUSTENTA."
         )
     return " ".join(partes)
+
+
+def _linea_servicio_determinista(
+    cups: str, servicio_del_modelo: str, texto_glosa: str, codigo_glosa: str = ""
+) -> str:
+    """El renglón «Servicio objetado» lo arma el motor, no el modelo.
+
+    01-09-2026, refactor pedido por el auditor: «el LLM nunca más tendrá acceso
+    a escribir la línea Servicio objetado ni las tarifas».
+
+    Tiene razón en el fondo. Ese renglón no es redacción, es un dato: qué se
+    facturó. Pedírselo a un modelo generativo y después limpiar lo que devuelve
+    es hacer el trabajo dos veces y perder una de cada tantas.
+
+    De dónde sale, en este orden:
+
+      1. Si el CUPS está en el catálogo oficial → su DESCRIPCIÓN OFICIAL más el
+         código. Es el caso bueno: dato verificable, la entidad lo cruza y lo
+         encuentra.
+      2. Si hay CUPS pero NO está en el catálogo (el caso real de esta factura:
+         215601 sale de los PDF y no figura) → la descripción que haya, SIN el
+         código. Poner un código que la entidad no encuentra es lo que le sirve
+         para ratificar; el aviso de «revise el código» ya se lo da aparte.
+      3. Si no hay CUPS → la descripción disponible, sin código.
+
+    La descripción del modelo se usa como último recurso y SIEMPRE se le quita
+    la causal: nunca aporta el código, porque el código no se lo pedimos a él.
+    """
+    _desc_oficial = ""
+    cups = (cups or "").strip()
+    if cups:
+        try:
+            from app.services.cups_soat_service import descripcion_cups
+
+            _desc_oficial = (descripcion_cups(cups) or "").strip()
+        except Exception:  # sin catálogo no se inventa nada
+            _desc_oficial = ""
+
+    en_catalogo = bool(cups) and _cups_esta_en_catalogo(cups)
+    if _desc_oficial:
+        descripcion = _desc_oficial
+    else:
+        # Las dos limpiezas, encadenadas: la primera se ocupa del código
+        # rotulado («código CL4506»), la segunda del código a secas entre
+        # paréntesis («(CL4506)»). Ninguna cubre sola las dos formas.
+        descripcion = _quitar_causal_propia_del_cuerpo(
+            _quitar_causal_del_servicio((servicio_del_modelo or "").strip(), codigo_glosa),
+            codigo_glosa,
+        )
+    # Último cepillado sobre la DESCRIPCIÓN (no sobre el dictamen): acá sí se
+    # puede barrer el código en cualquier forma —«[CL4506]», «ref. CL4506»—
+    # porque este string es solo el nombre del servicio, y ahí la causal de la
+    # entidad nunca pinta nada. Es la prueba de por qué las redes no sobran
+    # aunque el modelo pierda el control del renglón: el texto que él escribe
+    # sigue llegando por otro campo.
+    _cod = (codigo_glosa or "").upper().strip().replace("-", "").replace(" ", "")
+    if descripcion and re.fullmatch(r"[A-Z]{2}\d{2,4}", _cod):
+        descripcion = re.sub(
+            rf"[(\[]?\s*(?:c[óo]digo|cups|ref\.?)?\s*[:\-]?\s*{_cod[:2]}\s*-?\s*{_cod[2:]}\s*[)\]]?",
+            "",
+            descripcion,
+            flags=re.IGNORECASE,
+        )
+    descripcion = re.sub(r"\s{2,}", " ", descripcion or "").strip(" .,;:–—-")
+    if not descripcion:
+        return ""
+    return f"{descripcion} (CUPS {cups})" if en_catalogo else descripcion
+
+
+def _limpiar_linea_servicio_objetado(dictamen: str, codigo_glosa: str) -> str:
+    """Saca el código de la glosa de la línea «Servicio objetado», y solo de ahí.
+
+    01-09-2026 (GL-149), pedido del auditor: «si detectas CL4506 en la línea de
+    Servicio objetado, destrúyelo».
+
+    Las otras dos redes ya lo hacen y funcionan contra el texto exacto que salió
+    en pantalla — se comprobó. Esta es la tercera y ataca la LÍNEA, no el
+    patrón: si mañana el modelo lo escribe de una forma que las otras no
+    contemplan («ref. CL4506», «[CL4506]», el código suelto al final), acá cae
+    igual, porque en ese renglón el código de la objeción no pinta nada.
+
+    Un ajuste al pedido: NO se reemplaza por «el string extraído de la
+    descripción quirúrgica». Ese texto vendría de la nota operatoria y no es el
+    nombre del servicio facturado; ponerlo ahí sería cambiar una imprecisión por
+    un dato inventado. El código se borra y queda la descripción que el motor ya
+    tenía, que es lo único verificable.
+
+    Alcance deliberadamente estrecho: solo el renglón que empieza por «Servicio
+    objetado». El resto del dictamen no se toca — un barrido amplio ya se llevó
+    por delante los títulos multi-código una vez.
+    """
+    if not dictamen or not codigo_glosa:
+        return dictamen
+    cod = codigo_glosa.upper().strip().replace("-", "").replace(" ", "")
+    if not re.fullmatch(r"[A-Z]{2}\d{2,4}", cod):
+        return dictamen
+    _cod = rf"{cod[:2]}\s*-?\s*{cod[2:]}"
+
+    def _limpiar(m: "re.Match[str]") -> str:
+        renglon = m.group(0)
+        # El código con su rótulo y su separador, venga como venga.
+        sin_codigo = re.sub(
+            rf"\s*[(\[]?\s*(?:[,;:–—-]\s*)?(?:c[óo]digo|cups|ref\.?)?\s*[:\-]?\s*"
+            rf"{_cod}\s*[)\]]?",
+            "",
+            renglon,
+            flags=re.IGNORECASE,
+        )
+        sin_codigo = re.sub(r"[ \t]+(?=</)", "", sin_codigo)
+        sin_codigo = re.sub(r"[ \t]{2,}", " ", sin_codigo)
+        # Si al quitarlo el renglón queda sin servicio, se deja como estaba:
+        # un rótulo huérfano confunde más que el código de más.
+        return sin_codigo if len(_solo_texto_argumento(sin_codigo) or sin_codigo) > 20 else renglon
+
+    return re.sub(
+        r"(?:<[^>]*>\s*)*<b>\s*Servicio objetado:\s*</b>[^<]*(?:</\w+>)?"
+        r"|Servicio objetado:[^\n<]*",
+        _limpiar,
+        dictamen,
+        flags=re.IGNORECASE,
+    )
 
 
 def _quitar_causal_propia_del_cuerpo(texto: str, codigo_glosa: str) -> str:
@@ -7173,6 +7335,17 @@ class GlosaService:
         except Exception:
             _flag_campos = False
 
+        # 01-09-2026 — bandera de la salida JSON (refactor GL-149). Misma
+        # forma que la de arriba: se lee una vez y gobierna tanto lo que se le
+        # pide a la IA como cómo se lee lo que devuelve. OFF por defecto.
+        _flag_json = False
+        try:
+            from app.core.config import get_settings as _get_settings_js
+
+            _flag_json = bool(_get_settings_js().glosa_salida_json)
+        except Exception:
+            _flag_json = False
+
         codigos_detectados = self._extraer_codigos_glosa(texto_base)
         codigo_det = codigos_detectados[0] if codigos_detectados else "N/A"
 
@@ -7895,6 +8068,21 @@ class GlosaService:
                         )
             except Exception as _e_sc:
                 logger.debug(f"[SUBCONCEPTOS] no inyectados: {_e_sc}")
+
+            # 01-09-2026 — SALIDA JSON (bandera glosa_salida_json, OFF por
+            # defecto). El esquema va AL FINAL del prompt a propósito: es lo
+            # último que el modelo lee antes de responder, que es donde más
+            # pesa una instrucción de formato.
+            if _flag_json:
+                try:
+                    from app.services.respuesta_ia_estructurada import (
+                        esquema_para_el_prompt,
+                    )
+
+                    user_prompt = user_prompt + "\n\n" + esquema_para_el_prompt()
+                    logger.info("[SALIDA-JSON] esquema estructurado inyectado al prompt")
+                except Exception as _e_ej:
+                    logger.debug(f"[SALIDA-JSON] esquema no inyectado: {_e_ej}")
 
             # Mejora #3: si el flag está ON, inyectar al user prompt los
             # valores DETERMINISTAS (EPS efectiva, contrato del catálogo,
@@ -8956,7 +9144,34 @@ class GlosaService:
                         )
             except Exception as _e_vv:
                 logger.debug(f"[VIGENCIA-VENCIDA] guarda no aplicada: {_e_vv}")
-            arg_ia = self._xml("argumento", res_ia, "")
+            # 01-09-2026 — el argumento sale del JSON cuando la bandera está
+            # encendida Y el JSON vino utilizable. Si viene mal, se sigue por
+            # el XML de siempre: un modelo que un día devuelva mal las llaves
+            # no puede dejar sin dictamen al hospital. Por eso el fallback no
+            # es un detalle de implementación, es el requisito.
+            arg_ia = ""
+            if _flag_json:
+                try:
+                    from app.services.respuesta_ia_estructurada import (
+                        parsear_respuesta_ia,
+                    )
+
+                    _resp_json = parsear_respuesta_ia(res_ia or "")
+                    if _resp_json is not None:
+                        arg_ia = _resp_json.argumento()
+                        logger.info(
+                            "[SALIDA-JSON] argumento tomado del contrato "
+                            f"estructurado ({len(arg_ia)} chars)"
+                        )
+                    else:
+                        logger.warning(
+                            "[SALIDA-JSON] el modelo no devolvió JSON utilizable; "
+                            "se sigue por el camino XML"
+                        )
+                except Exception as _e_pj:
+                    logger.debug(f"[SALIDA-JSON] parseo no aplicado: {_e_pj}")
+            if not arg_ia:
+                arg_ia = self._xml("argumento", res_ia, "")
             # 01-09-2026 — EL PÁRRAFO DEL TOPE LO ARMA EL MOTOR, NO EL MODELO.
             # Tres corridas de la prueba 2 con el mismo resultado: la objeción
             # de dinero salía muda o con un adjetivo. Se saca del prompt y se
@@ -8966,7 +9181,17 @@ class GlosaService:
             # sí trae contrato, tarifa o la exigencia de la cláusula, se respeta
             # lo que escribió — el párrafo del motor es la red, no la norma.
             try:
-                if arg_ia and _objecion_de_dinero_sin_resolver(texto_base, arg_ia):
+                # 01-09-2026 (GL-149) — YA NO SE LE PREGUNTA A LA IA SI LO RESOLVIÓ.
+                # Antes solo se inyectaba cuando la argumentación no traía nada
+                # de plata. La IA aprendió a escribir la palabra «tarifa» y con
+                # eso desactivaba la inyección… escribiendo una cuenta que nadie
+                # hizo: «EL VALOR FACTURADO DE $18.940.000 ES COMPATIBLE CON LA
+                # UVB VIGENTE». Peor que el silencio.
+                #
+                # Con la prohibición de dinero en el system prompt, la IA no debe
+                # tocar el tema: la defensa económica la arma esta capa, con los
+                # datos de la malla. Se inyecta siempre que la glosa objete plata.
+                if arg_ia and _la_glosa_objeta_plata(texto_base):
                     _parr_tar = _parrafo_tarifario_determinista(
                         texto_base,
                         locals().get("_ficha_vig"),
@@ -9522,7 +9747,16 @@ class GlosaService:
                 numero_factura=data.numero_factura,
                 numero_radicado=data.numero_radicado,
                 normas_clave=normas_clave if normas_clave else None,
-                servicio=servicio_ia if servicio_ia else None,
+                # 01-09-2026 — el renglón del servicio ya no lo escribe el modelo.
+                servicio=(
+                    _linea_servicio_determinista(
+                        str(locals().get("cups_verificado") or ""),
+                        servicio_ia,
+                        texto_base,
+                        str(locals().get("codigo_det") or ""),
+                    )
+                    or None
+                ),
                 contrato=contrato_ia if contrato_ia else None,
                 tarifa=tarifa_ia if tarifa_ia else None,
                 adjuntos=self._documentos_adjuntos(contexto_pdf),
@@ -9832,6 +10066,32 @@ class GlosaService:
                     )
             except Exception as _e_cp:
                 logger.debug(f"[CAUSAL-PROPIA] red no aplicada: {_e_cp}")
+
+            # 01-09-2026 — y la misma pasada, dirigida al renglón del servicio.
+            try:
+                _linea_ok = _limpiar_linea_servicio_objetado(
+                    dictamen, str(locals().get("codigo_det") or "")
+                )
+                if _linea_ok != dictamen:
+                    dictamen = _linea_ok
+                    logger.info("[LINEA-SERVICIO] causal retirada del renglón del servicio")
+            except Exception as _e_ls:
+                logger.debug(f"[LINEA-SERVICIO] red no aplicada: {_e_ls}")
+
+            # 01-09-2026 (GL-149) — CIFRAS QUE NADIE CALCULÓ.
+            try:
+                _plata = _afirmacion_financiera_del_modelo(_solo_texto_argumento(dictamen) or "")
+                if _plata:
+                    _correcciones.append(
+                        "OJO: la argumentación afirma cosas de dinero que el motor "
+                        "no calculó (" + ", ".join(_plata) + "). El motor no tiene "
+                        "el tarifario ni la fecha del servicio: a la entidad le "
+                        "basta pedir la liquidación para tumbar la respuesta. "
+                        "Bórrelas o respáldelas antes de radicar."
+                    )
+                    logger.warning(f"[PLATA-INVENTADA] el modelo escribió: {_plata}")
+            except Exception as _e_pi2:
+                logger.debug(f"[PLATA-INVENTADA] red no aplicada: {_e_pi2}")
 
             try:
                 _dictamen_cups_respaldado = _neutralizar_cups_sin_respaldo(

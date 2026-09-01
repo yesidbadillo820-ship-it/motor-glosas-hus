@@ -201,6 +201,17 @@ class Settings(BaseSettings):
     # GLOSA_CAMPOS_ESTRUCTURADOS=true.
     glosa_campos_estructurados: bool = False
 
+    # 01-09-2026 — SALIDA JSON DE LA IA (refactor GL-149).
+    # ON  → a la IA se le pide un objeto JSON con dos claves
+    #       (justificacion_clinica, fundamentos_ley) y el motor arma el
+    #       dictamen. El renglón del servicio y el bloque económico ya no los
+    #       escribe el modelo: salen del catálogo CUPS y de la malla.
+    # OFF (default) → el camino XML de siempre, intacto.
+    # Si el JSON viene mal, se cae con suavidad al XML: la salida estructurada
+    # es una mejora, no un punto único de falla. El hospital nunca se queda
+    # sin dictamen porque un modelo devolvió mal las llaves.
+    glosa_salida_json: bool = False
+
     # Token compartido del agente local de lotes (tools/agente_lotes.py).
     # El agente corre headless en el PC del hospital y no puede usar JWT
     # de usuario (expiran a las 8h): se autentica con este token estático
