@@ -4491,6 +4491,76 @@ def _contratos_citados_en_glosa(texto_glosa: str) -> list[str]:
     return vistos[:3]
 
 
+# ── Cláusulas transcritas que nadie leyó (01-09-2026, prueba 3) ──
+# El dictamen GL-154 escribió: «LA CLÁUSULA SEXTA DEL CONTRATO S-13-1-03-1-04958
+# DISPOSA QUE "LA FACTURACIÓN, PAGO, GLOSAS Y DEVOLUCIONES SE REALIZARÁN DE
+# CONFORMIDAD CON LO ESTABLECIDO EN LAS LEYES VIGENTES…"». El único PDF adjunto
+# era la historia clínica: ese contrato no estaba a la vista de nadie.
+#
+# Es el mismo defecto que le imputamos a la entidad cuando invoca una cláusula
+# que no existe, cometido por nosotros. Y es peor: destruye la buena fe procesal
+# y expone al hospital a que le imputen falsedad documental.
+#
+# Ya había una red para esto (Ronda 15, Bug Q) y no disparó, por dos huecos:
+# exigía el ordinal en NÚMEROS («cláusula 5») y verbos exactos («dice:»). Acá
+# venía «CLÁUSULA SEXTA» y «DISPOSA QUE». Esta red no depende del ordinal ni
+# del verbo: mira la estructura —una cláusula, un verbo de decir, unas
+# comillas— y pregunta si el contrato estaba entre lo aportado.
+_RE_CLAUSULA_TRANSCRITA = re.compile(
+    r"[^.]*?\bCL[ÁA]USULA\b[^.]{0,120}?"
+    r"(?:DISPO\w*|ESTABLE\w*|SE[ÑN]AL\w*|DICE|REZA|PRECEPT\w*|INDICA|EXPRESA|"
+    r"CONSAGRA|PREV[EÉ]\w*|CITA\w*)\s*(?:QUE)?\s*[:,]?\s*"
+    r"[«\"“][^«»\"“”]{20,}[»\"”]\s*\.?",
+    re.IGNORECASE,
+)
+
+_RE_ES_CITA_DE_NORMA = re.compile(
+    r"\b(?:LEY|RESOLUCI[ÓO]N|DECRETO|SENTENCIA|CIRCULAR)\b", re.IGNORECASE
+)
+
+
+def _clausulas_transcritas_sin_respaldo(
+    dictamen: str, contexto_pdf: str
+) -> "tuple[str, list[str]]":
+    """Borra las cláusulas que el dictamen transcribe sin haberlas leído.
+
+    Devuelve `(dictamen_limpio, fragmentos_borrados)`.
+
+    Se borra la ORACIÓN completa, no solo las comillas: quitar la cita y dejar
+    «la cláusula sexta dispone que.» produce un renglón roto que también delata
+    el recorte. Y no se pierde nada real: la oración entera era invención.
+
+    Solo se toca cuando NINGÚN contrato llegó entre los documentos aportados.
+    Si el gestor adjuntó el contrato, la IA sí pudo leerlo y la transcripción
+    puede ser legítima; ahí no nos corresponde borrar.
+
+    Las citas de NORMAS no entran acá. El dictamen transcribe el Art. 17 de la
+    Ley 1751 a diario y está bien: esa norma está en el corpus y se verifica
+    contra él. Lo que no se puede verificar contra nada es una cláusula.
+    """
+    if not dictamen:
+        return dictamen, []
+    ctx = (contexto_pdf or "").upper()
+    if "CONTRATO" in ctx or "CLAUSULA" in ctx or "CLÁUSULA" in ctx:
+        return dictamen, []
+
+    borrados: list[str] = []
+
+    def _borrar(m: "re.Match[str]") -> str:
+        frag = m.group(0).strip()
+        if _RE_ES_CITA_DE_NORMA.search(frag):
+            return m.group(0)
+        borrados.append(frag[:160])
+        return ""
+
+    limpio = _RE_CLAUSULA_TRANSCRITA.sub(_borrar, dictamen)
+    if not borrados:
+        return dictamen, []
+    limpio = re.sub(r"\s{2,}", " ", limpio)
+    limpio = re.sub(r"\s+([.,;:])", r"\1", limpio)
+    return limpio, borrados
+
+
 def _parrafo_contrato_ajeno(texto_glosa: str, ficha_contrato: Optional[dict], eps: str = "") -> str:
     """Refuta el contrato ajeno en el que la entidad funda su glosa.
 
@@ -4632,6 +4702,47 @@ def _parrafo_tarifario_determinista(
     return " ".join(partes)
 
 
+# Con qué NO puede empezar el nombre de un servicio. Si el renglón arranca por
+# una de estas, lo que quedó es un jirón de frase, no una descripción.
+_ARRANQUES_ROTOS = (
+    "DE ",
+    "DEL ",
+    "EN ",
+    "AL ",
+    "POR ",
+    "PARA ",
+    "CON ",
+    "SIN ",
+    "Y ",
+    "O ",
+    "QUE ",
+    "LA ",
+    "EL ",
+    "LOS ",
+    "LAS ",
+    "UN ",
+    "UNA ",
+    "SE ",
+    "SU ",
+)
+
+
+def _es_descripcion_rota(descripcion: str) -> bool:
+    """True si lo que quedó no alcanza para nombrar un servicio.
+
+    Tres señales, cualquiera basta: empieza por preposición o artículo, es
+    demasiado corta para nombrar nada, o no tiene ni una palabra con cuerpo.
+    """
+    d = (descripcion or "").strip().upper()
+    if not d:
+        return False  # vacío lo maneja el llamador: no hay nada que rotular
+    if d.startswith(_ARRANQUES_ROTOS):
+        return True
+    if len(d) < 8:
+        return True
+    return not re.search(r"[A-ZÁÉÍÓÚÑ]{5,}", d)
+
+
 def _linea_servicio_determinista(
     cups: str, servicio_del_modelo: str, texto_glosa: str, codigo_glosa: str = ""
 ) -> str:
@@ -4694,6 +4805,16 @@ def _linea_servicio_determinista(
             flags=re.IGNORECASE,
         )
     descripcion = re.sub(r"\s{2,}", " ", descripcion or "").strip(" .,;:–—-")
+    # 01-09-2026 (PRUEBA 3, AU0201) — SALIÓ «Servicio objetado: DE URGENCIAS».
+    # La glosa no nombraba ningún procedimiento y no había CUPS, así que la
+    # extracción se quedó con un jirón de frase. Un renglón que empieza por
+    # preposición no es el nombre de un servicio: es lo que sobró de recortar.
+    #
+    # Decirlo así —«NO ESPECIFICADO EN LA GLOSA»— es más honesto y más útil:
+    # el gestor ve que ese dato falta y lo completa, en vez de radicar una
+    # frase rota que la entidad lee como descuido.
+    if _es_descripcion_rota(descripcion):
+        return "NO ESPECIFICADO EN LA GLOSA"
     if not descripcion:
         return ""
     return f"{descripcion} (CUPS {cups})" if en_catalogo else descripcion
@@ -10306,6 +10427,23 @@ class GlosaService:
                     logger.info("[NOTA-OPERATORIA] pertinencia quirúrgica sin citar la nota")
             except Exception as _e_no:
                 logger.debug(f"[NOTA-OPERATORIA] red no aplicada: {_e_no}")
+
+            # 01-09-2026 (PRUEBA 3) — CLÁUSULAS TRANSCRITAS QUE NADIE LEYÓ.
+            try:
+                _dict_sin_clausulas, _clau_borradas = _clausulas_transcritas_sin_respaldo(
+                    dictamen, contexto_pdf or ""
+                )
+                if _clau_borradas:
+                    dictamen = _dict_sin_clausulas
+                    _correcciones.append(
+                        "Quité del escrito el texto de una cláusula que el dictamen "
+                        "decía transcribir sin que ese contrato estuviera entre los "
+                        "soportes. Inventar la redacción de una cláusula es lo mismo "
+                        "que le reprochamos a la entidad, y expone al hospital."
+                    )
+                    logger.warning(f"[CLAUSULA-INVENTADA] borradas: {len(_clau_borradas)}")
+            except Exception as _e_ci:
+                logger.debug(f"[CLAUSULA-INVENTADA] red no aplicada: {_e_ci}")
 
             # 31-08-2026 — LA OBJECIÓN DE DINERO DESPACHADA CON UN ADJETIVO.
             try:
