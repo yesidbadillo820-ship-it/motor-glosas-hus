@@ -4307,7 +4307,7 @@ def _quitar_causal_del_servicio(servicio: str, codigo_glosa: str = "") -> str:
         return servicio
     _propio = (codigo_glosa or "").upper().strip().replace("-", "").replace(" ", "")
     limpio = re.sub(
-        r"[,;]?\s*(?:c[óo]digo|cups)\s*[:\-]?\s*"
+        r"[,;–—-]?\s*(?:c[óo]digo|cups)\s*[:\-]?\s*"
         r"((?:TA|SO|FA|CL|CO|AU|SA|DE)\s*-?\s*\d{2,4})\b",
         lambda m: (
             ""
@@ -4320,7 +4320,10 @@ def _quitar_causal_del_servicio(servicio: str, codigo_glosa: str = "") -> str:
         servicio,
         flags=re.IGNORECASE,
     )
-    limpio = re.sub(r"\s{2,}", " ", limpio).strip(" ,;.")
+    # 01-09-2026 — al quitar «– código CL4506» quedaba «OSTEOSÍNTESIS DE FÉMUR –»
+    # con el guion colgando. El guion largo, el corto y los dos puntos también
+    # se barren: un renglón que termina en signo delata que algo se borró ahí.
+    limpio = re.sub(r"\s{2,}", " ", limpio).strip(" ,;.:–—-")
     return limpio or servicio
 
 
@@ -4367,6 +4370,24 @@ _RE_DEFENSA_TARIFARIA_REAL = re.compile(
 )
 
 
+def _objecion_de_dinero_sin_resolver(texto_glosa: str, argumento: str) -> bool:
+    """True si la glosa objeta plata y la argumentación no la contesta.
+
+    Más amplia que `_objecion_de_dinero_con_relleno`: aquella exige que además
+    haya una fórmula vacía. Esta cubre el caso de la primera corrida —silencio
+    total— y el de la tercera —el adjetivo—, que para el hospital son lo mismo:
+    esa parte del dinero se ratifica.
+    """
+    if not texto_glosa or not argumento:
+        return False
+    from app.services.glosa_ia_prompts import FAMILIAS_DE_OBJECION
+
+    fam = next((f for f in FAMILIAS_DE_OBJECION if f[0] == "tarifa"), None)
+    if fam is None or not fam[2].search(texto_glosa.upper()):
+        return False
+    return not _RE_DEFENSA_TARIFARIA_REAL.search(argumento)
+
+
 def _objecion_de_dinero_con_relleno(texto_glosa: str, dictamen: str) -> bool:
     """True si la glosa objeta plata y el dictamen la despachó con un adjetivo.
 
@@ -4387,6 +4408,88 @@ def _objecion_de_dinero_con_relleno(texto_glosa: str, dictamen: str) -> bool:
     if not _RE_RELLENO_TARIFARIO.search(dictamen):
         return False
     return not _RE_DEFENSA_TARIFARIA_REAL.search(dictamen)
+
+
+def _parrafo_tarifario_determinista(
+    texto_glosa: str, ficha_contrato: Optional[dict], valor_objetado: str = ""
+) -> str:
+    """El párrafo que contesta el tope contractual, armado en Python.
+
+    01-09-2026. Pedido del auditor después de tres corridas: «el modelo no es
+    confiable para armar el párrafo del tope contractual, sácalo del prompt».
+    Tiene razón y la evidencia lo respalda — ante «EL VALOR UNITARIO DEL CLAVO
+    SUPERA EL TOPE CONTRACTUAL» la IA escribió, en corridas distintas, nada y
+    después «EL VALOR FACTURADO SE AJUSTA A LA COMPLEJIDAD DEL PROCEDIMIENTO».
+
+    Este párrafo no se le pide a nadie: se arma con lo que el motor YA SABE de
+    la malla contractual y se inyecta tal cual. Cadena vacía cuando la glosa no
+    objeta dinero, que es cuando no hace falta.
+
+    Qué dice y qué NO dice. Afirma tres cosas verificables —qué contrato rige,
+    qué tarifa resulta de él, y que un tope debe constar por escrito— y le pide
+    a la entidad la cláusula. NO afirma que el valor cobrado sea correcto: eso
+    depende del tarifario y de la fecha del servicio, y el motor no siempre los
+    tiene. Prometer más de lo que se puede probar es lo que hace que la entidad
+    ratifique.
+    """
+    from app.services.glosa_ia_prompts import FAMILIAS_DE_OBJECION
+
+    fam = next((f for f in FAMILIAS_DE_OBJECION if f[0] == "tarifa"), None)
+    if fam is None or not texto_glosa or not fam[2].search(texto_glosa.upper()):
+        return ""
+
+    ficha = ficha_contrato or {}
+    numero = str(ficha.get("numero") or "").strip()
+    tarifa = str(ficha.get("tarifa") or "").strip()
+    vencida = bool(ficha.get("_vigencia_vencida"))
+    sin_contrato = not numero or "SIN CONTRATO" in numero.upper()
+
+    partes: list[str] = ["EN CUANTO A LA OBJECIÓN TARIFARIA:"]
+    if sin_contrato:
+        partes.append(
+            "NO EXISTE ACUERDO DE VOLUNTADES SUSCRITO CON LA ENTIDAD, DE MODO QUE "
+            "NO HAY TOPE CONTRACTUAL QUE PUEDA INVOCARSE. A FALTA DE PACTO, LAS "
+            "ATENCIONES SE LIQUIDAN A TARIFA SOAT PLENA, SIN DESCUENTO ALGUNO, "
+            "PUES NINGÚN DESCUENTO ES APLICABLE SIN PACTO EXPRESO."
+        )
+    elif vencida:
+        # La ficha trae la advertencia pegada al número («CONTRATO CON VIGENCIA
+        # TERMINADA: 02-01-…»). Para el párrafo se usa el número solo: la
+        # advertencia ya va en su propio recuadro y repetirla aquí sonaría a
+        # muletilla, no a argumento.
+        _num_limpio = numero.split(":", 1)[-1].strip() if ":" in numero else numero
+        _num_limpio = _num_limpio.split("(")[0].strip() or numero
+        partes.append(
+            f"EL CONTRATO {_num_limpio.upper()} NO SE ENCUENTRA VIGENTE, POR LO QUE "
+            "MAL PUEDE LA ENTIDAD INVOCAR UN TOPE DERIVADO DE ÉL SIN PRECISAR LA "
+            "FECHA DE PRESTACIÓN Y LA CLÁUSULA APLICABLE."
+        )
+        if tarifa:
+            _tar_corta = tarifa.split("—")[0].split(".")[0].strip() or tarifa
+            partes.append(f"BASE TARIFARIA APLICABLE: {_tar_corta.upper()}.")
+    else:
+        partes.append(
+            f"LAS ATENCIONES SE RIGEN POR EL CONTRATO {numero.upper()}"
+            + (f", CUYA TARIFA PACTADA ES {tarifa.upper()}" if tarifa else "")
+            + "."
+        )
+
+    partes.append(
+        "LA ENTIDAD NO IDENTIFICA LA CLÁUSULA NI EL ANEXO DONDE CONSTARÍA EL "
+        "TOPE QUE ALEGA. SE SOLICITA QUE LO PRECISE: UN TOPE QUE NO CONSTA POR "
+        "ESCRITO EN EL ACUERDO NO ES OPONIBLE AL PRESTADOR. LA SUSTITUCIÓN "
+        "UNILATERAL DE LA TARIFA EN VÍA DE GLOSA VULNERA EL PRINCIPIO PACTA "
+        "SUNT SERVANDA (ART. 1602 DEL CÓDIGO CIVIL) Y LA BUENA FE CONTRACTUAL "
+        "(ART. 871 DEL CÓDIGO DE COMERCIO), Y REQUIERE ACUERDO MODIFICATORIO "
+        "ENTRE LAS PARTES."
+    )
+    if valor_objetado:
+        partes.append(
+            f"SE SOLICITA EL DESGLOSE ARITMÉTICO DE LOS {valor_objetado} OBJETADOS: "
+            "VALOR UNITARIO RECONOCIDO, TOPE QUE SE APLICA Y NORMA O CLÁUSULA "
+            "QUE LO SUSTENTA."
+        )
+    return " ".join(partes)
 
 
 def _quitar_causal_propia_del_cuerpo(texto: str, codigo_glosa: str) -> str:
@@ -4428,7 +4531,7 @@ def _quitar_causal_propia_del_cuerpo(texto: str, codigo_glosa: str) -> str:
     )
     # 2) Rotulado sin paréntesis: «, código CL4506», «con CUPS CL-4506».
     limpio = re.sub(
-        rf"[,;]?\s*(?:\b(?:con|del|de|el|la)\s+)?(?:c[óo]digo|cups)\s*[:\-]?\s*{_cod}\b",
+        rf"[,;–—-]?\s*(?:\b(?:con|del|de|el|la)\s+)?(?:c[óo]digo|cups)\s*[:\-]?\s*{_cod}\b",
         "",
         limpio,
         flags=re.IGNORECASE,
@@ -4436,6 +4539,12 @@ def _quitar_causal_propia_del_cuerpo(texto: str, codigo_glosa: str) -> str:
     # Barrer lo que quede: paréntesis vacíos y espacios dobles.
     limpio = re.sub(r"\(\s*\)", "", limpio)
     limpio = re.sub(r"\s+([,.;:])", r"\1", limpio)
+    # 01-09-2026 — AQUÍ HUBO UN BARRIDO GLOBAL DE GUIONES Y SE LLEVÓ POR
+    # DELANTE LOS TÍTULOS MULTI-CÓDIGO: «RESPUESTA AL CÓDIGO TA0201 — TARIFAS»
+    # perdía la raya. Lo cazaron tres pruebas de test_multi_codigo. Tenían
+    # razón: esta función solo puede tocar el trozo que borró, nunca el resto
+    # del escrito. El separador que precede al código ya lo consume el propio
+    # patrón de arriba, así que no hace falta ningún barrido global.
     limpio = re.sub(r"[ \t]{2,}", " ", limpio)
     return limpio if limpio.strip() else texto
 
@@ -6283,7 +6392,12 @@ def _objeciones_sin_contestar(texto_glosa: str, dictamen: str) -> list[str]:
         return []
     from app.services.glosa_ia_prompts import objeciones_no_respondidas
 
-    return objeciones_no_respondidas(texto_glosa, dictamen)
+    # 01-09-2026 — LA RED SE ESTABA CALLANDO SOLA. El recuadro «Contrato /
+    # Tarifa aplicada» que el propio motor inyecta trae las palabras TARIFA y
+    # SOAT; al buscarlas en el dictamen ENTERO, la red daba por contestada una
+    # objeción de tarifa que la argumentación nunca tocó. Se pregunta solo por
+    # el argumento, que es lo que la entidad lee como defensa.
+    return objeciones_no_respondidas(texto_glosa, _solo_texto_argumento(dictamen) or dictamen)
 
 
 def _nota_operatoria_sin_citar(
@@ -8835,6 +8949,32 @@ class GlosaService:
             except Exception as _e_vv:
                 logger.debug(f"[VIGENCIA-VENCIDA] guarda no aplicada: {_e_vv}")
             arg_ia = self._xml("argumento", res_ia, "")
+            # 01-09-2026 — EL PÁRRAFO DEL TOPE LO ARMA EL MOTOR, NO EL MODELO.
+            # Tres corridas de la prueba 2 con el mismo resultado: la objeción
+            # de dinero salía muda o con un adjetivo. Se saca del prompt y se
+            # arma con los datos duros de la malla.
+            #
+            # Se INYECTA solo si la argumentación no la resolvió: cuando la IA
+            # sí trae contrato, tarifa o la exigencia de la cláusula, se respeta
+            # lo que escribió — el párrafo del motor es la red, no la norma.
+            try:
+                if arg_ia and _objecion_de_dinero_sin_resolver(texto_base, arg_ia):
+                    _parr_tar = _parrafo_tarifario_determinista(
+                        texto_base,
+                        locals().get("_ficha_vig"),
+                        str(locals().get("valor_raw") or ""),
+                    )
+                    if _parr_tar:
+                        arg_ia = arg_ia.rstrip() + " " + _parr_tar
+                        _correcciones_previas.append(
+                            "La glosa objetaba el tope tarifario y la argumentación no "
+                            "lo resolvía. Agregué el párrafo con el contrato, la tarifa "
+                            "y la exigencia de la cláusula del tope — armado con los "
+                            "datos de la malla contractual, no redactado por la IA."
+                        )
+                        logger.info("[PARRAFO-TARIFARIO] inyectado por el motor")
+            except Exception as _e_pt:
+                logger.debug(f"[PARRAFO-TARIFARIO] no aplicado: {_e_pt}")
             normas_clave = self._xml("normas_clave", res_ia, "")
 
             # ── Mejora #3: cruzar campos estructurados vs deterministas ──

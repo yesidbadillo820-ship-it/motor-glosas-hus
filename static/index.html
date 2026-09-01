@@ -2259,12 +2259,12 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     </div>
     <div class="hdr-right">
       <div class="hdr-kpis" id="hdr-kpis" style="display:flex;align-items:center;gap:.8rem;padding:.25rem .7rem;margin-right:.4rem;background:rgba(255,255,255,.08);border-radius:20px;font-size:.7rem;color:rgba(255,255,255,.85);font-weight:600;letter-spacing:.2px;">
-        <span id="hdr-kpi-glosas" title="Glosas analizadas hoy" style="display:inline-flex;align-items:center;gap:.3rem">
+        <span id="hdr-kpi-glosas" title="Glosas registradas este mes — el contador arranca de cero cada día 1" style="display:inline-flex;align-items:center;gap:.3rem">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.85"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           <span data-num="—">—</span>
         </span>
         <span style="opacity:.3">·</span>
-        <span id="hdr-kpi-recuperado" title="Valor recuperado este mes" style="display:inline-flex;align-items:center;gap:.3rem">
+        <span id="hdr-kpi-recuperado" title="Valor recuperado este mes — también arranca de cero cada día 1" style="display:inline-flex;align-items:center;gap:.3rem">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.85"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           <span data-num="—">—</span>
         </span>
@@ -8000,7 +8000,13 @@ async function refrescarKpisHeader(){
       if(span) span.textContent = valor;
       else el.textContent = valor;  // fallback si la estructura cambia
     }
-    _setKpi($('hdr-kpi-glosas'), fmtNum(a.glosas_mes || 0) + ' glosas');
+    // 01-09-2026 — DECÍA «148 glosas» Y EL title DECÍA «analizadas hoy»,
+    // pero el dato es del MES (glosa_repository.analytics filtra por
+    // extract('month', creado_en) == mes actual). El 1 de septiembre el
+    // encabezado amaneció en «0 glosas · $0» y el auditor creyó que se
+    // habían borrado las 148 de agosto. No se perdió nada: cambió el mes.
+    // La métrica está bien; lo que engañaba era el rótulo.
+    _setKpi($('hdr-kpi-glosas'), fmtNum(a.glosas_mes || 0) + ' glosas este mes');
     var rec = a.valor_recuperado_mes || 0;
     _setKpi($('hdr-kpi-recuperado'), (rec > 0 ? cop(rec) : '$0'));
     // Pendientes: glosas con fecha_vencimiento próxima

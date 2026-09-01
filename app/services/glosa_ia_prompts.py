@@ -2665,10 +2665,16 @@ RE_PERTINENCIA_QUIRURGICA = re.compile(
     re.IGNORECASE,
 )
 
+# 01-09-2026 — el archivo se llamaba «nota_operatoria.pdf» y la regla no
+# disparó: exigía un ESPACIO entre las dos palabras y ahí venían pegadas con
+# guion bajo. El nombre del archivo es evidencia igual que su contenido; el
+# separador puede ser espacio, guion bajo o guion.
+_SEP = r"[\s_\-]+"
 RE_NOTA_OPERATORIA_EN_PDF = re.compile(
-    r"NOTA\s+(?:OPERATORIA|QUIR[UÚ]RGICA)|DESCRIPCI[ÓO]N\s+(?:QUIR[UÚ]RGICA|"
-    r"DEL\s+PROCEDIMIENTO)|PROTOCOLO\s+(?:OPERATORIO|QUIR[UÚ]RGICO)|"
-    r"REPORTE\s+(?:OPERATORIO|QUIR[UÚ]RGICO)",
+    rf"NOTA{_SEP}(?:OPERATORIA|QUIR[UÚ]RGICA)|"
+    rf"DESCRIPCI[ÓO]N{_SEP}(?:QUIR[UÚ]RGICA|DEL{_SEP}PROCEDIMIENTO)|"
+    rf"PROTOCOLO{_SEP}(?:OPERATORIO|QUIR[UÚ]RGICO)|"
+    rf"REPORTE{_SEP}(?:OPERATORIO|QUIR[UÚ]RGICO)",
     re.IGNORECASE,
 )
 
