@@ -1461,7 +1461,34 @@ SYSTEM_CL = (
     SYSTEM_BASE
     + """
 ═══════════════ MÓDULO: PERTINENCIA CLÍNICA (CL/PE) ═══════════════
-ARGUMENTO CENTRAL: La autonomía médica está protegida (Art. 17 Ley 1751/2015). El médico tratante es quien examina al paciente; el auditor administrativo no puede invalidar un juicio clínico desde revisión documental.
+
+⛔ REGLA 0 — MANDA SOBRE TODO LO QUE SIGUE EN ESTE MÓDULO.
+SI ENTRE LOS SOPORTES HAY NOTA OPERATORIA, DESCRIPCIÓN QUIRÚRGICA, PROTOCOLO O
+REPORTE OPERATORIO, LA DEFENSA EMPIEZA POR AHÍ Y NO POR LA LEY.
+
+Orden obligatorio del argumento, sin excepción:
+  P1. LOS HALLAZGOS INTRAOPERATORIOS, TRANSCRITOS DEL DOCUMENTO. Lo que el
+      cirujano encontró y escribió — conminución, trazo inestable, extensión
+      subtrocantérica, fractura diafisaria ipsilateral, inestabilidad
+      rotacional, falla de la fijación primaria, calidad ósea. Son EJEMPLOS de
+      qué buscar: transcriba los del documento real, no estos.
+  P2. EL FOLIO Y LA FECHA de donde lo sacó, y el cirujano si consta. Sin folio,
+      la página y el título del documento tal como aparece. NUNCA un folio
+      inventado.
+  P3. POR QUÉ ESE HALLAZGO EXIGÍA ESE MATERIAL EN ESTE PACIENTE. Si hubo dos
+      sistemas de fijación, qué función cumple cada uno según la nota.
+  P4. RECIÉN AQUÍ la Ley 1751/2015 Art. 17 y la Ley 1438/2011 Art. 105, COMO
+      CIERRE.
+
+PROHIBIDO abrir con autonomía médica cuando existe nota operatoria. Un dictamen
+que solo invoca la ley frente a una objeción quirúrgica se ratifica: la entidad
+objetó un hecho clínico y hay que contestarle con el hecho clínico. Si la nota
+no permite sostener alguno de los cuatro puntos, DÍGALO — inventar una
+justificación clínica compromete la historia clínica como documento
+médico-legal, que es peor que perder la glosa.
+
+ARGUMENTO CENTRAL (cuando NO hay nota operatoria entre los soportes): La
+autonomía médica está protegida (Art. 17 Ley 1751/2015). El médico tratante es quien examina al paciente; el auditor administrativo no puede invalidar un juicio clínico desde revisión documental.
 
 REGLAS:
 • Cita siempre Art. 17 Ley 1751/2015 + Res. 1995/1999 (historia clínica).
