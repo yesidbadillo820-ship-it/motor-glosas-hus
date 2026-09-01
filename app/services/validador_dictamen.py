@@ -471,18 +471,35 @@ _CITAS_INCORRECTAS = [
 _EMAILS_CONTACTO = ("CARTERA@HUS.GOV.CO", "GLOSASYDEVOLUCIONES@HUS.GOV.CO")
 
 
-def _extraer_argumento_xml(xml: str) -> Optional[str]:
-    """Extrae el contenido de <argumento>...</argumento>."""
-    if not xml:
+def _extraer_argumento_xml(bruto: str) -> Optional[str]:
+    """El argumento del modelo, venga en XML o en el contrato JSON.
+
+    01-09-2026. Con la bandera `glosa_salida_json` encendida el modelo ya no
+    devuelve `<argumento>`: devuelve un objeto JSON con `justificacion_clinica`
+    y `fundamentos_ley`. Este validador buscaba solo la etiqueta, así que
+    habría rechazado por «falta el tag <argumento>» un dictamen perfectamente
+    bueno — y peor: lo habría rechazado por una razón que no existe, mandando
+    al gestor a buscar un defecto imaginario.
+
+    Se prueban las dos formas. Primero el XML, que es el camino de siempre y
+    el que usa `dictamen_directo`; después el JSON.
+    """
+    if not bruto:
         return None
     m = re.search(
         r"<argumento>(.*?)</argumento>",
-        xml,
+        bruto,
         re.IGNORECASE | re.DOTALL,
     )
-    if not m:
+    if m:
+        return (m.group(1) or "").strip()
+    try:
+        from app.services.respuesta_ia_estructurada import parsear_respuesta_ia
+
+        resp = parsear_respuesta_ia(bruto)
+    except Exception:  # noqa: BLE001 — el validador nunca tumba un dictamen
         return None
-    return (m.group(1) or "").strip()
+    return resp.argumento() if resp is not None else None
 
 
 def detectar_defectos_criticos(
