@@ -72,10 +72,17 @@ class TestElDictamenLosRelaciona:
         assert "epicrisis.pdf" in html
 
     def test_no_afirma_que_obren_en_el_expediente(self):
-        """Eso lo verifica el índice, y en este camino no se verificó."""
+        """Eso lo verifica el índice, y en este camino no se verificó.
+
+        31-08-2026: el texto de la nota cambió al sacar el bloque de la rama
+        del índice. Lo que la prueba vigila NO cambió —que el escrito no
+        afirme que lo adjuntado obra en el expediente institucional— así que
+        se ancla en la afirmación, no en la redacción exacta.
+        """
         html = self._html(adjuntos=["nota_operatoria.pdf"])
         assert "RELACIÓN DE SOPORTES APORTADOS" not in html
-        assert "queda pendiente del índice" in html
+        assert "obran en el expediente" not in html.lower()
+        assert "índice del servidor de radicación" in html
 
     def test_sin_adjuntos_no_pinta_la_tabla(self):
         html = self._html(adjuntos=[])

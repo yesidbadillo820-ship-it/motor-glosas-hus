@@ -2514,6 +2514,181 @@ def _articulos_fuera_de_tema(codigo: str, texto_glosa: str) -> set:
     return set()
 
 
+# ── Objeciones que caben en una sola glosa (31-08-2026, prueba 2 CL4506) ──
+# El código de la glosa dice cuál es el motivo PRINCIPAL, no el único. La
+# CL4506 objetaba pertinencia Y «ADICIONALMENTE EL VALOR UNITARIO DEL CLAVO
+# SUPERA EL TOPE CONTRACTUAL»; el dictamen contestó la primera y calló la
+# segunda. Lo que no se contesta se ratifica.
+#
+# El bloque multi-concepto que ya existía solo dispara con DOS CÓDIGOS de
+# glosa. Acá hay uno solo y dos objeciones en prosa: por eso no lo cubría.
+#
+# Esta tabla es la fuente única: la usa el prompt (para exigir el párrafo
+# antes de redactar) y la usa el motor (para avisar si aun así faltó).
+FAMILIAS_DE_OBJECION: tuple[tuple[str, str, "re.Pattern[str]", tuple[str, ...]], ...] = (
+    (
+        "tarifa",
+        "el mayor valor o el tope tarifario",
+        re.compile(
+            r"TOPE\s+CONTRACTUAL|SUPERA\s+EL\s+TOPE|MAYOR\s+VALOR|"
+            r"VALOR\s+UNITARIO|TARIFA\s+PACTADA|EXCEDE\s+LA\s+TARIFA|SOBRECOSTO"
+        ),
+        ("TARIFA", "TOPE", "VALOR UNITARIO", "PACTA SUNT SERVANDA", "SOAT", "MAYOR VALOR"),
+    ),
+    (
+        "autorización",
+        "la falta de autorización previa",
+        re.compile(
+            r"(?:SIN|NO|CARECE\s+DE|FALTA\s+DE)\s+AUTORIZAC|AUTORIZACI[ÓO]N\s+PREVIA|"
+            r"NO\s+AUTORIZAD[OA]"
+        ),
+        ("AUTORIZAC", "URGENCIA", "ART. 67", "ARTICULO 67", "ARTÍCULO 67"),
+    ),
+    (
+        # «NO SE EVIDENCIA» a secas NO es glosa de soportes: en la CL4506 la
+        # frase era «NO SE EVIDENCIA JUSTIFICACION DE AMBOS SISTEMAS», que es
+        # pertinencia pura. Lo que distingue una glosa de soportes es QUÉ
+        # falta: un DOCUMENTO con nombre propio, no una justificación clínica.
+        "soportes",
+        "los soportes que la entidad echa de menos",
+        re.compile(
+            r"(?:NO\s+SE\s+(?:EVIDENCIA|ANEXA|APORTA|ADJUNTA)|NO\s+(?:ANEXA|APORTA|"
+            r"ADJUNTA)|SIN|FALTA(?:N)?(?:\s+DE)?|AUSENCIA\s+DE|CARECE\s+DE)"
+            r"[^.\n]{0,40}?"
+            r"(?:HISTORIA\s+CL[IÍ]NICA|EPICRISIS|RIPS|ORDEN\s+M[EÉ]DICA|"
+            r"DESCRIPCI[ÓO]N\s+QUIR[UÚ]RGICA|NOTA\s+(?:OPERATORIA|DE\s+ENFERMER[ÍI]A)|"
+            r"SOPORTE|ANEXO|INFORME|RESULTADO\s+DE|HOJA\s+DE|COMPROBANTE)"
+        ),
+        ("SOPORTE", "HISTORIA CLINICA", "HISTORIA CLÍNICA", "FOLIO", "EPICRISIS", "ANEXA"),
+    ),
+    (
+        "cantidad",
+        "la cantidad o el número de unidades cobradas",
+        re.compile(
+            r"CANTIDAD\s+COBRADA|MAYOR\s+CANTIDAD|UNIDADES\s+DE\s+M[ÁA]S|"
+            r"DOBLE\s+COBRO|COBRO\s+DUPLICADO"
+        ),
+        ("CANTIDAD", "UNIDAD", "DUPLICAD", "DOBLE COBRO"),
+    ),
+    (
+        "pertinencia",
+        "la pertinencia clínica del servicio",
+        re.compile(
+            r"PERTINENCIA|NO\s+PERTINENTE|NO\s+ACORDE\s+A\s+GPC|"
+            r"(?:SIN|NO\s+SE\s+EVIDENCIA)\s+JUSTIFICACI[ÓO]N|"
+            r"SIN\s+JUSTIFICACI[ÓO]N\s+CL[IÍ]NICA|NO\s+SE\s+JUSTIFICA"
+        ),
+        ("PERTINEN", "AUTONOMIA", "AUTONOMÍA", "MEDICO TRATANTE", "MÉDICO TRATANTE"),
+    ),
+)
+
+# Con qué palabras encadena una entidad la segunda objeción. Sin alguna de
+# ellas no se afirma que haya dos: una glosa puede nombrar la tarifa de paso.
+RE_HAY_SEGUNDA_OBJECION = re.compile(
+    r"\b(?:ADICIONALMENTE|AS[ÍI]\s+MISMO|ASIMISMO|IGUALMENTE|ADEM[ÁA]S|"
+    r"POR\s+OTRA\s+PARTE|AUNADO\s+A|DE\s+IGUAL\s+(?:FORMA|MANERA)|"
+    r"AS[ÍI]\s+COMO\s+TAMBI[ÉE]N)\b",
+    re.IGNORECASE,
+)
+
+# Con qué se contesta cada objeción. Va al prompt para que la IA no resuelva
+# la segunda con las normas de la primera.
+FUNDAMENTO_POR_FAMILIA: dict[str, str] = {
+    "tarifa": (
+        "el CONTRATO y su tarifa — PACTA SUNT SERVANDA (Art. 1602 C.C., Art. 871 "
+        "C.Co.): la tarifa no se modifica unilateralmente en vía de glosa. "
+        "OBLIGATORIO nombrar el CONTRATO y la TARIFA que van en <contrato> y "
+        "<tarifa> de tu propia respuesta, con esas palabras exactas. Si la "
+        "entidad alega un TOPE, EXÍGELE la CLÁUSULA y el NÚMERO donde consta: "
+        "un tope que no aparece en el contrato no existe, y así hay que decirlo. "
+        "Si <tarifa> dice que NO está determinada o que la vigencia terminó, ESO "
+        "es lo que se escribe —y se pide la fecha de prestación—, no una tarifa "
+        "inventada"
+    ),
+    "autorización": (
+        "Art. 67 Ley 715/2001 y Art. 168 Ley 100/1993 — la urgencia está "
+        "exceptuada de autorización previa"
+    ),
+    "soportes": (
+        "Res. 1995/1999 y Decreto 4747/2007 Art. 21, citando el DOCUMENTO REAL "
+        "del expediente con su folio"
+    ),
+    "cantidad": ("el registro de administración/consumo del expediente, unidad por unidad"),
+    "pertinencia": (
+        "la justificación clínica del médico tratante TOMADA DEL EXPEDIENTE, con "
+        "el Art. 17 Ley 1751/2015 solo como cierre"
+    ),
+}
+
+
+def familias_de_objecion_en(
+    texto: str,
+) -> list[tuple[str, str, "re.Pattern[str]", tuple[str, ...]]]:
+    """Las familias de objeción que el texto plantea, si plantea más de una.
+
+    Lista vacía cuando hay una sola objeción, o cuando el texto no encadena
+    con «adicionalmente», «además»… Prudente a propósito: sin conector no se
+    cuenta como segunda objeción.
+    """
+    if not texto:
+        return []
+    txt_up = texto.upper()
+    if not RE_HAY_SEGUNDA_OBJECION.search(txt_up):
+        return []
+    presentes = [fam for fam in FAMILIAS_DE_OBJECION if fam[2].search(txt_up)]
+    return presentes if len(presentes) >= 2 else []
+
+
+def objeciones_no_respondidas(texto_glosa: str, dictamen: str) -> list[str]:
+    """Objeciones que la glosa plantea y el dictamen no menciona."""
+    if not dictamen:
+        return []
+    dict_up = dictamen.upper()
+    return [
+        fam[1]
+        for fam in familias_de_objecion_en(texto_glosa or "")
+        if not any(p in dict_up for p in fam[3])
+    ]
+
+
+# ── Cirugía: la nota operatoria se lee, no se invoca (31-08-2026) ──
+# Pedido textual del auditor sobre la CL4506: «escudarse en la autonomía
+# médica sin justificar clínicamente el uso de doble material (clavo + placa)
+# garantiza que la EPS ratifique la glosa». Tiene razón: contra una glosa de
+# pertinencia QUIRÚRGICA la Ley 1751 sola no prueba nada — lo que prueba es lo
+# que el cirujano escribió y por qué.
+RE_PERTINENCIA_QUIRURGICA = re.compile(
+    r"OSTEOS[IÍ]NTESIS|MATERIAL\s+DE\s+FIJACI[ÓO]N|CLAVO\s+(?:CEFALOMEDULAR|"
+    r"ENDOMEDULAR|INTRAMEDULAR)|PLACA\s+(?:DCP|LCP|BLOQUEADA)|TORNILLO|"
+    r"PR[ÓO]TESIS|IMPLANTE|ARTROPLASTIA|ARTRODESIS|SISTEMAS?\s+DE\s+FIJACI[ÓO]N|"
+    r"ACTO\s+QUIR[UÚ]RGICO|INTERVENCI[ÓO]N\s+QUIR[UÚ]RGICA",
+    re.IGNORECASE,
+)
+
+RE_NOTA_OPERATORIA_EN_PDF = re.compile(
+    r"NOTA\s+(?:OPERATORIA|QUIR[UÚ]RGICA)|DESCRIPCI[ÓO]N\s+(?:QUIR[UÚ]RGICA|"
+    r"DEL\s+PROCEDIMIENTO)|PROTOCOLO\s+(?:OPERATORIO|QUIR[UÚ]RGICO)|"
+    r"REPORTE\s+(?:OPERATORIO|QUIR[UÚ]RGICO)",
+    re.IGNORECASE,
+)
+
+
+def exige_nota_operatoria(codigo: str, texto_glosa: str, contexto_pdf: str) -> bool:
+    """True si esta glosa se contesta leyendo la nota operatoria.
+
+    Las tres condiciones a la vez: es de pertinencia (CL/PE), el objeto es
+    quirúrgico o de osteosíntesis, y la nota está entre lo aportado. Sin la
+    tercera no se exige citar un documento que nadie entregó — pedir que se
+    cite lo que no existe es pedir que se invente.
+    """
+    prefijo = (codigo or "")[:2].upper()
+    if prefijo not in ("CL", "PE"):
+        return False
+    if not RE_PERTINENCIA_QUIRURGICA.search(texto_glosa or ""):
+        return False
+    return bool(RE_NOTA_OPERATORIA_EN_PDF.search(contexto_pdf or ""))
+
+
 def build_user_prompt(
     texto_glosa: str,
     contexto_pdf: str,
@@ -2677,6 +2852,72 @@ def build_user_prompt(
             "COBERTURA=Ley 1751/2015. NO mezcles las defensas en un solo parrafo generico.\n"
             "En la TABLA CODIGOS DE LA RESPUESTA debe aparecer una FILA por cada concepto, "
             "no una sola fila combinada.\n"
+        )
+
+    # ─── SEGUNDA OBJECION EN PROSA (31-08-2026, prueba 2 CL4506) ───
+    # El bloque multi-concepto de arriba exige DOS CODIGOS. Acá hay uno solo
+    # y dos objeciones dentro del mismo párrafo. Es el caso que se perdía.
+    bloque_segunda_objecion_str = ""
+    _fams = familias_de_objecion_en(texto_glosa or "")
+    if _fams:
+        _lineas = "\n".join(
+            f"  • ({chr(105) * (i + 1)}) EN CUANTO A {f[1].upper()}: "
+            f"resuélvala con {FUNDAMENTO_POR_FAMILIA.get(f[0], 'la norma que le corresponde')}."
+            for i, f in enumerate(_fams)
+        )
+        bloque_segunda_objecion_str = (
+            "\n[⚠ ESTA GLOSA OBJETA MAS DE UNA COSA — " + ", ".join(f[1] for f in _fams) + "]\n"
+            "El codigo de la glosa nombra el motivo PRINCIPAL, no el unico. El texto "
+            "encadena una segunda objecion. OBLIGATORIO: UN PARRAFO INDEPENDIENTE POR "
+            "CADA UNA, nombrandola al abrir el parrafo. Lo que no se contesta se "
+            "ratifica y el hospital pierde esa plata sin haberla discutido.\n"
+            f"{_lineas}\n"
+            "PROHIBIDO resolver la segunda con las normas de la primera, y PROHIBIDO "
+            "omitirla. Si no hay con que contestarla en el expediente, DIGA QUE FALTA "
+            "y pida el dato — pero no la deje en silencio.\n"
+            # 31-08-2026, tercera corrida: ante el tope contractual la IA
+            # escribio «EL VALOR FACTURADO SE AJUSTA A LA COMPLEJIDAD DEL
+            # PROCEDIMIENTO». Eso no defiende nada: no cita contrato, no cita
+            # tarifa, no exige la clausula. En auditoria se ratifica solo.
+            "PROHIBIDAS las formulas vacias para contestar una objecion de dinero. "
+            "Estan EXPRESAMENTE prohibidas, entre otras: «se ajusta a la complejidad "
+            "del procedimiento», «corresponde a los estandares del mercado», «el valor "
+            "es razonable», «acorde con la naturaleza del servicio». Una objecion de "
+            "TARIFA o de TOPE se contesta con TRES cosas concretas o no se contesta: "
+            "(1) el NUMERO del contrato, (2) la TARIFA aplicable tal como aparece en "
+            "<tarifa>, y (3) la exigencia de que la entidad muestre la CLAUSULA del "
+            "tope que invoca. Si te faltan datos para las tres, DILO — pedir el dato "
+            "es defensa; llenar el renglon con un adjetivo no lo es.\n"
+        )
+
+    # ─── PERTINENCIA QUIRURGICA: SE CONTESTA CON LA NOTA OPERATORIA ───
+    # Pedido del auditor sobre la CL4506: la autonomia medica a secas, sin
+    # decir POR QUE el cirujano puso clavo Y placa, garantiza la ratificacion.
+    bloque_nota_operatoria_str = ""
+    if exige_nota_operatoria(codigo, texto_glosa or "", contexto_pdf or ""):
+        bloque_nota_operatoria_str = (
+            "\n[⚠ PERTINENCIA QUIRURGICA — LA NOTA OPERATORIA ESTA ENTRE LOS SOPORTES]\n"
+            "PROHIBIDO defender esta glosa con la plantilla juridica de autonomia "
+            "medica como argumento PRINCIPAL. Contra una objecion quirurgica el Art. 17 "
+            "de la Ley 1751/2015 no prueba nada por si solo: prueba lo que el cirujano "
+            "escribio y por que.\n"
+            "OBLIGATORIO, en este orden:\n"
+            "  • P1 — Localice la NOTA OPERATORIA en los documentos aportados y extraiga "
+            "la JUSTIFICACION CLINICA EXACTA del cirujano para el material empleado "
+            "(por ejemplo: inestabilidad del trazo, conminucion, falla de la fijacion "
+            "primaria, extension subtrocanterica, calidad osea). TRANSCRIBA lo que dice "
+            "el documento, no lo resuma en generico.\n"
+            "  • P2 — CITE el folio y la fecha exactos de donde lo saco, y el nombre del "
+            "cirujano si consta. Si el documento no trae folio, diga la pagina y el "
+            "titulo del documento tal como aparece. NUNCA invente un numero de folio.\n"
+            "  • P3 — Explique por que ESE hallazgo hacia necesario ESE material en ESTE "
+            "paciente. Si se usaron dos sistemas de fijacion, diga que funcion cumple "
+            "cada uno segun la nota.\n"
+            "  • P4 — CIERRE con el Art. 17 Ley 1751/2015 y el Art. 105 Ley 1438/2011. "
+            "Solo el cierre.\n"
+            "Si la nota operatoria NO permite sostener alguno de estos puntos, digalo "
+            "expresamente. Inventar una justificacion clinica es peor que perder la "
+            "glosa: compromete la historia clinica como documento medico-legal.\n"
         )
 
     # ─── DETECCION AUTOMATICA DE VICIOS PROCEDIMENTALES (mayo 2026) ───
@@ -3534,7 +3775,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_datos_clinicos_str}{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_contexto_enriquecido_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_vicios_str}{bloque_ratificacion_str}{bloque_referencias_str}
+{bloque_datos_clinicos_str}{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_contexto_enriquecido_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_segunda_objecion_str}{bloque_nota_operatoria_str}{bloque_vicios_str}{bloque_ratificacion_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 
