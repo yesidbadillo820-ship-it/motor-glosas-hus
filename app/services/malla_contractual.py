@@ -628,3 +628,41 @@ def estado_vigencia(hoy: date, dias_aviso: int = DIAS_AVISO_VENCIMIENTO) -> dict
 
 def pagadores() -> list[str]:
     return sorted({c.pagador for c in MALLA})
+
+
+def _clave_numero(numero: str) -> str:
+    """El número de contrato sin puntuación, para poder compararlos.
+
+    En la malla el contrato de FAMISANAR está escrito «S13103104958» y la
+    ficha lo muestra como «S-13-1-03-1-04958». Es el mismo contrato. Sin
+    normalizar, cualquier comparación diría que no coinciden.
+    """
+    return re.sub(r"[^A-Z0-9]", "", (numero or "").upper())
+
+
+def titular_del_contrato(numero: str) -> str:
+    """Con quién está firmado ese contrato, según la malla. "" si no aparece.
+
+    01-09-2026, prueba 3 de estrés (AU0201, factura HUS0000602233). FAMISANAR
+    glosó invocando «la cláusula décima segunda del CONTRATO 440-DIGSA». Ese
+    contrato existe —es real— pero está firmado con la Dirección de Sanidad
+    del Ejército, Dispensario Médico de Bucaramanga. No con FAMISANAR.
+
+    Poder NOMBRAR al verdadero titular es lo que convierte la refutación en
+    algo verificable: la entidad puede comprobarlo, y no le queda margen.
+
+    Se acepta la coincidencia parcial porque las entidades citan el contrato
+    a medias: la glosa decía «440-DIGSA» y en la malla es
+    «440-DIGSA/DMBUG-2025». Se exige un mínimo de 6 caracteres útiles para
+    que un fragmento corto no empareje con cualquier cosa.
+    """
+    clave = _clave_numero(numero)
+    if len(clave) < 6:
+        return ""
+    for c in MALLA:
+        propio = _clave_numero(c.numero)
+        if not propio:
+            continue
+        if clave == propio or clave in propio or propio in clave:
+            return c.nombre_malla or c.pagador
+    return ""

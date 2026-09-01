@@ -4451,6 +4451,105 @@ def _objecion_de_dinero_con_relleno(texto_glosa: str, dictamen: str) -> bool:
     return not _RE_DEFENSA_TARIFARIA_REAL.search(dictamen)
 
 
+# ── El contrato que la entidad invoca y no es el suyo (01-09-2026) ──
+# Prueba 3 de estrés, glosa AU0201, factura HUS0000602233. FAMISANAR glosó
+# $2.640.000 «CONFORME A LA CLÁUSULA DÉCIMA SEGUNDA DEL CONTRATO 440-DIGSA».
+#
+# Dos cosas están mal ahí, y el dictamen no dijo ninguna: ese contrato NO es de
+# FAMISANAR —está firmado con la Dirección de Sanidad del Ejército, Dispensario
+# Médico de Bucaramanga— y la cláusula que invoca no existe en él.
+#
+# El motor sí trajo bien el contrato real (S-13-1-03-1-04958) y su tarifa, pero
+# se limitó a ponerlos en su recuadro. Ignorar el contrato ajeno en vez de
+# refutarlo deja en pie el fundamento de la glosa: si nadie lo niega, queda
+# aceptado.
+#
+# Esto NO se le pide a la IA. Es una comparación de dos cadenas contra la malla:
+# o coinciden o no. Justo el tipo de cosa que no debe depender de un modelo.
+_RE_CONTRATO_EN_GLOSA = re.compile(
+    r"\bCONTRATO\s*(?:N[°ºo]\.?|NO\.?|NRO\.?|N[UÚ]MERO)?\s*[:\-]?\s*"
+    r"([A-Z0-9][A-Z0-9\-/\.]{4,29})",
+    re.IGNORECASE,
+)
+
+
+def _contratos_citados_en_glosa(texto_glosa: str) -> list[str]:
+    """Los números de contrato que la ENTIDAD nombra en su glosa."""
+    if not texto_glosa:
+        return []
+    vistos: list[str] = []
+    for m in _RE_CONTRATO_EN_GLOSA.finditer(texto_glosa):
+        num = (m.group(1) or "").strip(" .,;:")
+        # Un «contrato» sin un solo dígito casi siempre es prosa recortada
+        # («CONTRATO VIGENTE», «CONTRATO SUSCRITO»), no un número.
+        if (
+            num
+            and any(ch.isdigit() for ch in num)
+            and num.upper() not in {v.upper() for v in vistos}
+        ):
+            vistos.append(num)
+    return vistos[:3]
+
+
+def _parrafo_contrato_ajeno(texto_glosa: str, ficha_contrato: Optional[dict], eps: str = "") -> str:
+    """Refuta el contrato ajeno en el que la entidad funda su glosa.
+
+    Cadena vacía cuando no hay nada que refutar: la entidad no citó contrato,
+    citó el correcto, o el motor no sabe cuál es el de esta EPS —y sin saberlo
+    no se puede afirmar que el citado sea ajeno—.
+
+    Se nombra al VERDADERO titular cuando la malla lo conoce. Eso es lo que
+    hace la refutación verificable: la entidad puede comprobarlo y no le queda
+    margen. Cuando no se conoce, se dice lo único sostenible: que no consta
+    como la relación con esta entidad.
+    """
+    citados = _contratos_citados_en_glosa(texto_glosa)
+    if not citados:
+        return ""
+    numero_real = str((ficha_contrato or {}).get("numero") or "").strip()
+    if not numero_real or "SIN CONTRATO" in numero_real.upper():
+        return ""
+
+    from app.services.malla_contractual import _clave_numero, titular_del_contrato
+
+    # La ficha trae la advertencia pegada al número cuando la vigencia terminó.
+    _limpio_real = numero_real.split(":", 1)[-1].split("(")[0].strip()
+    clave_real = _clave_numero(_limpio_real)
+    ajenos = [
+        c
+        for c in citados
+        if clave_real
+        and _clave_numero(c)
+        and _clave_numero(c) not in clave_real
+        and clave_real not in _clave_numero(c)
+    ]
+    if not ajenos:
+        return ""
+
+    invocado = ajenos[0]
+    titular = titular_del_contrato(invocado)
+    partes = [
+        f"LA OBJECIÓN SE FUNDAMENTA EN EL CONTRATO {invocado.upper()}, QUE NO "
+        "CORRESPONDE A LA RELACIÓN CONTRACTUAL VINCULANTE CON ESTA ENTIDAD."
+    ]
+    if titular:
+        partes.append(
+            f"DICHO CONTRATO SE ENCUENTRA SUSCRITO CON {titular.upper()}, "
+            "PERSONA JURÍDICA DISTINTA DE LA ENTIDAD OBJETANTE."
+        )
+    _con_eps = f" SUSCRITO CON {eps.upper()}" if eps.strip() else ""
+    partes.append(f"LA RELACIÓN CONTRACTUAL APLICABLE ES EL {_limpio_real.upper()}{_con_eps}.")
+    partes.append(
+        "TODA CAUSAL DERIVADA DE UN CONTRATO AJENO CARECE DE VALIDEZ FRENTE AL "
+        "PRESTADOR, POR APLICACIÓN DEL PRINCIPIO DE RELATIVIDAD DE LOS CONTRATOS "
+        "(ART. 1602 DEL CÓDIGO CIVIL): EL CONTRATO ES LEY PARA LAS PARTES QUE LO "
+        "SUSCRIBEN, Y NO PRODUCE EFECTOS FRENTE A QUIEN NO ES PARTE. SE SOLICITA "
+        "A LA ENTIDAD PRECISAR LA CLÁUSULA DEL CONTRATO QUE SÍ NOS VINCULA EN LA "
+        "QUE PRETENDE FUNDAR SU OBJECIÓN."
+    )
+    return " ".join(partes)
+
+
 def _parrafo_tarifario_determinista(
     texto_glosa: str, ficha_contrato: Optional[dict], valor_objetado: str = ""
 ) -> str:
@@ -9167,6 +9266,28 @@ class GlosaService:
                         logger.info("[PARRAFO-TARIFARIO] inyectado por el motor")
             except Exception as _e_pt:
                 logger.debug(f"[PARRAFO-TARIFARIO] no aplicado: {_e_pt}")
+
+            # 01-09-2026 (PRUEBA 3, AU0201) — EL CONTRATO AJENO SE REFUTA DE
+            # ENTRADA. Va PRIMERO y no al final: si la entidad fundó su glosa en
+            # un contrato que no nos vincula, eso derriba la causal antes de
+            # discutir el fondo, y así lo tiene que leer su auditor.
+            #
+            # Ignorarlo, como pasó en GL-154, deja el fundamento en pie: lo que
+            # no se refuta se da por aceptado.
+            try:
+                _parr_ctr = _parrafo_contrato_ajeno(
+                    texto_base, locals().get("_ficha_vig"), str(getattr(data, "eps", "") or "")
+                )
+                if _parr_ctr and arg_ia:
+                    arg_ia = _parr_ctr + " " + arg_ia.lstrip()
+                    _correcciones_previas.append(
+                        "La entidad fundó su glosa en un contrato que no es el "
+                        "nuestro y el dictamen no lo decía. Agregué de entrada la "
+                        "refutación, con el número del contrato que sí nos vincula."
+                    )
+                    logger.info("[CONTRATO-AJENO] refutación inyectada al inicio")
+            except Exception as _e_ca:
+                logger.debug(f"[CONTRATO-AJENO] no aplicada: {_e_ca}")
             normas_clave = self._xml("normas_clave", res_ia, "")
 
             # ── Mejora #3: cruzar campos estructurados vs deterministas ──
