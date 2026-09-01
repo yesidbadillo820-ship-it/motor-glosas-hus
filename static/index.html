@@ -23163,9 +23163,10 @@ var ROL_COLORS={'SUPER_ADMIN':'rol-super_admin','COORDINADOR':'rol-coordinador',
 //   Gestión: Conciliación, Plantillas Gold, Papelera
 //   Herramientas: Consulta Normativa, Salud Total, Importar recepción,
 //                 Importación masiva
-// Los demás items (Mi desempeño, Mis glosas, Historial, Alertas,
-// Contratos, Usuarios, Dashboard, Auditoría, Multi-concepto,
+// Los demás items (Usuarios, Dashboard, Auditoría, Multi-concepto,
 // Detector en masa, Simulador) quedan ocultos.
+// 01-09-2026: Contratos e Importación masiva entran a la lista, a pedido
+// de Yesid — ver el comentario dentro de la lista.
 // SUPER_ADMIN y COORDINADOR ven todo.
 var AUDITOR_TABS_PERMITIDAS = {
   // Análisis
@@ -23184,6 +23185,12 @@ var AUDITOR_TABS_PERMITIDAS = {
   // El validador ADRES y el buscador de autorizaciones son trabajo diario
   // del auditor, y sus rutas ya exigen rol AUDITOR o superior.
   'validador-adres': true,
+  // 01-09-2026 — Yesid, con las capturas en la mano: «que los auditores
+  // puedan ver esos espacios». Contratos e Importación masiva faltaban en
+  // esta lista, así que el menú se los escondía a todos los gestores aunque
+  // el servidor ya les permitiera consultarlos.
+  'contratos': true,
+  'importacion-masiva': true,
   // 31-08-2026 — LAS GLOSAS DEL ADRES SON TRABAJO DIARIO DEL GESTOR.
   // Faltaban en esta lista, así que el botón del menú se le escondía a todo
   // el que tuviera rol AUDITOR — o sea, a los 28 gestores. Ninguno podía

@@ -64,10 +64,29 @@ class TestElGestorVeLaPantalla:
 
     def test_no_se_le_abrio_lo_que_no_se_pidio(self, html: str):
         """La lista blanca es lo único que separa al gestor de las pantallas
-        de coordinación. Que no se cuele nada de paso."""
+        de coordinación. Que no se cuele nada de paso.
+
+        01-09-2026: 'contratos' sale de esta lista de prohibidas porque Yesid
+        lo pidió expresamente para los gestores (ver TestLoQuePidioYesid)."""
         blanca = _lista_blanca(html)
-        for prohibida in ("'mando'", "'usuarios'", "'contratos'", "'admin-sugerencias'"):
+        for prohibida in ("'mando'", "'usuarios'", "'admin-sugerencias'"):
             assert prohibida not in blanca, prohibida
+
+
+class TestLoQuePidioYesid:
+    """01-09-2026, con las capturas en la mano: «que los auditores puedan ver
+    esos espacios». Contratos e Importación masiva faltaban en la lista blanca:
+    el menú se los escondía a todos los gestores aunque el servidor ya les
+    permitiera consultarlos."""
+
+    @pytest.mark.parametrize("tab", ["'contratos'", "'importacion-masiva'"])
+    def test_entran_a_la_lista_blanca(self, html: str, tab):
+        assert f"{tab}: true" in _lista_blanca(html), tab
+
+    def test_y_lo_ya_abierto_sigue_abierto(self, html: str):
+        blanca = _lista_blanca(html)
+        for tab in ("'conciliacion'", "'papelera'", "'glosas-adres'", "'consulta-normativa'"):
+            assert f"{tab}: true" in blanca, tab
 
 
 class TestElGestorPuedeRepartirElArea:
