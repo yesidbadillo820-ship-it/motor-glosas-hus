@@ -20245,11 +20245,31 @@ async function gaIrAPaquete(paqueteId, factura){
   gaBuscar();
 }
 
+// `HUS405315` y `HUS0000405315` son la misma factura.
+function gaMismaFactura(a, b){
+  var limpiar = function(x){ return String(x||'').replace(/[^0-9]/g,'').replace(/^0+/,''); };
+  var la = limpiar(a), lb = limpiar(b);
+  return !!la && la === lb;
+}
+
 async function gaBuscar(){
   var numero = (document.getElementById('ga-factura').value||'').trim();
   var caja = document.getElementById('ga-resultado');
   if(!numero){ caja.innerHTML=''; return; }
-  caja.innerHTML = '<div style="padding:1rem;color:var(--text3)">Buscando '+escHtml(numero)+'…</div>';
+  // 01-09-2026. Yesid: «cada vez que digito un dato vuelve y se regresa a la
+  // página de inicio y me toca bajar y mirar». Pasaba porque, al guardar una
+  // decisión, esta función vaciaba la caja para poner «Buscando…»: la página
+  // se encogía, el navegador subía el scroll al inicio, y el gestor quedaba
+  // arriba, frente a la lista de facturas, teniendo que bajar otra vez.
+  //
+  // Ahora se distingue: si es la MISMA factura que ya está en pantalla, no se
+  // vacía nada y la caja se queda donde estaba. Si es OTRA factura, se busca
+  // y se lleva la vista hasta la caja, que vive debajo de la lista.
+  var misma = !!(GA_DATOS && gaMismaFactura(GA_DATOS.factura, numero));
+  var posicion = misma ? caja.getBoundingClientRect().top : null;
+  if(!misma){
+    caja.innerHTML = '<div style="padding:1rem;color:var(--text3)">Buscando '+escHtml(numero)+'…</div>';
+  }
   try{
     var url = '/glosas-adres/factura/'+encodeURIComponent(numero)+(GA_PAQUETE?'?paquete_id='+GA_PAQUETE:'');
     var r = await fetch(url, {headers: authH()});
@@ -20261,12 +20281,27 @@ async function gaBuscar(){
     // 31-08-2026: cada factura se abre LIMPIA. El filtro es de la factura que
     // se esta mirando; si se heredara de la anterior, en una factura de pocas
     // glosas la barra del filtro no se dibuja y las filas escondidas no se
-    // podrian ni ver ni destapar.
-    GA_FILTRO = {texto:'', causal:'', clasificacion:'', estado:''};
+    // podrian ni ver ni destapar. (Si es la misma factura, el filtro que el
+    // gestor puso se respeta: acaba de guardar una decisión, no cambió de hoja.)
+    if(!misma) GA_FILTRO = {texto:'', causal:'', clasificacion:'', estado:''};
     GA_DATOS = await r.json();
     gaPintar(GA_DATOS);
+    gaDejarLaVistaEnSuSitio(caja, misma, posicion);
   }catch(e){
     caja.innerHTML = '<div style="color:#991b1b;padding:1rem">Error: '+escHtml(e.message)+'</div>';
+  }
+}
+
+// Misma factura: la caja vuelve exactamente a la altura de pantalla en que
+// estaba antes de repintar. Otra factura: se baja hasta la caja.
+function gaDejarLaVistaEnSuSitio(caja, misma, posicion){
+  if(typeof window === 'undefined' || !caja || !caja.getBoundingClientRect) return;
+  if(misma && posicion !== null){
+    var corrimiento = caja.getBoundingClientRect().top - posicion;
+    if(corrimiento) window.scrollBy(0, corrimiento);
+  } else if(caja.scrollIntoView){
+    caja.style.scrollMarginTop = '12px';
+    caja.scrollIntoView({behavior:'smooth', block:'start'});
   }
 }
 
