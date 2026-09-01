@@ -9118,6 +9118,33 @@ cualquier sesión.
 
 ---
 
+### 01-09 (tarde) — «Nada, siguen sin ver esos botones»: era otra lista
+
+Después de abrir la Papelera, Yesid mostró la pantalla del gestor Óscar: seguía
+sin ver **Contratos** ni **Importación masiva**.
+
+**La causa no era el permiso del servidor sino el menú.** Además de las marcas
+de «solo coordinación», el menú tiene una **lista blanca para el rol AUDITOR**:
+todo lo que no esté en esa lista se esconde. Ahí ya estaban Conciliación,
+Papelera, Glosas ADRES (agregada el 31-08 por el otro frente de trabajo),
+Consulta Normativa, Salud Total y Validador ADRES — pero **Contratos e
+Importación masiva faltaban**, así que el menú se los escondía a los 28
+gestores aunque el servidor ya les permitiera consultarlos.
+
+**Lo que quedó:** Contratos e Importación masiva entran a la lista blanca del
+gestor, con la fecha y el porqué escritos en el propio código. La prueba del
+otro frente —que vigila que no se le abra al gestor nada que no se haya
+pedido— se actualizó con la nueva directiva, y una prueba nueva deja escrito
+lo que Yesid pidió: si un cambio futuro le vuelve a esconder alguno de estos
+botones al gestor, la prueba se pone roja.
+
+Mando ejecutivo, Usuarios, Inteligencia y las demás pantallas de coordinación
+siguen escondidas para el gestor, como estaban.
+
+3 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
 
 ### Curso de noruego (31-08, noche)
