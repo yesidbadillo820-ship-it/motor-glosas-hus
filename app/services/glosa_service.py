@@ -4530,8 +4530,16 @@ def _quitar_causal_propia_del_cuerpo(texto: str, codigo_glosa: str) -> str:
         flags=re.IGNORECASE,
     )
     # 2) Rotulado sin paréntesis: «, código CL4506», «con CUPS CL-4506».
+    #
+    # 01-09-2026 — el `\s*` inicial es lo que evita dejar basura detrás. Sin él,
+    # en «FÉMUR – código CL4506</div>» la coincidencia arrancaba en la raya y el
+    # espacio de antes quedaba pegado a la etiqueta de cierre. Invisible en
+    # pantalla, pero delata el recorte y rompe cualquier comparación exacta.
+    # Se consume aquí, dentro del trozo que de verdad se borra, en vez de
+    # barrer espacios por todo el escrito: ese barrido global ya se llevó una
+    # vez por delante los títulos multi-código.
     limpio = re.sub(
-        rf"[,;–—-]?\s*(?:\b(?:con|del|de|el|la)\s+)?(?:c[óo]digo|cups)\s*[:\-]?\s*{_cod}\b",
+        rf"\s*[,;–—-]?\s*(?:\b(?:con|del|de|el|la)\s+)?(?:c[óo]digo|cups)\s*[:\-]?\s*{_cod}\b",
         "",
         limpio,
         flags=re.IGNORECASE,
