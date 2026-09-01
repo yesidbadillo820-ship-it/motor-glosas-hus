@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 31-08-2026 (noche)
+**Última actualización:** 01-09-2026
 
 ---
 
@@ -89,6 +89,52 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 01-09-2026 — Guardar una glosa ya no lo devuelve al inicio de la página (y la base maestra de servicios)
+
+**Lo que reportó Yesid.** En Glosas ADRES, cada vez que marcaba una decisión
+(«SE SUBSANA», un valor aceptado, un área), la página se iba sola al inicio y
+tocaba bajar otra vez, pasando toda la lista de facturas, para encontrar la
+factura que estaba trabajando. Con 28 facturas por paquete, eso era bajar 28
+veces.
+
+**Qué estaba pasando.** Al guardar, la pantalla volvía a pedir la factura al
+servidor y, mientras llegaba, **vaciaba la caja** para escribir «Buscando…».
+La página se encogía un instante, el navegador subía el scroll al comienzo, y
+cuando la factura volvía a pintarse el gestor ya estaba arriba.
+
+**Qué se arregló.** La pantalla ahora distingue dos casos:
+
+- **Misma factura** (acaba de guardar algo): no vacía nada, repinta encima y
+  deja la caja **exactamente a la misma altura** en que estaba. Y respeta el
+  filtro que el gestor tenía puesto.
+- **Otra factura** (la buscó o la abrió de la lista): busca, y **baja la vista
+  hasta la caja del resultado**, que vive debajo de la lista. Ya no toca
+  buscarla a mano.
+
+Con 9 pruebas automáticas que corren el código real de la página; las 9 fallan
+si alguien deshace el arreglo.
+
+**También del día — la base maestra de servicios facturados al ADRES.** Se
+leyeron **completos** los 6 archivos de detallados (LOTE 1 a 5 y
+FACTURAS_ADRES_PARA_DETALLADOS: 300.219 filas, 4.207 bloques de factura) y
+salió `MAESTRO_SERVICIOS_FACTURADOS_ADRES.xlsx`, entregado por chat:
+
+- **2.264 servicios únicos** de **3.254 facturas distintas**, con cantidad,
+  número de facturas, valor mínimo / máximo / más frecuente, facturas donde
+  aparece, descripciones y fuente.
+- **Cuadre al peso:** las facturas declaran 78.294 ítems y $16.902.945.579; el
+  maestro suma exactamente eso. Diferencia $0 en las 4.207 facturas.
+- Hallazgo importante: **13.895 renglones sin consecutivo** son el desglose de
+  los paquetes quirúrgicos (anestesiólogo, ayudantía, derechos de sala,
+  materiales). Están en el maestro como servicios, pero **no suman al total de
+  la factura** — si se sumaran, el paquete se contaría dos veces.
+- Las 953 facturas de FACTURAS_ADRES_PARA_DETALLADOS están todas dentro de
+  LOTE_5, idénticas renglón por renglón: se cuentan una vez.
+- Homologación DGH con evidencia documental: **545 confirmadas**, 33 en
+  revisión técnica. Las 1.686 restantes quedan «sin homologación identificada»
+  porque la exportación de DGH que hay **solo trae las 73 facturas del paquete
+  31068** (HUS352890 a HUS404761). No es que no exista: no hay con qué probarla.
 
 ### 31-08-2026 — Pruebas de estrés: la prueba 2 destapó dos fallas caras
 
@@ -9834,6 +9880,16 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     --recursivo` antes de subirlas.
 20. **Revisar el número de factura si la reexpiden:** si sale con número nuevo,
     el JSON debe llevar el número nuevo, no `MED737`.
+
+### Base maestra de servicios ADRES (01-09)
+- **Pedir a quien saca los reportes de DGH** la misma consulta `DGDATATABLE`
+  de `SERVICIOS_FACTURADOS_DGH_ADRES` (mismas 18 columnas), pero para las
+  facturas **HUS405000 en adelante** o con fecha de factura **de agosto de
+  2025 en adelante**. Con eso se homologan los 1.686 servicios que quedaron
+  sin evidencia y la tabla SERVICIO FACTURADO → CÓDIGO DGH queda completa.
+- 656 servicios con el mismo nombre en varios códigos y 163 códigos con más
+  de una descripción quedaron marcados **REQUIERE VALIDACIÓN** en el maestro:
+  son para que el área los mire, no se unieron por parecido.
 
 ## 4) PARA MAÑANA
 
