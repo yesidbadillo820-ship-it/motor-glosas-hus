@@ -9145,6 +9145,34 @@ siguen escondidas para el gestor, como estaban.
 
 ---
 
+### 02-09 — «Yo no veo que se vean todos esos botones»: el menú del gestor, completo
+
+Yesid volvió con sus capturas del menú: a los gestores les seguían faltando
+botones. Se abrió el resto de lo que aparece en ellas — **Mi día,
+Vencimientos, el «Contratos» de ANÁLISIS (la malla contractual),
+Automatización, Tarifas y Soportes** — después de verificar, guard por guard,
+que el servidor ya les permite consultar cada una de esas pantallas con rol
+AUDITOR.
+
+El menú del gestor queda entonces con: Analizar glosa, Mi día, Mi desempeño,
+Mis glosas, Historial, Vencimientos, Contratos (malla), Automatización,
+Alertas · Contratos, Tarifas, Conciliación, Papelera · Glosas ADRES ·
+Consulta Normativa, Salud Total, Validador ADRES, Soportes, Importación
+masiva y Pre-auditoría.
+
+**Lo que sigue escondido**, por la directiva del propio Yesid del 21-08:
+Inteligencia, Expediente, Plata recuperada, Usuarios, Mando ejecutivo,
+Importar recepción y el Diagnóstico del sistema. Si algún día las quiere
+abrir, es agregar una línea a la misma lista.
+
+La prueba que deja esto escrito creció a 8 pestañas vigiladas: si un cambio
+futuro le vuelve a esconder cualquiera de estos botones al gestor, se pone
+roja.
+
+6 pruebas nuevas.
+
+---
+
 ## 3) PENDIENTE
 
 ### Curso de noruego (31-08, noche)

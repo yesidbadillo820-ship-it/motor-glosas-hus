@@ -79,7 +79,21 @@ class TestLoQuePidioYesid:
     el menú se los escondía a todos los gestores aunque el servidor ya les
     permitiera consultarlos."""
 
-    @pytest.mark.parametrize("tab", ["'contratos'", "'importacion-masiva'"])
+    @pytest.mark.parametrize(
+        "tab",
+        [
+            "'contratos'",
+            "'importacion-masiva'",
+            # 02-09-2026: el resto de las capturas de Yesid («yo no veo que se
+            # vean todos esos botones»). El servidor ya las deja consultar.
+            "'mi-dia'",
+            "'vencimientos'",
+            "'malla'",
+            "'automatizacion'",
+            "'tarifas'",
+            "'soportes'",
+        ],
+    )
     def test_entran_a_la_lista_blanca(self, html: str, tab):
         assert f"{tab}: true" in _lista_blanca(html), tab
 

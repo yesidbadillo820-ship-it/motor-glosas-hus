@@ -23191,6 +23191,19 @@ var AUDITOR_TABS_PERMITIDAS = {
   // el servidor ya les permitiera consultarlos.
   'contratos': true,
   'importacion-masiva': true,
+  // 02-09-2026 — Yesid, con sus capturas del menú completo: «yo no veo que se
+  // vean todos esos botones». Se abre el resto de lo que aparece en ellas.
+  // Su directiva original del 21-08 era «el AUDITOR ve TODO menos
+  // Inteligencia, Expediente, Usuarios, Mando ejecutivo e Importar
+  // recepción» — esas cinco (y Plata recuperada) siguen escondidas.
+  // El servidor ya deja consultar todas estas con rol AUDITOR (verificado
+  // guard por guard el 02-09).
+  'mi-dia': true,
+  'vencimientos': true,
+  'malla': true,  // el «Contratos» de ANÁLISIS: la malla contractual
+  'automatizacion': true,
+  'tarifas': true,
+  'soportes': true,
   // 31-08-2026 — LAS GLOSAS DEL ADRES SON TRABAJO DIARIO DEL GESTOR.
   // Faltaban en esta lista, así que el botón del menú se le escondía a todo
   // el que tuviera rol AUDITOR — o sea, a los 28 gestores. Ninguno podía
