@@ -4142,6 +4142,53 @@ def _neutralizar_periodo_inventado(
     return resultado
 
 
+# ── Pólizas, autorizaciones y radicados no son CUPS (02-09-2026, caso CO4601) ──
+# La glosa decía «PÓLIZA SOAT No. 7745120-3». El escrito salió con «EL SERVICIO
+# FACTURADO-3» y «RADIOGRAFÍA DE TÓRAX-3»: alguna red numérica se comió el
+# número de la póliza y dejó el sufijo pegado al nombre del servicio, y la red
+# de CUPS sin respaldo lo rotuló «código 7745120-3» y sacó el aviso de «revise
+# el CUPS» por un número que nunca fue un CUPS.
+#
+# Antes de que corra CUALQUIER red numérica, los identificadores con rótulo
+# propio —póliza, autorización, radicado, orden, lote, referencia— se sacan del
+# texto y se ponen de vuelta al final, intactos. Un identificador rotulado no es
+# un código de procedimiento y ninguna red tiene por qué tocarlo.
+_RE_IDENTIFICADOR_ROTULADO = re.compile(
+    r"\b(P[ÓO]LIZA(?:\s+SOAT)?|AUTORIZACI[ÓO]N|RADICADO|ORDEN|LOTE|REFERENCIA(?:\s+INTERNA)?|"
+    r"REMISI[ÓO]N|SOLICITUD|CONSECUTIVO)\b"
+    r"(\s*(?:SOAT\s*)?(?:N[°ºo]\.?|NO\.?|NRO\.?|N[ÚU]MERO)?\s*[:#]?\s*)"
+    r"([A-Z0-9][A-Z0-9\-/\.]{3,24})",
+    re.IGNORECASE,
+)
+
+
+def _enmascarar_identificadores(texto: str) -> "tuple[str, dict[str, str]]":
+    """Reemplaza cada identificador rotulado por una marca sin dígitos.
+
+    Devuelve `(texto_enmascarado, mapa)`. La marca es solo letras para que
+    ninguna red la confunda con un número; se restaura con `_desenmascarar`.
+    """
+    if not texto:
+        return texto, {}
+    mapa: dict[str, str] = {}
+
+    def _sub(m: "re.Match[str]") -> str:
+        ident = m.group(3)
+        if not any(ch.isdigit() for ch in ident):
+            return m.group(0)  # «ORDEN MÉDICA», «LOTE VENCIDO»: no es un número
+        clave = f"IDENTREF{chr(65 + len(mapa) % 26)}{len(mapa)}X"
+        mapa[clave] = ident
+        return f"{m.group(1)}{m.group(2)}{clave}"
+
+    return _RE_IDENTIFICADOR_ROTULADO.sub(_sub, texto), mapa
+
+
+def _desenmascarar(texto: str, mapa: dict[str, str]) -> str:
+    for clave, ident in (mapa or {}).items():
+        texto = texto.replace(clave, ident)
+    return texto
+
+
 def _neutralizar_cups_falsos(texto: str) -> str:
     """Sustituye 'CUPS <fecha>' o 'CUPS HUS00...' por 'el procedimiento facturado'.
 
@@ -4973,6 +5020,116 @@ def _parrafo_contrato_ajeno(texto_glosa: str, ficha_contrato: Optional[dict], ep
     return " ".join(partes)
 
 
+# ── Accidente de tránsito: quién paga primero, y quién lo prueba (02-09-2026) ──
+# Caso 6 (CO4601, COOSALUD). La entidad gloso toda la factura porque el hospital
+# «no acredita el agotamiento de la cobertura del SOAT». Sin un solo PDF, el
+# dictamen afirmó que la carga de probar el agotamiento era de la entidad («carga
+# dinámica»), que la Res. 2284 «confirma que los servicios deben ser reconocidos»
+# y omitió el Decreto 780 de 2016. Tres invenciones en un párrafo.
+#
+# La regla, en Colombia, es al revés: la IPS factura al SOAT, la IPS obtiene de la
+# aseguradora el certificado de agotamiento, y la IPS lo aporta. Sin certificado
+# entre los soportes, lo único sostenible es el orden de cobertura y anunciar el
+# documento. Eso se decide acá, en código, no en el prompt.
+def _es_glosa_cobertura_soat(texto_glosa: str) -> bool:
+    from app.services.glosa_ia_prompts import es_glosa_cobertura_soat
+
+    return es_glosa_cobertura_soat(texto_glosa)
+
+
+def _hay_certificado_agotamiento(contexto_pdf: str) -> bool:
+    from app.services.glosa_ia_prompts import hay_certificado_agotamiento
+
+    return hay_certificado_agotamiento(contexto_pdf)
+
+
+# Lo que el escrito NO puede decir sin el certificado. Se evalúa por ORACIÓN,
+# con las palabras en cualquier orden: «demostrar el agotamiento corresponde a
+# la entidad» y «corresponde a la entidad demostrar el agotamiento» son la
+# misma mentira dicha al revés.
+_RE_NIEGA = re.compile(
+    r"\bNO\s+(?:SE\s+)?(?:AFIRMA|ACREDITA|SOSTIENE)|\bSIN\s+(?:EL\s+)?CERTIFICADO|\bNO\s+CONSTA",
+    re.IGNORECASE,
+)
+
+
+def _oracion_afirma_agotamiento(o: str) -> bool:
+    u = o.upper()
+    if _RE_NIEGA.search(u):
+        return False
+    tiene = lambda *ws: all(re.search(w, u) for w in ws)  # noqa: E731
+    # «se agotó el tope / la cobertura está agotada / póliza agotada»
+    if tiene(r"\bAGOT[ÓO]\b|\bAGOTAD[OA]\b", r"\bTOPE\b|\bCOBERTURA\b|\bP[ÓO]LIZA\b"):
+        return True
+    # «el certificado se aportó / obra / está anexo»
+    if tiene(
+        r"CERTIFICA(?:DO|CI[ÓO]N)",
+        r"\bAPORT[ÓO]\b|\bAPORTAD[OA]\b|\bADJUNT[OA]\b|\bANEXAD[OA]\b|\bOBRA\b",
+    ):
+        return True
+    # carga dinámica aplicada al agotamiento / a la entidad pagadora
+    if tiene(r"CARGA\s+DIN[ÁA]MICA", r"AGOTAMIENTO|\bSOAT\b|\bADRES\b|ENTIDAD\s+PAGADORA|\bEPS\b"):
+        return True
+    # «corresponde a la entidad demostrar/probar/acreditar el agotamiento»
+    if tiene(r"\bENTIDAD\b|\bEPS\b|PAGADORA", r"DEMOSTRAR|PROBAR|ACREDITAR", r"AGOTAMIENTO"):
+        return True
+    # Res. 2284 como regla de pago/reconocimiento
+    if tiene(r"2284", r"RECONOC|DEB[AE]N?\s+SER\s+PAGAD|SIN\s+AGOTAR|TOPES?"):
+        return True
+    return False
+
+
+def _afirmaciones_soat_sin_respaldo(
+    argumento: str, con_certificado: bool
+) -> "tuple[str, list[str]]":
+    """Borra del argumento las oraciones que no se pueden sostener sin el
+    certificado. Devuelve `(argumento_limpio, oraciones_borradas)`. Con
+    certificado entre los soportes no se toca nada."""
+    if not argumento or con_certificado:
+        return argumento, []
+    oraciones = re.split(r"(?<=[.;])\s+", argumento)
+    quedan, borradas = [], []
+    for o in oraciones:
+        if _oracion_afirma_agotamiento(o):
+            borradas.append(o.strip()[:160])
+        else:
+            quedan.append(o)
+    if not borradas:
+        return argumento, []
+    limpio = re.sub(r"\s{2,}", " ", " ".join(quedan)).strip()
+    return limpio, borradas
+
+
+def _parrafo_cobertura_soat(eps: str, con_certificado: bool) -> str:
+    """El párrafo de cobertura SOAT/ADRES, armado en Python.
+
+    Dice lo verificable —el orden de cobertura del Decreto 780 de 2016— y, sin
+    certificado, deja constancia de que se aportará y pide a la entidad precisar
+    el tope que considera no agotado. NO afirma que el tope se agotó: eso solo
+    lo prueba el certificado de la aseguradora, que obtiene y aporta la IPS.
+    """
+    ent = (eps or "LA ENTIDAD").upper().strip()
+    base = (
+        "EN CUANTO A LA OBJECIÓN POR TOPES DEL SOAT Y DEL ADRES: EL ORDEN DE "
+        "COBERTURA EN ACCIDENTES DE TRÁNSITO ES EL QUE FIJA EL DECRETO 780 DE 2016 "
+        "(RÉGIMEN ECAT/SOAT): LA PÓLIZA SOAT RESPONDE EN PRIMER LUGAR HASTA SU TOPE, "
+        "AGOTADO ÉSTE RESPONDE EL ADRES, Y SOLO DESPUÉS LA ENTIDAD PROMOTORA DE SALUD. "
+    )
+    if con_certificado:
+        return base + (
+            "EL AGOTAMIENTO DE LA COBERTURA DEL SOAT SE ACREDITA CON EL CERTIFICADO DE "
+            "LA ASEGURADORA QUE OBRA ENTRE LOS SOPORTES DE ESTA RESPUESTA, POR LO QUE "
+            f"LA FACTURACIÓN A {ent} PROCEDE EN EL ORDEN LEGAL."
+        )
+    return base + (
+        "ESTA INSTITUCIÓN NO AFIRMA EN ESTE ESCRITO QUE EL TOPE SE ENCUENTRE AGOTADO: "
+        "ESE HECHO SE ACREDITA ÚNICAMENTE CON EL CERTIFICADO DE AGOTAMIENTO EXPEDIDO "
+        "POR LA ASEGURADORA, QUE ESTA IPS GESTIONA Y APORTARÁ COMO SOPORTE. ENTRE TANTO, "
+        f"SE SOLICITA A {ent} PRECISAR EL TOPE Y EL VALOR QUE CONSIDERA NO AGOTADOS, "
+        "PARA CONCILIAR SOBRE CIFRAS Y NO SOBRE SUPUESTOS."
+    )
+
+
 def _parrafo_tarifario_determinista(
     texto_glosa: str, ficha_contrato: Optional[dict], valor_objetado: str = ""
 ) -> str:
@@ -5322,6 +5479,15 @@ def _neutralizar_cups_sin_respaldo(texto: str, evidencia: str, codigo_glosa: str
             return ""
         if _cups_esta_en_catalogo(codigo):
             return m.group(0)  # es un CUPS de verdad: no se toca
+        # 02-09-2026 — un CUPS tiene 6 dígitos (a veces una letra). Un token con
+        # sufijo «-N», o con 7 dígitos o más, no es un CUPS por su sola forma:
+        # es una póliza, un radicado o una factura. Se retira la mención entera
+        # en vez de dejarla como «código …», que conserva la basura en el
+        # escrito y dispara el aviso de «revise el CUPS» por lo que nunca lo fue.
+        _solo_digitos = re.sub(r"\D", "", codigo)
+        if re.search(r"-\d+$", codigo) or len(_solo_digitos) >= 7:
+            borrados.append(codigo)
+            return ""
         # 27-08-2026 — EL CÓDIGO DE LA GLOSA NUNCA ES EL DEL SERVICIO.
         # Lo destapó el dictamen GL-135: la IA escribió «EL PROCEDIMIENTO
         # FACTURADO CON CUPS SO0102», y SO0102 es la CAUSAL de la glosa, no el
@@ -7055,13 +7221,43 @@ _FAMILIAS_DOCUMENTALES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         r"ORDEN\s+M[ÉE]DICA|F[ÓO]RMULA\s+M[ÉE]DICA",
         ("ORDEN MEDICA", "ORDEN MÉDICA", "FORMULA MEDICA", "FÓRMULA MÉDICA", "PRESCRIPCION"),
     ),
+    # 02-09-2026 (caso CO4601, accidente de tránsito). El dictamen afirmó que
+    # el SOAT «se agotó» sin que existiera el certificado de la aseguradora
+    # entre los soportes. Ese certificado es un documento con nombre propio:
+    # si el escrito dice lo que contiene y no llegó, es invento.
+    (
+        "certificado de agotamiento del SOAT",
+        r"CERTIFICA(?:DO|CI[ÓO]N)\s+DE\s+AGOTAMIENTO|AGOTAMIENTO\s+DE\s+(?:LA\s+)?(?:COBERTURA|P[ÓO]LIZA|TOPE)"
+        r"|CERTIFICA(?:DO|CI[ÓO]N)\s+DE\s+LA\s+ASEGURADORA",
+        (
+            "CERTIFICADO DE AGOTAMIENTO",
+            "CERTIFICACION DE AGOTAMIENTO",
+            "CERTIFICACIÓN DE AGOTAMIENTO",
+            "AGOTAMIENTO DE COBERTURA",
+            "AGOTAMIENTO DE LA COBERTURA",
+            "TOPE AGOTADO",
+            "COBERTURA AGOTADA",
+            "PAGOS EFECTUADOS POR LA ASEGURADORA",
+        ),
+    ),
 )
 
 _VERBOS_DE_LECTURA = (
     r"\b(?:DETALLA|DETALLAN|DESCRIBE|DESCRIBEN|REGISTRA|REGISTRAN|CONSIGNA|"
     r"CONSIGNAN|REPORTA|REPORTAN|INDICA|INDICAN|EVIDENCIA|EVIDENCIAN|"
     r"DEMUESTRA|DEMUESTRAN|CONFIRMA|CONFIRMAN|ACREDITA|ACREDITAN|"
+    r"CONSTA|CONSTAN|SE[ÑN]ALA|SE[ÑN]ALAN|CERTIFICA|CERTIFICAN|ESTABLECE|ESTABLECEN|"
+    r"EXPEDID[OA]\s+POR|"
     r"SE\s+ENCUENTRAN?\s+ADJUNT[OA]S?|OBRA\s+EN\s+EL\s+EXPEDIENTE)\b"
+)
+
+# 02-09-2026 (caso 6). El modelo también «lee» un documento PONIÉNDOLO ANTES:
+# «SEGÚN EL CERTIFICADO…», «COMO CONSTA EN LA HISTORIA CLÍNICA…», «CONFORME
+# A LA EPICRISIS…». Es la misma afirmación con las palabras al revés, y la
+# red no la veía. Vale para todas las familias, no solo para el certificado.
+_INTRODUCE_LECTURA = (
+    r"\b(?:SEG[ÚU]N|COMO\s+CONSTA\s+EN|CONFORME\s+A|DE\s+ACUERDO\s+CON|"
+    r"TAL\s+COMO\s+(?:LO\s+)?(?:REGISTRA|SE[ÑN]ALA|INDICA))\s+(?:EL|LA|LOS|LAS)?\s*"
 )
 
 
@@ -7082,7 +7278,8 @@ def _familias_afirmadas_sin_respaldo(dictamen: str, texto_soportes: str) -> list
     faltan: list[str] = []
     for nombre, patron_doc, huellas in _FAMILIAS_DOCUMENTALES:
         afirma = re.search(
-            rf"(?:{patron_doc})[^.<]{{0,90}}?{_VERBOS_DE_LECTURA}",
+            rf"(?:{patron_doc})[^.<]{{0,90}}?{_VERBOS_DE_LECTURA}"
+            rf"|{_INTRODUCE_LECTURA}(?:{patron_doc})",
             dictamen,
             re.IGNORECASE,
         )
@@ -10344,6 +10541,42 @@ class GlosaService:
             except Exception as _e_ca:
                 logger.debug(f"[CONTRATO-AJENO] no aplicada: {_e_ca}")
 
+            # 02-09-2026 (CASO 6, CO4601) — COBERTURA SOAT/ADRES: LO QUE NO SE
+            # PUEDE DECIR SIN EL CERTIFICADO SE BORRA, Y EL PÁRRAFO CON EL ORDEN
+            # DE COBERTURA LO ARMA EL MOTOR.
+            try:
+                if arg_ia and _es_glosa_cobertura_soat(texto_base):
+                    _con_cert = _hay_certificado_agotamiento(contexto_pdf or "")
+                    arg_ia, _soat_borradas = _afirmaciones_soat_sin_respaldo(arg_ia, _con_cert)
+                    if _soat_borradas:
+                        _correcciones_previas.append(
+                            "Quité del escrito lo que afirmaba sobre el agotamiento del "
+                            "SOAT sin que exista el certificado de la aseguradora entre los "
+                            "soportes: " + " | ".join(_soat_borradas[:3])
+                        )
+                    if "DECRETO 780 DE 2016 (RÉGIMEN ECAT/SOAT)" not in arg_ia.upper():
+                        arg_ia = (
+                            arg_ia.rstrip()
+                            + " "
+                            + _parrafo_cobertura_soat(
+                                str(getattr(data, "eps", "") or ""), _con_cert
+                            )
+                        )
+                        _correcciones_previas.append(
+                            "Agregué el párrafo del orden de cobertura SOAT → ADRES → EPS "
+                            "(Decreto 780 de 2016), armado por el motor. "
+                            + (
+                                "El certificado de agotamiento sí está entre los soportes."
+                                if _con_cert
+                                else "Sin certificado de agotamiento no se afirma que el tope se agotó: se anuncia que se aportará."
+                            )
+                        )
+                    logger.info(
+                        f"[COBERTURA-SOAT] certificado={_con_cert} borradas={len(_soat_borradas)}"
+                    )
+            except Exception as _e_cs:
+                logger.debug(f"[COBERTURA-SOAT] no aplicada: {_e_cs}")
+
             # 01-09-2026 (PRUEBA 4, SO0102) — LA CUENTA LA HACE PYTHON.
             # La IA leyó bien el kardex —dijo «QUINCE (15) DOSIS ADMINISTRADAS
             # Y REGISTRADAS»— y después recomendó defender el 100 %. Sabía el
@@ -10704,6 +10937,13 @@ class GlosaService:
             #  → la IA escribió "código CUPS 20260511" (es yyyymmdd, no
             #  CUPS). Se sustituye por "EL PROCEDIMIENTO FACTURADO".
             # ═══════════════════════════════════════════════════════════
+            # 02-09-2026 — las pólizas, autorizaciones y radicados salen del
+            # texto mientras corren las redes numéricas y vuelven intactos.
+            _mapa_ids: dict[str, str] = {}
+            try:
+                dictamen, _mapa_ids = _enmascarar_identificadores(dictamen)
+            except Exception as _e_ma:
+                logger.debug(f"[IDENTIFICADORES] enmascarado no aplicado: {_e_ma}")
             try:
                 _dictamen_sin_cups_falso = _neutralizar_cups_falsos(dictamen)
                 if _dictamen_sin_cups_falso != dictamen:
@@ -10866,6 +11106,10 @@ class GlosaService:
                         logger.debug(f"[CUPS-SIN-RESPALDO] no se pudo re-revisar: {_e_rev}")
             except Exception as _e_csr:
                 logger.debug(f"[CUPS-SIN-RESPALDO] red final no aplicada: {_e_csr}")
+            try:
+                dictamen = _desenmascarar(dictamen, _mapa_ids)
+            except Exception as _e_dm:
+                logger.debug(f"[IDENTIFICADORES] desenmascarado no aplicado: {_e_dm}")
 
             # Ronda 22 — RED FINAL: norma citada para el tema equivocado
             # (caso ECOOPSOS: Ley 1388/2010 —cáncer— citada para discapacidad
