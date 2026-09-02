@@ -7391,7 +7391,9 @@ function iniciarNarracion(traceId){
       ia_completada: function(){ return '✅ Dictamen redactado, afinando detalles…'; },
       persistido: function(){ return '💾 Guardado en el historial…'; },
       finalizado: function(){ return '🎉 ¡Listo!'; },
-      error: function(d){ return '⚠️ ' + (d.mensaje || 'Hubo un problema'); }
+      error: function(d){ return '⚠️ ' + (d.mensaje || 'Hubo un problema'); },
+      reconectando: function(){ return '📡 Se cortó la narración en vivo; reconectando… (el dictamen sigue generándose y se recogerá solo)'; },
+      sin_narracion: function(){ return '📡 La narración en vivo no volvió. El dictamen sigue generándose y aparecerá aquí al terminar.'; }
     };
     function agregar(tipo, datos){
       var fn = COPY[tipo]; if(!fn || !steps) return;
@@ -7413,7 +7415,13 @@ function iniciarNarracion(traceId){
     // empiece a redactarse el dictamen, asi que el panel se cerraba con el
     // trabajo a medias y parecia que se habia caido. 6 minutos.
     setTimeout(cerrar, 360000);
-    (async function(){
+    // 02-09-2026 — un corte del túnel NO puede apagar la narración en silencio.
+    // El bucle tiene nombre para poder reintentarlo una vez con el mismo
+    // trace_id: la cola del servidor sigue viva y entrega lo que falte. El
+    // dictamen llega igual por la consulta corta; esto es para que la pantalla
+    // no se quede muda. `terminado` marca que llegó un evento final legítimo.
+    var reintentado = false, terminado = false;
+    async function leer(){
       try {
         var resp = await fetch('/eventos/analizar/'+encodeURIComponent(traceId), {headers: authH(), signal: ctrl.signal});
         if(!resp.ok || !resp.body){ cerrar(); return; }
@@ -7435,12 +7443,21 @@ function iniciarNarracion(traceId){
             if(!ev) return;
             var datos={}; try{ datos=JSON.parse(data||'{}'); }catch(e){}
             agregar(ev, datos);
-            if(ev==='finalizado' || ev==='error' || ev==='timeout') cerrar();
+            if(ev==='finalizado' || ev==='error' || ev==='timeout'){ terminado = true; cerrar(); }
           });
         }
-      } catch(e){ /* abort/red: cierre silencioso */ }
+      } catch(e){ /* abort o red: se decide abajo si se reintenta */ }
+      if(cerrado || terminado){ cerrar(); return; }
+      if(!reintentado){
+        reintentado = true;
+        agregar('reconectando', {});
+        setTimeout(function(){ if(!cerrado) leer(); }, 1500);
+        return;
+      }
+      agregar('sin_narracion', {});
       cerrar();
-    })();
+    }
+    leer();
     return { cerrar: cerrar };
   } catch(e){ return { cerrar: function(){} }; }
 }
@@ -16433,6 +16450,33 @@ function ocultarPreviewAuditoria(){
   if(landing) landing.style.display = '';
 }
 
+// 02-09-2026 — Espera el resultado de /analizar/async con peticiones cortas.
+// Devuelve un objeto con la forma de la Response de antes (ok, status, json())
+// para que el resto de analizar() no cambie ni una línea.
+async function esperarResultadoAnalisis(traceId){
+  var cada=2500, tope=20*60*1000, inicio=Date.now(), sinRegistro=0;
+  while(Date.now()-inicio<tope){
+    var res=null;
+    try{ res=await fetch('/analizar/resultado/'+encodeURIComponent(traceId),{headers:authH()}); }
+    catch(e){ res=null; }  // un corte de red en una consulta corta no es fatal: se reintenta
+    if(res){
+      if(res.status===401){ return {ok:false,status:401,json:async function(){return{detail:'Sesión vencida'};}}; }
+      if(res.status===404){
+        // El registro puede tardar un instante en aparecer; pasados varios
+        // intentos seguidos sin registro, el análisis no existe.
+        if(++sinRegistro>=8){ return {ok:false,status:404,json:async function(){return{detail:'El análisis no quedó registrado. Vuelva a intentarlo.'};}}; }
+      } else if(res.ok){
+        sinRegistro=0;
+        var e=await res.json().catch(function(){return{estado:'en_curso'};});
+        if(e.estado==='listo'){ var d=e.resultado||{}; return {ok:true,status:200,json:async function(){return d;}}; }
+        if(e.estado==='error'){ var det=e.detail||'Error procesando análisis'; var st=e.status||500; return {ok:false,status:st,json:async function(){return{detail:det};}}; }
+      }
+    }
+    await new Promise(function(ok){ setTimeout(ok,cada); });
+  }
+  return {ok:false,status:504,json:async function(){return{detail:'El análisis sigue en curso. Revíselo en Historial en un momento: el dictamen se guarda al terminar.'};}};
+}
+
 async function analizar(modoOverride){
   var eps=document.getElementById('eps-sel').value;
   var glosa=document.getElementById('f-glosa').value.trim();
@@ -16536,7 +16580,22 @@ async function analizar(modoOverride){
   }
 
   try{
-    var r=await fetch('/analizar',{method:'POST',headers:authH(),body:fd});
+    // 02-09-2026 — PRUEBA 2 (CL4506): el túnel corta toda respuesta a los 100 s
+    // y una glosa pesada tarda más. El motor terminaba y guardaba, pero la
+    // respuesta nunca llegaba: «Error de conexión». Ahora el POST devuelve el
+    // trace_id enseguida y el resultado se recoge con peticiones cortas, que el
+    // túnel no alcanza a cortar. La narración en vivo sigue por su canal.
+    var r0=await fetch('/analizar/async',{method:'POST',headers:authH(),body:fd});
+    if(r0.status===401){logout();return;}
+    if(!r0.ok){
+      var er0=await r0.json().catch(function(){return{detail:'Error desconocido'}});
+      toast('Error en el análisis',er0.detail||'Verifique los datos','error');
+      if(typeof paMarcarFallaPipeline === 'function') paMarcarFallaPipeline();
+      if(_narr) try{ _narr.cerrar(); }catch(e){}
+      hideLoading();_rehab();return;
+    }
+    var acuse=await r0.json().catch(function(){return{}});
+    var r=await esperarResultadoAnalisis(acuse.trace_id||_traceId);
     if(r.status===401){logout();return;}
     if(!r.ok){
       var er=await r.json().catch(function(){return{detail:'Error desconocido'}});

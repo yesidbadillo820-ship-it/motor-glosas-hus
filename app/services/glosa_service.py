@@ -4394,21 +4394,84 @@ _RE_MODELO_HABLANDO_DE_PLATA = re.compile(
 )
 
 
-def _afirmacion_financiera_del_modelo(argumento: str) -> list[str]:
+def _afirmacion_financiera_del_modelo(argumento: str, respaldo: str = "") -> list[str]:
     """Frases de dinero que la IA escribió pese a tenerlo prohibido.
 
     Devuelve los fragmentos encontrados, para nombrárselos al gestor. Lista
     vacía = la IA respetó la prohibición y la defensa económica es la que
     inyectó el motor con los datos de la malla.
+
+    02-09-2026 — FALSO POSITIVO EN LA PRUEBA 1. Marcó «SOAT PLENA» y «UVB»
+    como inventados en un dictamen que salió por texto_fijo: la plantilla del
+    motor para tarifa sin contrato, que dice exactamente eso porque la ficha
+    de La Previsora dice «SOAT PLENO — UVB 2026 = $12.110». Acusaba al motor
+    de lo que el motor mismo puso. `respaldo` es el texto que el motor sí
+    respalda (la tarifa de la ficha, el párrafo económico): lo que aparezca
+    ahí no es invención.
     """
     if not argumento:
         return []
+    resp_up = (respaldo or "").upper()
     vistos: list[str] = []
     for m in _RE_MODELO_HABLANDO_DE_PLATA.finditer(argumento):
         frag = m.group(0).strip()
-        if frag.upper() not in {v.upper() for v in vistos}:
+        clave = re.sub(r"\s+", " ", frag.upper())
+        # «SOAT PLENA» en el argumento y «SOAT PLENO» en la ficha son lo mismo.
+        raiz = re.sub(r"[AO]\b", "", clave)
+        if resp_up and (clave in resp_up or (raiz and raiz in resp_up)):
+            continue
+        if clave not in {v.upper() for v in vistos}:
             vistos.append(frag)
     return vistos[:5]
+
+
+# ── Hechos clínicos que no están en ningún PDF (02-09-2026) ──
+# Pedido del auditor tras la prueba 3: «si el modelo no ha leído la historia
+# clínica, no puede inventarse un cuadro clínico o un triage para ganar la
+# glosa. Eso es fraude documental». En esa prueba el triage SÍ estaba en el
+# PDF adjunto; pero la regla es correcta y hoy no había nada que la hiciera
+# cumplir. Se vigilan los datos que se pueden comprobar exactos: el nivel de
+# triage, los códigos CIE-10 y las fechas. Un síntoma es prosa y no se puede
+# cotejar sin equivocarse; eso queda en el prompt.
+_RE_TRIAGE = re.compile(r"\bTRIAGE\s*(?:NIVEL\s*)?([IV1-5]{1,3})\b", re.IGNORECASE)
+_RE_CIE10 = re.compile(r"\b([A-TV-Z]\d{2}(?:\.\d{1,2})?)\b")
+_RE_FECHA_DMY = re.compile(r"\b(\d{1,2}/\d{1,2}/\d{4})\b")
+
+
+def _hechos_clinicos_sin_respaldo(argumento: str, contexto_pdf: str) -> list[str]:
+    """Triage, CIE-10 y fechas que el escrito afirma y ningún PDF trae.
+
+    Devuelve los datos sin respaldo, para nombrárselos al gestor. No borra:
+    quitar una oración clínica a ciegas puede dejar la defensa sin sentido, y
+    el gestor sí puede ir a la historia y comprobarlo.
+    """
+    if not argumento:
+        return []
+    ctx = (contexto_pdf or "").upper()
+    sin_respaldo: list[str] = []
+
+    def _norm_triage(t: str) -> str:
+        t = t.upper()
+        return {"1": "I", "2": "II", "3": "III", "4": "IV", "5": "V"}.get(t, t)
+
+    for m in _RE_TRIAGE.finditer(argumento):
+        nivel = _norm_triage(m.group(1))
+        if not re.search(
+            rf"TRIAGE\s*(?:NIVEL\s*)?(?:{nivel}|{ {'I': '1', 'II': '2', 'III': '3', 'IV': '4', 'V': '5'}.get(nivel, nivel) })\b",
+            ctx,
+        ):
+            sin_respaldo.append(f"TRIAGE {nivel}")
+    for m in _RE_CIE10.finditer(argumento):
+        cod = m.group(1).upper()
+        if cod not in ctx:
+            sin_respaldo.append(f"CIE-10 {cod}")
+    for m in _RE_FECHA_DMY.finditer(argumento):
+        f = m.group(1)
+        d, mth, y = f.split("/")
+        variantes = {f, f"{int(d):02d}/{int(mth):02d}/{y}", f"{y}-{int(mth):02d}-{int(d):02d}"}
+        if not any(v in ctx for v in variantes):
+            sin_respaldo.append(f"fecha {f}")
+    return list(dict.fromkeys(sin_respaldo))[:6]
 
 
 def _objecion_de_dinero_sin_resolver(texto_glosa: str, argumento: str) -> bool:
@@ -7578,8 +7641,56 @@ def _nombre_entidad_para_texto(eps: str, texto_contextual: str = "") -> str:
     return f"LA ENTIDAD {e}"
 
 
+def _fecha_del_formulario(data):
+    """La fecha del servicio que trae el formulario, o None si no la trae.
+
+    02-09-2026 (prueba 1). Con fecha, la plantilla fija nombra la UVB del año;
+    sin fecha, dice que hay que confirmarla. Nunca un año a ciegas. Va en un
+    helper de una línea para no engordar la llamada: hay una prueba que mira
+    una ventana fija de texto antes de `tipo_glosa = "TA_TARIFA"` y vigila que
+    la guarda del texto fijo siga exigiendo lo mismo de siempre.
+    """
+    return getattr(data, "fecha_radicacion", None) or getattr(data, "fecha_recepcion", None)
+
+
+def _frase_uvb_segun_fecha(fecha_hecho) -> str:
+    """La frase del Manual SOAT/UVB de la plantilla fija, honesta con la fecha.
+
+    02-09-2026 — PRUEBA 1 (TA0301, La Previsora). La plantilla decía «MANUAL
+    TARIFARIO SOAT 2026 INDEXADO A UVB — VALOR UVB 2026: $12.110» en un
+    dictamen SIN fecha de prestación. Sin la fecha no se sabe qué UVB rige:
+    una atención de 2025 va con la UVB de 2025. Afirmar el año y el valor a
+    ciegas es justo lo que la entidad tumba pidiendo la liquidación.
+
+    Con fecha de 2026 se nombra el valor; con otro año, ese año; sin fecha se
+    dice que la UVB es la vigente a la fecha de prestación y que hay que
+    confirmarla antes de radicar. La norma (Circular 047/2025) se cita igual.
+    """
+    anio = getattr(fecha_hecho, "year", None)
+    if anio == 2026:
+        return (
+            "DE CONFORMIDAD CON LA CIRCULAR EXTERNA 047 DE 2025 DEL MINISTERIO DE "
+            "SALUD (MANUAL TARIFARIO SOAT 2026 INDEXADO A UVB — VALOR UVB 2026: $12.110)"
+        )
+    if anio:
+        return (
+            "DE CONFORMIDAD CON LA CIRCULAR EXTERNA 047 DE 2025 DEL MINISTERIO DE "
+            f"SALUD (MANUAL TARIFARIO SOAT INDEXADO A LA UVB VIGENTE EN {anio}, "
+            "AÑO DE LA PRESTACIÓN)"
+        )
+    return (
+        "DE CONFORMIDAD CON LA CIRCULAR EXTERNA 047 DE 2025 DEL MINISTERIO DE "
+        "SALUD (MANUAL TARIFARIO SOAT INDEXADO A LA UVB VIGENTE A LA FECHA DE LA "
+        "PRESTACIÓN — VALOR A CONFIRMAR CON LA FECHA DEL SERVICIO ANTES DE RADICAR)"
+    )
+
+
 def generar_texto_injustificada(
-    eps: str, codigo: str = "", valor: str = "", texto_contextual: str = ""
+    eps: str,
+    codigo: str = "",
+    valor: str = "",
+    texto_contextual: str = "",
+    fecha_hecho=None,
 ) -> str:
     """Argumento fijo para glosas de tarifas SIN contrato pactado.
 
@@ -7621,8 +7732,7 @@ def generar_texto_injustificada(
         f"EN SEGUNDO LUGAR, NO ES ADMISIBLE APLICAR DESCUENTOS UNILATERALES SIN "
         f"SOPORTE CONTRACTUAL. EN TERCER LUGAR, LA GLOSA CARECE DE EVIDENCIA DE "
         f"UNA TARIFA DISTINTA QUE JUSTIFIQUE LA REDUCCIÓN APLICADA. "
-        f"DE CONFORMIDAD CON LA CIRCULAR EXTERNA 047 DE 2025 DEL MINISTERIO DE "
-        f"SALUD (MANUAL TARIFARIO SOAT 2026 INDEXADO A UVB — VALOR UVB 2026: $12.110) Y "
+        f"{_frase_uvb_segun_fecha(fecha_hecho)} Y "
         f"EL DECRETO 780 DE 2016, EL MANUAL TARIFARIO SOAT RIGE SUPLETORIAMENTE A FALTA DE "
         f"CONTRATO. POR SU PARTE, EL ARTÍCULO 871 DEL CÓDIGO DE COMERCIO "
         f"CONSAGRA EL PRINCIPIO DE BUENA FE CONTRACTUAL, Y EL ARTÍCULO 177 DE "
@@ -8075,6 +8185,7 @@ class GlosaService:
                 codigo_det,
                 valor_raw,
                 texto_contextual=texto_base,
+                fecha_hecho=_fecha_del_formulario(data),
             )
             tipo_glosa = "TA_TARIFA"
 
@@ -10673,7 +10784,27 @@ class GlosaService:
 
             # 01-09-2026 (GL-149) — CIFRAS QUE NADIE CALCULÓ.
             try:
-                _plata = _afirmacion_financiera_del_modelo(_solo_texto_argumento(dictamen) or "")
+                # Si el argumento no lo escribió la IA (plantilla fija,
+                # abstención), no hay «modelo hablando de plata» que vigilar.
+                _es_de_la_ia = str(locals().get("modelo_usado") or "") not in (
+                    "texto_fijo",
+                    "abstencion",
+                    "plantilla",
+                )
+                _respaldo_plata = " ".join(
+                    str(x or "")
+                    for x in (
+                        (locals().get("_ficha_vig") or {}).get("tarifa"),
+                        locals().get("_parr_tar"),
+                    )
+                )
+                _plata = (
+                    _afirmacion_financiera_del_modelo(
+                        _solo_texto_argumento(dictamen) or "", _respaldo_plata
+                    )
+                    if _es_de_la_ia
+                    else []
+                )
                 if _plata:
                     _correcciones.append(
                         "OJO: la argumentación afirma cosas de dinero que el motor "
@@ -10685,6 +10816,22 @@ class GlosaService:
                     logger.warning(f"[PLATA-INVENTADA] el modelo escribió: {_plata}")
             except Exception as _e_pi2:
                 logger.debug(f"[PLATA-INVENTADA] red no aplicada: {_e_pi2}")
+
+            # 02-09-2026 — TRIAGE, CIE-10 O FECHAS QUE NINGÚN PDF TRAE.
+            try:
+                _clinico = _hechos_clinicos_sin_respaldo(
+                    _solo_texto_argumento(dictamen) or "", contexto_pdf or ""
+                )
+                if _clinico:
+                    _correcciones.append(
+                        "OJO: el escrito afirma datos clínicos que no están en ningún "
+                        "PDF aportado (" + ", ".join(_clinico) + "). Si la entidad abre "
+                        "la historia y no los encuentra, no pierde la glosa: expone al "
+                        "hospital. Compruébelos en la historia clínica o bórrelos."
+                    )
+                    logger.warning(f"[CLINICO-SIN-RESPALDO] {_clinico}")
+            except Exception as _e_cl:
+                logger.debug(f"[CLINICO-SIN-RESPALDO] red no aplicada: {_e_cl}")
 
             try:
                 _dictamen_cups_respaldado = _neutralizar_cups_sin_respaldo(
@@ -12727,7 +12874,23 @@ class GlosaService:
             # anexos a esta respuesta. Sin folios: el motor conoce el nombre
             # del archivo, no su foliación.
             if adjuntos:
-                bloque_adjuntos = _bloque_anexos + (aviso_adj or "")
+                # 02-09-2026 — PRUEBA 3, UX. Con dos PDF recién leídos, debajo
+                # salía «⏳ EL ÍNDICE SE ESTÁ RECONSTRUYENDO» y el auditor entendió
+                # que el motor no había leído nada — cuando el triage y el dolor
+                # torácico venían justamente de ese PDF. Son dos cosas distintas:
+                # lo adjunto ya se leyó; lo que el índice del servidor no puede
+                # confirmar todavía es el EXPEDIENTE institucional de la factura.
+                # Se dice con todas las letras, antes del aviso.
+                _aclaracion = ""
+                if aviso_adj:
+                    _aclaracion = (
+                        '<div style="color:#14304f;font-size:11px;margin-top:6px;">'
+                        f"Los {len(adjuntos)} archivo(s) anexos <b>sí se leyeron</b> para "
+                        "este dictamen. El aviso siguiente es sobre el <b>expediente "
+                        "institucional</b> de la factura en el servidor de radicación, "
+                        "no sobre lo que usted adjuntó.</div>"
+                    )
+                bloque_adjuntos = _bloque_anexos + _aclaracion + (aviso_adj or "")
             else:
                 # Sin expediente que respalde y sin nada adjunto, no se firma
                 # una relación de soportes.

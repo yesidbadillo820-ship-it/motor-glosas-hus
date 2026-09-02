@@ -1005,6 +1005,194 @@ def get_glosa_service() -> GlosaService:
 
 
 @router.post(
+    "/analizar/async",
+    status_code=202,
+    summary="Analizar Glosa (sin bloquear)",
+    description=(
+        "Arranca el análisis y responde de inmediato con el trace_id. El dictamen "
+        "se recoge con GET /analizar/resultado/{trace_id} y el progreso se sigue "
+        "por /eventos/analizar/{trace_id}. Ninguna petición dura más que el túnel."
+    ),
+)
+@limiter.limit("60/minute")
+async def analizar_async(
+    request: Request,
+    eps: str = Form(...),
+    etapa: str = Form(...),
+    fecha_radicacion: Optional[str] = Form(None),
+    fecha_recepcion: Optional[str] = Form(None),
+    valor_aceptado: str = Form("0"),
+    tabla_excel: str = Form(...),
+    numero_factura: Optional[str] = Form(None),
+    numero_radicado: Optional[str] = Form(None),
+    tono: Optional[str] = Form("conciliador"),
+    modo_respuesta: Optional[str] = Form("defender"),
+    valor_aceptado_parcial: Optional[float] = Form(0.0),
+    usar_pdf_nativo_soportes: Optional[bool] = Form(False),
+    trace_id: Optional[str] = Form(None),
+    archivos: Optional[list[UploadFile]] = File(None),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """02-09-2026 — PRUEBA 2 (CL4506): el túnel corta a los 100 s y una glosa
+    pesada tarda más. El motor terminaba y guardaba, pero la respuesta nunca
+    llegaba: «Error de conexión». Para el auditor eso es una caída.
+
+    Acá el POST devuelve el trace_id enseguida y el análisis corre aparte, con
+    su propia sesión de base de datos —la de la petición se cierra al
+    responder—. Los PDF se leen AHORA, porque UploadFile también se cierra al
+    responder. La pantalla recoge el resultado con peticiones cortas.
+    """
+    import asyncio
+    import uuid
+
+    from app.services import resultados_analisis as _res
+
+    _tid = (trace_id or "").strip() or uuid.uuid4().hex
+    _archivos: list[tuple[str, bytes, str]] = []
+    for a in archivos or []:
+        if a is None or not a.filename:
+            continue
+        _archivos.append((a.filename, await a.read(), a.content_type or "application/pdf"))
+
+    _res.abrir(_tid)
+    _overrides = dict(getattr(request.app, "dependency_overrides", {}) or {})
+    asyncio.create_task(
+        _correr_analisis_en_fondo(
+            trace_id=_tid,
+            overrides=_overrides,
+            eps=eps,
+            etapa=etapa,
+            fecha_radicacion=fecha_radicacion,
+            fecha_recepcion=fecha_recepcion,
+            valor_aceptado=valor_aceptado,
+            tabla_excel=tabla_excel,
+            numero_factura=numero_factura,
+            numero_radicado=numero_radicado,
+            tono=tono,
+            modo_respuesta=modo_respuesta,
+            valor_aceptado_parcial=valor_aceptado_parcial,
+            usar_pdf_nativo_soportes=usar_pdf_nativo_soportes,
+            archivos=_archivos,
+            current_user=current_user,
+        )
+    )
+    return {"trace_id": _tid, "estado": "en_curso"}
+
+
+async def _correr_analisis_en_fondo(
+    *,
+    trace_id: str,
+    eps: str,
+    etapa: str,
+    fecha_radicacion: Optional[str],
+    fecha_recepcion: Optional[str],
+    valor_aceptado: str,
+    tabla_excel: str,
+    numero_factura: Optional[str],
+    numero_radicado: Optional[str],
+    tono: Optional[str],
+    modo_respuesta: Optional[str],
+    valor_aceptado_parcial: Optional[float],
+    usar_pdf_nativo_soportes: Optional[bool],
+    archivos: list[tuple[str, bytes, str]],
+    current_user: UsuarioRecord,
+    overrides: Optional[dict] = None,
+) -> None:
+    """Corre la MISMA lógica del camino bloqueante y deja el resultado en
+    `resultados_analisis`. Nada de aquí puede escapar como excepción: un
+    análisis caído se registra como error con su causa, y ya.
+
+    La sesión de base de datos y el servicio se resuelven como lo haría
+    FastAPI —respetando `dependency_overrides`—: en producción son las
+    fábricas reales; en pruebas, las sustituidas por el test."""
+    from io import BytesIO
+
+    from fastapi.encoders import jsonable_encoder
+    from starlette.datastructures import Headers
+
+    from app.services import resultados_analisis as _res
+
+    _ov = overrides or {}
+    _fab_db = _ov.get(get_db, get_db)
+    _fab_svc = _ov.get(get_glosa_service, get_glosa_service)
+
+    _gen_db = _fab_db()
+    if hasattr(_gen_db, "__next__"):
+        db = next(_gen_db)
+        _cerrar_db = lambda: next(_gen_db, None)  # noqa: E731 — agota el generador (cierra)
+    else:
+        db = _gen_db
+        _cerrar_db = getattr(db, "close", lambda: None)
+    service = _fab_svc()
+
+    ups: list[UploadFile] = [
+        UploadFile(
+            file=BytesIO(data),
+            filename=nombre,
+            headers=Headers({"content-type": ct}),
+        )
+        for nombre, data, ct in archivos
+    ]
+    try:
+        respuesta = await _analizar_impl(
+            eps=eps,
+            etapa=etapa,
+            fecha_radicacion=fecha_radicacion,
+            fecha_recepcion=fecha_recepcion,
+            valor_aceptado=valor_aceptado,
+            tabla_excel=tabla_excel,
+            numero_factura=numero_factura,
+            numero_radicado=numero_radicado,
+            tono=tono,
+            modo_respuesta=modo_respuesta,
+            valor_aceptado_parcial=valor_aceptado_parcial,
+            usar_pdf_nativo_soportes=usar_pdf_nativo_soportes,
+            trace_id=trace_id,
+            archivos=ups or None,
+            db=db,
+            service=service,
+            current_user=current_user,
+        )
+        _res.cerrar_ok(trace_id, jsonable_encoder(respuesta), getattr(respuesta, "id", None))
+    except HTTPException as e:
+        _res.cerrar_error(trace_id, str(e.detail), e.status_code)
+    except Exception as e:  # noqa: BLE001 — se registra, nunca se pierde en silencio
+        logger.error(f"[{trace_id}] análisis en fondo cayó: {e}", exc_info=True)
+        _res.cerrar_error(trace_id, f"Error procesando análisis: {str(e)[:200]}", 500)
+    finally:
+        try:
+            _cerrar_db()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+@router.get(
+    "/analizar/resultado/{trace_id}",
+    summary="Resultado de un análisis lanzado con /analizar/async",
+)
+async def resultado_analisis(
+    trace_id: str,
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Petición corta, a prueba de túnel. Estados: en_curso · listo · error."""
+    import asyncio
+
+    from app.services import resultados_analisis as _res
+
+    # Ceder el turno al bucle: si el análisis acaba de terminar, que alcance
+    # a registrarse antes de responder «en curso».
+    await asyncio.sleep(0)
+    e = _res.consultar(trace_id)
+    if e is None:
+        raise HTTPException(status_code=404, detail="No hay un análisis con ese identificador.")
+    if e["estado"] == "listo":
+        return {"estado": "listo", "glosa_id": e.get("glosa_id"), "resultado": e.get("resultado")}
+    if e["estado"] == "error":
+        return {"estado": "error", "status": e.get("status") or 500, "detail": e.get("detail")}
+    return {"estado": "en_curso"}
+
+
+@router.post(
     "/analizar",
     response_model=GlosaResult,
     summary="Analizar Glosa",
@@ -1030,6 +1218,54 @@ async def analizar(
     db: Session = Depends(get_db),
     service: GlosaService = Depends(get_glosa_service),
     current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Camino de siempre: responde cuando el dictamen está listo.
+
+    02-09-2026 — el cuerpo vive en `_analizar_impl` para que el camino
+    asíncrono (`/analizar/async`) corra EXACTAMENTE la misma lógica sin
+    duplicarla. Esta ruta se conserva intacta para los clientes que la usan
+    (el agente de lotes, las pruebas, las herramientas).
+    """
+    return await _analizar_impl(
+        eps=eps,
+        etapa=etapa,
+        fecha_radicacion=fecha_radicacion,
+        fecha_recepcion=fecha_recepcion,
+        valor_aceptado=valor_aceptado,
+        tabla_excel=tabla_excel,
+        numero_factura=numero_factura,
+        numero_radicado=numero_radicado,
+        tono=tono,
+        modo_respuesta=modo_respuesta,
+        valor_aceptado_parcial=valor_aceptado_parcial,
+        usar_pdf_nativo_soportes=usar_pdf_nativo_soportes,
+        trace_id=trace_id,
+        archivos=archivos,
+        db=db,
+        service=service,
+        current_user=current_user,
+    )
+
+
+async def _analizar_impl(
+    *,
+    eps: str,
+    etapa: str,
+    fecha_radicacion: Optional[str],
+    fecha_recepcion: Optional[str],
+    valor_aceptado: str,
+    tabla_excel: str,
+    numero_factura: Optional[str],
+    numero_radicado: Optional[str],
+    tono: Optional[str],
+    modo_respuesta: Optional[str],
+    valor_aceptado_parcial: Optional[float],
+    usar_pdf_nativo_soportes: Optional[bool],
+    trace_id: Optional[str],
+    archivos: Optional[list[UploadFile]],
+    db: Session,
+    service: GlosaService,
+    current_user: UsuarioRecord,
 ):
     from app.services.progreso_analisis import publicar as _publicar_progreso
 
