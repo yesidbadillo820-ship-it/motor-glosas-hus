@@ -90,6 +90,64 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 02-09-2026 (noche, tercera tanda) — Diez contradicciones que el modelo no puede razonar solo (casos F a O)
+
+**Qué pasó.** Se corrieron diez ejemplos nuevos en la pantalla y en todos el
+dictamen falló por la misma raíz: el modelo se dejó llevar por el código de la
+glosa, se inventó una ley, capturó mal los números o se puso a defender un
+imposible. La respuesta a esto no es pedirle al modelo que «razone mejor»: es
+que **Python decida** los hechos y el modelo solo redacte.
+
+**Los diez casos y qué se hizo.** Todo vive en un archivo nuevo,
+`app/services/reglas_casos_fno.py`, con una regla por caso y su prueba:
+
+- **F. Código de tarifa, texto de soportes.** La glosa decía «TARIFA» pero el
+  motivo real era que no se adjuntó la nota quirúrgica ni el récord de
+  anestesia. Ahora, cuando el texto de una glosa de tarifa reclama un soporte
+  clínico, se responde como documental (se aportan los soportes), no con SOAT
+  y UVB.
+- **G. Ley inventada.** La EPS citó el «Artículo 99 de la Resolución 8888 de
+  2025», que no existe. El dictamen se ponía a discutir si «aplicaba». Ahora,
+  si la norma que cita la entidad no está en el corpus, no se debate: se deja
+  constancia de que no existe y se defiende con normas vigentes.
+- **H. Porcentaje.** «Se glosa el 25 % del valor total» de una factura de
+  $10.000.000 son $2.500.000, y el motor tomaba los $10.000.000. Ahora hace la
+  cuenta.
+- **I. Imposible clínico.** Un parto facturado a un paciente hombre de 65 años.
+  El dictamen lo defendía con «autonomía del médico tratante». Ahora reconoce
+  el error de facturación y anuncia la nota crédito.
+- **J. Ratificación camuflada.** El texto decía «respuesta a conciliación / se
+  ratifica la glosa» pero se redactó una respuesta inicial. Ahora se detecta en
+  el texto y se va por el camino de ratificada (mantener respuesta, conciliar).
+- **K. Texto basura.** Una glosa llena de símbolos (`&&& /// _ ::: $$$`) hacía
+  que el código saliera «N/A». Ahora se limpia el ruido antes de leer y el
+  código, el CUPS y el valor salen bien. El encabezado normal no se toca.
+- **L. Fechas invertidas.** Ingreso 25/08 y alta 20/08: imposible. El modelo se
+  inventó un «cierre administrativo» para defenderlo. Ahora reconoce el error y
+  manda a corregir la factura.
+- **M. Doble pagador (espejo del Caso 6).** Acá la EPS SÍ tenía razón: mostró
+  con números que el tope del SOAT no se había agotado (quedaban $24.600.000 de
+  $34.600.000). El motor se abstenía. Ahora acepta y ordena cobrar primero a la
+  aseguradora del SOAT, no a la EPS (Decreto 780 de 2016).
+- **N. Alto costo sin MIPRES.** Rituximab sin el formato MIPRES. El motor
+  devolvía «no identifica el servicio» —falso: el medicamento estaba
+  nombrado—. La causa: una glosa de un solo renglón se borraba entera al quitar
+  el encabezado y quedaba «vacía». Se corrigió ese recorte y ahora se exige el
+  formato MIPRES como anexo obligatorio.
+- **O. Glosado $0.** Una glosa informativa («glosado $0, aceptado $500.000»)
+  tomaba los $500.000 como objetados y pedía pruebas. Ahora se lee que lo
+  glosado es $0, se marca como informativa y no se arma defensa jurídica.
+
+**Cómo quedó.** La IA redacta; Python decide. Cada regla tiene prueba de que
+funciona y —igual de importante— de que NO se dispara de más (un parto en mujer
+no salta, una tarifa de verdad no se reclasifica, una norma real no se marca
+como inventada, el Caso 6 sigue defendiéndose). El caso 6 y la abstención de la
+prueba 5 siguen intactos.
+
+**Pendiente:** correr estos diez en la pantalla tras desplegar con reinicio; y
+siguen los dos operativos de siempre: contratos AURORA/ARL vencidos el 31-08 y
+confirmar las glosas de agosto con `tools/verificar_glosas.py`.
+
 ### 02-09-2026 (noche, segunda tanda) — Caso 6: quién paga primero en accidente de tránsito, y quién lo prueba
 
 **Qué pasó.** Se corrió en la pantalla real un caso nuevo, distinto a los cinco
