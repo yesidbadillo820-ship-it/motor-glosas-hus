@@ -126,6 +126,37 @@ async def importar_bitacora(
     return {"ok": True, "items": n}
 
 
+@router.post("/importar-reparto")
+async def importar_reparto(
+    paquete_id: int = Form(...),
+    archivo: UploadFile = File(..., description="Tabla FACTURA / PROFESIONAL / TECNICO"),
+    db: Session = Depends(get_db),
+    usuario: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Sube el reparto del área: quién audita cada factura del paquete.
+
+    Lo pidió Yesid el 02-09-2026: la columna GESTOR del informe sale de la
+    macro y en estos paquetes viene vacía, pero el área sí tiene el reparto
+    hecho en su propia tabla de FACTURA / PROFESIONAL / TÉCNICO. El técnico es
+    el gestor y el profesional la médica auditora. La lógica vive en el
+    servicio; acá solo se recibe, se valida y se responde.
+    """
+    if db.get(PaqueteAdresRecord, paquete_id) is None:
+        raise HTTPException(404, f"No existe el paquete {paquete_id}")
+    contenido = await archivo.read()
+    if not contenido:
+        raise HTTPException(400, "El archivo llegó vacío.")
+    if len(contenido) > MAX_BYTES:
+        raise HTTPException(413, "El archivo supera el tamaño máximo permitido.")
+    try:
+        resumen = svc.importar_reparto(
+            db, contenido, paquete_id=paquete_id, nombre_archivo=archivo.filename or ""
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"ok": True, **resumen}
+
+
 @router.get("/paquetes")
 def paquetes(
     db: Session = Depends(get_db),
