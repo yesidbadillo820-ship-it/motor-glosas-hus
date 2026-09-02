@@ -6,6 +6,8 @@ import hashlib
 import asyncio
 import time
 from datetime import datetime, timedelta
+
+from app.services import reglas_casos_fno as _rcf
 from typing import Optional
 
 import httpx
@@ -4886,7 +4888,8 @@ _RE_ELEMENTOS_MATERIALES = re.compile(
     r"HONORARIOS?|MATERIAL|OSTEOS[IÍ]NTESIS|INTERCONSULTA|URGENCIA|URGENTE)\w*\b"  # un servicio
     r"|\bCONTRATO\s+[A-Z0-9][A-Z0-9\-/\.]{3,}|\bCL[ÁA]USULA\b"  # lo contractual
     r"|\b(?:AUTORIZACI|SOPORTE|HISTORIA\s+CL[IÍ]NICA|EPICRISIS|RIPS|KARDEX|"
-    r"TARIFA|UVB|SOAT|PERTINENCIA|ATENCI[OÓ]N)\w*\b",  # la causal o el documento
+    r"TARIFA|UVB|SOAT|PERTINENCIA|ATENCI[OÓ]N|MIPRES)\w*\b"  # la causal o el documento
+    r"|\bNO\s*P[BO]S\b",  # medicamento fuera del plan (MIPRES/alto costo)
     re.IGNORECASE,
 )
 _RE_FECHA_EN_TEXTO = re.compile(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b")
@@ -4913,8 +4916,15 @@ def _glosa_sin_elementos(texto_glosa: str, contexto_pdf: str, cups: str = "") ->
     # y una glosa escrita en un solo renglón —«…SANCIÓN DEL 10 % AL VALOR
     # FACTURADO conforme a la Cláusula 18 del contrato…»— se borraba completa
     # y quedaba «vacía». Se abstenía de una glosa llena de elementos.
+    # Se quita SOLO el prefijo «CÓDIGO | FACTURA |», no el resto de la línea. La
+    # versión anterior comía hasta el fin de línea (`[^\n]*$`), y una glosa
+    # escrita en un solo renglón —«FA0102 | HUS… | ASMET. SE COBRA RITUXIMAB
+    # POR $4.500.000. NO SE ADJUNTA MIPRES…»— quedaba vacía y se abstenía: se
+    # devolvía «no identifica el servicio» cuando el servicio estaba ahí. Ese
+    # fue el falso positivo del Caso N (02-09-2026). El nombre de la entidad
+    # queda en el cuerpo (no trae elementos por sí solo).
     cuerpo = re.sub(
-        r"^\s*[A-Z]{2}\d{2,4}\s*\|\s*[A-Z0-9\-]+\s*\|[^\n]*$",  # «FA0205 | HUS… | ENTIDAD»
+        r"^\s*[A-Z]{2}\d{2,4}\s*\|\s*[A-Z0-9\-]+\s*\|\s*",  # «FA0205 | HUS… | »
         " ",
         texto_glosa or "",
         flags=re.IGNORECASE | re.MULTILINE,
@@ -8107,6 +8117,11 @@ class GlosaService:
                 few_shots = []
             few_shots = list(few_shots) + [hint_gestor]
         texto_base = str(data.tabla_excel).strip().upper()
+        # Caso K (02-09-2026): texto basura. Antes de extraer código, CUPS y
+        # valor, se limpian los separadores basura (&&& /// _ ::: $$$) que
+        # rompían el `\b` del regex del código («FA0301_» no daba límite de
+        # palabra) y dejaban «N/A». No toca el encabezado «CÓD | FACTURA | EPS».
+        texto_base = _rcf.limpiar_ruido_glosa(texto_base)
 
         # 20-08-2026 — lo que la IA TIENE A LA VISTA para redactar: el
         # contexto de los PDF más el texto de la glosa. Con esto se revisa
@@ -8281,7 +8296,13 @@ class GlosaService:
         tipo_glosa = self._determinar_tipo_glosa(prefijo, texto_base)
 
         es_extemporanea = dias > DIAS_HABILES_LIMITE_EXTEMPORANEA
-        es_ratificacion = "RATIF" in str(data.etapa).upper()
+        # Caso J (02-09-2026): la etapa venía como respuesta inicial pero el
+        # TEXTO dice «se ratifica» / «respuesta a conciliación». Se enruta al
+        # camino de ratificada (mantener respuesta, solicitar conciliación), no
+        # a redactar una subsanación inicial que repite defensas.
+        es_ratificacion = "RATIF" in str(data.etapa).upper() or _rcf.texto_es_ratificacion(
+            texto_base
+        )
         tiene_pdf = bool(contexto_pdf and len(contexto_pdf.strip()) > 0)
         es_urgencia = "URGENCIA" in texto_base or "URGENTE" in texto_base
         # Es tarifa SOLO si el prefijo del código es TA. FA=facturación,
@@ -8294,6 +8315,23 @@ class GlosaService:
         tiene_contrato = eps_key in (contratos_db or {})
 
         argumento_fijo = None
+        # Casos F, I, L, M, O (02-09-2026) — CONTRADICCIONES QUE EL MODELO NO
+        # DEBE «RAZONAR». La glosa trae en su propio texto un hecho que decide
+        # la respuesta: glosado $0 (informativa), incompatibilidad clínica
+        # (parto en hombre), fechas invertidas (alta antes del ingreso), tope
+        # SOAT no agotado con matemática correcta, u objeción de soportes bajo
+        # un código de tarifa. Python decide el dictamen; se aplica más abajo,
+        # con prioridad sobre las ramas de tarifa pero por debajo de la
+        # extemporaneidad y la ratificación (que ganan por plazo/etapa).
+        _forzado = None
+        _modo_pre = (getattr(data, "modo_respuesta", None) or "defender").lower()
+        if _modo_pre == "defender" and not es_ratificacion and not es_extemporanea:
+            try:
+                _forzado = _rcf.dictamen_forzado_por_contradiccion(
+                    texto_base, prefijo, codigo_det, valor_raw, str(data.eps or "")
+                )
+            except Exception as _e_fz:
+                logger.debug(f"[FORZADO] no evaluado: {_e_fz}")
         # 25-08-2026: con una ASEGURADORA, la ratificación va al motor para que
         # refute el motivo concreto. Con las demás sigue la plantilla del área.
         _rat_al_analisis = es_ratificacion and _ratificada_va_al_analisis(str(data.eps or ""))
@@ -8385,6 +8423,15 @@ class GlosaService:
                 fecha_hecho=_fecha_del_formulario(data),
             )
             tipo_glosa = "TA_TARIFA"
+
+        # Aplicación del camino forzado (casos F, I, L, M, O). Gana sobre las
+        # ramas de tarifa de arriba —por eso va después—, pero no sobre la
+        # extemporaneidad ni la ratificación, que ya se descartaron al calcular
+        # `_forzado`. El texto lo arma Python; no pasa por la IA.
+        if _forzado:
+            argumento_fijo = _forzado["arg"]
+            tipo_glosa = _forzado["tipo"]
+            logger.info(f"[FORZADO] {_forzado['tipo']} ({codigo_det}): {_forzado['nota']}")
 
         # Modo de respuesta explicito por concepto (Sprint 1):
         # Si el auditor marco "aceptar_total" o "aceptar_parcial", sobreescribe
@@ -8495,6 +8542,12 @@ class GlosaService:
         else:
             cod_res, desc_res = "RE9901", "GLOSA NO ACEPTADA - SUBSANADA EN SU TOTALIDAD"
 
+        # El camino forzado (casos F, I, L, M, O) impone su propio código de
+        # respuesta: informativa (RE9701), aceptación por error/tope (RE9702) o
+        # defensa documental (RE9901). Va después de la cascada para ganarle.
+        if _forzado and argumento_fijo == _forzado["arg"]:
+            cod_res, desc_res = _forzado["cod"], _forzado["desc"]
+
         plantilla = obtener_plantilla_por_codigo(codigo_det)
         # 06-08-2026 (OT-012) — la plantilla del código corta el paso a la IA
         # y responde sola. Con una sola objeción está bien: es texto aprobado.
@@ -8546,6 +8599,12 @@ class GlosaService:
                 "TARIFA_MATCH_PERFECTO": "DEFENDER_TOTAL",
                 "ACEPTADA_TOTAL": "ACEPTAR_TOTAL",
                 "ACEPTADA_PARCIAL": "ACEPTAR_PARCIAL",
+                # Casos forzados (02-09-2026): la acción la fija _rcf.
+                "ACEPTADA_ERROR_FACTURA": "ACEPTAR_TOTAL",
+                "ACEPTADA_FECHA_INVERTIDA": "ACEPTAR_TOTAL",
+                "ACEPTADA_SOAT_REMANENTE": "ACEPTAR_TOTAL",
+                "FA_SOPORTES_FORZADO": "DEFENDER_TOTAL",
+                "INFORMATIVA_CERO": "",
             }
             accion_ia = _mapa_accion.get(tipo_glosa, "")
             try:
@@ -8570,6 +8629,12 @@ class GlosaService:
                 "ACEPTADA_TOTAL",
                 "ACEPTADA_PARCIAL",
                 "TARIFA_MATCH_PERFECTO",
+                # Casos forzados: texto curado en Python, no se retoca.
+                "ACEPTADA_ERROR_FACTURA",
+                "ACEPTADA_FECHA_INVERTIDA",
+                "ACEPTADA_SOAT_REMANENTE",
+                "FA_SOPORTES_FORZADO",
+                "INFORMATIVA_CERO",
             )
             arg_ia = argumento_fijo if _saltar_suavizar else _suavizar_tono(argumento_fijo)
             # Sanitizer: aplicar al camino de texto_fijo para garantizar que
@@ -10623,6 +10688,53 @@ class GlosaService:
             except Exception as _e_dn:
                 logger.debug(f"[DOC-NO-APORTADO] no aplicada: {_e_dn}")
 
+            # Caso G (02-09-2026, CO0302) — NO LEGITIMAR LA LEY QUE LA ENTIDAD
+            # INVENTÓ. Si la glosa se apoya en una norma que no existe en el
+            # corpus (p. ej. «Resolución 8888 de 2025»), el escrito no debe
+            # debatir su aplicabilidad como si existiera: se borra esa discusión
+            # y se deja constancia de que no está en el ordenamiento.
+            try:
+                _normas_fake = _rcf.normas_inexistentes_citadas(texto_base)
+                if _normas_fake and arg_ia:
+                    arg_ia, _leg_borradas = _rcf.no_legitimar_normas_ajenas(arg_ia, _normas_fake)
+                    if _leg_borradas:
+                        _correcciones_previas.append(
+                            "La entidad citó "
+                            + ", ".join(_normas_fake)
+                            + ", que no existe en el corpus normativo. Quité del escrito lo que "
+                            "la debatía como si existiera y dejé la defensa en normas vigentes."
+                        )
+                        logger.warning(
+                            f"[NORMA-AJENA-INEXISTENTE] {_normas_fake} borradas={len(_leg_borradas)}"
+                        )
+            except Exception as _e_ng:
+                logger.debug(f"[NORMA-AJENA-INEXISTENTE] no aplicada: {_e_ng}")
+
+            # Caso N (02-09-2026, FA0102) — MIPRES: REQUISITO, NO DEVOLUCIÓN. El
+            # servicio (medicamento NO PBS) SÍ está identificado; evadir con una
+            # devolución administrativa genérica es falso. Se exige el formato
+            # MIPRES como anexo obligatorio; si el escrito evadió, se reemplaza.
+            try:
+                if arg_ia and _rcf.glosa_exige_mipres(texto_base):
+                    _con_mipres = _rcf.hay_mipres_en_soportes(contexto_pdf or "")
+                    _parr_mip = _rcf.parrafo_mipres(_con_mipres)
+                    if _rcf.es_evasion_devolucion(arg_ia):
+                        arg_ia = _parr_mip
+                        _correcciones_previas.append(
+                            "El escrito evadía con una devolución administrativa genérica una "
+                            "glosa que sí identifica el servicio (medicamento) y el requisito "
+                            "(MIPRES). Lo reemplacé por el requerimiento del formato MIPRES."
+                        )
+                    elif "MIPRES" not in arg_ia.upper():
+                        arg_ia = arg_ia.rstrip() + " " + _parr_mip
+                        _correcciones_previas.append(
+                            "Agregué el requerimiento del formato MIPRES como anexo obligatorio "
+                            "para el medicamento no financiado con la UPC."
+                        )
+                    logger.info(f"[MIPRES] con_mipres={_con_mipres}")
+            except Exception as _e_mip:
+                logger.debug(f"[MIPRES] no aplicada: {_e_mip}")
+
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             # Ronda 17 (26-jun-2026): aplicar normalización de MAYÚSCULAS
             # sostenidas AQUÍ, sobre el ARGUMENTO en texto plano, antes
@@ -12528,13 +12640,27 @@ class GlosaService:
                 _mejor = max(_hits, key=lambda x: _pvc_lab(x) or 0)
                 return _en_pesos_colombianos(_mejor)
 
+        # Caso H (02-09-2026) — GLOSA POR PORCENTAJE. «SE GLOSA EL 25 % DEL VALOR
+        # TOTAL DE LA FACTURA» sobre una factura de $10.000.000 son $2.500.000,
+        # no $10.000.000. Python hace la cuenta antes de que el patrón genérico
+        # agarre el total. Solo si hay porcentaje asociado al total Y una base.
+        _pct_val = _rcf.valor_glosa_por_porcentaje(t)
+        if _pct_val:
+            return _en_pesos_colombianos(f"{int(_pct_val):,}".replace(",", "."))
+
+        # Caso O (02-09-2026) — GLOSADO $0. Si el valor glosado/objetado es
+        # explícitamente cero, la glosa es informativa: el objetado ES $0. Sin
+        # esto, el patrón genérico agarraba el «ACEPTADO $500.000» de al lado.
+        if _rcf.glosa_es_informativa_cero(t):
+            return "$ 0.00"
+
         # EL FACTURADO NUNCA ES EL OBJETADO. Si el texto rotula un valor como
         # facturado (o cobrado, o total de la factura) y ningún rótulo de los
         # de arriba enganchó, ese número se saca del camino antes de que los
         # patrones genéricos lo agarren por ser el primero que aparece.
         # Se opera sobre una copia: el texto original no se toca.
         _t_sin_facturado = re.sub(
-            r"\b(?:valor|vr|vlr)\.?\s+(?:facturado|cobrado|total\s+factura)[:\s]*\$?\s*[\d][\d\.,]{2,}",
+            r"\b(?:valor|vr|vlr)?\.?\s*(?:facturado|cobrado|total\s+factura|aceptad[oa]|reconocid[oa])[:\s]*\$?\s*[\d][\d\.,]{2,}",
             " ",
             t,
             flags=re.IGNORECASE,
