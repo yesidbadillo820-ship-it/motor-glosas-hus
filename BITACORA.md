@@ -90,6 +90,51 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 02-09-2026 (noche, segunda tanda) — Caso 6: quién paga primero en accidente de tránsito, y quién lo prueba
+
+**Qué pasó.** Se corrió en la pantalla real un caso nuevo, distinto a los cinco
+del paquete: COOSALUD glosa toda una factura de accidente de tránsito (causal
+CO4601) porque el hospital «no acredita el agotamiento de la cobertura del
+SOAT». Sin ningún PDF adjunto, el dictamen dijo tres cosas falsas: que probar
+el agotamiento le tocaba a la EPS «por carga dinámica de la prueba»; que la
+Resolución 2284 de 2023 «confirma que esos servicios deben reconocerse»; y no
+citó el Decreto 780 de 2016, que es la norma del orden de cobertura. Además el
+número de la póliza (7745120-3) terminó pegado al nombre del servicio.
+
+**La regla, en plata blanca.** En accidente de tránsito paga primero la póliza
+SOAT hasta su tope, después el ADRES y solo al final la EPS (Decreto 780 de
+2016). Y **es el hospital** quien factura al SOAT y quien pide y aporta el
+certificado de agotamiento de la aseguradora. Trasladarle esa carga a la EPS
+es una excusa que la EPS tumba en una línea.
+
+**Qué se hizo.**
+- El propio prompt enseñaba la «carga dinámica» como arma general y con la
+  norma equivocada (Art. 57 de la Ley 1438, que es el trámite de glosas). Se
+  corrigió a su fuente (Art. 167 del Código General del Proceso) y se acotó:
+  solo para soportes que la entidad produce o custodia, nunca para lo propio
+  del hospital ni para el agotamiento del SOAT.
+- Quedó escrito que la Resolución 2284 es el manual de códigos y no dice nada
+  de pagos ni de topes.
+- El módulo de cobertura del prompt tiene ahora la regla SOAT → ADRES → EPS.
+- Por código: si la glosa es de cobertura SOAT/ADRES y no hay certificado de
+  agotamiento entre los PDF, el motor **borra** del escrito cualquier frase que
+  afirme que el tope se agotó, que el certificado se aportó, o que le toca a la
+  EPS probarlo; y **agrega** el párrafo con el orden de cobertura y la
+  constancia de que el certificado se aportará. Con certificado entre los
+  soportes, sí lo dice y lo señala.
+- Los números de póliza, autorización, radicado y similares se resguardan
+  antes de que corran las limpiezas de números y vuelven intactos. Y un
+  «CUPS» con guion o de siete dígitos ya no se rotula «código»: se retira,
+  porque por su sola forma no es un CUPS.
+
+**Verificado en producción antes de esto:** las pruebas 1, 2 y 3 del ciclo de
+estrés, ya con el camino asíncrono (la pantalla aguantó la glosa pesada sin
+cortarse a los 100 segundos).
+
+**Pendiente:** correr este caso 6 de nuevo tras desplegar; después las
+pruebas 4 y 5; y siguen los dos operativos: contratos AURORA/ARL vencidos el
+31-08 y confirmar las 148 glosas de agosto con `tools/verificar_glosas.py`.
+
 ### 02-09-2026 (noche) — El PDF de evidencia ya no se cae, y salen todos de una en un ZIP
 
 **Lo que reportó Yesid.** En la factura HUS414206, el botón «PDF de evidencia»
