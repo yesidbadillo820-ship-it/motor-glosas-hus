@@ -17,6 +17,7 @@ import csv
 import io
 import json
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -37,7 +38,12 @@ _TOOLS = Path(__file__).resolve().parents[2] / "tools"
 if str(_TOOLS) not in sys.path:
     sys.path.insert(0, str(_TOOLS))
 
-from ajustar_detallado_glosas import normalizar_factura  # noqa: E402
+from ajustar_detallado_glosas import (  # noqa: E402
+    _fila_encabezado,
+    _leer_filas,
+    _mapear_columnas,
+    normalizar_factura,
+)
 from glosas_adres_por_factura import (  # noqa: E402
     aceptado_sin_duplicar,
     leer_oficiales,
@@ -490,6 +496,147 @@ def importar_bitacora(db: Session, contenido: bytes, *, paquete_id: int) -> int:
     db.commit()
     logger.info("Bitácora del paquete %s: %d ítem(s) del detallado", paquete_id, n)
     return n
+
+
+# ─── Reparto del trabajo: quién audita cada factura ──────────────────────────
+
+# El área reparte el paquete en una tabla de tres columnas y la manda así:
+#
+#     FACTURA      PROFESIONAL        TECNICO
+#     HUS405724    JEFE LAURA         OSCAR
+#     HUS406048    SIN PERTINENCIA    CAROLINA
+#
+# El TÉCNICO es el gestor de cuentas y el PROFESIONAL la médica auditora.
+# «SIN PERTINENCIA» no es una persona: es la anotación del área para decir que
+# esa factura no tiene glosas de pertinencia, así que no lleva médica. Se
+# guarda tal cual está escrito —es el dato del área— pero no cuenta como
+# profesional en el conteo que devuelve esta función.
+ALIAS_REPARTO: dict[str, tuple[str, ...]] = {
+    "factura": ("FACTURA", "NUMERO FACTURA", "NRO FACTURA"),
+    "gestor": ("TECNICO", "GESTOR", "AUDITOR", "RESPONSABLE"),
+    "medico": ("PROFESIONAL", "MEDICO"),
+}
+SIN_MEDICO = "SIN PERTINENCIA"
+
+
+def _filas_del_archivo(contenido: bytes, nombre_archivo: str) -> list[list]:
+    """Las filas de un xlsx/csv que llega por la web, con el lector del repo."""
+    sufijo = Path(nombre_archivo or "").suffix.lower()
+    if sufijo not in (".xlsx", ".xlsm", ".csv", ".txt"):
+        sufijo = ".xlsx"
+    with tempfile.NamedTemporaryFile(suffix=sufijo, delete=False) as tmp:
+        tmp.write(contenido)
+        ruta = Path(tmp.name)
+    try:
+        return _leer_filas(ruta)
+    finally:
+        ruta.unlink(missing_ok=True)
+
+
+def leer_reparto_de_archivo(
+    contenido: bytes, nombre_archivo: str = ""
+) -> dict[str, tuple[str, str]]:
+    """`{clave de factura: (gestor, médico)}` a partir del archivo del área."""
+    filas = _filas_del_archivo(contenido, nombre_archivo)
+    idx = _fila_encabezado(filas, ALIAS_REPARTO, minimo=2)
+    if idx < 0:
+        raise ValueError(
+            "No reconocí el encabezado. El archivo debe traer una fila con FACTURA y, al "
+            "lado, TECNICO (o GESTOR) y PROFESIONAL (o MEDICO)."
+        )
+    cols = _mapear_columnas(filas[idx], ALIAS_REPARTO)
+    if "factura" not in cols or "gestor" not in cols:
+        raise ValueError("El archivo tiene que traer al menos las columnas FACTURA y TECNICO.")
+
+    def val(fila: list, campo: str) -> str:
+        j = cols.get(campo, -1)
+        if not (0 <= j < len(fila)) or fila[j] is None:
+            return ""
+        return str(fila[j]).strip()
+
+    reparto: dict[str, tuple[str, str]] = {}
+    for fila in filas[idx + 1 :]:
+        clave = normalizar_factura(val(fila, "factura"))
+        if not clave or clave == "0":
+            continue
+        reparto[clave] = (val(fila, "gestor"), val(fila, "medico"))
+    return reparto
+
+
+def importar_reparto(
+    db: Session, contenido: bytes, *, paquete_id: int, nombre_archivo: str = ""
+) -> dict:
+    """Pone quién audita cada factura del paquete: técnico (gestor) y médica.
+
+    POR QUÉ EXISTE (02-09-2026). La columna GESTOR del informe sale de la macro,
+    y en los paquetes 31078 y 31073 viene vacía: las 81 facturas del 31078
+    salían «(sin gestor asignado)». El área sí tiene el reparto hecho, en su
+    propia tabla de FACTURA / PROFESIONAL / TÉCNICO, pero no había por dónde
+    subirlo. Esto lo sube.
+
+    Solo escribe lo que el archivo trae: una celda vacía **no borra** lo que ya
+    estaba. Devuelve el detalle de lo que cambió y de lo que quedó por fuera,
+    para que nada pase inadvertido.
+    """
+    reparto = leer_reparto_de_archivo(contenido, nombre_archivo)
+    if not reparto:
+        raise ValueError("El archivo no trae ninguna factura.")
+
+    fichas = db.query(FacturaAdresRecord).filter(FacturaAdresRecord.paquete_id == paquete_id).all()
+    en_el_paquete = {f.factura_clave for f in fichas}
+
+    facturas_tocadas = 0
+    for f in fichas:
+        gestor, medico = reparto.get(f.factura_clave, ("", ""))
+        cambio = False
+        if gestor and f.gestor != gestor:
+            f.gestor = gestor
+            cambio = True
+        if medico and f.medico != medico:
+            f.medico = medico
+            cambio = True
+        facturas_tocadas += 1 if cambio else 0
+
+    # Los renglones llevan el mismo reparto de su factura: así la hoja POR
+    # GESTOR del informe y el filtro por gestor de la pantalla reparten de
+    # verdad, sin tener que mirar la ficha una por una.
+    glosas_tocadas = 0
+    for g in db.query(GlosaAdresRecord).filter(GlosaAdresRecord.paquete_id == paquete_id).all():
+        gestor, medico = reparto.get(g.factura_clave, ("", ""))
+        cambio = False
+        if gestor and g.gestor != gestor:
+            g.gestor = gestor
+            cambio = True
+        if medico and g.medico != medico:
+            g.medico = medico
+            cambio = True
+        glosas_tocadas += 1 if cambio else 0
+
+    db.commit()
+
+    sin_asignar = sorted(en_el_paquete - set(reparto))
+    sobran = sorted(set(reparto) - en_el_paquete)
+    gestores = sorted({g for g, _ in reparto.values() if g})
+    medicos = sorted({m for _, m in reparto.values() if m and m.upper() != SIN_MEDICO})
+    logger.info(
+        "Reparto del paquete %s: %d factura(s) y %d glosa(s) actualizadas; "
+        "%d sin asignación, %d del archivo no están en el paquete",
+        paquete_id,
+        facturas_tocadas,
+        glosas_tocadas,
+        len(sin_asignar),
+        len(sobran),
+    )
+    return {
+        "en_el_archivo": len(reparto),
+        "facturas_actualizadas": facturas_tocadas,
+        "glosas_actualizadas": glosas_tocadas,
+        "sin_asignar": sin_asignar,
+        "no_estan_en_el_paquete": sobran,
+        "gestores": gestores,
+        "medicos": medicos,
+        "sin_pertinencia": sum(1 for _, m in reparto.values() if m and m.upper() == SIN_MEDICO),
+    }
 
 
 # ─── Consultar ───────────────────────────────────────────────────────────────

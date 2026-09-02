@@ -3284,7 +3284,13 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
         <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem">Excel de la macro (opcional — trae el reparto y lo ya decidido)</label>
         <input type="file" id="ga-file-macro" accept=".xlsx,.xlsm" style="width:100%;margin-bottom:.8rem;font-size:.8rem">
         <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem">Bitácora del ajustador de detallados (opcional — CSV)</label>
-        <input type="file" id="ga-file-bitacora" accept=".csv" style="width:100%;margin-bottom:1rem;font-size:.8rem">
+        <input type="file" id="ga-file-bitacora" accept=".csv" style="width:100%;margin-bottom:.8rem;font-size:.8rem">
+        <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem">Reparto del área (opcional — quién audita cada factura)</label>
+        <div style="font-size:.72rem;color:var(--text3);margin-bottom:.25rem">
+          Tabla de tres columnas: <code>FACTURA</code>, <code>PROFESIONAL</code> (la médica) y
+          <code>TECNICO</code> (el gestor). Sin esto la columna Gestor sale «(sin gestor asignado)».
+        </div>
+        <input type="file" id="ga-file-reparto" accept=".xlsx,.xlsm,.csv" style="width:100%;margin-bottom:1rem;font-size:.8rem">
         <div id="ga-cargue-estado" style="font-size:.8rem;color:var(--text3);margin-bottom:.8rem"></div>
         <div style="display:flex;gap:.5rem;justify-content:flex-end">
           <button class="btn btn-ghost" onclick="document.getElementById('ga-modal-cargue').style.display='none'">Cancelar</button>
@@ -21112,6 +21118,7 @@ async function gaCargar(){
   var macro = document.getElementById('ga-file-macro').files[0];
   var listaFacturas = document.getElementById('ga-file-facturas').files[0];
   var bitacora = document.getElementById('ga-file-bitacora').files[0];
+  var reparto = document.getElementById('ga-file-reparto').files[0];
   var estado = document.getElementById('ga-cargue-estado');
   var boton = document.getElementById('ga-btn-cargar');
   if(!reporte){ estado.textContent = 'Falta el reporte de glosas del ADRES.'; return; }
@@ -21134,6 +21141,25 @@ async function gaCargar(){
       var r2 = await fetch('/glosas-adres/importar-bitacora', {method:'POST', headers: authH(), body: fd2});
       var d2 = await r2.json();
       if(r2.ok) estado.textContent += ' ' + d2.items + ' renglones del detallado.';
+    }
+    if(reparto){
+      // 02-09-2026: quién audita cada factura. Si falla, el paquete YA quedó
+      // cargado: se avisa qué pasó y no se pierde el cargue.
+      estado.textContent += ' Cargando el reparto…';
+      var fd3 = new FormData();
+      fd3.append('paquete_id', d.paquete_id);
+      fd3.append('archivo', reparto);
+      var r3 = await fetch('/glosas-adres/importar-reparto', {method:'POST', headers: authH(), body: fd3});
+      var d3 = await r3.json();
+      if(r3.ok){
+        estado.textContent += ' Reparto: '+d3.facturas_actualizadas+' factura(s) para '+
+          (d3.gestores||[]).join(', ')+'.';
+        if((d3.sin_asignar||[]).length){
+          estado.textContent += ' OJO: '+d3.sin_asignar.length+' factura(s) del paquete quedaron sin asignar.';
+        }
+      }else{
+        estado.textContent += ' El reparto NO se cargó: '+(d3.detail || ('HTTP '+r3.status));
+      }
     }
     GA_PAQUETE = d.paquete_id;
     await loadGlosasAdres();
@@ -23222,9 +23248,10 @@ var ROL_COLORS={'SUPER_ADMIN':'rol-super_admin','COORDINADOR':'rol-coordinador',
 //   Gestión: Conciliación, Plantillas Gold, Papelera
 //   Herramientas: Consulta Normativa, Salud Total, Importar recepción,
 //                 Importación masiva
-// Los demás items (Mi desempeño, Mis glosas, Historial, Alertas,
-// Contratos, Usuarios, Dashboard, Auditoría, Multi-concepto,
+// Los demás items (Usuarios, Dashboard, Auditoría, Multi-concepto,
 // Detector en masa, Simulador) quedan ocultos.
+// 01-09-2026: Contratos e Importación masiva entran a la lista, a pedido
+// de Yesid — ver el comentario dentro de la lista.
 // SUPER_ADMIN y COORDINADOR ven todo.
 var AUDITOR_TABS_PERMITIDAS = {
   // Análisis
@@ -23243,6 +23270,25 @@ var AUDITOR_TABS_PERMITIDAS = {
   // El validador ADRES y el buscador de autorizaciones son trabajo diario
   // del auditor, y sus rutas ya exigen rol AUDITOR o superior.
   'validador-adres': true,
+  // 01-09-2026 — Yesid, con las capturas en la mano: «que los auditores
+  // puedan ver esos espacios». Contratos e Importación masiva faltaban en
+  // esta lista, así que el menú se los escondía a todos los gestores aunque
+  // el servidor ya les permitiera consultarlos.
+  'contratos': true,
+  'importacion-masiva': true,
+  // 02-09-2026 — Yesid, con sus capturas del menú completo: «yo no veo que se
+  // vean todos esos botones». Se abre el resto de lo que aparece en ellas.
+  // Su directiva original del 21-08 era «el AUDITOR ve TODO menos
+  // Inteligencia, Expediente, Usuarios, Mando ejecutivo e Importar
+  // recepción» — esas cinco (y Plata recuperada) siguen escondidas.
+  // El servidor ya deja consultar todas estas con rol AUDITOR (verificado
+  // guard por guard el 02-09).
+  'mi-dia': true,
+  'vencimientos': true,
+  'malla': true,  // el «Contratos» de ANÁLISIS: la malla contractual
+  'automatizacion': true,
+  'tarifas': true,
+  'soportes': true,
   // 31-08-2026 — LAS GLOSAS DEL ADRES SON TRABAJO DIARIO DEL GESTOR.
   // Faltaban en esta lista, así que el botón del menú se le escondía a todo
   // el que tuviera rol AUDITOR — o sea, a los 28 gestores. Ninguno podía

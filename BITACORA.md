@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 01-09-2026
+**Última actualización:** 02-09-2026
 
 ---
 
@@ -90,6 +90,76 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 02-09-2026 (tarde) — Ya se puede subir el reparto: quién audita cada factura
+
+**Lo que pasó.** En la mañana quedó listo que el informe deduzca el gestor de
+la huella del sistema (quién cerró la factura, quién decidió sus glosas). Yesid
+mandó después **la tabla con la que el área repartió de verdad** el paquete
+31078: `FACTURA · PROFESIONAL · TECNICO`, donde el técnico es el gestor de
+cuentas y el profesional la médica auditora.
+
+Ese reparto existía en un Excel del área, pero **no había por dónde subirlo**:
+por eso las 81 facturas salían «(sin gestor asignado)».
+
+**Qué se hizo.** En la ventana **«Cargar paquete»** hay un campo nuevo,
+*Reparto del área*, donde se sube esa misma tabla (Excel o CSV). Al subirla:
+
+- cada factura queda con su **gestor** y su **médica**;
+- los renglones del paquete llevan el mismo reparto, así la hoja **POR GESTOR**
+  del informe reparte de verdad;
+- la ventana avisa cuántas facturas se asignaron, para quién, y **si alguna
+  factura del paquete quedó sin asignar**.
+
+Detalles que importan: una celda vacía **no borra** lo que ya estaba; volver a
+subir el mismo archivo no cambia nada; corregir el reparto sí lo pisa; y
+«SIN PERTINENCIA» se guarda tal cual está escrito —es la anotación del área
+para decir que esa factura no lleva médica— pero no se cuenta como profesional.
+
+**Comprobación de la tabla del 31078:** 81 facturas, sin repetidas, y calza
+exacto con el paquete (81 = 81, ninguna de más ni de menos). Las 73 que tienen
+detallado están todas; las 8 que faltan son justo las que ya se sabía que no
+traen detallado (HUS406456, HUS406911, HUS407660, HUS407662, HUS407666,
+HUS407676, HUS407819 y HUS455655). El reparto quedó: **OSCAR 41 facturas,
+CAROLINA 40**; JEFE LEYDY 19, DRA ZULAY 19, JEFE LAURA 17 y 26 sin pertinencia.
+
+Se le entregó por chat el archivo `REPARTO_31078.xlsx` listo para subir. El bot
+`preauditar_glosas_adres.py` también aprendió a reconocer la columna TECNICO.
+
+### 02-09-2026 — El Excel de Glosas ADRES ya dice quién trabaja cada factura
+
+**Lo que pidió Yesid**, con los archivos `RTA_GLOSA_ADRES_PAQ_31078` y `…31073`
+en la mano: «la celda GESTOR no me dice qué gestor la está trabajando para esas
+que están EN PROCESO o CERRADA; este dato se puede sacar por el correo de las
+celdas Cerrada por».
+
+**Qué pasaba.** La columna Gestor sale de la macro que importa el paquete, y en
+estos paquetes viene vacía: las 84 facturas del 31078 decían «(sin gestor
+asignado)», aunque 16 estaban cerradas (con el correo de quien las cerró al
+lado) y 41 en proceso con glosas ya decididas. La hoja POR GESTOR quedaba con
+una sola fila inútil.
+
+**Qué se arregló.** El sistema sí sabe quién trabaja cada factura, porque
+guarda el correo de quien la cierra y de quien decide cada glosa. Ahora la
+columna Gestor se llena con esa huella, en este orden y sin inventar:
+
+1. si la macro trae gestor, manda la macro;
+2. si la factura está **CERRADA**, es quien la cerró;
+3. si está **EN PROCESO**, es quien ha decidido sus glosas (la persona con más
+   glosas decididas va primero; si son varias, se nombran todas);
+4. si la reabrieron y nadie ha decidido nada desde entonces, quien la reabrió;
+5. solo queda «(sin gestor asignado)» cuando nadie la ha tocado.
+
+Los correos se cambian por el **nombre** de la tabla de usuarios; si el correo
+no tiene usuario creado, se deja el correo tal cual (no se inventa un nombre).
+La hoja FACTURAS trae una columna nueva, **«De dónde sale el gestor»**, para
+que cada dato sea rastreable; la columna «Cerrada por» sigue igual. Los
+renglones de Hoja1 llevan el mismo gestor de su factura, así que la hoja
+**POR GESTOR** por fin reparte entre personas. Las 26 columnas de la macro no
+se movieron: cambia lo que dice la columna GESTOR, no dónde está.
+
+Con 28 pruebas nuevas (la regla sola, y el libro completo generado sobre una
+base de mentira) y los 88 tests del API de Glosas ADRES en verde.
+
 ### 02-09-2026 — El túnel ya no decide si el dictamen llega, y tres arreglos de las corridas reales
 
 **Prueba 2 (CL4506) «no pasó el sistema».** Se vio la causa: el túnel que da salida
@@ -125,6 +195,7 @@ el año que corresponde.
 prueba 2 (que ahora debe terminar sin desconectarse) y luego las pruebas 4 y 5.
 Y siguen abiertos los dos de siempre: contratos AURORA/ARL vencidos el 31-08 y
 confirmar las 148 glosas de agosto con `tools/verificar_glosas.py`.
+
 
 ### 01-09-2026 — Se cerró el ciclo de las cinco pruebas de estrés
 
@@ -9207,6 +9278,61 @@ El rol VIEWER sigue sin ver la papelera: mirar es de los gestores, no de
 cualquier sesión.
 
 10 + 10 pruebas nuevas.
+
+---
+
+### 01-09 (tarde) — «Nada, siguen sin ver esos botones»: era otra lista
+
+Después de abrir la Papelera, Yesid mostró la pantalla del gestor Óscar: seguía
+sin ver **Contratos** ni **Importación masiva**.
+
+**La causa no era el permiso del servidor sino el menú.** Además de las marcas
+de «solo coordinación», el menú tiene una **lista blanca para el rol AUDITOR**:
+todo lo que no esté en esa lista se esconde. Ahí ya estaban Conciliación,
+Papelera, Glosas ADRES (agregada el 31-08 por el otro frente de trabajo),
+Consulta Normativa, Salud Total y Validador ADRES — pero **Contratos e
+Importación masiva faltaban**, así que el menú se los escondía a los 28
+gestores aunque el servidor ya les permitiera consultarlos.
+
+**Lo que quedó:** Contratos e Importación masiva entran a la lista blanca del
+gestor, con la fecha y el porqué escritos en el propio código. La prueba del
+otro frente —que vigila que no se le abra al gestor nada que no se haya
+pedido— se actualizó con la nueva directiva, y una prueba nueva deja escrito
+lo que Yesid pidió: si un cambio futuro le vuelve a esconder alguno de estos
+botones al gestor, la prueba se pone roja.
+
+Mando ejecutivo, Usuarios, Inteligencia y las demás pantallas de coordinación
+siguen escondidas para el gestor, como estaban.
+
+3 pruebas nuevas.
+
+---
+
+### 02-09 — «Yo no veo que se vean todos esos botones»: el menú del gestor, completo
+
+Yesid volvió con sus capturas del menú: a los gestores les seguían faltando
+botones. Se abrió el resto de lo que aparece en ellas — **Mi día,
+Vencimientos, el «Contratos» de ANÁLISIS (la malla contractual),
+Automatización, Tarifas y Soportes** — después de verificar, guard por guard,
+que el servidor ya les permite consultar cada una de esas pantallas con rol
+AUDITOR.
+
+El menú del gestor queda entonces con: Analizar glosa, Mi día, Mi desempeño,
+Mis glosas, Historial, Vencimientos, Contratos (malla), Automatización,
+Alertas · Contratos, Tarifas, Conciliación, Papelera · Glosas ADRES ·
+Consulta Normativa, Salud Total, Validador ADRES, Soportes, Importación
+masiva y Pre-auditoría.
+
+**Lo que sigue escondido**, por la directiva del propio Yesid del 21-08:
+Inteligencia, Expediente, Plata recuperada, Usuarios, Mando ejecutivo,
+Importar recepción y el Diagnóstico del sistema. Si algún día las quiere
+abrir, es agregar una línea a la misma lista.
+
+La prueba que deja esto escrito creció a 8 pestañas vigiladas: si un cambio
+futuro le vuelve a esconder cualquiera de estos botones al gestor, se pone
+roja.
+
+6 pruebas nuevas.
 
 ---
 
