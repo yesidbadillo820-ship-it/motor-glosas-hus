@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 01-09-2026
+**Última actualización:** 02-09-2026
 
 ---
 
@@ -89,6 +89,41 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 02-09-2026 — El Excel de Glosas ADRES ya dice quién trabaja cada factura
+
+**Lo que pidió Yesid**, con los archivos `RTA_GLOSA_ADRES_PAQ_31078` y `…31073`
+en la mano: «la celda GESTOR no me dice qué gestor la está trabajando para esas
+que están EN PROCESO o CERRADA; este dato se puede sacar por el correo de las
+celdas Cerrada por».
+
+**Qué pasaba.** La columna Gestor sale de la macro que importa el paquete, y en
+estos paquetes viene vacía: las 84 facturas del 31078 decían «(sin gestor
+asignado)», aunque 16 estaban cerradas (con el correo de quien las cerró al
+lado) y 41 en proceso con glosas ya decididas. La hoja POR GESTOR quedaba con
+una sola fila inútil.
+
+**Qué se arregló.** El sistema sí sabe quién trabaja cada factura, porque
+guarda el correo de quien la cierra y de quien decide cada glosa. Ahora la
+columna Gestor se llena con esa huella, en este orden y sin inventar:
+
+1. si la macro trae gestor, manda la macro;
+2. si la factura está **CERRADA**, es quien la cerró;
+3. si está **EN PROCESO**, es quien ha decidido sus glosas (la persona con más
+   glosas decididas va primero; si son varias, se nombran todas);
+4. si la reabrieron y nadie ha decidido nada desde entonces, quien la reabrió;
+5. solo queda «(sin gestor asignado)» cuando nadie la ha tocado.
+
+Los correos se cambian por el **nombre** de la tabla de usuarios; si el correo
+no tiene usuario creado, se deja el correo tal cual (no se inventa un nombre).
+La hoja FACTURAS trae una columna nueva, **«De dónde sale el gestor»**, para
+que cada dato sea rastreable; la columna «Cerrada por» sigue igual. Los
+renglones de Hoja1 llevan el mismo gestor de su factura, así que la hoja
+**POR GESTOR** por fin reparte entre personas. Las 26 columnas de la macro no
+se movieron: cambia lo que dice la columna GESTOR, no dónde está.
+
+Con 28 pruebas nuevas (la regla sola, y el libro completo generado sobre una
+base de mentira) y los 88 tests del API de Glosas ADRES en verde.
 
 ### 01-09-2026 — Se cerró el ciclo de las cinco pruebas de estrés
 
