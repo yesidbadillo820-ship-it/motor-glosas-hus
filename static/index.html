@@ -2259,12 +2259,12 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     </div>
     <div class="hdr-right">
       <div class="hdr-kpis" id="hdr-kpis" style="display:flex;align-items:center;gap:.8rem;padding:.25rem .7rem;margin-right:.4rem;background:rgba(255,255,255,.08);border-radius:20px;font-size:.7rem;color:rgba(255,255,255,.85);font-weight:600;letter-spacing:.2px;">
-        <span id="hdr-kpi-glosas" title="Glosas analizadas hoy" style="display:inline-flex;align-items:center;gap:.3rem">
+        <span id="hdr-kpi-glosas" title="Glosas registradas este mes — el contador arranca de cero cada día 1" style="display:inline-flex;align-items:center;gap:.3rem">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.85"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           <span data-num="—">—</span>
         </span>
         <span style="opacity:.3">·</span>
-        <span id="hdr-kpi-recuperado" title="Valor recuperado este mes" style="display:inline-flex;align-items:center;gap:.3rem">
+        <span id="hdr-kpi-recuperado" title="Valor recuperado este mes — también arranca de cero cada día 1" style="display:inline-flex;align-items:center;gap:.3rem">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.85"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           <span data-num="—">—</span>
         </span>
@@ -8000,7 +8000,13 @@ async function refrescarKpisHeader(){
       if(span) span.textContent = valor;
       else el.textContent = valor;  // fallback si la estructura cambia
     }
-    _setKpi($('hdr-kpi-glosas'), fmtNum(a.glosas_mes || 0) + ' glosas');
+    // 01-09-2026 — DECÍA «148 glosas» Y EL title DECÍA «analizadas hoy»,
+    // pero el dato es del MES (glosa_repository.analytics filtra por
+    // extract('month', creado_en) == mes actual). El 1 de septiembre el
+    // encabezado amaneció en «0 glosas · $0» y el auditor creyó que se
+    // habían borrado las 148 de agosto. No se perdió nada: cambió el mes.
+    // La métrica está bien; lo que engañaba era el rótulo.
+    _setKpi($('hdr-kpi-glosas'), fmtNum(a.glosas_mes || 0) + ' glosas este mes');
     var rec = a.valor_recuperado_mes || 0;
     _setKpi($('hdr-kpi-recuperado'), (rec > 0 ? cop(rec) : '$0'));
     // Pendientes: glosas con fecha_vencimiento próxima
@@ -8611,7 +8617,7 @@ async function cargarPapelera(){
   try{
     var r = await fetch('/papelera/', {headers: authH()});
     if(!r.ok){
-      if(r.status === 403){ body.innerHTML = '<tr><td colspan="8" style="color:#b45309;padding:2rem;text-align:center">Solo COORDINADOR/SUPER_ADMIN puede ver la papelera</td></tr>'; }
+      if(r.status === 403){ body.innerHTML = '<tr><td colspan="8" style="color:#b45309;padding:2rem;text-align:center">Su usuario no tiene permiso para ver la papelera (se requiere rol AUDITOR o superior)</td></tr>'; }
       else { body.innerHTML = '<tr><td colspan="8" style="color:#b91c1c;padding:2rem;text-align:center">Error ' + r.status + '</td></tr>'; }
       return;
     }
@@ -8633,8 +8639,10 @@ async function cargarPapelera(){
         '<td>'+fecha+'</td>' +
         '<td class="cell-center">'+badge+'</td>' +
         '<td class="cell-center">' +
-          '<button class="btn-sm" onclick="restaurarGlosa('+p.id+')">Restaurar</button> ' +
-          '<button class="btn-sm ghost" style="color:#b91c1c" onclick="purgarGlosa('+p.id+')">Purgar</button>' +
+          (esDeCoordinacion()
+            ? '<button class="btn-sm" onclick="restaurarGlosa('+p.id+')">Restaurar</button> ' +
+              '<button class="btn-sm ghost" style="color:#b91c1c" onclick="purgarGlosa('+p.id+')">Purgar</button>'
+            : '<span style="font-size:.72rem;color:var(--text3)" title="Restaurar o purgar es de coordinación">solo lectura</span>') +
         '</td></tr>';
     }).join('');
   }catch(e){ body.innerHTML = '<tr><td colspan="8" style="color:#b91c1c;padding:2rem;text-align:center">'+escHtml(e.message)+'</td></tr>'; }
@@ -23155,9 +23163,10 @@ var ROL_COLORS={'SUPER_ADMIN':'rol-super_admin','COORDINADOR':'rol-coordinador',
 //   Gestión: Conciliación, Plantillas Gold, Papelera
 //   Herramientas: Consulta Normativa, Salud Total, Importar recepción,
 //                 Importación masiva
-// Los demás items (Mi desempeño, Mis glosas, Historial, Alertas,
-// Contratos, Usuarios, Dashboard, Auditoría, Multi-concepto,
+// Los demás items (Usuarios, Dashboard, Auditoría, Multi-concepto,
 // Detector en masa, Simulador) quedan ocultos.
+// 01-09-2026: Contratos e Importación masiva entran a la lista, a pedido
+// de Yesid — ver el comentario dentro de la lista.
 // SUPER_ADMIN y COORDINADOR ven todo.
 var AUDITOR_TABS_PERMITIDAS = {
   // Análisis
@@ -23176,6 +23185,25 @@ var AUDITOR_TABS_PERMITIDAS = {
   // El validador ADRES y el buscador de autorizaciones son trabajo diario
   // del auditor, y sus rutas ya exigen rol AUDITOR o superior.
   'validador-adres': true,
+  // 01-09-2026 — Yesid, con las capturas en la mano: «que los auditores
+  // puedan ver esos espacios». Contratos e Importación masiva faltaban en
+  // esta lista, así que el menú se los escondía a todos los gestores aunque
+  // el servidor ya les permitiera consultarlos.
+  'contratos': true,
+  'importacion-masiva': true,
+  // 02-09-2026 — Yesid, con sus capturas del menú completo: «yo no veo que se
+  // vean todos esos botones». Se abre el resto de lo que aparece en ellas.
+  // Su directiva original del 21-08 era «el AUDITOR ve TODO menos
+  // Inteligencia, Expediente, Usuarios, Mando ejecutivo e Importar
+  // recepción» — esas cinco (y Plata recuperada) siguen escondidas.
+  // El servidor ya deja consultar todas estas con rol AUDITOR (verificado
+  // guard por guard el 02-09).
+  'mi-dia': true,
+  'vencimientos': true,
+  'malla': true,  // el «Contratos» de ANÁLISIS: la malla contractual
+  'automatizacion': true,
+  'tarifas': true,
+  'soportes': true,
   // 31-08-2026 — LAS GLOSAS DEL ADRES SON TRABAJO DIARIO DEL GESTOR.
   // Faltaban en esta lista, así que el botón del menú se le escondía a todo
   // el que tuviera rol AUDITOR — o sea, a los 28 gestores. Ninguno podía

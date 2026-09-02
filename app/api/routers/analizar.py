@@ -691,6 +691,34 @@ async def _persistir_y_responder(
     # Cinturón (incidente 04-08-2026): un texto con firma de error del
     # proveedor de IA jamás se persiste como dictamen, venga de donde venga
     # (caché envenenado, camino viejo, lo que sea).
+    # ── ÚLTIMA MILLA: la causal de la glosa no sale como código del servicio ──
+    # 01-09-2026, pedido del auditor tras cinco corridas: «el LLM es terco con
+    # el código; bórralo a la fuerza por backend».
+    #
+    # Ya hay dos redes que lo hacen dentro del motor —una sobre el campo
+    # <servicio> del modelo y otra sobre el cuerpo del dictamen— y ambas
+    # funcionan. Esta es la tercera y va acá a propósito: en el ÚLTIMO punto
+    # por el que pasa el texto antes de persistirse y de viajar al navegador.
+    # Así deja de depender de en qué orden corran las redes de adentro, de si
+    # mañana se agrega un camino nuevo, o de si el dictamen llega armado desde
+    # otra parte. Es idempotente: si las redes de adentro ya limpiaron, no
+    # encuentra nada que hacer.
+    try:
+        from app.services.glosa_service import _quitar_causal_propia_del_cuerpo
+
+        _cod_glosa = str(getattr(resultado, "codigo_glosa", "") or "")
+        _limpio = _quitar_causal_propia_del_cuerpo(
+            getattr(resultado, "dictamen", "") or "", _cod_glosa
+        )
+        if _limpio != (getattr(resultado, "dictamen", "") or ""):
+            resultado.dictamen = _limpio
+            logger.info(
+                f"[{req_id}] [ULTIMA-MILLA] se retiró la causal {_cod_glosa} "
+                "del dictamen: es el código de la objeción, no el del servicio"
+            )
+    except Exception as _e_um:  # una limpieza cosmética jamás tumba un dictamen
+        logger.debug(f"[ULTIMA-MILLA] no aplicada: {_e_um}")
+
     _dictamen_txt = getattr(resultado, "dictamen", "") or ""
     if "ARGUMENTACIÓN JURÍDICA" in _dictamen_txt:
         _cuerpo = _dictamen_txt.split("ARGUMENTACIÓN JURÍDICA", 1)[1]

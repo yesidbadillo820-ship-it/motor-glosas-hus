@@ -201,10 +201,32 @@ class TestGetContratoRonda29:
         assert "GID-ARL-0090" not in str(resultado.get("numero", ""))
 
     def test_clave_un_token_como_palabra_si_matchea(self):
+        """«ARL» como palabra completa dentro de «SEGUROS AURORA S.A.».
+
+        01-09-2026 — se le pasa la fecha porque los contratos de AURORA
+        vencieron el 31-08-2026 y sin fecha la ficha responde la advertencia de
+        vigencia, no el número. Lo que esta prueba vigila es la RESOLUCIÓN del
+        nombre, no el calendario.
+        """
+        import datetime as _dt
+
         from app.services.glosa_ia_prompts import get_contrato
 
-        resultado = get_contrato("SEGUROS AURORA S.A.")
+        resultado = get_contrato("SEGUROS AURORA S.A.", _dt.date(2026, 5, 1))
         assert "GID-ARL-0090" in str(resultado.get("numero", ""))
+
+    def test_la_resolucion_del_nombre_funciona_aunque_el_contrato_venciera(self):
+        """Con el contrato vencido igual tiene que reconocer a AURORA.
+
+        Si la resolución del nombre fallara, la ficha diría «SIN CONTRATO
+        PACTADO» —como cualquier pagador desconocido— y no habría forma de
+        distinguir «no lo encontré» de «lo encontré y está vencido».
+        """
+        from app.services.glosa_ia_prompts import get_contrato
+
+        resultado = get_contrato("SEGUROS AURORA S.A.", None)
+        assert resultado.get("_vigencia_vencida") is True
+        assert "GID" in str(resultado.get("numero", ""))
 
 
 # ── 6. GET /exportar/dgh reconectado ─────────────────────────────────────
