@@ -90,6 +90,40 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 02-09-2026 (noche, quinta tanda) — Regresión del Caso Q: «MANTIENE GLOSA» sí es ratificación
+
+**Qué pasó.** En la prueba de producción, el Caso Q (`SO0601 | SANITAS. MANTIENE
+GLOSA. EL HOSPITAL RESPONDIÓ LA GLOSA INICIAL FUERA DE LOS TÉRMINOS DE LEY.`)
+falló en los dos frentes: no salió el badge de etapa y el dictamen respondió
+como si faltaran fotocopias («los documentos están presentes en el
+expediente»), cuando el reclamo era de TIEMPOS: que el hospital respondió tarde.
+Tener los papeles no borra que se entregaron tarde.
+
+**La causa.** El clasificador de etapa sí veía «MANTIENE GLOSA» como
+ratificación, pero solo alimentaba el badge; el RUTEO (lo que decide la vía de
+respuesta) era estrecho y solo reaccionaba a la palabra «conciliación». Así que
+el Caso Q no se enrutaba como ratificación: caía en el camino común y se
+respondía como una glosa de soportes.
+
+**Qué se hizo.**
+- El ruteo ahora sí manda las ratificaciones («mantiene glosa», «se ratifica»,
+  «segunda instancia», «respuesta a conciliación») por la vía de ratificada:
+  sostener la respuesta inicial y exigir la mesa de conciliación / Supersalud,
+  SIN argumentar soportes.
+- La ÚNICA excepción: una ratificación EXTEMPORÁNEA DE LA ENTIDAD (cuando las
+  fechas radicación → recepción de la ratificación prueban que la EPS ratificó
+  tarde) sigue yendo al motor con su defensa de tiempo, que es la más fuerte.
+  Sin fechas que lo prueben, una ratificación es una ratificación.
+- El prompt de segunda instancia recibió, además, la distinción entre «faltan
+  papeles» (soportes) y «se venció el tiempo de ley»: prohíbe refutar un
+  vencimiento diciendo que los documentos están presentes.
+
+**Pendiente:** correr de nuevo el Caso Q en la pantalla tras desplegar con
+reinicio (debe salir el badge de ratificación, el dictamen debe exigir
+conciliación y NO argumentar soportes); y siguen los dos operativos: contratos
+AURORA/ARL vencidos el 31-08 y confirmar las glosas de agosto con
+`tools/verificar_glosas.py`.
+
 ### 02-09-2026 (noche, cuarta tanda) — El motor ya sabe en qué etapa va la glosa (ratificación / conciliación)
 
 **Qué pasó.** El Caso J dejó al descubierto una ceguera procesal: el motor
