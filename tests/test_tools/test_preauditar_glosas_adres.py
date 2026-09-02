@@ -178,6 +178,12 @@ class TestReglas:
         assert pa.clasificar("4307") == "TARIFAS"
         assert pa.clasificar("") == pa.CLASIFICACION_SIN_CAUSAL
 
+    def test_la_4302_tambien_es_tarifas(self):
+        """02-09-2026: la 4302 no salió en el paquete 31068 (de donde se aprendió
+        la tabla) y sus glosas quedaban «sin clasificar» en el 31073. Yesid
+        confirmó que es de TARIFAS, como sus vecinas 4303–4309."""
+        assert pa.clasificar("4302") == "TARIFAS"
+
     def test_clasificacion_aprendida_manda_sobre_la_tabla(self):
         assert pa.clasificar("3106", {"3106": "OTRA COSA"}) == "OTRA COSA"
 
