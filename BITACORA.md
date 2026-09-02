@@ -90,6 +90,39 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 02-09-2026 (noche, cuarta tanda) — El motor ya sabe en qué etapa va la glosa (ratificación / conciliación)
+
+**Qué pasó.** El Caso J dejó al descubierto una ceguera procesal: el motor
+respondía CUALQUIER texto como si fuera una glosa inicial. Cuando la entidad
+mandaba una ratificación o una respuesta de conciliación («se ratifica la
+glosa», «respuesta a conciliación»), el dictamen pedía el «levantamiento» como
+el día uno. Si eso se radica en segunda instancia, la EPS cierra el caso por
+un error de forma y se pierde la plata.
+
+**Qué se hizo.**
+- **Detector de etapa.** El motor ahora lee el texto y lo clasifica en tres
+  etapas: INICIAL, RATIFICACIÓN o CONCILIACIÓN. Los marcadores: «ratifica»,
+  «mantiene la glosa», «segunda instancia», «respuesta a conciliación», «mesa
+  de conciliación», «acta de conciliación».
+- **Cambio de vía.** Si el caso va al motor de IA, el prompt le PROHÍBE
+  redactar como respuesta inicial: le ordena sostener la defensa ya presentada
+  y exigir la mesa de conciliación de auditoría médica y, si no hay acuerdo,
+  escalar a la Superintendencia Nacional de Salud (Ley 1438 de 2011). Cuando el
+  caso ya tiene texto fijo de ratificada, ese texto ya decía exactamente eso.
+- **Aviso en pantalla.** El gestor ve un badge «⚠️ ETAPA: RATIFICACIÓN
+  DETECTADA» (o CONCILIACIÓN) para saber que el motor ajustó la defensa
+  procesal y que NO es un caso nuevo.
+
+**Lo que NO se tocó.** Una ratificación que llega TARDE (extemporánea) sigue
+yendo al motor con su defensa de tiempo, que es la más fuerte; el badge la
+marca, pero no se la lleva el texto fijo. Y el ruteo al texto fijo de ratificada
+no cambió: sigue decidiéndose con los marcadores claros de conciliación.
+
+**Pendiente:** correr en la pantalla, tras desplegar con reinicio, una
+ratificación y una respuesta de conciliación; y siguen los dos operativos:
+contratos AURORA/ARL vencidos el 31-08 y confirmar las glosas de agosto con
+`tools/verificar_glosas.py`.
+
 ### 02-09-2026 (noche, tercera tanda) — Diez contradicciones que el modelo no puede razonar solo (casos F a O)
 
 **Qué pasó.** Se corrieron diez ejemplos nuevos en la pantalla y en todos el

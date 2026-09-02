@@ -8303,6 +8303,15 @@ class GlosaService:
         es_ratificacion = "RATIF" in str(data.etapa).upper() or _rcf.texto_es_ratificacion(
             texto_base
         )
+        # Ciclo de vida de la glosa (Caso J, 02-09-2026). Clasificar la etapa
+        # procesal para (1) avisar al gestor con un badge y (2) ordenarle al
+        # modelo, cuando el caso va por IA, que NO responda una segunda
+        # instancia como si fuera el dia uno. NO cambia el ruteo al texto fijo
+        # de ratificada: eso lo decide es_ratificacion (mas estricto), asi la
+        # extemporaneidad de una ratificacion sigue yendo al motor (SO0601).
+        _etapa_procesal = _rcf.clasificar_etapa_procesal(
+            texto_base, str(getattr(data, "etapa", "") or "")
+        )
         tiene_pdf = bool(contexto_pdf and len(contexto_pdf.strip()) > 0)
         es_urgencia = "URGENCIA" in texto_base or "URGENTE" in texto_base
         # Es tarifa SOLO si el prefijo del código es TA. FA=facturación,
@@ -9029,6 +9038,37 @@ class GlosaService:
                         )
             except Exception as _e_dc:
                 logger.debug(f"[DEFENSA-CLINICA] no inyectada: {_e_dc}")
+
+            # ═══════════════════════════════════════════════════════════
+            #  Etapa procesal (Caso J, 02-09-2026). Si la glosa está en
+            #  ratificación o conciliación, el modelo tiene PROHIBIDO
+            #  redactar como respuesta inicial: se prepende la instrucción de
+            #  sostener la defensa y exigir la mesa de conciliación / escalar a
+            #  Supersalud. Va antes del bloque de extemporaneidad para que ese,
+            #  si aplica (ratificación tardía), quede de primero.
+            # ═══════════════════════════════════════════════════════════
+            if _etapa_procesal != "INICIAL":
+                _etq = "RATIFICACIÓN" if _etapa_procesal == "RATIFICACION" else "CONCILIACIÓN"
+                _bloque_etapa = (
+                    "═══════════════ INSTRUCCIÓN PRIORITARIA — ETAPA PROCESAL "
+                    "═══════════════\n"
+                    f"[ETAPA {_etq} DETECTADA — NO ES UNA GLOSA INICIAL]\n"
+                    "Esta objeción ya fue respondida antes y la entidad la sostiene. "
+                    "PROHIBIDO redactar como respuesta inicial y PROHIBIDO pedir un simple "
+                    "«levantamiento» como el día uno. OBLIGATORIO: mantén y reafirma la "
+                    "defensa técnico-jurídica ya presentada en la glosa inicial, y exige de "
+                    "forma expresa la programación de la MESA DE CONCILIACIÓN DE AUDITORÍA "
+                    "MÉDICA Y/O TÉCNICA entre las partes (Art. 57 de la Ley 1438 de 2011); "
+                    "de no lograrse acuerdo, anuncia que el conflicto se elevará ante la "
+                    "SUPERINTENDENCIA NACIONAL DE SALUD (Art. 126 de la Ley 1438 de 2011).\n"
+                    "═══════════════════════════════════════════════════════════"
+                    "════════════════\n\n"
+                )
+                user_prompt = _bloque_etapa + user_prompt
+                logger.info(
+                    f"[ETAPA-PROCESAL] {_etapa_procesal} — bloque de segunda instancia "
+                    "prepend al prompt."
+                )
 
             # ═══════════════════════════════════════════════════════════
             #  Extemporaneidad de la RATIFICACIÓN (12-jun-2026, ronda 2 —
@@ -12219,6 +12259,7 @@ class GlosaService:
             paciente=pac_ia,
             mensaje_tiempo=msg_tiempo,
             color_tiempo=color_tiempo,
+            etapa_procesal=(locals().get("_etapa_procesal") or "INICIAL"),
             score=score,
             dias_restantes=max(0, DIAS_HABILES_LIMITE_EXTEMPORANEA - dias),
             modelo_ia=modelo_usado,

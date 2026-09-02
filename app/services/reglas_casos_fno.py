@@ -396,6 +396,45 @@ def texto_es_ratificacion(texto: str) -> bool:
     return bool(_RE_RATIFICACION_TEXTO.search(texto or ""))
 
 
+# ── Clasificador de ETAPA PROCESAL (refactor del ciclo de vida, 02-09-2026) ──
+# Amplio a propósito: sirve para AVISARLE al gestor (badge en pantalla) y para
+# ORDENARLE al modelo, cuando el caso va por IA, que no responda una segunda
+# instancia como si fuera el día uno. NO decide el ruteo al texto fijo de
+# ratificada (eso lo sigue haciendo `texto_es_ratificacion`, más estricto, para
+# que una ratificación extemporánea siga yendo al motor con su defensa de
+# tiempo — caso SO0601). Por eso aquí sí entra la palabra «ratifica» a secas.
+_RE_ETAPA_CONCILIACION = re.compile(
+    r"\bRESPUESTA\s+A\s+(?:LA\s+)?CONCILIACI[ÓO]N\b|\bMESA\s+DE\s+CONCILIACI[ÓO]N\b|"
+    r"\bACTA\s+DE\s+(?:CONCILIACI[ÓO]N|AUDITOR[ÍI]A)\b|\bAUDIENCIA\s+DE\s+CONCILIACI[ÓO]N\b|"
+    r"\bEN\s+(?:ETAPA\s+DE\s+)?CONCILIACI[ÓO]N\b",
+    re.IGNORECASE,
+)
+_RE_ETAPA_RATIFICACION = re.compile(
+    r"\bRATIFICA\w*\b|(?:\bSE\s+)?MANTIENE\s+(?:LA\s+)?GLOSA\b|\bSEGUNDA\s+INSTANCIA\b|"
+    r"\bSEGUNDA\s+RESPUESTA\s+A\s+(?:LA\s+)?GLOSA\b|\bINSISTE\s+EN\s+LA\s+GLOSA\b|"
+    r"\bREITERA\s+LA\s+GLOSA\b|\bNO\s+ACEPTA\s+(?:LA\s+)?RESPUESTA\b|"
+    r"\bRESPUESTA\s+A\s+(?:LA\s+)?RATIFICACI[ÓO]N\b",
+    re.IGNORECASE,
+)
+
+
+def clasificar_etapa_procesal(texto: str, etapa_form: str = "") -> str:
+    """Devuelve la etapa del ciclo de vida de la glosa: "INICIAL",
+    "RATIFICACION" o "CONCILIACION".
+
+    Requisito 1 del Caso J: el texto se escanea en busca de marcadores de etapa
+    avanzada. La conciliación es una etapa posterior a la ratificación, así que
+    manda si aparecen las dos. El campo `etapa` del formulario también cuenta.
+    """
+    ef = (etapa_form or "").upper()
+    u = texto or ""
+    if "CONCILIA" in ef or _RE_ETAPA_CONCILIACION.search(u):
+        return "CONCILIACION"
+    if "RATIF" in ef or _RE_ETAPA_RATIFICACION.search(u):
+        return "RATIFICACION"
+    return "INICIAL"
+
+
 # ─────────────────────────── Caso G: norma inventada por la entidad ───────────────────────────
 _RE_NORMA_CITADA = re.compile(
     r"\b(RESOLUCI[ÓO]N|DECRETO|LEY|CIRCULAR)\s+(\d{1,5})\s+DE\s+(\d{4})",
