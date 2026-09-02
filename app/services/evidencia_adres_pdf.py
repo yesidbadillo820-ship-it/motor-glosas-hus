@@ -16,10 +16,18 @@ una. Se dicen en una nota al pie, para que el documento no oculte nada.
 
 from __future__ import annotations
 
+import zipfile
 from io import BytesIO
 from xml.sax.saxutils import escape as _xml_escape
 
-__all__ = ["generar_pdf_evidencia", "nombre_archivo_evidencia"]
+from app.utils.moneda import parse_valor_cop as _parse_valor_cop
+
+__all__ = [
+    "generar_pdf_evidencia",
+    "generar_zip_evidencias",
+    "nombre_archivo_evidencia",
+    "nombre_archivo_zip",
+]
 
 
 def _moneda(valor) -> str:
@@ -28,6 +36,19 @@ def _moneda(valor) -> str:
         return "$" + f"{int(round(float(valor or 0))):,}".replace(",", ".")
     except (TypeError, ValueError):
         return "$0"
+
+
+def _num(valor) -> float:
+    """Un número, venga como venga.
+
+    02-09-2026. La plata llega de la base como float, pero un dato traído de un
+    Excel o de una macro puede llegar como texto («678.700»). Antes eso
+    reventaba el PDF entero —`round()` sobre un str— y el gestor solo veía un
+    error del servidor. Ahora se lee y, si de plano no es un número, es cero.
+    """
+    if isinstance(valor, (int, float)):
+        return float(valor)
+    return _parse_valor_cop(valor) if valor not in (None, "") else 0.0
 
 
 def _esc(texto) -> str:
@@ -51,7 +72,7 @@ def rta_glosa_completa(glosa: dict) -> str:
     decision = glosa.get("decision") or ""
     descripcion = glosa.get("descripcion") or ""
     observacion = glosa.get("observacion_tecnico") or ""
-    aceptado = glosa.get("valor_aceptado") or 0
+    aceptado = _num(glosa.get("valor_aceptado"))
     if aceptado > 0:
         cantidad = glosa.get("cantidad_aceptada") or ""
         return (
@@ -67,6 +88,12 @@ def rta_glosa_completa(glosa: dict) -> str:
 def nombre_archivo_evidencia(factura: str) -> str:
     limpio = "".join(c for c in str(factura or "FACTURA") if c.isalnum() or c in "-_")
     return f"RTA_ADRES_{limpio or 'FACTURA'}.pdf"
+
+
+def nombre_archivo_zip(numero_paquete: str = "") -> str:
+    """El nombre del ZIP con los PDF de todo el paquete."""
+    limpio = "".join(c for c in str(numero_paquete or "") if c.isalnum())
+    return f"RTA_ADRES_{('PAQ_' + limpio) if limpio else 'PAQUETE'}_EVIDENCIAS.zip"
 
 
 def generar_pdf_evidencia(datos: dict) -> bytes:
@@ -126,11 +153,11 @@ def generar_pdf_evidencia(datos: dict) -> bytes:
     filas = [[Paragraph(h, st_cab) for h in encabezados]]
     glosas = [g for g in datos.get("glosas", []) if not g.get("glosa_total")]
     for g in glosas:
-        aceptado = g.get("valor_aceptado") or 0
+        aceptado = _num(g.get("valor_aceptado"))
         filas.append(
             [
                 Paragraph(_esc(datos.get("factura")), st_celda),
-                Paragraph(_esc(int(round(g.get("valor_glosado") or 0))), st_celda),
+                Paragraph(_esc(int(round(_num(g.get("valor_glosado"))))), st_celda),
                 Paragraph(_esc(datos.get("documento_paciente")), st_celda),
                 Paragraph(_esc(g.get("descripcion")), st_celda),
                 Paragraph(_esc(rta_glosa_completa(g)), st_celda),
@@ -179,5 +206,99 @@ def generar_pdf_evidencia(datos: dict) -> bytes:
     for linea in pie:
         partes.append(Paragraph(_esc(linea), st_pie))
 
-    doc.build(partes)
+    try:
+        doc.build(partes)
+    except Exception:
+        # 02-09-2026. Antes, si la maqueta de la tabla no cerraba, el gestor se
+        # quedaba sin PDF y con un error del servidor. El papel es lo que
+        # importa: se rehace en texto corrido, sin tabla, con la misma
+        # información y avisando arriba por qué salió así.
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            leftMargin=1.5 * cm,
+            rightMargin=1.5 * cm,
+            topMargin=1.5 * cm,
+            bottomMargin=1.5 * cm,
+            title=f"REPORTE RTA ADRES {datos.get('factura', '')}",
+        )
+        llanas = [
+            Paragraph("REPORTE RTA ADRES", st_titulo),
+            Paragraph(f"Número Factura: {_esc(datos.get('factura'))}", st_dato),
+            Paragraph(f"Número Radicación: {_esc(datos.get('radicacion'))}", st_dato),
+            Paragraph(f"Tip- Num Doc Victima: {_esc(datos.get('documento_paciente'))}", st_dato),
+            Spacer(1, 0.4 * cm),
+            Paragraph(
+                "Este documento salió sin la tabla porque alguna respuesta es demasiado "
+                "larga para la cuadrícula. La información es la misma.",
+                st_pie,
+            ),
+            Spacer(1, 0.4 * cm),
+        ]
+        for i, g in enumerate(glosas, 1):
+            aceptado = _num(g.get("valor_aceptado"))
+            llanas.append(
+                Paragraph(
+                    f"<b>{i}. {_esc(g.get('descripcion'))}</b> — glosado "
+                    f"{_moneda(g.get('valor_glosado'))}"
+                    + (f" · aceptado {_moneda(aceptado)}" if aceptado else ""),
+                    st_dato,
+                )
+            )
+            llanas.append(Paragraph(_esc(rta_glosa_completa(g)), st_celda))
+            llanas.append(Spacer(1, 0.25 * cm))
+        for linea in pie:
+            llanas.append(Paragraph(_esc(linea), st_pie))
+        doc.build(llanas)
     return buffer.getvalue()
+
+
+def generar_zip_evidencias(facturas: list[dict]) -> tuple[bytes, list[dict]]:
+    """Un ZIP con el PDF de cada factura. Devuelve (zip, novedades).
+
+    POR QUÉ EXISTE (02-09-2026). Yesid: «que salga una opción de descargar el
+    PDF también de forma masiva y me quede en un zip con todas las facturas, un
+    pdf por factura». Bajarlos de a uno con 81 facturas es un día de trabajo.
+
+    Si una factura no se puede armar, **el ZIP igual sale**: esa factura queda
+    anotada en `NOVEDADES.txt` dentro del mismo ZIP y en lo que se devuelve. Un
+    error en una no puede dejar sin evidencia a las otras ochenta.
+    """
+    novedades: list[dict] = []
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        usados: set[str] = set()
+        for posicion, datos in enumerate(facturas, 1):
+            # Todo va dentro del try, incluido leer el número: si una entrada
+            # viene corrupta, no puede tumbar el ZIP de las demás.
+            numero = ""
+            try:
+                numero = str(datos.get("factura") or "")
+                nombre = nombre_archivo_evidencia(numero)
+                # Dos facturas no pueden pisarse dentro del ZIP.
+                if nombre in usados:
+                    raiz, _, ext = nombre.rpartition(".")
+                    n = 2
+                    while f"{raiz}_{n}.{ext}" in usados:
+                        n += 1
+                    nombre = f"{raiz}_{n}.{ext}"
+                usados.add(nombre)
+                zf.writestr(nombre, generar_pdf_evidencia(datos))
+            except Exception as e:  # noqa: BLE001 — se anota y se sigue
+                novedades.append(
+                    {
+                        "factura": numero or f"(la número {posicion} de la lista)",
+                        "motivo": f"{type(e).__name__}: {e}",
+                    }
+                )
+        if novedades:
+            texto = [
+                "NOVEDADES AL ARMAR LOS PDF DE EVIDENCIA",
+                "",
+                f"{len(novedades)} factura(s) no se pudieron armar. Las demás sí están en este ZIP.",
+                "",
+            ]
+            texto += [f"{n['factura']}: {n['motivo']}" for n in novedades]
+            zf.writestr("NOVEDADES.txt", "\n".join(texto).encode("utf-8"))
+    return buffer.getvalue(), novedades

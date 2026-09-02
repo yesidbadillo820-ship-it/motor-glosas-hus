@@ -90,6 +90,41 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 02-09-2026 (noche) — El PDF de evidencia ya no se cae, y salen todos de una en un ZIP
+
+**Lo que reportó Yesid.** En la factura HUS414206, el botón «PDF de evidencia»
+respondió **«No se pudo generar el PDF · HTTP 502»**. Y pidió además poder
+bajarlos **todos de una vez, en un ZIP, un PDF por factura**.
+
+**Sobre el 502, con honestidad.** No se pudo reproducir con los datos de esa
+factura: se probó el armado del PDF con 5 glosas, con respuestas larguísimas,
+con textos sin espacios, sin glosas, y con la misma versión de la librería que
+corre en producción. Todos salieron bien. Un «502» lo devuelve el servidor de
+entrada, no el programa, así que puede haber sido un corte momentáneo.
+
+Lo que sí se encontró y se corrigió son **dos fallas reales** de las que nadie
+se había dado cuenta: si la plata llegaba como **texto** (por ejemplo
+«678.700», como la escribe Excel) en vez de como número, el PDF **reventaba
+entero**. Ahora se lee bien venga como venga.
+
+Además, para que esto no vuelva a quedar en un error mudo:
+
+- **El PDF siempre sale.** Si la tabla no cabe en la hoja, el documento se
+  rehace en texto corrido, con la misma información y diciendo arriba por qué
+  salió así. Antes, ahí el gestor se quedaba sin papel.
+- **El error dejó de ser mudo.** Si algo falla, la pantalla dice **de qué
+  factura** y **qué pasó**, y queda anotado en el registro del servidor. Ya no
+  hay un «502» pelado sin pista.
+
+**Lo nuevo: bajar todos los PDF de una.** En la barra de Glosas ADRES hay un
+botón **«📦 PDF de todas (ZIP)»**. Baja un ZIP con **un PDF por factura** del
+paquete escogido. Probado con las 81 facturas del 31078: salió en **menos de un
+segundo**. Si alguna factura no se puede armar, **el ZIP igual sale** y esa
+queda anotada en un `NOVEDADES.txt` adentro: un error en una no deja sin
+evidencia a las otras ochenta.
+
+El ZIP se arma con **tres consultas** a la base, no con una por factura.
+
 ### 02-09-2026 (tarde) — Ya se puede subir el reparto: quién audita cada factura
 
 **Lo que pasó.** En la mañana quedó listo que el informe deduzca el gestor de

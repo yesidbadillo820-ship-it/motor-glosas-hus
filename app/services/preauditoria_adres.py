@@ -18,6 +18,7 @@ import io
 import json
 import sys
 import tempfile
+from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -637,6 +638,73 @@ def importar_reparto(
         "medicos": medicos,
         "sin_pertinencia": sum(1 for _, m in reparto.values() if m and m.upper() == SIN_MEDICO),
     }
+
+
+# ─── Evidencia de todo el paquete, de una sola pasada ────────────────────────
+
+
+def datos_evidencia_del_paquete(
+    db: Session, paquete_id: int, *, estado: str | None = None
+) -> list[dict]:
+    """Lo que necesita el PDF de evidencia, de todas las facturas del paquete.
+
+    POR QUÉ EXISTE (02-09-2026). Para el ZIP con un PDF por factura. Llamar a
+    `consultar_factura` en un bucle son cinco consultas por factura —405 en el
+    paquete 31078—; esto lo arma con **tres consultas en total** y con las
+    mismas reglas de plata: la glosa total no se responde ítem por ítem y lo
+    aceptado se consolida por servicio, con tope en lo glosado.
+    """
+    fichas = (
+        db.query(FacturaAdresRecord)
+        .filter(FacturaAdresRecord.paquete_id == paquete_id)
+        .order_by(FacturaAdresRecord.factura)
+        .all()
+    )
+    if estado:
+        limpio = estado.strip().upper()
+        fichas = [f for f in fichas if (f.estado or "PENDIENTE").upper() == limpio]
+    if not fichas:
+        return []
+
+    glosas = (
+        db.query(GlosaAdresRecord)
+        .filter(GlosaAdresRecord.paquete_id == paquete_id)
+        .order_by(GlosaAdresRecord.factura, GlosaAdresRecord.id)
+        .all()
+    )
+    por_factura: dict[str, list[GlosaAdresRecord]] = defaultdict(list)
+    for g in glosas:
+        por_factura[g.factura_clave].append(g)
+
+    salida = []
+    for f in fichas:
+        todas = por_factura.get(f.factura_clave, [])
+        if not todas:
+            continue
+        totales = [g for g in todas if g.glosa_total]
+        propias = [g for g in todas if not g.glosa_total]
+        decididas = [g for g in propias if g.decision]
+        salida.append(
+            {
+                "factura": f.factura,
+                "radicacion": f.radicacion or (todas[0].radicacion if todas else ""),
+                "documento_paciente": f.doc_victima or (todas[0].doc_victima if todas else ""),
+                "estado": f.estado or "PENDIENTE",
+                "glosas": [glosa_dict(g) for g in propias],
+                "resumen": {
+                    "glosas": len(propias),
+                    "decididas": len(decididas),
+                    "pendientes": len(propias) - len(decididas),
+                    "valor_glosado": sum((g.valor_glosado or 0) for g in propias if g.cuenta_valor),
+                    "valor_aceptado": aceptado_consolidado(propias),
+                    "glosas_totales_ocultas": len(totales),
+                    "valor_glosas_totales": sum(
+                        (g.valor_glosado or 0) for g in totales if g.cuenta_valor
+                    ),
+                },
+            }
+        )
+    return salida
 
 
 # ─── Consultar ───────────────────────────────────────────────────────────────
