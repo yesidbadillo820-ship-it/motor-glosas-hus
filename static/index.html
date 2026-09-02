@@ -3241,6 +3241,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
             <select id="ga-paquete" onchange="gaCambiarPaquete()" style="padding:.42rem .6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.8rem"></select>
             <button class="btn btn-ghost" onclick="gaExportarExcel(this)" style="font-size:.8rem" title="Baja el paquete completo: la Hoja1 de siempre (las 26 columnas de la macro) y encima el informe por causal, por área, por gestor y factura por factura">⬇ Exportar Excel</button>
+            <button class="btn btn-ghost" onclick="gaEvidenciasZip()" style="font-size:.8rem" title="Un PDF de evidencia por factura, todo en un ZIP">📦 PDF de todas (ZIP)</button>
             <button class="btn btn-ghost" onclick="gaAbrirCargue()" style="font-size:.8rem">Cargar paquete</button>
           </div>
         </div>
@@ -21055,6 +21056,37 @@ async function gaExportarExcel(btn){
 
 // El PDF de evidencia de la factura, con el mismo formato del reporte que
 // venía armando la macro.
+// 02-09-2026. Yesid: «que salga una opción de descargar el PDF también de
+// forma masiva y me quede en un zip con todas las facturas, un pdf por
+// factura». Con 81 facturas, bajarlos de a uno es un día de trabajo.
+async function gaEvidenciasZip(){
+  if(!GA_PAQUETE){ toast('Escogé un paquete', 'Arriba, en la lista de paquetes', 'error'); return; }
+  toast('Armando los PDF', 'Puede tardar un momento: es uno por factura', 'info');
+  try{
+    var r = await fetch('/glosas-adres/paquete/'+encodeURIComponent(GA_PAQUETE)+'/evidencias.zip',
+                        {headers: authH()});
+    if(!r.ok){
+      var e = await r.json().catch(function(){ return {}; });
+      throw new Error(e.detail || ('HTTP '+r.status));
+    }
+    var cuantas = r.headers.get('X-Facturas') || '';
+    var novedades = parseInt(r.headers.get('X-Novedades') || '0', 10);
+    var blob = await r.blob();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'RTA_ADRES_EVIDENCIAS.zip';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    if(novedades){
+      toast('ZIP descargado con novedades',
+            cuantas+' factura(s); '+novedades+' no se pudieron armar. Mirá NOVEDADES.txt dentro del ZIP.',
+            'error');
+    }else{
+      toast('ZIP descargado', cuantas+' PDF, uno por factura', 'success');
+    }
+  }catch(e){ toast('No se pudo armar el ZIP', e.message, 'error'); }
+}
+
 async function gaEvidenciaPDF(){
   if(!GA_DATOS) return;
   try{
