@@ -1133,6 +1133,7 @@ input::placeholder,textarea::placeholder{color:var(--text4);font-weight:400}
 .pill-time.ok{background:var(--c-green-light);color:var(--c-green)}
 .pill-gray{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
 .pill-teal{background:var(--c-teal-light);color:var(--c-teal)}
+.pill-etapa{background:#fef3c7;color:#92400e;border:1px solid #f59e0b;font-weight:700}
 
 .res-score{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem 1.25rem}
 .score-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}
@@ -17616,6 +17617,11 @@ function renderResult(d){
     +'<div class="res-title">'+d.resumen+'</div>'
     +'<div class="res-pills">'
     +'<span class="pill pill-code">'+d.codigo_glosa+'</span>'
+    +((d.etapa_procesal && d.etapa_procesal!=='INICIAL')
+        ? '<span class="pill pill-etapa">⚠️ ETAPA: '
+          +(d.etapa_procesal==='CONCILIACION'?'CONCILIACIÓN':'RATIFICACIÓN')
+          +' DETECTADA</span>'
+        : '')
     +'<span class="pill '+(isOk?'pill-time ok':'pill-time')+'">'+d.mensaje_tiempo+'</span>'
     +(d.valor_objetado!=='$ 0.00'?'<span class="pill pill-gray">'+d.valor_objetado+'</span>':'')
     +'<span class="pill pill-teal">'+d.modelo_ia+'</span>'
