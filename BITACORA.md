@@ -90,6 +90,41 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 02-09-2026 (tarde) — Ya se puede subir el reparto: quién audita cada factura
+
+**Lo que pasó.** En la mañana quedó listo que el informe deduzca el gestor de
+la huella del sistema (quién cerró la factura, quién decidió sus glosas). Yesid
+mandó después **la tabla con la que el área repartió de verdad** el paquete
+31078: `FACTURA · PROFESIONAL · TECNICO`, donde el técnico es el gestor de
+cuentas y el profesional la médica auditora.
+
+Ese reparto existía en un Excel del área, pero **no había por dónde subirlo**:
+por eso las 81 facturas salían «(sin gestor asignado)».
+
+**Qué se hizo.** En la ventana **«Cargar paquete»** hay un campo nuevo,
+*Reparto del área*, donde se sube esa misma tabla (Excel o CSV). Al subirla:
+
+- cada factura queda con su **gestor** y su **médica**;
+- los renglones del paquete llevan el mismo reparto, así la hoja **POR GESTOR**
+  del informe reparte de verdad;
+- la ventana avisa cuántas facturas se asignaron, para quién, y **si alguna
+  factura del paquete quedó sin asignar**.
+
+Detalles que importan: una celda vacía **no borra** lo que ya estaba; volver a
+subir el mismo archivo no cambia nada; corregir el reparto sí lo pisa; y
+«SIN PERTINENCIA» se guarda tal cual está escrito —es la anotación del área
+para decir que esa factura no lleva médica— pero no se cuenta como profesional.
+
+**Comprobación de la tabla del 31078:** 81 facturas, sin repetidas, y calza
+exacto con el paquete (81 = 81, ninguna de más ni de menos). Las 73 que tienen
+detallado están todas; las 8 que faltan son justo las que ya se sabía que no
+traen detallado (HUS406456, HUS406911, HUS407660, HUS407662, HUS407666,
+HUS407676, HUS407819 y HUS455655). El reparto quedó: **OSCAR 41 facturas,
+CAROLINA 40**; JEFE LEYDY 19, DRA ZULAY 19, JEFE LAURA 17 y 26 sin pertinencia.
+
+Se le entregó por chat el archivo `REPARTO_31078.xlsx` listo para subir. El bot
+`preauditar_glosas_adres.py` también aprendió a reconocer la columna TECNICO.
+
 ### 02-09-2026 — El Excel de Glosas ADRES ya dice quién trabaja cada factura
 
 **Lo que pidió Yesid**, con los archivos `RTA_GLOSA_ADRES_PAQ_31078` y `…31073`

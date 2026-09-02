@@ -856,8 +856,10 @@ def leer_reparto(ruta: Path) -> dict[str, tuple[str, str]]:
     filas = _leer_filas(ruta)
     alias = {
         "factura": ("FACTURA", "NUMERO FACTURA", "NRO FACTURA"),
-        "gestor": ("GESTOR", "AUDITOR", "RESPONSABLE"),
-        "medico": ("MEDICO", "MÉDICO", "PROFESIONAL"),
+        # 02-09-2026: el reparto del área llega con los títulos TECNICO y
+        # PROFESIONAL. Se reconocen igual que GESTOR y MEDICO.
+        "gestor": ("GESTOR", "TECNICO", "AUDITOR", "RESPONSABLE"),
+        "medico": ("MEDICO", "PROFESIONAL"),
     }
     idx = _fila_encabezado(filas, alias, minimo=2)
     if idx < 0:
