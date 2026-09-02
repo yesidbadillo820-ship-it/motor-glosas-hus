@@ -9336,6 +9336,32 @@ roja.
 
 ---
 
+### 02-09 (tarde) — «La causal 4302 es tarifas»: el catálogo aprende y lo cargado se arregla con un comando
+
+Venía pendiente del paquete 31073: sus glosas con causal 4302 salían **«sin
+clasificar»**, porque esa causal no apareció en el paquete 31068, que fue de
+donde se aprendió la tabla de clasificación — y el sistema, antes que
+inventar, las dejó en blanco. Ya el 05-08 el análisis del 31078 había
+apuntado a que la 4302 (mayor valor en consulta) era de tarifas; hoy **Yesid
+lo confirmó** y quedó en firme:
+
+- **La 4302 entra a la tabla como TARIFAS**, junto a sus vecinas 4303–4309.
+  Todo paquete que se cargue de aquí en adelante la clasifica solo.
+- Como la clasificación se guarda **al cargar** el paquete, lo ya cargado no
+  se arregla solo. Nace el comando **`glosas_adres_reclasificar.py`**: le pone
+  la clasificación que falta a las glosas en blanco cuya causal ya está en la
+  tabla (y a las que siguen sin decidir les deja también la sugerencia de la
+  familia — TARIFAS propone SE OBJETA). **No toca** nada ya clasificado, ni
+  lo decidido por el equipo, ni la 4506 que reparte un SUPER ADMIN; y si
+  encuentra causales que siguen por fuera de la tabla, las canta para
+  agregarlas. Primero corre en **ensayo** (solo mira, con la base abierta en
+  solo lectura) y solo escribe si se le agrega la palabra `aplicar`.
+
+9 pruebas nuevas (las del comando y la que deja escrito que la 4302 es
+TARIFAS).
+
+---
+
 ## 3) PENDIENTE
 
 ### Curso de noruego (31-08, noche)

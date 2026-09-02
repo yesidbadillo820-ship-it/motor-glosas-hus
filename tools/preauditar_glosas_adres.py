@@ -147,6 +147,9 @@ CLASIFICACION_POR_CAUSAL: dict[str, str] = {
     "3302": "HABILITACION REPS",
     "4103": "GLOSADA TOTAL POR  FURIPS 1",
     "4104": "PERTINENCIA (NO DERIVADOS DEL SINIESTRO)",
+    # 02-09-2026: la 4302 no salió en el 31068 y quedaba «sin clasificar»
+    # (se vio en el paquete 31073). Yesid confirmó que es de TARIFAS.
+    "4302": "TARIFAS",
     "4303": "TARIFAS",
     "4305": "TARIFAS",
     "4306": "TARIFAS",
