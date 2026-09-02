@@ -160,6 +160,43 @@ se movieron: cambia lo que dice la columna GESTOR, no dónde está.
 Con 28 pruebas nuevas (la regla sola, y el libro completo generado sobre una
 base de mentira) y los 88 tests del API de Glosas ADRES en verde.
 
+### 02-09-2026 — El túnel ya no decide si el dictamen llega, y tres arreglos de las corridas reales
+
+**Prueba 2 (CL4506) «no pasó el sistema».** Se vio la causa: el túnel que da salida
+al motor corta cualquier respuesta a los 100 segundos, y la glosa más pesada de
+las cinco tarda más que eso. El motor terminaba el dictamen y lo guardaba en el
+historial, pero la respuesta nunca llegaba a la pantalla: «Error de conexión».
+Para el auditor eso es una caída, y con razón. Se cambió la forma de trabajar:
+la pantalla ahora **lanza** el análisis y recibe de inmediato un número de
+seguimiento; el motor trabaja aparte; y la pantalla **pregunta** por el resultado
+con consultas cortas cada pocos segundos, que el túnel no alcanza a cortar. La
+narración en vivo sigue igual. El camino de siempre queda intacto para el agente
+de lotes y las herramientas.
+
+**Prueba 3 (AU0201).** El auditor leyó «TRIAGE II Y DOLOR TORÁCICO» en el dictamen
+y lo tomó por inventado, porque abajo salía «el índice de soportes se está
+reconstruyendo». No era inventado: el PDF adjunto lo dice con esas palabras. El
+aviso es del expediente del servidor, no del archivo adjunto — y ahora el dictamen
+lo aclara antes del aviso: «los archivos anexos sí se leyeron». De paso quedó la
+regla que el auditor pidió, que sí hacía falta: el prompt prohíbe describir
+triage, diagnóstico, síntomas o fechas que no estén escritos en un PDF aportado,
+y una revisión coteja triage, códigos CIE-10 y fechas del escrito contra los PDF
+y le nombra al gestor lo que no encuentra.
+
+**Prueba 1 (TA0301).** El aviso de «cifras que nadie calculó» marcó «SOAT PLENA» y
+«UVB» en un dictamen que salió por la plantilla fija, no por la IA; la ficha de
+La Previsora dice exactamente eso. Era un falso positivo del propio motor y se
+corrigió. Pero el auditor tenía razón en el fondo: la plantilla afirmaba «UVB
+2026: $12.110» sin conocer la fecha del servicio. Ahora, sin fecha, dice que la
+UVB es la vigente a la fecha de prestación y pide confirmarla; con fecha, nombra
+el año que corresponde.
+
+**Pendiente:** correr en la pantalla real, después de desplegar con reinicio, la
+prueba 2 (que ahora debe terminar sin desconectarse) y luego las pruebas 4 y 5.
+Y siguen abiertos los dos de siempre: contratos AURORA/ARL vencidos el 31-08 y
+confirmar las 148 glosas de agosto con `tools/verificar_glosas.py`.
+
+
 ### 01-09-2026 — Se cerró el ciclo de las cinco pruebas de estrés
 
 **En una frase:** el motor ya no le cree a la IA en lo que no es redacción.
