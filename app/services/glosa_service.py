@@ -8296,21 +8296,36 @@ class GlosaService:
         tipo_glosa = self._determinar_tipo_glosa(prefijo, texto_base)
 
         es_extemporanea = dias > DIAS_HABILES_LIMITE_EXTEMPORANEA
-        # Caso J (02-09-2026): la etapa venía como respuesta inicial pero el
-        # TEXTO dice «se ratifica» / «respuesta a conciliación». Se enruta al
-        # camino de ratificada (mantener respuesta, solicitar conciliación), no
-        # a redactar una subsanación inicial que repite defensas.
-        es_ratificacion = "RATIF" in str(data.etapa).upper() or _rcf.texto_es_ratificacion(
-            texto_base
-        )
-        # Ciclo de vida de la glosa (Caso J, 02-09-2026). Clasificar la etapa
-        # procesal para (1) avisar al gestor con un badge y (2) ordenarle al
-        # modelo, cuando el caso va por IA, que NO responda una segunda
-        # instancia como si fuera el dia uno. NO cambia el ruteo al texto fijo
-        # de ratificada: eso lo decide es_ratificacion (mas estricto), asi la
-        # extemporaneidad de una ratificacion sigue yendo al motor (SO0601).
+        # Ciclo de vida de la glosa (Caso J y regresión Caso Q, 02-09-2026).
+        # Clasificar la etapa procesal —INICIAL / RATIFICACION / CONCILIACION—
+        # para avisar al gestor con un badge y ajustar la defensa procesal.
         _etapa_procesal = _rcf.clasificar_etapa_procesal(
             texto_base, str(getattr(data, "etapa", "") or "")
+        )
+        # RUTEO A LA RATIFICACIÓN. «MANTIENE GLOSA», «se ratifica», «segunda
+        # instancia», «respuesta a conciliación» tienen que ir por la vía de
+        # ratificada (sostener la respuesta + exigir conciliación), NO tratarse
+        # como una glosa inicial de soportes. El Caso Q (SO0601 «MANTIENE
+        # GLOSA. EL HOSPITAL RESPONDIÓ FUERA DE TÉRMINOS») se respondía como si
+        # faltaran fotocopias. La ÚNICA excepción es la ratificación
+        # EXTEMPORÁNEA DE LA ENTIDAD: cuando las fechas radicación → recepción
+        # de la ratificación exceden el término, esa defensa de TIEMPO es la
+        # más fuerte y va al motor (caso SO0601 con fechas). Sin fechas que lo
+        # prueben, una ratificación es una ratificación.
+        _ratif_extemporanea = False
+        try:
+            _fx_rat = detectar_fechas_en_texto(texto_base)
+            _fr_rat = _fx_rat.get("fecha_radicacion")
+            _frat_rat = _fx_rat.get("fecha_ratificacion")
+            if _fr_rat and _frat_rat:
+                _dr_rat = self._calcular_dias_habiles(_fr_rat, _frat_rat)
+                _ratif_extemporanea = (
+                    _dr_rat is not None and _dr_rat > DIAS_HABILES_LIMITE_RATIFICACION
+                )
+        except Exception as _e_re:
+            logger.debug(f"[RATIF-EXTEMP] no evaluada: {_e_re}")
+        es_ratificacion = "RATIF" in str(data.etapa).upper() or (
+            _etapa_procesal != "INICIAL" and not _ratif_extemporanea
         )
         tiene_pdf = bool(contexto_pdf and len(contexto_pdf.strip()) > 0)
         es_urgencia = "URGENCIA" in texto_base or "URGENTE" in texto_base
@@ -9061,6 +9076,12 @@ class GlosaService:
                     "MÉDICA Y/O TÉCNICA entre las partes (Art. 57 de la Ley 1438 de 2011); "
                     "de no lograrse acuerdo, anuncia que el conflicto se elevará ante la "
                     "SUPERINTENDENCIA NACIONAL DE SALUD (Art. 126 de la Ley 1438 de 2011).\n"
+                    "DISTINGUE EL MOTIVO: si la objeción es por VENCIMIENTO DE TÉRMINOS "
+                    "(una respuesta presentada fuera del plazo de ley) es un asunto de "
+                    "TIEMPOS, no de soportes — PROHIBIDO refutarla diciendo que «los "
+                    "documentos están presentes en el expediente»: tener los papeles no "
+                    "borra que se entregaron tarde. Discútela en el plano procesal (plazos "
+                    "y fechas), no documental.\n"
                     "═══════════════════════════════════════════════════════════"
                     "════════════════\n\n"
                 )

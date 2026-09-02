@@ -61,12 +61,11 @@ class TestClasificadorDeEtapa:
         assert R.clasificar_etapa_procesal("texto sin marcadores", "RATIFICACION") == "RATIFICACION"
         assert R.clasificar_etapa_procesal("texto sin marcadores", "CONCILIACION") == "CONCILIACION"
 
-    def test_el_ruteo_al_texto_fijo_no_cambia(self):
-        """`texto_es_ratificacion` (más estricto) sigue decidiendo el texto
-        fijo: «ratifica» a secas NO lo dispara (para que SO0601 vaya al motor);
-        el marcador de conciliación sí."""
-        assert not R.texto_es_ratificacion(up("LA EPS RATIFICA LA GLOSA"))
-        assert R.texto_es_ratificacion(up("RESPUESTA A CONCILIACION"))
+    def test_mantiene_glosa_es_ratificacion(self):
+        """Regresión Caso Q: «MANTIENE GLOSA» (sin «se», sin «la») es
+        ratificación. Antes el ruteo estrecho no lo veía y lo trataba como
+        soportes."""
+        assert R.clasificar_etapa_procesal(up("SANITAS. MANTIENE GLOSA.")) == "RATIFICACION"
 
 
 # ─────────────────────────── integración end-to-end ───────────────────────────
@@ -120,8 +119,12 @@ def _data(texto: str, eps: str, etapa: str = "RESPUESTA A GLOSA"):
 
 
 CASO_J = "FA0101 | HUS0000605555 | COOSALUD. RESPUESTA A CONCILIACION. LA IPS APORTO LOS SOPORTES PERO SIGUEN ILEGIBLES. SE RATIFICA LA GLOSA INICIAL POR $800.000."
+# Caso Q (regresión 02-09-2026): «MANTIENE GLOSA» + la IPS respondió tarde. El
+# motor lo respondía como soportes («los documentos están presentes»). Ahora es
+# ratificación → texto fijo, conciliación, sin argumentar soportes.
+CASO_Q = "SO0601 | HUS0000609999 | SANITAS. MANTIENE GLOSA. EL HOSPITAL RESPONDIO LA GLOSA INICIAL FUERA DE LOS TERMINOS DE LEY."
 RATIFICA_SOLA = "SO0701 | HUS0000607000 | NUEVA EPS. LA EPS RATIFICA LA GLOSA POR FALTA DE EPICRISIS. VALOR OBJETADO $500.000."
-SO0601 = "SO0601 | HUS0000606000 | NUEVA EPS. LA EPS RATIFICA LA GLOSA POR FALTA DE EPICRISIS. FECHA RADICACION: 2026-03-01. FECHA RECEPCION RATIFICACION: 2026-05-30. VALOR OBJETADO $1.350.000."
+SO0601_CON_FECHAS = "SO0601 | HUS0000606000 | NUEVA EPS. LA EPS RATIFICA LA GLOSA POR FALTA DE EPICRISIS. FECHA RADICACION: 2026-03-01. FECHA RECEPCION RATIFICACION: 2026-05-30. VALOR OBJETADO $1.350.000."
 
 
 @pytest.mark.asyncio
@@ -141,34 +144,67 @@ class TestEnrutamientoEtapa:
         # No responde como día uno: mantiene la respuesta inicial.
         assert "MANTIENE" in d
 
-    async def test_ratifica_sola_va_al_motor_con_bloque_de_etapa(self, monkeypatch):
+    async def test_caso_q_mantiene_glosa_no_se_responde_como_soportes(self, monkeypatch):
+        """La regresión que reportó el auditor: «MANTIENE GLOSA. EL HOSPITAL
+        RESPONDIÓ FUERA DE TÉRMINOS» se contestaba como si faltaran fotocopias.
+        Ahora es ratificación → texto fijo, conciliación, SIN argumentar
+        soportes ni pedir levantamiento inicial, y con el badge puesto."""
+        _preparar_entorno(monkeypatch)
+        prompts = []
+        _stub_ia(monkeypatch, prompts)
+        r = await GlosaService(groq_api_key=None).analizar(
+            _data(CASO_Q, "SANITAS"), contratos_db={}
+        )
+        assert prompts == []  # texto fijo, la IA no toca esto
+        assert r.etapa_procesal == "RATIFICACION"  # el badge sale
+        d = r.dictamen.upper()
+        assert "CONCILIACIÓN" in d and "SUPERINTENDENCIA NACIONAL DE SALUD" in d
+        # No comete el error de producción: no argumenta soportes presentes.
+        assert not ("SOPORTE" in d and "PRESENT" in d)
+        assert "SE SOLICITA EL LEVANTAMIENTO" not in d
+
+    async def test_ratifica_sin_fechas_va_por_texto_fijo(self, monkeypatch):
+        """Una ratificación sin fechas que prueben extemporaneidad va por el
+        texto fijo (determinista), no al modelo."""
         _preparar_entorno(monkeypatch)
         prompts = []
         _stub_ia(monkeypatch, prompts)
         r = await GlosaService(groq_api_key=None).analizar(
             _data(RATIFICA_SOLA, "NUEVA EPS"), contratos_db={}
         )
-        assert prompts, "una ratificación sin marcador de conciliación va al motor"
+        assert prompts == []
         assert r.etapa_procesal == "RATIFICACION"
-        # El prompt le prohíbe redactar como respuesta inicial.
-        assert "NO ES UNA GLOSA INICIAL" in prompts[0]
-        assert "MESA DE CONCILIACIÓN" in prompts[0]
-        assert "SUPERINTENDENCIA NACIONAL DE SALUD" in prompts[0]
+        assert "CONCILIACIÓN" in r.dictamen.upper()
 
     async def test_ratificacion_extemporanea_conserva_su_defensa_de_tiempo(self, monkeypatch):
-        """SO0601: ratificación tardía. El badge la marca, pero NO se la lleva
-        el texto fijo: va al motor, y el prompt trae el bloque de
-        extemporaneidad ADEMÁS del de etapa."""
+        """SO0601 CON FECHAS: la entidad ratificó tarde. Esa defensa de tiempo
+        es la más fuerte y va al motor —NO se la lleva el texto fijo—, con el
+        bloque de extemporaneidad ADEMÁS del de etapa. El badge la marca igual."""
         _preparar_entorno(monkeypatch)
         prompts = []
         _stub_ia(monkeypatch, prompts)
         r = await GlosaService(groq_api_key=None).analizar(
-            _data(SO0601, "NUEVA EPS"), contratos_db={}
+            _data(SO0601_CON_FECHAS, "NUEVA EPS"), contratos_db={}
         )
         assert prompts, "la ratificación extemporánea va al motor, no al texto fijo"
         assert r.etapa_procesal == "RATIFICACION"
         assert "EXTEMPORANEIDAD DETECTADA" in prompts[0]
         assert "NO ES UNA GLOSA INICIAL" in prompts[0]
+        # El bloque de etapa también trae la distinción temporal-vs-documental.
+        assert "VENCIMIENTO DE TÉRMINOS" in prompts[0]
+
+    async def test_el_badge_viaja_en_la_serializacion(self, monkeypatch):
+        """El badge sólo sirve si etapa_procesal llega al front. El camino
+        asíncrono guarda con jsonable_encoder; se comprueba que el campo va."""
+        from fastapi.encoders import jsonable_encoder
+
+        _preparar_entorno(monkeypatch)
+        prompts = []
+        _stub_ia(monkeypatch, prompts)
+        r = await GlosaService(groq_api_key=None).analizar(
+            _data(CASO_Q, "SANITAS"), contratos_db={}
+        )
+        assert jsonable_encoder(r).get("etapa_procesal") == "RATIFICACION"
 
 
 # ─────────────────────────── UI ───────────────────────────
