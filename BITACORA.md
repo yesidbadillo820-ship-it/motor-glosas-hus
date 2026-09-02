@@ -90,6 +90,43 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 02-09-2026 (noche, sexta tanda) — V2, Pilar 1: análisis masivo por lotes (CSV + ZIP)
+
+**Qué pasó.** Con el motor ya estable en producción, arrancó la V2
+(«Automatización total y procesamiento a escala»), cinco pilares. Este es el
+primero: procesar muchas glosas de una sola vez.
+
+**Qué se hizo.** Un endpoint nuevo, `/analizar/masivo`, que recibe un **CSV**
+con hasta 500 glosas y un **ZIP** con sus PDF de soporte. El motor las encola y
+las procesa **en el fondo, varias a la vez** (con `concurrent.futures`), sin
+bloquear la pantalla, y al terminar deja **un solo Excel** con todos los
+dictámenes: factura, código de glosa, valor objetado, código de respuesta,
+etapa procesal, acción de la IA, estado y el dictamen en texto.
+
+- Cada glosa del lote corre por **exactamente la misma lógica** del análisis
+  de una sola glosa (la que ya blindamos con los casos 1–6 y F–Q). Cero
+  retroceso: no hay un «motor de lotes» aparte que pueda desalinearse.
+- El CSV es tolerante: acepta los encabezados con o sin tilde, en mayúscula o
+  minúscula, con coma o punto y coma. Columnas: `eps`, `etapa`, `factura`,
+  `texto` (la glosa), `valor aceptado` y `pdfs` (nombres dentro del ZIP,
+  opcional; si no viene, empareja los PDF por el número de factura).
+- Una fila con problema (sin texto, o que cae) queda marcada como **error** en
+  el Excel y **no tumba el lote**.
+- El avance se consulta con `/analizar/masivo/{job_id}` y el Excel se descarga
+  con `/analizar/masivo/{job_id}/resultado`. Cada glosa queda además guardada
+  en el historial, como siempre.
+
+**Ojo con el costo.** Un lote de 500 son 500 llamadas a la IA: el paralelismo
+va acotado (por defecto 4 a la vez, máximo 8) precisamente para no reventar ni
+la cuota ni la caché.
+
+**Pendiente (los otros 4 pilares de la V2):** piloto automático con bandeja de
+salida (apagado por defecto, con bitácora, liberado por un humano), folios
+forenses en los PDF (PyMuPDF), el demonio de vencimientos (alerta roja a 3 días
+hábiles del tope de 20) y el acta de desacuerdo para Supersalud. Y siguen los
+dos operativos: contratos AURORA/ARL vencidos el 31-08 y el cruce de CUPS del
+paquete 31078 (script entregado, falta el resumen de la corrida).
+
 ### 02-09-2026 (noche, quinta tanda) — Regresión del Caso Q: «MANTIENE GLOSA» sí es ratificación
 
 **Qué pasó.** En la prueba de producción, el Caso Q (`SO0601 | SANITAS. MANTIENE
