@@ -11796,8 +11796,8 @@ async function poblarLandingKPIs(){
     // 03-09-2026 (V2, Pilar 4) — ROJO ANTES DE QUE SE VENZA. Hasta ahora solo
     // se avisaba de lo YA vencido, que es cuando ya no hay nada que hacer. A
     // 3 días hábiles o menos todavía se alcanza a responder: eso va en rojo.
-    // El demonio de vencimientos mantiene `dias_restantes` fresco; antes el
-    // número estaba congelado desde el día del análisis.
+    // El plazo llega calculado EN CALIENTE por la API (radicación vs hoy,
+    // hábiles sin festivos); antes venía congelado desde el día del análisis.
     nCriticas = alertas.alertas.filter(function(a){
       var d = a.dias_restantes; return d != null && d > 0 && d <= 3;
     }).length;

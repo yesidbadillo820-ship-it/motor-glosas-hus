@@ -90,6 +90,17 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 03-09-2026 — V2, Pilar 4 (corregido): los días restantes se calculan al leer, no se guardan
+
+**Corrección sobre la entrada de abajo.** El primer arreglo refrescaba el
+número con un barrido cada 30 minutos que lo reescribía en la base. Se
+descartó por orden del auditor: el tiempo es continuo y no se persiste. Ahora
+los días restantes se calculan EN EL MOMENTO de cada consulta, cruzando la
+fecha de radicación de la factura contra la fecha de hoy, descontando fines de
+semana y los festivos colombianos del calendario del motor (FERIADOS_CO). La
+columna guardada queda solo de respaldo para glosas sin fechas. El aviso rojo
+a 3 días hábiles o menos queda igual, pero ahora sobre el valor real de hoy.
+
 ### 03-09-2026 — V2, Pilar 4: el reloj del vencimiento vuelve a correr
 
 **El problema, que no era el que parecía.** El sistema ya sabía avisar: había
