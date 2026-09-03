@@ -463,6 +463,8 @@ def borradores_auto_pilot(
     db: Session = Depends(get_db),
     current_user: UsuarioRecord = Depends(get_usuario_actual),
 ):
+    from app.models.db import AutoPilotBitacoraRecord
+    from app.services import vencimiento_dinamico
     from app.services.auto_pilot_worker import ESTADO_CUARENTENA
 
     filas = (
@@ -472,24 +474,50 @@ def borradores_auto_pilot(
         .limit(limite)
         .all()
     )
-    return {
-        "total": len(filas),
-        "borradores": [
-            {
-                "glosa_id": g.id,
-                "factura": g.factura,
-                "eps": g.eps,
-                "codigo_glosa": g.codigo_glosa,
-                "valor_objetado": g.valor_objetado,
-                "workflow_state": g.workflow_state,
-                # Hotfix 03-09-2026: la nota distingue un borrador normal de
-                # una glosa detenida por el cortacircuito OCR (ERROR_OCR).
-                "nota_workflow": g.nota_workflow,
-                "modelo_ia": g.modelo_ia,
-            }
-            for g in filas
-        ],
-    }
+
+    # Tablero Kanban (03-09-2026): cada tarjeta muestra la confianza, el
+    # riesgo y el modelo que decidió — vienen de la ÚLTIMA fila CANDIDATA
+    # de la bitácora, en una sola consulta (nada de N+1).
+    ultima_candidata: dict[int, AutoPilotBitacoraRecord] = {}
+    ids = [g.id for g in filas]
+    if ids:
+        for f in (
+            db.query(AutoPilotBitacoraRecord)
+            .filter(AutoPilotBitacoraRecord.glosa_id.in_(ids))
+            .filter(AutoPilotBitacoraRecord.decision == "CANDIDATA")
+            .order_by(AutoPilotBitacoraRecord.id.asc())
+            .all()
+        ):
+            ultima_candidata[f.glosa_id] = f  # orden ascendente: la última gana
+
+    def _dias(g) -> Optional[int]:
+        try:
+            return vencimiento_dinamico.dias_restantes_de(g)
+        except Exception:
+            return getattr(g, "dias_restantes", None)
+
+    def _fila(g) -> dict:
+        b = ultima_candidata.get(g.id)
+        return {
+            "glosa_id": g.id,
+            "factura": g.factura,
+            "eps": g.eps,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": g.valor_objetado,
+            "workflow_state": g.workflow_state,
+            # Hotfix 03-09-2026: la nota distingue un borrador normal de
+            # una glosa detenida por el cortacircuito OCR (ERROR_OCR).
+            "nota_workflow": g.nota_workflow,
+            "modelo_ia": g.modelo_ia,
+            # Enriquecido para el Kanban (03-09-2026):
+            "confianza": b.confianza if b else None,
+            "riesgo": (b.riesgo or "") if b else "",
+            "modelo_utilizado": (b.modelo_utilizado or "") if b else (g.modelo_ia or ""),
+            "regla_aplicada": (b.regla_aplicada or "") if b else "",
+            "dias_restantes": _dias(g),
+        }
+
+    return {"total": len(filas), "borradores": [_fila(g) for g in filas]}
 
 
 @router.post("/liberar/{glosa_id}", summary="Clic humano afirmativo: liberar un borrador")
@@ -501,6 +529,29 @@ def liberar_borrador(
     from app.services.auto_pilot_worker import liberar
 
     resultado = liberar(db, glosa_id, str(getattr(current_user, "email", "") or "humano"))
+    if resultado["estado"] == "no_existe":
+        raise HTTPException(status_code=404, detail="No existe una glosa con ese id.")
+    if resultado["estado"] == "no_esta_en_borradores":
+        raise HTTPException(
+            status_code=409,
+            detail=f"La glosa no está en borradores (estado: {resultado['workflow_state']}).",
+        )
+    return resultado
+
+
+@router.post("/devolver/{glosa_id}", summary="Clic humano: devolver un borrador a revisión manual")
+def devolver_borrador(
+    glosa_id: int,
+    motivo: str = Query("", max_length=300),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """El botón carmesí del panel de decisión (03-09-2026): la glosa sale de
+    la bandeja de borradores SIN radicarse — vuelve a RADICADA para revisión
+    manual, con el motivo en la nota y la devolución en la bitácora."""
+    from app.services.auto_pilot_worker import devolver
+
+    resultado = devolver(db, glosa_id, str(getattr(current_user, "email", "") or "humano"), motivo)
     if resultado["estado"] == "no_existe":
         raise HTTPException(status_code=404, detail="No existe una glosa con ese id.")
     if resultado["estado"] == "no_esta_en_borradores":

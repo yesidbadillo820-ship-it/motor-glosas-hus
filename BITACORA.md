@@ -90,6 +90,48 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 03-09-2026 — La pantalla se vuelve clínica: pantalla dividida, tablero y semáforo
+
+Rediseño visual ordenado por el auditor, montado SOBRE el sistema de diseño
+propio (sin librerías nuevas de internet — el PC del hospital no puede
+depender de eso). Cuatro piezas:
+
+1. **Pantalla dividida (adiós a las ventanas emergentes).** Al abrir una
+   glosa ya no se abre otra ventana: la mitad izquierda es un visor de los
+   soportes de la factura (factura electrónica, historia clínica, RIPS, con
+   zoom − / + / 100 %), y la derecha es el panel de decisión: dictamen,
+   confianza, regla aplicada, riesgo, modelo que decidió, y los dos botones
+   — **✔ Liberar** (esmeralda) y **✖ Devolver a revisión manual** (carmesí,
+   nuevo: la glosa vuelve a la bandeja normal y la devolución queda en la
+   bitácora con su motivo). Los dos lados cargan POR SEPARADO: un PDF de
+   20 MB o un enlace roto en el visor no congela los botones de decisión.
+   El visor solo puede abrir archivos que el índice de soportes ya conoce —
+   nunca rutas que mande el navegador (y cada apertura queda en la
+   auditoría PHI).
+2. **Bandeja Auto-Pilot en tablero.** La tabla plana de borradores ahora es
+   un tablero de tarjetas: «En cuarentena», «Detenidas por OCR» y
+   «Liberadas recientes». Cada tarjeta trae el % de confianza, el modelo
+   que escribió el dictamen y su barra de vencimiento; clic en la tarjeta =
+   pantalla dividida.
+3. **Semáforo de vencimientos.** Donde había fechas en texto ahora hay una
+   barra que se va consumiendo: rojo estricto a ≤ 3 días hábiles (incluye
+   «Vence HOY» y las vencidas, que laten en rojo), ámbar de 4 a 7, verde
+   tenue con más de 7. La barra aguanta 0 días, días negativos o datos
+   basura sin romperse (el ancho siempre queda entre 0 y 100).
+4. **Modo oscuro grafito por defecto + números tabulares.** El tema oscuro
+   (azul grafito) pasa a ser el arranque estándar para reducir fatiga
+   visual; quien prefiera claro, su elección guardada se respeta. Valores,
+   facturas y códigos CUPS quedan en tipografía tabular: las cifras se
+   alinean en columna perfecta.
+
+**Se validó primero contra escenarios extremos** (con un navegador real,
+Chromium): PDF de 20 MB lento y enlace 404 sin congelar el panel de
+decisión; tarjeta con modelo de nombre kilométrico y valor de
+$999.999.999,99 sin desbordes; barras con 0, 3 y −5 días. El arnés cazó un
+defecto real (la barra pintaba vacía por un detalle de CSS) que quedó
+corregido y con su prueba de regresión. 25/25 escenarios en verde y
+17 pruebas nuevas de pytest.
+
 ### 03-09-2026 — El Auto-Pilot queda ENCENDIDO y con su prueba en vivo
 
 Con los tres escudos en verde, el auditor dio la orden: encender el
