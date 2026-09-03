@@ -325,6 +325,47 @@ def cerrar_acta(
     return {"message": "Acta firmada", "conciliacion": _serializar(c)}
 
 
+@router.get("/acta-desacuerdo/{glosa_id}/pdf")
+def pdf_acta_desacuerdo(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Acta de Desacuerdo (V2, Pilar 5): la constancia que exige la mesa de
+    conciliación y sirve para escalar a la Supersalud (Arts. 57 y 126, Ley
+    1438/2011). Se estructura sola con los datos REALES del registro, y SOLO
+    para glosas en etapa de ratificación o conciliación: a una glosa inicial
+    no se le fabrica un desacuerdo que todavía no existe (409)."""
+    from fastapi import Response
+
+    from app.services.acta_desacuerdo import (
+        datos_acta_desacuerdo,
+        exige_mesa,
+        generar_pdf_acta_desacuerdo,
+    )
+
+    glosa = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
+    if glosa is None:
+        raise HTTPException(status_code=404, detail="No existe una glosa con ese id.")
+    if not exige_mesa(glosa):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Esta glosa está en etapa inicial: no hay ratificación ni "
+                "conciliación que documentar. El acta de desacuerdo se genera "
+                "cuando la entidad ratifica y la IPS sostiene su respuesta."
+            ),
+        )
+    datos = datos_acta_desacuerdo(glosa)
+    pdf = generar_pdf_acta_desacuerdo(datos)
+    nombre = f"acta_desacuerdo_{datos.get('factura') or glosa_id}.pdf"
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
 @router.get("/{conciliacion_id}/pdf")
 def pdf_acta(
     conciliacion_id: int,

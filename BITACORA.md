@@ -90,6 +90,34 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 03-09-2026 — V2, Pilar 5: el acta de desacuerdo se arma sola
+
+**Qué es.** Cuando la entidad ratifica su glosa y el hospital sostiene su
+respuesta, el camino legal es la mesa de conciliación y, si no hay acuerdo, la
+Superintendencia Nacional de Salud (Arts. 57 y 126 de la Ley 1438 de 2011).
+Para ese escalamiento hay que dejar por escrito la constancia del desacuerdo —
+un formato que hasta hoy se armaba a mano.
+
+**Qué se hizo.** El motor ahora estructura y exporta el **Acta de Desacuerdo**
+en PDF con los datos reales del expediente: factura, entidad, código de glosa,
+valores, radicado y fechas; la constancia de que la entidad ratificó y el HUS
+sostiene su respuesta; la solicitud expresa de la mesa de conciliación de
+auditoría médica; y el anuncio de escalamiento a la Supersalud. Se descarga
+desde la API por glosa.
+
+**Las reglas de siempre.**
+- No se inventa nada: lo que no está en el registro queda en blanco con línea
+  para diligenciar, y una nota interna dice qué faltó.
+- Solo aplica a glosas en etapa de ratificación o conciliación (usa el mismo
+  detector de etapa del motor): a una glosa inicial no se le fabrica un
+  desacuerdo que todavía no existe.
+- Las firmas quedan vacías: el acta la firman personas.
+- Las actas que ya existían (acta SINAC y acta-Excel de la mesa) no se
+  tocaron: esas son el resultado DE la mesa; esta es la constancia que la exige.
+
+**Con esto queda un solo pilar pendiente de la V2:** el 2 (piloto automático,
+que irá con la bandeja de salida apagada por defecto y liberación humana).
+
 ### 03-09-2026 — V2, Pilar 4 (corregido): los días restantes se calculan al leer, no se guardan
 
 **Corrección sobre la entrada de abajo.** El primer arreglo refrescaba el
