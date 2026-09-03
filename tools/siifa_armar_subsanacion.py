@@ -10,8 +10,10 @@ QUÉ HACE. Toma el informe de seguimientos, busca lo que está reiterado y
 todavía sin subsanar, y arma el Excel que carga `responder_glosas_siifa.py`
 con `--accion reiteracion-respuesta`.
 
-EN QUÉ SE DIFERENCIA DE LA PRIMERA RESPUESTA. La subsanación no repite el
-mismo texto: la EPS ya lo leyó y no lo aceptó. Este escrito (a) deja constancia
+EN QUÉ SE DIFERENCIA DE LA PRIMERA RESPUESTA. Por defecto la subsanación no
+repite el mismo texto: la EPS ya lo leyó y no lo aceptó. (Con
+`--repetir-respuesta` sí lo repite, cuando el prestador decide sostener el
+mismo argumento; con `--texto` sale la plantilla institucional.) Este escrito (a) deja constancia
 de que el hospital ya había respondido y en qué fecha, (b) señala que la
 reiteración no desvirtúa lo sustentado, y (c) insiste en la posición
 institucional. El argumento de fondo de la causal se conserva, porque sigue
@@ -152,8 +154,38 @@ def es_devolucion(fila: dict) -> bool:
     return _limpiar(fila.get("tipo_seguimiento")).upper().startswith("DEVOL")
 
 
+def repetir_respuesta_anterior(linea: dict) -> dict[str, str]:
+    """Vuelve a radicar la respuesta que el prestador ya había dado.
+
+    Es una decisión del prestador, no del motor: ante la ratificación
+    sostiene el mismo argumento con el mismo código. Sin respuesta anterior
+    registrada no hay nada que repetir, y la línea sale marcada en vez de
+    inventarle un texto.
+    """
+    texto = " ".join(str(linea.get("observacion_respuesta") or "").split())
+    codigo = str(linea.get("codigo_respuesta") or "").strip().upper()
+    if not texto:
+        return {
+            "CODIGO_RESPUESTA": "",
+            "OBSERVACION_RESPUESTA": "",
+            "REVISAR": (
+                "SIN RESPUESTA ANTERIOR EN EL INFORME: no hay texto que repetir. "
+                "Escribir la subsanación a mano o usar --texto."
+            ),
+        }
+    return {
+        "CODIGO_RESPUESTA": codigo or CODIGO_SUBSANACION,
+        "OBSERVACION_RESPUESTA": texto[:LIMITE_OBSERVACION],
+        "REVISAR": "Repite la respuesta anterior, tal cual se radicó.",
+    }
+
+
 def armar(
-    filas: list[dict], hoy: str, ips=None, texto_fijo: str | None = None
+    filas: list[dict],
+    hoy: str,
+    ips=None,
+    texto_fijo: str | None = None,
+    repetir: bool = False,
 ) -> tuple[list[dict], list[dict]]:
     """Separa lo que se puede subsanar por API de lo que no.
 
@@ -161,10 +193,21 @@ def armar(
     subsanación no está confirmada y mandarlas por la de glosas escribiría
     sobre otro registro de la plataforma, con un OK falso en el reporte.
 
-    Con `texto_fijo`, todas las glosas salen con ESE texto —la plantilla
-    institucional del prestador— en vez del que redacta el motor. Es lo que
-    el HUS radica ante la glosa ratificada, igual para todas.
+    Hay tres formas de escribir la subsanación, y las elige el prestador:
+
+    - `texto_fijo`: todas las glosas salen con ESE texto —la plantilla
+      institucional—. Es lo que el HUS radica ante la glosa ratificada.
+    - `repetir`: cada glosa vuelve a radicar SU PROPIA respuesta anterior,
+      con el mismo código, porque el prestador sostiene el mismo argumento
+      ante la ratificación. Si una línea no trae respuesta anterior, sale
+      marcada en REVISAR y sin texto: el bot de cargue la deja fuera.
+    - sin ninguna de las dos: el motor redacta una subsanación por línea.
     """
+    if texto_fijo and repetir:
+        raise SystemExit(
+            "\n--texto y --repetir-respuesta piden cosas distintas para el mismo "
+            "campo.\nElegí una sola.\n"
+        )
     if texto_fijo and len(texto_fijo) > LIMITE_OBSERVACION:
         raise SystemExit(
             f"\nEl texto de la plantilla tiene {len(texto_fijo)} caracteres y SIIFA "
@@ -198,6 +241,9 @@ def armar(
             fila["CODIGO_RESPUESTA"] = CODIGO_SUBSANACION
             fila["OBSERVACION_RESPUESTA"] = texto_fijo
             fila["REVISAR"] = "Texto de la plantilla institucional, igual para todas."
+            glosas.append(fila)
+        elif repetir:
+            fila.update(repetir_respuesta_anterior(f))
             glosas.append(fila)
         else:
             fila.update(redactar_subsanacion(f, ips=ips))
@@ -269,6 +315,12 @@ def main() -> None:
         "subsanaciones (ej. tools/plantillas/subsanacion_HUS.txt). Sin esta "
         "opción, el motor redacta una por una.",
     )
+    ap.add_argument(
+        "--repetir-respuesta",
+        action="store_true",
+        help="La subsanación repite, línea por línea, la MISMA respuesta que "
+        "el prestador ya había radicado (mismo texto y mismo código).",
+    )
     perfiles.agregar_argumento(ap)
     args = ap.parse_args()
     ips = perfiles.buscar(args.ips)
@@ -285,7 +337,9 @@ def main() -> None:
         if not ruta_texto.exists():
             raise SystemExit(f"\nNo encuentro el archivo de la plantilla:\n  {ruta_texto}\n")
         texto_fijo = " ".join(ruta_texto.read_text(encoding="utf-8").split())
-    glosas, devoluciones = armar(filas, hoy, ips=ips, texto_fijo=texto_fijo)
+    glosas, devoluciones = armar(
+        filas, hoy, ips=ips, texto_fijo=texto_fijo, repetir=args.repetir_respuesta
+    )
 
     if not glosas and not devoluciones:
         print("\nNo hay nada reiterado pendiente de subsanar. Nada que hacer.\n")
