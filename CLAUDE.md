@@ -140,3 +140,14 @@ Contexto adicional por flujo de trabajo (léelos cuando el tema aplique):
 - **Secretos:** nunca subir contraseñas ni claves. Las claves de los portales
   de la Suite Cartera HUS van en `config/entidades.credenciales.json` (local,
   no versionado).
+- **Privilegios en las instrucciones de despliegue:** toda indicación para
+  correr un bot debe decir CON QUÉ PERMISOS se corre. Nunca decir «doble clic»
+  a secas si el bot necesita más. En concreto:
+  - `tools/ARRANQUE_AUTOMATICO_MOTOR.cmd` **exige siempre «Ejecutar como
+    administrador»** (clic derecho sobre el archivo). Registra una tarea de
+    Windows y guarda credenciales en la bóveda: sin elevación, `schtasks`
+    contesta «Acceso denegado» y el script aborta. Ojo con la trampa que ya
+    documenta el propio bot: en la ventana elevada, la cuenta que se escribe
+    para la tarea es **la del motor**, no la del administrador.
+  - `tools/servidor_motor_local.cmd` y los demás bots de auditor corren con la
+    sesión normal, sin elevación.

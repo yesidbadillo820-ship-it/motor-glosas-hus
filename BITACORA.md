@@ -90,6 +90,25 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 03-09-2026 (cierre) — Regla de runbook: los permisos van en la instrucción
+
+Al cerrar la V2 le indiqué «doble clic» sobre
+`tools\ARRANQUE_AUTOMATICO_MOTOR.cmd`, y el bot abortó pidiendo permisos de
+administrador. El bot hizo lo correcto —comprueba los permisos y explica en
+pantalla qué hacer—; la instrucción incompleta fue mía.
+
+**Queda como regla del proyecto** (anotada también en `CLAUDE.md`): toda
+indicación de despliegue dice con qué permisos se corre.
+
+- `ARRANQUE_AUTOMATICO_MOTOR.cmd` → **siempre** clic derecho »
+  «Ejecutar como administrador». Registra la tarea de Windows y guarda la
+  contraseña en la bóveda del sistema. Y dentro de esa ventana elevada, la
+  cuenta que se escribe para la tarea es **la del motor**, no la del
+  administrador (el bot lo advierte, pero conviene decirlo antes).
+- El resto de bots del auditor (incluido `servidor_motor_local.cmd`) corren
+  con la sesión normal.
+
+
 ### 03-09-2026 — Una sola puerta para arrancar el motor (el 8080 a medias)
 
 **Lo que se vio.** La pantalla de Diagnóstico mostraba en rojo la carpeta de
