@@ -1,0 +1,486 @@
+/* ═══════════════════════════════════════════════════════════════════
+   HEALTH-TECH UI — Motor Glosas HUS (03-09-2026)
+
+   Cuatro piezas ordenadas por el auditor:
+     1. Pantalla dividida (visor de soportes | panel de decisión)
+     2. Bandeja Auto-Pilot en tablero Kanban (tarjetas)
+     3. Semáforo de vencimientos con barras que se consumen
+     4. Modo oscuro grafito por defecto + tipografía tabular
+
+   Reglas de la casa: todo sobre los tokens del sistema SINAC
+   (--bg, --bg-card, --text, --border…), así el modo claro y el oscuro
+   salen del mismo CSS. Acentos SOLO en botones de acción:
+   esmeralda = aprobar/liberar · carmesí = rechazar/error.
+   Este archivo va DESPUÉS de sinac-ds.css.
+═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --ht-esmeralda: #059669;
+  --ht-esmeralda-hover: #047857;
+  --ht-carmesi: #dc2626;
+  --ht-carmesi-hover: #b91c1c;
+  --ht-ambar: #d97706;
+  --ht-verde-tenue: rgba(16, 185, 129, 0.55);
+  --ht-visor-bg: #0b1622; /* el visor SIEMPRE es oscuro: lienzo clínico */
+}
+
+/* ── 4. Tipografía tabular: plata, facturas y CUPS alineados ───────── */
+body {
+  font-variant-numeric: tabular-nums;
+}
+.ht-num {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.ht-dato {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+}
+
+/* ── Botones de acción (únicos acentos de color) ───────────────────── */
+.ht-btn {
+  border: 0;
+  border-radius: 8px;
+  padding: 0.55rem 1rem;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: background 0.15s, transform 0.1s;
+  flex-shrink: 0;
+}
+.ht-btn:active { transform: translateY(1px); }
+.ht-btn:disabled { opacity: 0.55; cursor: wait; }
+.ht-btn-esmeralda { background: var(--ht-esmeralda); }
+.ht-btn-esmeralda:hover { background: var(--ht-esmeralda-hover); }
+.ht-btn-carmesi { background: var(--ht-carmesi); }
+.ht-btn-carmesi:hover { background: var(--ht-carmesi-hover); }
+.ht-btn-neutro {
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border2);
+}
+.ht-btn-neutro:hover { background: var(--bg-subtle); }
+
+/* ── 3. Semáforo de vencimientos: la barra se consume ──────────────────
+   El ancho SIEMPRE queda entre 0% y 100% (lo recorta el JS y lo vuelve a
+   recortar este max-width, para que un dato raro jamás rompa la caja). */
+.ht-venc {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  width: 100%;
+}
+.ht-venc-track {
+  flex: 1 1 auto;
+  min-width: 40px;
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(148, 163, 184, 0.28);
+  background: color-mix(in srgb, var(--text4) 22%, transparent);
+  overflow: hidden;
+  position: relative;
+}
+.ht-venc-fill {
+  /* display:block obligatorio: el relleno es un <span> y en línea el
+     ancho se ignora — la barra pintaba siempre vacía (cazado por el
+     arnés de estrés del 03-09-2026). */
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  min-width: 0;
+  max-width: 100%;
+  transition: width 0.4s var(--ease, ease);
+}
+.ht-venc-rojo .ht-venc-fill { background: var(--ht-carmesi); }
+.ht-venc-ambar .ht-venc-fill { background: var(--ht-ambar); }
+.ht-venc-verde .ht-venc-fill { background: var(--ht-verde-tenue); }
+.ht-venc-label {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ht-venc-rojo .ht-venc-label { color: var(--ht-carmesi); }
+.ht-venc-ambar .ht-venc-label { color: var(--ht-ambar); }
+.ht-venc-verde .ht-venc-label { color: var(--sds-success, #2e7d32); }
+body.dark .ht-venc-verde .ht-venc-label { color: #6ee7b7; }
+/* Vencida (días negativos) o venciendo HOY: la pista entera late en rojo */
+.ht-venc-vencida .ht-venc-track {
+  background: rgba(220, 38, 38, 0.3);
+  background: color-mix(in srgb, var(--ht-carmesi) 30%, transparent);
+  animation: ht-late 1.6s ease-in-out infinite;
+}
+@keyframes ht-late {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* ── 2. Tablero Kanban de Borradores Auto-Pilot ────────────────────── */
+.ht-kb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(10, 25, 41, 0.86);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(3px);
+  display: flex;
+  flex-direction: column;
+  padding: 1.1rem 1.3rem;
+}
+.ht-kb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+  flex-wrap: wrap;
+}
+.ht-kb-cols {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.9rem;
+  overflow: auto;
+  align-items: start;
+  min-height: 0;
+}
+.ht-col {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-height: 100%;
+  min-width: 0;
+}
+.ht-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text2);
+  padding: 0.15rem 0.25rem;
+}
+.ht-col-count {
+  background: var(--bg-card);
+  border: 1px solid var(--border2);
+  border-radius: 99px;
+  padding: 0.05rem 0.55rem;
+  font-variant-numeric: tabular-nums;
+}
+.ht-col-cards {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-height: 40px;
+}
+
+/* Tarjeta: flexbox estricto — nada se desborda aunque el modelo se llame
+   groq/openai/gpt-oss-120b-versatile-extended o la plata tenga 12 cifras. */
+.ht-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+  overflow: hidden;
+  transition: box-shadow 0.15s, transform 0.12s, border-color 0.15s;
+}
+.ht-card:hover {
+  border-color: var(--border-focus, var(--sinac-blue-500));
+  box-shadow: var(--sh-md);
+  transform: translateY(-1px);
+}
+.ht-card-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.ht-card-fila > * { min-width: 0; }
+.ht-card-factura {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ht-card-eps {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ht-card-valor {
+  flex: 0 0 auto;
+  font-weight: 800;
+  color: var(--text);
+  font-size: 0.78rem;
+}
+.ht-badge {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 6px;
+  padding: 0.12rem 0.45rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  background: var(--bg-subtle);
+  vertical-align: middle;
+}
+.ht-badge-confianza {
+  color: #fff;
+  border-color: transparent;
+  background: var(--sinac-blue-700, #1565c0);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+.ht-badge-modelo { font-family: var(--font-mono, ui-monospace, monospace); }
+.ht-badge-ocr {
+  color: #fff;
+  border-color: transparent;
+  background: var(--ht-carmesi);
+}
+.ht-badge-ok {
+  color: #fff;
+  border-color: transparent;
+  background: var(--ht-esmeralda);
+}
+
+/* ── 1. Pantalla dividida (Split-View) ─────────────────────────────── */
+.ht-sv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+.ht-sv-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  flex-wrap: wrap;
+}
+.ht-sv-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 0;
+}
+@media (max-width: 980px) {
+  .ht-sv-grid { grid-template-columns: minmax(0, 1fr); grid-auto-rows: 50%; }
+}
+
+/* Mitad izquierda: visor congelado con sus herramientas */
+.ht-visor {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--ht-visor-bg);
+  border-right: 1px solid var(--border);
+}
+.ht-visor-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.5rem 0.6rem;
+  overflow-x: auto;
+  flex: 0 0 auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ht-visor-tab {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #b0bec5;
+  border-radius: 7px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 0 auto;
+}
+.ht-visor-tab.activa {
+  background: rgba(30, 136, 229, 0.25);
+  border-color: #1e88e5;
+  color: #e3f2fd;
+}
+.ht-visor-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.6rem;
+  flex: 0 0 auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ht-zoom-btn {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e3f2fd;
+  border-radius: 6px;
+  width: 30px;
+  height: 26px;
+  font-weight: 800;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.ht-zoom-btn:hover { background: rgba(255, 255, 255, 0.14); }
+.ht-zoom-nivel {
+  color: #90a4ae;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+  text-align: center;
+}
+.ht-visor-lienzo {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  min-height: 0;
+}
+.ht-zoomwrap {
+  transform-origin: 0 0;
+  width: 100%;
+  height: 100%;
+}
+.ht-zoomwrap iframe,
+.ht-zoomwrap img {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: #fff;
+}
+.ht-zoomwrap img { object-fit: contain; background: transparent; }
+.ht-zoomwrap pre {
+  color: #e3f2fd;
+  font-size: 0.72rem;
+  padding: 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Mitad derecha: panel de decisión (carga INDEPENDIENTE del visor) */
+.ht-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+.ht-panel-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.2rem;
+  min-height: 0;
+}
+.ht-panel-acciones {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.7rem 1.2rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+  flex-wrap: wrap;
+}
+.ht-panel h3 {
+  font-size: 0.95rem;
+  color: var(--text);
+  margin: 0 0 0.4rem;
+  overflow-wrap: anywhere;
+}
+.ht-kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.8rem;
+  font-size: 0.78rem;
+  margin: 0.5rem 0;
+}
+.ht-kv dt { color: var(--text3); font-weight: 600; white-space: nowrap; }
+.ht-kv dd { color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.ht-dictamen {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  font-size: 0.8rem;
+  line-height: 1.7;
+  color: var(--text2);
+  overflow-wrap: anywhere;
+}
+.ht-dictamen * { max-width: 100%; }
+
+/* ── Esqueletos de carga (cada panel carga por su lado) ────────────── */
+.ht-skel {
+  border-radius: 8px;
+  background: linear-gradient(
+    100deg,
+    rgba(148, 163, 184, 0.16) 40%,
+    rgba(148, 163, 184, 0.3) 50%,
+    rgba(148, 163, 184, 0.16) 60%
+  );
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--text4) 14%, transparent) 40%,
+    color-mix(in srgb, var(--text4) 26%, transparent) 50%,
+    color-mix(in srgb, var(--text4) 14%, transparent) 60%
+  );
+  background-size: 200% 100%;
+  animation: ht-shimmer 1.3s linear infinite;
+  min-height: 12px;
+}
+@keyframes ht-shimmer {
+  to { background-position: -200% 0; }
+}
+.ht-estado {
+  border: 1px dashed var(--border2);
+  border-radius: 10px;
+  padding: 1.1rem;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text3);
+  overflow-wrap: anywhere;
+}
+.ht-estado-error {
+  border-color: rgba(220, 38, 38, 0.55);
+  border-color: color-mix(in srgb, var(--ht-carmesi) 55%, transparent);
+  color: var(--ht-carmesi);
+  border-style: solid;
+}
+.ht-visor .ht-estado { color: #90a4ae; margin: 1rem; }
+.ht-visor .ht-estado-error { color: #fca5a5; border-color: rgba(220, 38, 38, 0.6); }

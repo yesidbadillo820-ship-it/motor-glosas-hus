@@ -2188,6 +2188,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
 </style>
 <!-- SINAC Design System 2.0 — Plan de Transformación, Ola 3 -->
 <link rel="stylesheet" href="/static/sinac-ds.css">
+<link rel="stylesheet" href="/static/healthtech.css">
 <!-- SINAC Analizar PRO — gauge, dictamen héroe, loading premium, chips con identidad -->
 <link rel="stylesheet" href="/static/sinac-analizar-pro.css">
 </head>
@@ -7627,7 +7628,9 @@ async function initApp(){
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.add('show');
   document.getElementById('hdr-user').textContent=USER_NAME;
-  if(localStorage.getItem('dark')==='1') document.body.classList.add('dark');
+  // Health-Tech (03-09-2026): el modo oscuro grafito es el predeterminado.
+  // La eleccion guardada del gestor sigue mandando ('0' = prefiere claro).
+  if(localStorage.getItem('dark')!=='0') document.body.classList.add('dark');
   // FABs flotantes (Mis tareas + Reportar fallo) — los mostramos AQUÍ
   // como salvavidas adicional al evento hus:auth, porque initApp se
   // ejecuta tanto en login fresh como en restore de sesión persistida.
@@ -18501,14 +18504,19 @@ function _renderKanbanFromData(){
       var diasColor = (typeof dias === 'number' && dias < 0) ? '#dc2626' :
                       (typeof dias === 'number' && dias <= 5) ? '#d97706' :
                       'var(--text3)';
+      // Health-Tech (03-09-2026): el texto de días se vuelve barra que se
+      // consume. Con el módulo sin cargar, queda el texto de siempre.
+      var vencHtml = (window.HT && HT.barraVencimiento && typeof dias === 'number')
+        ? HT.barraVencimiento(dias)
+        : '<span style="color:'+diasColor+';font-weight:600">'+(typeof dias === 'number' ? dias+'d' : '—')+'</span>';
       return '<div class="kanban-card" draggable="true" data-id="'+g.id+'" data-estado="'+estado+'" '+
         'style="background:var(--bg-card);border:1px solid var(--border);border-radius:7px;padding:.55rem .7rem;cursor:grab;transition:box-shadow .15s,transform .12s">'+
         '<div style="display:flex;justify-content:space-between;align-items:center;font-size:.7rem;color:var(--text3);margin-bottom:.2rem">'+
           '<b style="color:var(--text2)">'+escHtml(g.factura||'#'+g.id)+'</b>'+
-          '<span style="color:'+diasColor+';font-weight:600">'+(typeof dias === 'number' ? dias+'d' : '—')+'</span>'+
         '</div>'+
         '<div style="font-size:.78rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(g.eps||g.entidad||'—')+'</div>'+
         '<div style="font-size:.7rem;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(g.codigo_glosa||'—')+' · '+cop(g.valor_objetado||0)+'</div>'+
+        '<div style="margin-top:.3rem">'+vencHtml+'</div>'+
       '</div>';
     }).join('');
     if(lista.length > 50){
@@ -22439,10 +22447,16 @@ async function loadAlertas(){
     list.innerHTML=data.map(function(a){
       var cls=a.dias_restantes<=2?'urgente':a.dias_restantes<=5?'media':'normal';
       var dc=a.dias_restantes<=2?'dias-red':a.dias_restantes<=5?'dias-amber':'dias-green';
+      // Health-Tech (03-09-2026): la fecha estática se vuelve barra que se
+      // consume (rojo ≤3 hábiles, ámbar 4-7, verde tenue >7). Si el módulo
+      // no cargó, se conserva el texto de siempre.
+      var venc = (window.HT && HT.barraVencimiento)
+        ? '<div style="min-width:150px;max-width:210px">'+HT.barraVencimiento(a.dias_restantes)+'</div>'
+        : '<div class="alerta-dias '+dc+'">'+a.dias_restantes+' días</div>';
       return '<div class="alerta-card '+cls+'">'
         +'<div class="alerta-info"><div class="alerta-eps">'+a.eps+'</div>'
         +'<div class="alerta-det">Cód: '+a.codigo_glosa+' — '+cop(a.valor_objetado)+' — Estado: '+a.estado+'</div></div>'
-        +'<div class="alerta-dias '+dc+'">'+a.dias_restantes+' días</div>'
+        +venc
         +'</div>';
     }).join('');
   } catch(e){list.innerHTML='<div style="color:var(--c-red);padding:1rem">Error cargando alertas</div>';}
@@ -24612,7 +24626,9 @@ window.addEventListener('DOMContentLoaded',function(){
   // auditor recarga la página. Sin esto, los botones que no le corresponden
   // reaparecen en cada F5 y el orden del menú dura un solo rato.
   try{ aplicarPermisosDelMenu(); }catch(e){}
-  if(localStorage.getItem('dark')==='1') document.body.classList.add('dark');
+  // Health-Tech (03-09-2026): el modo oscuro grafito es el predeterminado.
+  // La eleccion guardada del gestor sigue mandando ('0' = prefiere claro).
+  if(localStorage.getItem('dark')!=='0') document.body.classList.add('dark');
   // Registrar service worker para PWA (solo si es servido por HTTPS o localhost)
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('/sw.js').catch(function(){});
@@ -27115,6 +27131,7 @@ function paAjustarMisGlosas(){
 </script>
 <!-- SINAC UX 2.0 — Modo Enfocado + Command Palette + atajos -->
 <script src="/static/sinac-ux.js"></script>
+<script src="/static/healthtech.js"></script>
 <!-- SINAC Asistente Predictivo — Ola 4: detecta código/valor/plantilla en vivo -->
 <script src="/static/sinac-asistente.js"></script>
 <!-- SINAC Analizar PRO — transforma gauge/chips/dictamen vía MutationObserver -->

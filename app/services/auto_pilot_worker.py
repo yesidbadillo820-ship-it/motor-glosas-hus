@@ -295,6 +295,45 @@ def procesar(db: Any, limite: int = 50) -> dict:
     return parte
 
 
+def devolver(db: Any, glosa_id: int, usuario_email: str, motivo: str = "") -> dict:
+    """El otro clic humano: sacar un borrador de la bandeja SIN radicarlo.
+
+    La glosa vuelve a revisión manual (RADICADA) con el porqué en la nota,
+    y la devolución queda en la bitácora como fila nueva — igual que la
+    liberación, a nombre de quien la decidió."""
+    from app.models.db import GlosaRecord
+
+    glosa = db.query(GlosaRecord).filter(GlosaRecord.id == glosa_id).first()
+    if glosa is None:
+        return {"estado": "no_existe"}
+    if glosa.workflow_state != ESTADO_CUARENTENA:
+        return {"estado": "no_esta_en_borradores", "workflow_state": glosa.workflow_state}
+    motivo_txt = (motivo or "").strip()
+    glosa.workflow_state = "RADICADA"
+    glosa.nota_workflow = (
+        f"Devuelta de borradores del Auto-Pilot por {usuario_email}"
+        + (f": {motivo_txt}" if motivo_txt else "")
+    )[:500]
+    _registrar(
+        db,
+        glosa_id,
+        {
+            "decision": "DEVUELTA_POR_HUMANO",
+            "regla_aplicada": (
+                "Clic de devolución en la bandeja de borradores."
+                + (f" Motivo: {motivo_txt}" if motivo_txt else "")
+            ),
+            "confianza": None,
+            "riesgo": "",
+            "soportes": [],
+            "modelo_utilizado": _modelo_utilizado_de(glosa),
+        },
+        usuario_email,
+    )
+    db.commit()
+    return {"estado": "devuelta", "glosa_id": glosa_id}
+
+
 def liberar(db: Any, glosa_id: int, usuario_email: str) -> dict:
     """El clic humano afirmativo. Solo una persona saca un borrador de la
     bandeja; queda a su nombre en la bitácora (fila nueva, nada se edita)."""

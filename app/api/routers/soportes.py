@@ -145,6 +145,78 @@ def soportes_de_factura(
     }
 
 
+@router.get("/archivo")
+def descargar_soporte(
+    factura: str,
+    nombre: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Sirve UN soporte para el visor de la pantalla dividida (03-09-2026).
+
+    Seguridad: la ruta del disco NUNCA viene del cliente. Se recibe la
+    factura y el NOMBRE del archivo, y solo se sirve si ese nombre está en
+    lo que el indexador ya conoce para esa factura — cualquier otro nombre
+    (incluidos ../ o rutas) es 404/400. Auditoría PHI obligatoria: abrir una
+    historia clínica queda registrado igual que listarla.
+    """
+    from fastapi.responses import FileResponse
+
+    if not factura or len(factura) < 3:
+        raise HTTPException(400, "Número de factura inválido")
+    nombre = (nombre or "").strip()
+    if not nombre or "/" in nombre or "\\" in nombre or ".." in nombre:
+        raise HTTPException(400, "Nombre de archivo inválido")
+
+    indexer = get_indexer()
+    soportes = indexer.lookup(factura)
+    coincide = next((s for s in soportes if s.get("nombre_archivo") == nombre), None)
+    if coincide is None:
+        detalle = "Ese archivo no está en el índice de soportes de esa factura."
+        try:
+            if indexer.stats().get("construyendo"):
+                detalle += " El índice se está reconstruyendo: intente de nuevo en un momento."
+        except Exception:
+            pass
+        raise HTTPException(404, detalle)
+
+    ruta = Path(str(coincide.get("ruta") or ""))
+    if not ruta.is_file():
+        raise HTTPException(404, "El archivo ya no está en la ruta que conocía el índice.")
+
+    try:
+        ip = request.client.host if request.client else None
+        AuditRepository(db).registrar(
+            usuario_email=current_user.email,
+            usuario_rol=getattr(current_user, "rol", "") or "",
+            accion="VER_SOPORTE_FACTURA",
+            tabla="soportes_share",
+            detalle=f"factura={factura[:50]} archivo={nombre[:120]}",
+            ip=ip,
+        )
+    except Exception:
+        pass  # nunca tumbar la respuesta por fallo de audit
+
+    sufijo = ruta.suffix.lower()
+    media = {
+        ".pdf": "application/pdf",
+        ".json": "application/json",
+        ".xml": "application/xml",
+        ".txt": "text/plain; charset=utf-8",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+    }.get(sufijo, "application/octet-stream")
+    return FileResponse(
+        ruta,
+        media_type=media,
+        filename=nombre,
+        content_disposition_type="inline",
+        headers={"Cache-Control": "private, max-age=300"},
+    )
+
+
 @router.get("/buscar")
 def buscar_soportes(
     q: str,
