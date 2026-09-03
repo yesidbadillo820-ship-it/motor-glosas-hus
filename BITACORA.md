@@ -8743,6 +8743,30 @@ desgloses por EPS de lo respondido (51.381 por $2.284 millones, 99% SANITAS)
 y de lo pendiente; y la **landing page del servicio** (borrador «Glosa Cero»,
 artefacto privado con los números anonimizados) con su análisis de precios.
 
+### 03-09-2026 — Subsanar repitiendo la respuesta que ya se radicó
+
+El auditor fijó el criterio para la etapa 4: **ante la glosa ratificada, la
+subsanación repite la MISMA respuesta que el prestador ya había radicado**,
+con su mismo texto y su mismo código. Antes el armador sólo sabía redactar
+un escrito nuevo o poner la plantilla institucional del HUS.
+
+Ahora `siifa_armar_subsanacion.py` acepta `--repetir-respuesta`. Si una línea
+no trae respuesta anterior en el informe, sale **sin código y marcada** en vez
+de inventarle texto —el bot de cargue la deja fuera—, y la opción no se
+combina con `--texto` (las dos escriben el mismo campo).
+
+**Lo que mostró el semáforo del 03-09:**
+
+- **Girón:** 89 glosas levantadas (**$4.978.757 recuperados**), y **5 glosas
+  ratificadas por $212.000 ya vencidas hace 7 días hábiles** — son glosas, así
+  que se subsanan por el robot.
+- **HUS:** las 4 devoluciones ratificadas de SANITAS ($14.049.088) llevan **14
+  días hábiles vencidas** y siguen siendo trámite manual; además subió a 90 lo
+  sin responder ($47.686.929).
+- **Guane:** la EPS decidió 22 y las levantó todas ($475.656); 1.508 en mora de
+  la EPS y ninguna ratificada. Las 30 pendientes se armaron reusando los
+  textos de agosto por causal.
+
 ---
 
 ## 3) PENDIENTE

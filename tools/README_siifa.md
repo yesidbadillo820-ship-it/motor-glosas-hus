@@ -217,6 +217,19 @@ aceptó—: deja constancia de que el hospital contestó y en qué fecha, señal
 que la reiteración no aporta elemento nuevo, y conserva el argumento de fondo
 de la causal.
 
+**Tres formas de escribir la subsanación**, y la elige el prestador:
+
+| Cómo | Qué sale |
+|---|---|
+| sin opciones | el motor redacta una subsanación por línea (lo de arriba) |
+| `--texto plantilla.txt` | la **plantilla institucional**, igual para todas (así lo hace el HUS: `tools/plantillas/subsanacion_HUS.txt`) |
+| `--repetir-respuesta` | cada glosa vuelve a radicar **su propia respuesta anterior**, con el mismo texto y el mismo código, cuando el prestador sostiene el mismo argumento |
+
+Con `--repetir-respuesta`, una línea cuyo informe no traiga respuesta anterior
+sale **sin código y marcada en REVISAR**: no se le inventa texto y el bot de
+cargue la deja fuera. Las dos opciones no se combinan (escriben el mismo
+campo).
+
 > **Las devoluciones reiteradas salen aparte, en la hoja
 > `DEVOLUCIONES_NO_CARGAR`, sin código ni texto.** Su puerta de subsanación no
 > está confirmada; mandarlas por la de glosas escribiría sobre otro registro y
