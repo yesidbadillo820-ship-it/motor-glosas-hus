@@ -20,7 +20,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_usuario_actual, get_coordinador_o_admin
+from app.api.deps import get_usuario_actual, get_coordinador_o_admin, get_auditor_o_superior
 from app.database import get_db
 from app.models.db import GlosaRecord, UsuarioRecord, ROL_COORDINADOR, ROL_SUPER_ADMIN
 from pydantic import BaseModel, Field
@@ -411,3 +411,116 @@ def aplicar_texto_fijo(
         }
     db.commit()
     return {"glosa_id": glosa_id, "aplicado": True, **clase}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  ZERO-TOUCH GOBERNADO (V2, Pilar 2, 03-09-2026) — worker, borradores y
+#  liberación humana. Las cuatro salvaguardas viven en auto_pilot_worker:
+#  flag apagado por defecto, cuarentena PENDIENTE_APROBACION_HUMANA (la IA
+#  jamás escribe RESPONDIDA), bitácora inmutable y reglas estrictas.
+# ══════════════════════════════════════════════════════════════════════════
+
+
+@router.post("/procesar", summary="Correr el worker Zero-Touch (gobernado por AUTO_PILOT_ENABLED)")
+def procesar_zero_touch(
+    limite: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Con el flag apagado (el defecto) devuelve `deshabilitado` sin tocar
+    nada. Con el flag activo, evalúa y manda las candidatas a la bandeja de
+    borradores — nunca a RESPONDIDA."""
+    from app.services.auto_pilot_worker import procesar
+
+    return procesar(db, limite=limite)
+
+
+@router.get("/borradores", summary="Bandeja de Salida / Borradores del Auto-Pilot")
+def borradores_auto_pilot(
+    limite: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    from app.services.auto_pilot_worker import ESTADO_CUARENTENA
+
+    filas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.workflow_state == ESTADO_CUARENTENA)
+        .order_by(GlosaRecord.id.desc())
+        .limit(limite)
+        .all()
+    )
+    return {
+        "total": len(filas),
+        "borradores": [
+            {
+                "glosa_id": g.id,
+                "factura": g.factura,
+                "eps": g.eps,
+                "codigo_glosa": g.codigo_glosa,
+                "valor_objetado": g.valor_objetado,
+                "workflow_state": g.workflow_state,
+            }
+            for g in filas
+        ],
+    }
+
+
+@router.post("/liberar/{glosa_id}", summary="Clic humano afirmativo: liberar un borrador")
+def liberar_borrador(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    from app.services.auto_pilot_worker import liberar
+
+    resultado = liberar(db, glosa_id, str(getattr(current_user, "email", "") or "humano"))
+    if resultado["estado"] == "no_existe":
+        raise HTTPException(status_code=404, detail="No existe una glosa con ese id.")
+    if resultado["estado"] == "no_esta_en_borradores":
+        raise HTTPException(
+            status_code=409,
+            detail=f"La glosa no está en borradores (estado: {resultado['workflow_state']}).",
+        )
+    return resultado
+
+
+@router.get("/bitacora", summary="Bitácora inmutable de decisiones del Auto-Pilot")
+def bitacora_auto_pilot(
+    glosa_id: Optional[int] = Query(None),
+    limite: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    import json as _json
+
+    from app.models.db import AutoPilotBitacoraRecord
+
+    q = db.query(AutoPilotBitacoraRecord).order_by(AutoPilotBitacoraRecord.id.desc())
+    if glosa_id is not None:
+        q = q.filter(AutoPilotBitacoraRecord.glosa_id == glosa_id)
+    filas = q.limit(limite).all()
+
+    def _soportes(s):
+        try:
+            return _json.loads(s or "[]")
+        except Exception:
+            return []
+
+    return {
+        "total": len(filas),
+        "decisiones": [
+            {
+                "id": f.id,
+                "creado_en": f.creado_en.isoformat() if f.creado_en else None,
+                "glosa_id": f.glosa_id,
+                "decision": f.decision,
+                "regla_aplicada": f.regla_aplicada,
+                "confianza": f.confianza,
+                "riesgo": f.riesgo,
+                "soportes_analizados": _soportes(f.soportes_analizados),
+                "actor": f.actor,
+            }
+            for f in filas
+        ],
+    }

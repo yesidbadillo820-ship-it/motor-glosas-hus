@@ -90,6 +90,38 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 03-09-2026 — V2, Pilar 2: el piloto automático, con la máquina a raya
+
+**Cierra la V2.** El piloto automático quedó construido, pero con las cuatro
+rejas que se ordenaron antes de dejar que la máquina toque una glosa:
+
+1. **Interruptor general.** Todo vive detrás de `AUTO_PILOT_ENABLED`, que
+   viene APAGADO. Apagado, el proceso aborta en su primera línea: no consulta,
+   no escribe, no registra. Encenderlo es una decisión humana en el servidor.
+2. **Cuarentena, nunca radicación.** La máquina tiene prohibido marcar
+   «RESPONDIDA» o «ENVIADA». Lo que pasa sus reglas queda en
+   **PENDIENTE_APROBACION_HUMANA**, en una bandeja de «Borradores del
+   Auto-Pilot» nueva en la pantalla (botón 📤). Nada sale de ahí sin el clic
+   de una persona, y la liberación queda a nombre de quien la dio.
+3. **Bitácora que no se puede tocar.** Cada decisión —candidata, rechazada o
+   liberada— es una fila nueva en una tabla propia, con la regla aplicada, la
+   confianza matemática, el riesgo y los soportes que la evaluación tuvo a la
+   vista. No se edita ni se borra: solo se agrega.
+4. **Reglas estrictas.** Candidata solo con confianza mayor al 92 %, valor
+   objetado menor a $500.000 y riesgo BAJO. Y nunca: una abstención (el caso
+   «sin nada» se rechaza), una aceptación parcial (repartir plata la aprueba
+   una persona) o una glosa sin dictamen.
+
+**Se validó primero contra las pruebas de estrés, no contra casos felices:**
+el caso 03 (cláusula que no existe) se rechaza con fallo controlado —hasta si
+el evaluador revienta, el rechazo queda registrado con su causa—; el caso 04
+(soporte que dice lo contrario) se resuelve con la partición exacta de dosis y
+AUN ASÍ pasa por humano por ser parcial; y el caso 05 (sin nada) se rechaza de
+plano.
+
+**Con esto, la V2 queda completa:** lotes (1), folios forenses (3),
+vencimientos dinámicos (4), acta de desacuerdo (5) y piloto automático (2).
+
 ### 03-09-2026 — V2, Pilar 5: el acta de desacuerdo se arma sola
 
 **Qué es.** Cuando la entidad ratifica su glosa y el hospital sostiene su
