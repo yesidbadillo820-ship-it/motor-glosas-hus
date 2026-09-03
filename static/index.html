@@ -2756,6 +2756,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
                      Refrescar (Ctrl+R nativo) y Voz por contaminación visual; solo dejé las
                      acciones que el gestor usa día a día. -->
                 <button style="padding:.55rem 1.1rem;background:linear-gradient(90deg,#047857,#10b981);color:#fff;border:0;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;box-shadow:0 2px 8px rgba(4,120,87,.35);" onclick="prepararElDia()" title="Aplica texto fijo + marca RESPONDIDAS las RATIFICADAS/EXTEMPORÁNEAS en 1 click">⚡ Preparar el día</button>
+                <button style="padding:.55rem 1.1rem;background:#fff7ed;color:#9a3412;border:1px solid #f59e0b;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;" onclick="verBorradoresAutoPilot()" title="Bandeja de Salida del Auto-Pilot: lo que la máquina dejó en PENDIENTE_APROBACION_HUMANA. Nada sale sin su clic.">📤 Borradores Auto-Pilot</button>
                 <button class="btn-secondary" onclick="window.location.href='/importar-recepcion'" title="Subir Excel masivo — la IA auto-procesa cada glosa">📥 Importar Excel masivo</button>
                 <button class="btn-secondary" onclick="sidebarTab(document.querySelector('.sn-item[onclick*=\'mis-glosas\']'),'mis-glosas')" title="Ver glosas asignadas pendientes">📋 Mis glosas</button>
                 <button class="btn-secondary" onclick="nuevaGlosa()" title="Glosa nueva (Ctrl+N)">🆕 Nueva glosa</button>
@@ -8048,6 +8049,54 @@ async function refrescarKpisHeader(){
       }
     }catch(_){}
   }catch(e){/* silencioso, no bloquear UX */}
+}
+
+// ─── Bandeja de Salida / Borradores del Auto-Pilot (V2, Pilar 2) ─────────
+// La máquina NUNCA marca RESPONDIDA: lo que pasa sus reglas queda en
+// PENDIENTE_APROBACION_HUMANA y se muestra acá. Cada liberación es un clic
+// humano afirmativo, y queda a nombre de quien lo dio en la bitácora.
+async function verBorradoresAutoPilot(){
+  try{
+    var r = await fetch('/autopilot/borradores?limite=200', {headers: authH()});
+    if(!r.ok){ toast('Error', 'No se pudo consultar los borradores (HTTP '+r.status+')', 'error'); return; }
+    var d = await r.json();
+    var viejo = document.getElementById('ap-borradores-overlay');
+    if(viejo) viejo.remove();
+    var ov = document.createElement('div');
+    ov.id = 'ap-borradores-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem';
+    var filas = (d.borradores || []).map(function(g){
+      return '<tr>'+
+        '<td style="padding:.45rem .6rem">'+(g.factura||'—')+'</td>'+
+        '<td style="padding:.45rem .6rem">'+(g.eps||'—')+'</td>'+
+        '<td style="padding:.45rem .6rem">'+(g.codigo_glosa||'—')+'</td>'+
+        '<td style="padding:.45rem .6rem;text-align:right">'+fmtCOP(g.valor_objetado||0)+'</td>'+
+        '<td style="padding:.45rem .6rem"><button onclick="liberarBorradorAutoPilot('+g.glosa_id+')" style="background:#047857;color:#fff;border:0;border-radius:6px;padding:.35rem .8rem;font-weight:700;cursor:pointer">✓ Liberar</button></td>'+
+      '</tr>';
+    }).join('');
+    ov.innerHTML = '<div style="background:#fff;border-radius:12px;max-width:820px;width:100%;max-height:80vh;overflow:auto;padding:1.2rem 1.4rem;box-shadow:0 20px 50px rgba(0,0,0,.3)">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">'+
+        '<h3 style="margin:0;font-size:1rem;color:#9a3412">📤 Bandeja de Salida — Borradores del Auto-Pilot ('+(d.total||0)+')</h3>'+
+        '<button onclick="document.getElementById(\'ap-borradores-overlay\').remove()" style="border:0;background:none;font-size:1.2rem;cursor:pointer">✕</button>'+
+      '</div>'+
+      '<p style="font-size:.78rem;color:#64748b;margin:.2rem 0 .8rem">La máquina las dejó en <b>PENDIENTE_APROBACION_HUMANA</b>. Nada sale de aquí sin su clic; cada liberación queda a su nombre en la bitácora.</p>'+
+      ((d.total||0) === 0
+        ? '<p style="font-size:.85rem;color:#334155">No hay borradores en espera.</p>'
+        : '<table style="width:100%;border-collapse:collapse;font-size:.82rem"><thead><tr style="text-align:left;color:#64748b"><th style="padding:.45rem .6rem">Factura</th><th style="padding:.45rem .6rem">Entidad</th><th style="padding:.45rem .6rem">Glosa</th><th style="padding:.45rem .6rem;text-align:right">Valor</th><th></th></tr></thead><tbody>'+filas+'</tbody></table>')+
+    '</div>';
+    document.body.appendChild(ov);
+  }catch(e){ toast('Error', 'No se pudo abrir la bandeja de borradores', 'error'); }
+}
+
+async function liberarBorradorAutoPilot(glosaId){
+  if(!confirm('✓ Liberar borrador\n\nEsta glosa saldrá de la bandeja del Auto-Pilot y quedará RESPONDIDA a su nombre (queda registrado en la bitácora).\n\n¿Confirma la liberación?')) return;
+  try{
+    var r = await fetch('/autopilot/liberar/'+glosaId, {method:'POST', headers: authH()});
+    var d = await r.json();
+    if(!r.ok){ toast('No se liberó', d.detail || ('HTTP '+r.status), 'error'); return; }
+    toast('✓ Liberada', 'La glosa #'+glosaId+' salió de borradores y quedó a su nombre', 'success');
+    verBorradoresAutoPilot();
+  }catch(e){ toast('Error', 'No se pudo liberar el borrador', 'error'); }
 }
 
 // ─── Preparar el día (Ronda 37) — master action del coordinador ─────────

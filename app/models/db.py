@@ -1513,3 +1513,29 @@ class TrabajoBotRecord(Base):
     registro = Column(Text)  # salida/resumen que reportó el agente
     progreso = Column(Text)  # último avance reportado ("factura 12 de 40…")
     cancelado_por = Column(String(200))
+
+
+class AutoPilotBitacoraRecord(Base):
+    """Bitácora INMUTABLE del Auto-Pilot (V2, Pilar 2, 03-09-2026).
+
+    Cada decisión de la máquina —y cada liberación humana— es una fila NUEVA.
+    Aquí no se edita ni se borra nada: el servicio solo inserta, y así queda
+    auditable quién decidió qué, con cuánta confianza y mirando qué soportes.
+    """
+
+    __tablename__ = "auto_pilot_bitacora"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    glosa_id = Column(Integer, index=True)
+    # CANDIDATA / RECHAZADA / LIBERADA_POR_HUMANO
+    decision = Column(String(40), index=True)
+    # La regla de negocio que produjo la decisión, en palabras.
+    regla_aplicada = Column(Text)
+    # Confianza matemática del evaluador (0-1). Nula si no se llegó a calcular.
+    confianza = Column(Float)
+    riesgo = Column(String(20))
+    # JSON con los identificadores de lo que la evaluación tuvo a la vista.
+    soportes_analizados = Column(Text)
+    # "auto-pilot" para la máquina; el correo del gestor cuando libera.
+    actor = Column(String(120), index=True)
