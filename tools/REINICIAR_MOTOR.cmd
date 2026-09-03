@@ -64,6 +64,24 @@ if exist "%CD%\.env" (
   for /f "usebackq eol=# tokens=1* delims==" %%a in ("%CD%\.env") do set "%%a=%%b"
 )
 
+REM  MISMO ECOSISTEMA QUE EL MOTOR DE LA PAGINA (03-09-2026).
+REM
+REM  Este motor de pruebas cargaba el .env pero NO preparaba el resto
+REM  del entorno, asi que el auditor veia aqui la carpeta de soportes
+REM  en rojo y el piloto automatico apagado — diferencias con la pagina
+REM  real que no eran del codigo sino del arranque. Se prepara igual que
+REM  en tools\servidor_motor_local.cmd (mismo orden, mismas reglas): el
+REM  .env de arriba manda, esto solo rellena lo que falte.
+if not defined SOPORTES_ROOT set "SOPORTES_ROOT=%CD%\data\soportes"
+if exist "%CD%\config\soportes_root.txt" (
+  for /f "usebackq delims=" %%R in ("%CD%\config\soportes_root.txt") do (
+    if not "%%R"=="" set "SOPORTES_ROOT=%%R"
+  )
+)
+if not defined SOPORTES_LOCAL_ROOT set "SOPORTES_LOCAL_ROOT=%CD%\data\soportes"
+if not exist "%CD%\data\soportes" mkdir "%CD%\data\soportes"
+if not defined AUTO_PILOT_ENABLED set "AUTO_PILOT_ENABLED=true"
+
 REM --- 3. Arrancar uno solo -------------------------------------------
 echo  [3/3] Arrancando el motor...
 echo.

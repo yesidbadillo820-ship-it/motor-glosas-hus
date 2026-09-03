@@ -90,6 +90,48 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 03-09-2026 — Una sola puerta para arrancar el motor (el 8080 a medias)
+
+**Lo que se vio.** La pantalla de Diagnóstico mostraba en rojo la carpeta de
+soportes («/data/soportes no existe») y el piloto automático apagado, aunque el
+código estaba desplegado y `config\soportes_root.txt` intacto. Y al correr
+`servidor_motor_local.cmd` a mano solo salía un error de Windows: «el proceso no
+tiene acceso al archivo porque está siendo utilizado por otro proceso».
+
+**Lo que en realidad pasaba.** No se había cambiado ninguna ruta. El motor que
+estaba atendiendo **no lo arrancó el programa oficial de arranque**, sino una de
+las dos rutas de emergencia (la del autodespliegue y la de ACTUALIZAR_PAGINA),
+que prendían el motor «a lo bruto»: sin la carpeta de soportes, sin el piloto
+automático y sin releer las claves del día. Ese motor a medias se quedaba con el
+puerto ocupado y el vigilante de verdad se quedaba **parqueado esperando** — así
+que el motor mal configurado no se iba nunca. Y como esa emergencia además se
+quedaba con el archivo de registro tomado, el vigilante ni siquiera podía dejar
+escrito por qué se apartaba: por eso el auditor solo veía el error críptico.
+
+**Lo que se arregló.**
+
+1. **Una sola puerta.** Toda emergencia o despliegue arranca ahora llamando al
+   programa oficial (`servidor_motor_local.cmd`), que prepara el entorno
+   completo —carpeta de soportes, piloto automático, claves del día— y además
+   queda de vigilante. Ya no queda ni un arranque «a lo bruto» del motor de la
+   página. Si ya había un vigilante, el nuevo se cierra solo, como siempre.
+2. **El vigilante habla por pantalla.** Cuando se aparta porque ya hay otro, lo
+   dice en la ventana con todas sus letras y explica qué hacer. Antes eso vivía
+   solo dentro del registro, y el día que el registro estaba tomado el auditor
+   se quedó sin ninguna explicación.
+3. **El registro ya no manda.** Si el archivo de registro está bloqueado, el
+   motor arranca igual: escribe en un registro alterno y lo avisa. Antes, un
+   archivo tomado podía dejar la página caída en silencio.
+4. **El motor de pruebas del auditor** (el del puerto 8000, `REINICIAR_MOTOR`)
+   sigue siendo el mismo, con su ventana y su puerto —no se convirtió en el de
+   la página—, pero ahora prepara el mismo entorno: se acabó que las pruebas
+   locales mostraran los soportes en rojo y el piloto apagado.
+
+Todo con 19 pruebas nuevas y respetando los finales de línea de Windows. De
+paso, las pruebas que ya existían cazaron un defecto real del arreglo: un
+comentario con paréntesis dentro de un bloque, que en Windows corta el bloque a
+la mitad y deja el bot haciendo menos de lo que dice, en silencio.
+
 ### 03-09-2026 — Tres candados tras el caso TA0301 (dictamen a ciegas)
 
 Probando la glosa TA0301 en producción, el auditor encontró que el motor

@@ -9,6 +9,9 @@ rem ================================================================
 setlocal
 title MotorGlosasServidor
 set "REPO=C:\motor-glosas\repo"
+rem  El registro se define ARRIBA: el guardian de «un solo vigilante»
+rem  de aqui abajo ya lo necesita para dejar constancia.
+set "LOG=%REPO%\data\servidor.log"
 if not exist "%REPO%\venv\Scripts\python.exe" exit /b 1
 
 rem ---------------------------------------------------------------
@@ -44,7 +47,21 @@ rem  se salvaba solo por casualidad.
 rem ---------------------------------------------------------------
 powershell -NoProfile -Command "$n=@(Get-CimInstance Win32_Process | Where-Object {$_.Name -eq 'cmd.exe' -and $_.CommandLine -match 'servidor_motor_local'}).Count; if($n -gt 1){exit 1}else{exit 0}"
 if errorlevel 1 (
-  echo [%date% %time%] ya habia un vigilante corriendo: este sobra y se cierra >> "%REPO%\data\servidor.log"
+  rem  QUE SE VEA EN PANTALLA, 03-09-2026. Este aviso vivia SOLO dentro
+  rem  de data\servidor.log. El dia que otro proceso tenia ese archivo
+  rem  tomado, el auditor no vio la explicacion sino el error crudo de
+  rem  Windows «el proceso no tiene acceso al archivo porque esta siendo
+  rem  utilizado por otro proceso» — dos veces seguidas, sin entender que
+  rem  el script se estaba apartando A PROPOSITO. Ahora se dice por
+  rem  consola SIEMPRE, y el registro es un extra que no puede tumbar
+  rem  ni ensuciar el arranque.
+  echo.
+  echo  [i] Ya hay un vigilante del motor corriendo en este equipo.
+  echo      Este sobra y se cierra solo: el motor NO se toca.
+  echo      Si la pagina esta caida, cierre el motor del puerto 8080 y
+  echo      el vigilante que ya existe lo levanta en 5 segundos.
+  echo.
+  call :log_seguro "[%date% %time%] ya habia un vigilante corriendo: este sobra y se cierra"
   exit /b 0
 )
 
@@ -73,7 +90,6 @@ rem Para apagarlo sin tocar este archivo: AUTO_PILOT_ENABLED=0 en el
 rem .env (el .env se lee despues y le gana a este valor por defecto).
 set "AUTO_PILOT_ENABLED=true"
 if not exist "%REPO%\data\soportes" mkdir "%REPO%\data\soportes"
-set "LOG=%REPO%\data\servidor.log"
 
 :loop
 rem ¿Ya hay un servidor de PRODUCCION arriba? Entonces este vigilante
@@ -124,8 +140,28 @@ if exist "%REPO%\.env" (
 )
 rem Si el registro pasa de ~5 MB, se reinicia para no llenar el disco
 for %%s in ("%LOG%") do if %%~zs GTR 5000000 del "%LOG%" >nul 2>&1
-echo [%date% %time%] arrancando el servidor... >> "%LOG%"
+rem  EL REGISTRO NO PUEDE TUMBAR EL ARRANQUE (03-09-2026). El motor
+rem  manda su salida a %LOG% con >>; si otro proceso tiene ese archivo
+rem  tomado, la redireccion falla y uvicorn NO ARRANCA — el bucle se
+rem  quedaria girando en silencio con la pagina caida. Se comprueba
+rem  antes: si esta tomado se usa un registro alterno y se avisa.
+( echo. >>"%LOG%" ) 2>nul || (
+  echo  [!] El registro habitual esta tomado por otro proceso.
+  echo      Se escribira en data\servidor.alterno.log
+  set "LOG=%REPO%\data\servidor.alterno.log"
+)
+call :log_seguro "[%date% %time%] arrancando el servidor..."
 "%REPO%\venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8080 >> "%LOG%" 2>&1
-echo [%date% %time%] el servidor se detuvo; se reinicia en 5 segundos >> "%LOG%"
+call :log_seguro "[%date% %time%] el servidor se detuvo; se reinicia en 5 segundos"
 ping -n 6 127.0.0.1 >nul
 goto :loop
+
+rem ---------------------------------------------------------------
+rem  Deja una linea en el registro SIN poder tumbar el arranque. Si
+rem  otro proceso tiene el archivo tomado, Windows contesta «el proceso
+rem  no tiene acceso al archivo...» y ese error se traga aqui: el
+rem  vigilante sigue su camino, nunca al reves (03-09-2026).
+rem ---------------------------------------------------------------
+:log_seguro
+( echo %~1 >>"%LOG%" ) 2>nul
+exit /b 0

@@ -301,4 +301,9 @@ class TestNoSeRompioLoQueYaFuncionaba:
     def test_la_red_de_seguridad_del_autodespliegue_sigue_ahi(self):
         t = _texto(TOOLS / "autodeploy_motor_local.cmd")
         assert "el motor NO volvio solo: se arranca directo" in t
-        assert "-m uvicorn app.main:app" in t
+        # 03-09-2026: la red de seguridad sigue, pero ya no lanza uvicorn crudo
+        # —eso dejaba el motor sin SOPORTES_ROOT ni AUTO_PILOT_ENABLED—: ahora
+        # entra por el arranque oficial, que prepara el entorno completo.
+        assert "servidor_motor_local.cmd" in t, (
+            "la red de seguridad ya no levanta el motor por el camino oficial"
+        )
