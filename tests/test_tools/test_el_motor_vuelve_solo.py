@@ -53,10 +53,17 @@ class TestLaRedDeSeguridad:
         """
         t = _texto()
         assert "se arranca directo" in t
-        arranque = re.search(r"^\s*start\s+.*uvicorn app\.main:app.*$", t, re.M)
+        # 03-09-2026: el rescate ya no lanza uvicorn a mano — llama al arranque
+        # oficial, que prepara el entorno completo. Lo que esta prueba cuida
+        # sigue igual: que ALGUIEN levante el motor de producción, y sin `/b`.
+        arranque = re.search(
+            r"^\s*start\s+.*(?:uvicorn app\.main:app|servidor_motor_local\.cmd).*$", t, re.M
+        )
         assert arranque, "no hay arranque directo del motor"
         linea = arranque.group(0)
-        assert "app.main:app" in linea and "--port 8080" in linea
+        assert "servidor_motor_local.cmd" in linea or "--port 8080" in linea, (
+            "el rescate no levanta el motor de producción"
+        )
         antes_del_comando = linea.split("cmd", 1)[0]
         assert "/b" not in antes_del_comando, (
             "volvió el `start /b`: la tarea del autodespliegue se queda colgada y deja de correr."

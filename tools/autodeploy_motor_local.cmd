@@ -302,10 +302,24 @@ rem      mensajes propios. Justo el archivo donde habia que mirar para
 rem      entender por que no bajaba nada.
 rem
 rem  Ahora se abre en su propia ventana (`cmd /s /c`, que ademas es la
-rem  forma segura de pasar comillas dentro de comillas) y escribe en
-rem  servidor.log, que es donde va lo del servidor. Esta tarea termina
-rem  enseguida y la siguiente pasada corre normal.
-start "MotorGlosasRescate" /min cmd /s /c ""%REPO%\venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8080 >> "%REPO%\data\servidor.log" 2>&1"
+rem  forma segura de pasar comillas dentro de comillas) y lo del
+rem  servidor sigue yendo a servidor.log — desde el 03-09-2026 lo
+rem  escribe el propio arranque oficial, no esta linea. Esta tarea
+rem  termina enseguida y la siguiente pasada corre normal.
+rem
+rem  ARRANQUE UNIFICADO (03-09-2026). Aqui se lanzaba uvicorn CRUDO, y
+rem  eso dejaba un motor A MEDIO CONFIGURAR: sin SOPORTES_ROOT (la
+rem  pantalla de Diagnostico mostraba «/data/soportes» en rojo, como si
+rem  se hubiera perdido la carpeta del servidor de radicacion), sin
+rem  AUTO_PILOT_ENABLED y sin releer el .env del dia. Y encima ese motor
+rem  ocupaba el puerto 8080, con lo que el vigilante de verdad se quedaba
+rem  PARQUEADO esperando su turno: el motor a medias se quedaba arriba
+rem  indefinidamente. Paso el 03-09 y costo media tarde entenderlo.
+rem
+rem  Ahora el rescate entra por la PUERTA OFICIAL (servidor_motor_local),
+rem  que prepara el entorno completo y ademas queda de vigilante. Si ya
+rem  habia uno, el nuevo se cierra solo (su propio guardian lo cuida).
+start "MotorGlosasServidor" /min cmd /s /c ""%REPO%\tools\servidor_motor_local.cmd""
 rem  Misma espera con preguntas: un arranque en frio puede tardar.
 set /a INTENTOS=0
 :esperar_al_rescate

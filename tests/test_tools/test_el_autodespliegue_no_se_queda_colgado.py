@@ -28,15 +28,30 @@ import re
 from pathlib import Path
 
 RUTA = Path(__file__).resolve().parents[2] / "tools" / "autodeploy_motor_local.cmd"
+VIGILANTE = Path(__file__).resolve().parents[2] / "tools" / "servidor_motor_local.cmd"
 
 
 def _texto() -> str:
     return RUTA.read_bytes().decode("utf-8", errors="replace")
 
 
+def _texto_vigilante() -> str:
+    return VIGILANTE.read_bytes().decode("utf-8", errors="replace")
+
+
 def _linea_del_rescate() -> str:
+    """La línea que levanta el motor cuando el vigilante no está.
+
+    Desde el 03-09-2026 el rescate ya NO lanza uvicorn crudo: llama al arranque
+    oficial (`servidor_motor_local.cmd`). Antes lo hacía a mano y el motor
+    quedaba sin `SOPORTES_ROOT` ni `AUTO_PILOT_ENABLED`, ocupando el 8080
+    mientras el vigilante de verdad esperaba parqueado detrás. Se aceptan las
+    dos formas al buscar para que la prueba diga qué falla, no `None`.
+    """
     for linea in _texto().splitlines():
-        if linea.strip().startswith("start ") and "uvicorn" in linea:
+        if linea.strip().startswith("start ") and (
+            "uvicorn" in linea or "servidor_motor_local" in linea
+        ):
             return linea
     raise AssertionError("la red de seguridad ya no arranca el motor")
 
@@ -58,10 +73,21 @@ class TestLaTareaSuletaElProceso:
         assert "cmd /s /c" in _linea_del_rescate()
 
     def test_el_motor_sigue_siendo_el_de_produccion(self):
+        """El rescate levanta el motor de la PÁGINA, no otra cosa.
+
+        Antes eso se leía en la propia línea (`--port 8080`). Desde el
+        03-09-2026 la línea llama al arranque oficial, así que el puerto se
+        comprueba donde de verdad vive ahora: dentro de ese arranque.
+        """
         linea = _linea_del_rescate()
-        assert "app.main:app" in linea
-        assert "--port 8080" in linea
-        assert "127.0.0.1" in linea
+        assert "servidor_motor_local.cmd" in linea, (
+            "el rescate volvió a arrancar el motor por su cuenta: así queda sin "
+            "SOPORTES_ROOT ni AUTO_PILOT_ENABLED y sin releer el .env del día"
+        )
+        vig = _texto_vigilante()
+        assert "app.main:app" in vig
+        assert "--port 8080" in vig
+        assert "127.0.0.1" in vig
 
 
 class TestCadaRegistroEnSuSitio:
@@ -74,7 +100,19 @@ class TestCadaRegistroEnSuSitio:
         )
 
     def test_escribe_en_el_registro_del_servidor(self):
-        assert "servidor.log" in _linea_del_rescate()
+        """Lo del servidor va al registro del servidor.
+
+        03-09-2026: ya no lo escribe esta línea sino el arranque oficial, y es
+        mejor así. Cuando la redirección vivía AQUÍ, este proceso se quedaba con
+        `servidor.log` tomado, y el vigilante que se apartaba no podía ni dejar
+        su nota: el auditor solo veía «el proceso no tiene acceso al archivo».
+        """
+        linea = _linea_del_rescate()
+        assert "servidor.log" not in linea, (
+            "el rescate vuelve a quedarse con servidor.log tomado: eso deja al "
+            "vigilante sin poder escribir y al auditor sin explicación"
+        )
+        assert "servidor.log" in _texto_vigilante(), "nadie escribe ya en el registro del servidor"
 
     def test_el_registro_del_autodespliegue_no_crece_sin_fin(self):
         """Ya llegó a llenarse con el tráfico de la página. El vigilante ya se
