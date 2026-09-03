@@ -11019,28 +11019,58 @@ if(!window._concepto_parciales) window._concepto_parciales = {};
 // Auto-auditoría suave antes de marcar como RESPONDIDA. Si hay hallazgos
 // se muestra un modal con sugerencias; el gestor decide. Si todo OK, pasa
 // directo a marcar como RESPONDIDA con un mensaje celebratorio.
+//
+// Hotfix 03-09-2026 (prevención de error humano): el botón de estado final
+// se APAGA solo — nada de «de todos modos» — cuando el Quality Gate trae
+// hallazgos graves, el puntaje está en zona roja, o la confianza de la IA
+// no supera el umbral. El camino entonces es corregir (re-analizar) primero.
+var UMBRAL_CONFIANZA_RESPONDIDA = 0.85;
+
+function _bloqueosEstadoFinal(aud, ap){
+  var motivos = [];
+  ((aud && aud.hallazgos) || []).forEach(function(h){
+    if(h.severidad === 'alta') motivos.push('Hallazgo grave del control de calidad: ' + (h.titulo || 'anomalía'));
+  });
+  if(aud && typeof aud.puntaje === 'number' && aud.puntaje < 60){
+    motivos.push('Calidad del dictamen ' + aud.puntaje + '/100 (zona roja)');
+  }
+  if(ap && typeof ap.confianza === 'number' && ap.confianza < UMBRAL_CONFIANZA_RESPONDIDA){
+    motivos.push('La confianza de la IA (' + Math.round(ap.confianza*100) + '%) no supera el umbral del '
+      + Math.round(UMBRAL_CONFIANZA_RESPONDIDA*100) + '%');
+  }
+  return motivos;
+}
+
 async function _auditarYConfirmar(glosaId, factura){
   try{
+    var ap = null;
+    try{
+      var ra = await fetch('/autopilot/glosa/'+glosaId, {headers: authH()});
+      if(ra.ok) ap = await ra.json();
+    }catch(e){ /* sin evaluación del autopilot no se bloquea por confianza */ }
     var r = await fetch('/glosas/'+glosaId+'/auditoria', {headers: authH()});
     if(!r.ok) return true; // si la auditoría falla, no bloqueamos
     var aud = await r.json();
-    if(aud.ok){
+    var bloqueos = _bloqueosEstadoFinal(aud, ap);
+    if(aud.ok && bloqueos.length === 0){
       // Dictamen impecable — confirmación celebratoria simple
       return confirm('✨ Dictamen verificado — todo OK.\n\n' +
         (aud.celebracion || '') + '\n\n' +
         '¿Marcar la factura ' + (factura || '#'+glosaId) + ' como RESPONDIDA?');
     }
-    // Hay hallazgos — modal informativo con opción de continuar o corregir
-    return _mostrarModalAuditoria(glosaId, factura, aud);
+    // Hay hallazgos o bloqueos — modal informativo; con bloqueos, el botón
+    // de continuar sale deshabilitado (gris) con sus motivos.
+    return _mostrarModalAuditoria(glosaId, factura, aud, bloqueos);
   }catch(e){
     return confirm('¿Marcar la factura ' + (factura || '#'+glosaId) + ' como RESPONDIDA?');
   }
 }
 
-function _mostrarModalAuditoria(glosaId, factura, aud){
+function _mostrarModalAuditoria(glosaId, factura, aud, bloqueos){
   return new Promise(function(resolve){
     var prev = document.getElementById('auditoria-modal');
     if(prev) prev.remove();
+    var bloqueado = !!(bloqueos && bloqueos.length);
     var puntaje = aud.puntaje || 0;
     var color = puntaje >= 80 ? '#10b981' : puntaje >= 60 ? '#f59e0b' : '#dc2626';
     var titulo = puntaje >= 80
@@ -11074,9 +11104,22 @@ function _mostrarModalAuditoria(glosaId, factura, aud){
         +   '</div>'
         + '</div>';
     });
+    // Hotfix 03-09-2026: con bloqueos, la caja gris explica el porqué y el
+    // botón de estado final queda deshabilitado — no hay «de todos modos».
+    if(bloqueado){
+      html += '<div style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:10px;padding:12px 14px;margin-bottom:4px;color:#374151;font-size:.8rem">'
+        + '<b>🔒 Bloqueado por seguridad:</b>'
+        + '<ul style="margin:.4rem 0 0 1.1rem;padding:0">'
+        + bloqueos.map(function(m){ return '<li>' + m + '</li>'; }).join('')
+        + '</ul>'
+        + '<div style="margin-top:.5rem;font-size:.74rem;color:#6b7280">Corrija el dictamen (re-analizar o editar) y vuelva a intentar: el botón se habilita solo cuando el control de calidad y la confianza lo permiten.</div>'
+        + '</div>';
+    }
     html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap">'
       +   '<button id="aud-corregir" class="btn btn-ghost" style="padding:10px 16px">Lo corrijo primero</button>'
-      +   '<button id="aud-continuar" class="btn" style="padding:10px 18px;background:'+color+';color:#fff;border:0;border-radius:8px;font-weight:700">Marcar RESPONDIDA de todos modos</button>'
+      +   (bloqueado
+            ? '<button id="aud-continuar" disabled title="' + bloqueos.join(' · ').replace(/"/g,'&quot;') + '" style="padding:10px 18px;background:#9ca3af;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:not-allowed;opacity:.9">🔒 Marcar RESPONDIDA (bloqueado)</button>'
+            : '<button id="aud-continuar" class="btn" style="padding:10px 18px;background:'+color+';color:#fff;border:0;border-radius:8px;font-weight:700">Marcar RESPONDIDA de todos modos</button>')
       + '</div>'
       + '</div>';
     var bg = document.createElement('div');
@@ -11085,7 +11128,10 @@ function _mostrarModalAuditoria(glosaId, factura, aud){
     bg.innerHTML = html;
     document.body.appendChild(bg);
     document.getElementById('aud-corregir').onclick = function(){ bg.remove(); resolve(false); };
-    document.getElementById('aud-continuar').onclick = function(){ bg.remove(); resolve(true); };
+    var btnCont = document.getElementById('aud-continuar');
+    if(btnCont && !btnCont.disabled){
+      btnCont.onclick = function(){ bg.remove(); resolve(true); };
+    }
   });
 }
 
