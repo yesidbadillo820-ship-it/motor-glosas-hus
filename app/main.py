@@ -1450,7 +1450,26 @@ async def lifespan(app: FastAPI):
         except Exception as _e:
             logger.warning(f"No se pudo iniciar scheduler de soportes: {_e}")
 
+    # 03-09-2026 (V2, Pilar 4) — el reloj del plazo legal. `dias_restantes` se
+    # calculaba una sola vez, al analizar, y quedaba congelado: el semáforo
+    # nunca se ponía rojo solo. Este demonio lo recalcula periódicamente contra
+    # la fecha de hoy. No arranca en pruebas (el lifespan se levanta cientos de
+    # veces) y se puede apagar con VENCIMIENTOS_DEMONIO=0.
+    try:
+        from app.services.demonio_vencimientos import iniciar as iniciar_vencimientos
+
+        iniciar_vencimientos(app)
+    except Exception as _e:
+        logger.warning(f"No se pudo iniciar el demonio de vencimientos: {_e}")
+
     yield
+
+    try:
+        from app.services.demonio_vencimientos import detener as detener_vencimientos
+
+        detener_vencimientos(app)
+    except Exception:
+        pass
 
     # Shutdown: detener schedulers limpiamente
     try:

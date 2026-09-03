@@ -90,6 +90,37 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 03-09-2026 — V2, Pilar 4: el reloj del vencimiento vuelve a correr
+
+**El problema, que no era el que parecía.** El sistema ya sabía avisar: había
+motor de vencimientos (clasifica urgencia) y servicio de correo, y los dos
+funcionaban. Lo que estaba roto era el NÚMERO que leían. Los «días restantes»
+se calculaban UNA sola vez, el día que se analizaba la glosa, y quedaban
+guardados en la tabla para siempre. Una glosa que entró con 18 días de margen
+seguía diciendo 18 un mes después. El semáforo nunca se ponía rojo solo.
+
+Eso es exactamente lo que costó las tres facturas de junio, halladas 45 días
+tarde: nadie se equivocó, el reloj simplemente no avanzaba.
+
+**Qué se hizo.** Un proceso que corre solo en el servidor y cada media hora
+repasa las glosas que siguen abiertas, vuelve a contar los días hábiles que
+quedan del plazo de ley (20 días, Art. 57 de la Ley 1438) contra la fecha de
+HOY, y deja el número al día en la base. Con eso, el tablero, los correos y la
+pantalla por fin ven la verdad.
+
+**El aviso rojo.** A **3 días hábiles o menos** de vencerse, la glosa queda
+marcada como crítica y la pantalla lo muestra en rojo — antes solo se avisaba
+de lo YA vencido, que es cuando ya no hay nada que hacer. Ahora avisa cuando
+todavía se alcanza a responder.
+
+**Lo que no toca.** Las glosas ya cerradas (levantadas, aceptadas, conciliadas)
+no se tocan: no compiten contra el reloj y alertar sobre ellas es ruido. Y una
+glosa sin fecha de recepción se deja como está: sin fecha no hay plazo que
+calcular, y no se inventa.
+
+**Pendiente:** los pilares 2 (piloto automático, con la bandeja de salida
+apagada por defecto) y 5 (acta de desacuerdo).
+
 ### 03-09-2026 — V2, Pilar 3: el dictamen dice en qué folio está el soporte
 
 **El problema.** El escrito podía decir «la epicrisis está adjunta». Para el
