@@ -1450,6 +1450,11 @@ async def lifespan(app: FastAPI):
         except Exception as _e:
             logger.warning(f"No se pudo iniciar scheduler de soportes: {_e}")
 
+    # 03-09-2026 (V2, Pilar 4) — los días restantes del plazo legal NO se
+    # refrescan con un job: se calculan en caliente al consultar
+    # (motor_vencimientos.evaluar → vencimiento_dinamico), cruzando la fecha
+    # de radicación contra hoy con días hábiles y festivos colombianos.
+
     yield
 
     # Shutdown: detener schedulers limpiamente

@@ -11789,10 +11789,18 @@ async function poblarLandingKPIs(){
   //
   // Cuando no se sabe, se dice que no se sabe.
   var _hayAlertas = !!(alertas && Array.isArray(alertas.alertas));
-  var nVencen = 0, nVencidas = 0;
+  var nVencen = 0, nVencidas = 0, nCriticas = 0;
   if(_hayAlertas){
     nVencen = alertas.alertas.length;
     nVencidas = alertas.alertas.filter(function(a){ return (a.dias_restantes||0) <= 0; }).length;
+    // 03-09-2026 (V2, Pilar 4) — ROJO ANTES DE QUE SE VENZA. Hasta ahora solo
+    // se avisaba de lo YA vencido, que es cuando ya no hay nada que hacer. A
+    // 3 días hábiles o menos todavía se alcanza a responder: eso va en rojo.
+    // El plazo llega calculado EN CALIENTE por la API (radicación vs hoy,
+    // hábiles sin festivos); antes venía congelado desde el día del análisis.
+    nCriticas = alertas.alertas.filter(function(a){
+      var d = a.dias_restantes; return d != null && d > 0 && d <= 3;
+    }).length;
   }
   if($('land-alertas')) $('land-alertas').textContent = _hayAlertas ? nVencen : '—';
   var deltaA = $('land-alertas-delta');
@@ -11803,8 +11811,10 @@ async function poblarLandingKPIs(){
     } else {
       deltaA.textContent = nVencidas > 0
         ? (nVencidas + ' ya vencida' + (nVencidas===1?'':'s'))
-        : 'en 5 días';
-      deltaA.className = 'stat-card-delta ' + (nVencidas > 0 ? 'down' : 'neutral');
+        : nCriticas > 0
+          ? ('⚠ ' + nCriticas + ' crítica' + (nCriticas===1?'':'s') + ' — vence' + (nCriticas===1?'':'n') + ' en ≤3 días')
+          : 'en 5 días';
+      deltaA.className = 'stat-card-delta ' + ((nVencidas > 0 || nCriticas > 0) ? 'down' : 'neutral');
     }
   }
 
