@@ -90,6 +90,35 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 03-09-2026 — V2, Pilar 3: el dictamen dice en qué folio está el soporte
+
+**El problema.** El escrito podía decir «la epicrisis está adjunta». Para el
+auditor de la EPS eso no prueba nada: le toca ponerse a buscarla entre las
+páginas del expediente, y si no la encuentra rápido, ratifica la glosa.
+
+**Qué se hizo.** Ahora el motor abre los PDF que usted adjunta, busca dentro el
+documento que la entidad echa de menos y escribe la ubicación REAL:
+
+    «EL SOPORTE REQUERIDO SE ENCUENTRA ÍNTEGRAMENTE VISIBLE EN EL EXPEDIENTE
+     REMITIDO: LA EPICRISIS EN EL FOLIO 3 DEL ARCHIVO ADJUNTO soportes.pdf»
+
+Busca epicrisis, MIPRES, historia clínica, nota operatoria, récord de anestesia,
+kardex, RIPS, orden médica, consentimiento informado, certificado de agotamiento
+del SOAT y factura. Solo busca lo que la glosa reclama: si le piden la
+epicrisis, ubica la epicrisis, no todo el expediente.
+
+**La regla de siempre.** Si el documento NO aparece en ningún folio, no se cita
+ninguna ubicación. El folio no se inventa: lo encuentra Python leyendo el PDF,
+no lo redacta la IA. Y si el PDF viene escaneado sin texto, corrupto o
+protegido, sencillamente no se cita folio — nunca se cae el dictamen.
+
+**Nota técnica.** La librería que lee los PDF (PyMuPDF) estaba solo en las
+dependencias de desarrollo; se subió a las de producción para que esto funcione
+en el servidor.
+
+**Pendiente:** los pilares 2 (piloto automático, con la bandeja de salida
+apagada por defecto), 4 (demonio de vencimientos) y 5 (acta de desacuerdo).
+
 ### 02-09-2026 (noche, sexta tanda) — V2, Pilar 1: análisis masivo por lotes (CSV + ZIP)
 
 **Qué pasó.** Con el motor ya estable en producción, arrancó la V2
