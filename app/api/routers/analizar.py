@@ -34,6 +34,7 @@ from app.services.glosa_service import (
     IANoDisponibleError,
     texto_con_error_de_proveedor,
 )
+from app.services.pdf_service import ETIQUETA_ERROR_OCR, ErrorOCR
 from app.utils.moneda import parse_valor_cop
 from app.utils.parsers_glosa import (
     _concepto_glosa,
@@ -272,6 +273,10 @@ async def _extraer_soportes_del_servidor(
                 f"[{req_id}] Soporte auto inyectado: {nombre} "
                 f"({metodo}, {len(texto_recortado)} chars)"
             )
+        except ErrorOCR:
+            # Cortacircuito: un corte de red en el OCR detiene la glosa —
+            # no se sigue «como si nada» con un soporte a medio leer.
+            raise
         except Exception as e:
             logger.warning(f"[{req_id}] Error procesando soporte auto {nombre}: {e}")
 
@@ -341,6 +346,10 @@ async def _extraer_pdfs(
             contexto_pdf += sep + texto
             procesados += 1
             logger.info(f"[{req_id}] PDF {archivo.filename}: {metodo} ({len(texto)} chars)")
+        except ErrorOCR:
+            # Cortacircuito: el corte de red del OCR sube hasta _analizar_impl,
+            # que detiene la glosa y la deja en manos humanas.
+            raise
         except Exception as e:
             logger.warning(f"[{req_id}] Error extrayendo PDF {archivo.filename}: {e}")
 
@@ -1645,6 +1654,68 @@ async def analizar(
     )
 
 
+def _marcar_glosa_error_ocr(
+    db: Session,
+    *,
+    numero_factura: Optional[str],
+    etapa: str,
+    eps: str,
+    tabla_excel: str,
+    detalle: str,
+    req_id: str,
+) -> Optional[int]:
+    """Deja la glosa DETENIDA en manos humanas tras un corte del OCR.
+
+    Cortacircuito OCR (03-09-2026): si ya existe la fila (re-análisis), se
+    muta; si no, se crea una fila mínima SIN dictamen — nada de dictámenes a
+    ciegas sobre soportes a medio leer. En ambos casos la glosa queda en
+    PENDIENTE_APROBACION_HUMANA con la etiqueta ERROR_OCR en la nota.
+    """
+    from app.models.db import GlosaRecord
+    from app.services.auto_pilot_worker import ESTADO_CUARENTENA
+
+    nota = f"{ETIQUETA_ERROR_OCR}: {detalle}"[:500]
+    try:
+        glosa = None
+        if numero_factura:
+            glosa = (
+                db.query(GlosaRecord)
+                .filter(GlosaRecord.factura == numero_factura)
+                .filter(GlosaRecord.etapa == etapa)
+                .order_by(GlosaRecord.creado_en.desc())
+                .first()
+            )
+        if glosa is None:
+            codigo_m = re.search(
+                r"\b(?:TA|SO|AU|CO|CL|PE|FA|SE|IN|ME|EX)\d{2,4}\b", (tabla_excel or "").upper()
+            )
+            glosa = GlosaRecord(
+                eps=eps,
+                factura=numero_factura or "N/A",
+                etapa=etapa,
+                estado="PENDIENTE",
+                codigo_glosa=codigo_m.group(0) if codigo_m else None,
+                texto_glosa_original=tabla_excel or None,
+            )
+            db.add(glosa)
+        glosa.workflow_state = ESTADO_CUARENTENA
+        glosa.nota_workflow = nota
+        db.commit()
+        db.refresh(glosa)
+        logger.warning(
+            f"[{req_id}] [{ETIQUETA_ERROR_OCR}] Glosa ID={glosa.id} detenida y en "
+            f"cuarentena humana: {detalle[:160]}"
+        )
+        return glosa.id
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.error(f"[{req_id}] [{ETIQUETA_ERROR_OCR}] No pude marcar la glosa: {e}")
+        return None
+
+
 async def _analizar_impl(
     *,
     eps: str,
@@ -1951,6 +2022,30 @@ async def _analizar_impl(
         logger.error(f"[{req_id}] IA no disponible: {e.mensaje}")
         _publicar_progreso(_tid, "error", {"mensaje": e.mensaje[:200]})
         raise HTTPException(status_code=503, detail=e.mensaje)
+    except ErrorOCR as e:
+        # Cortacircuito OCR (03-09-2026): el OCR de Gemini se cortó por red
+        # (timeout o desconexión). Sin leer los soportes no hay dictamen
+        # honesto: la glosa se detiene AQUÍ y queda en manos humanas.
+        _gid = _marcar_glosa_error_ocr(
+            db,
+            numero_factura=numero_factura,
+            etapa=etapa,
+            eps=eps,
+            tabla_excel=tabla_excel,
+            detalle=str(e),
+            req_id=req_id,
+        )
+        _publicar_progreso(_tid, "error", {"mensaje": f"{ETIQUETA_ERROR_OCR}: {str(e)[:180]}"})
+        _donde = f" (ID {_gid})" if _gid else ""
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"{ETIQUETA_ERROR_OCR}: la lectura OCR de los soportes se cortó por red. "
+                f"La glosa quedó detenida en la bandeja de aprobación humana{_donde}, "
+                f"sin dictamen. Reintente el análisis cuando la conexión esté estable. "
+                f"Detalle: {str(e)[:200]}"
+            ),
+        )
     except Exception as e:
         logger.error(f"[{req_id}] Error en análisis: {e}", exc_info=True)
         _publicar_progreso(_tid, "error", {"mensaje": str(e)[:200]})

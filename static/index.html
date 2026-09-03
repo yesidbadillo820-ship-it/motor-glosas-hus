@@ -8066,8 +8066,13 @@ async function verBorradoresAutoPilot(){
     ov.id = 'ap-borradores-overlay';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem';
     var filas = (d.borradores || []).map(function(g){
+      // Hotfix 03-09-2026: una glosa detenida por el cortacircuito OCR llega
+      // a esta bandeja con la nota "ERROR_OCR: ..." — se marca en rojo para
+      // que el gestor sepa que NO tiene dictamen y debe re-analizarla.
+      var esErrorOcr = ((g.nota_workflow||'').indexOf('ERROR_OCR') === 0);
+      var badgeOcr = esErrorOcr ? ' <span title="'+String(g.nota_workflow||'').replace(/"/g,'&quot;')+'" style="background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;border-radius:6px;padding:.1rem .4rem;font-size:.68rem;font-weight:800">⛔ ERROR_OCR</span>' : '';
       return '<tr>'+
-        '<td style="padding:.45rem .6rem">'+(g.factura||'—')+'</td>'+
+        '<td style="padding:.45rem .6rem">'+(g.factura||'—')+badgeOcr+'</td>'+
         '<td style="padding:.45rem .6rem">'+(g.eps||'—')+'</td>'+
         '<td style="padding:.45rem .6rem">'+(g.codigo_glosa||'—')+'</td>'+
         '<td style="padding:.45rem .6rem;text-align:right">'+fmtCOP(g.valor_objetado||0)+'</td>'+

@@ -25,6 +25,17 @@ toque el estado de una glosa:
    caso «sin nada» se RECHAZA), nunca una aceptación parcial (repartir plata
    la aprueba un humano), nunca sin dictamen. Un rechazo es un fallo
    CONTROLADO: decisión registrada con su porqué, sin excepciones al aire.
+
+Escudos de resiliencia (hotfix 03-09-2026), condición del auditor para
+encender el flag:
+
+- TRAZABILIDAD DEL FALLBACK. Cada fila de la bitácora registra
+  `modelo_utilizado`: el modelo que produjo el dictamen decidido — Claude
+  (Anthropic) o el fallback de Groq, tal como quedó en historial.modelo_ia.
+- BLOQUEO DEL INDEXADOR. Si el indexador de soportes reporta
+  «construyendo: true» (o su estado no se puede leer), el ciclo ABORTA
+  entero antes de evaluar nada: un índice a medio armar hace ver vacíos
+  expedientes que están completos, y sobre esa mentira no se decide.
 """
 
 from __future__ import annotations
@@ -51,6 +62,32 @@ ACTOR_MAQUINA = "auto-pilot"
 def habilitado() -> bool:
     """AUTO_PILOT_ENABLED — apagado por defecto."""
     return (os.getenv("AUTO_PILOT_ENABLED", "") or "").strip().lower() in ("1", "true", "si", "sí")
+
+
+def indexador_en_construccion() -> tuple[bool, str]:
+    """¿El indexador de soportes está a medio construir?
+
+    Devuelve (True, motivo) si reporta «construyendo: true» O si su estado no
+    se puede leer — en la duda, el ciclo no corre. Un índice incompleto le
+    haría creer a la máquina que facturas con expediente completo no tienen
+    soportes, y esa mentira contamina confianza, riesgo y bitácora.
+    """
+    try:
+        from app.services.soportes_autodiscovery_service import get_indexer
+
+        stats = get_indexer().stats() or {}
+    except Exception as e:  # noqa: BLE001 — estado ilegible = no se decide
+        return True, f"Estado del indexador ilegible ({str(e)[:120]}): no se decide a ciegas."
+    if bool(stats.get("construyendo")):
+        return True, "El indexador de soportes reporta construyendo=true."
+    return False, ""
+
+
+def _modelo_utilizado_de(glosa: Any) -> str:
+    """Qué modelo produjo el dictamen que se está decidiendo (trazabilidad
+    del fallback): el valor real de historial.modelo_ia — el nombre del
+    modelo de Anthropic o del fallback de Groq que enrutó ia_router."""
+    return str(getattr(glosa, "modelo_ia", "") or "")
 
 
 def _soportes_analizados(glosa: Any, senales: Optional[dict] = None) -> list[str]:
@@ -87,6 +124,8 @@ def evaluar_candidata(db: Any, glosa: Any) -> dict:
     from app.services.autopilot_service import evaluar_glosa_autopilot
     from app.services.riesgo_ratificacion import calcular_riesgo
 
+    modelo_utilizado = _modelo_utilizado_de(glosa)
+
     def _rechazo(regla: str, confianza=None, riesgo="", soportes=None) -> dict:
         return {
             "decision": "RECHAZADA",
@@ -94,9 +133,10 @@ def evaluar_candidata(db: Any, glosa: Any) -> dict:
             "confianza": confianza,
             "riesgo": riesgo,
             "soportes": soportes or [],
+            "modelo_utilizado": modelo_utilizado,
         }
 
-    modelo = str(getattr(glosa, "modelo_ia", "") or "").lower()
+    modelo = modelo_utilizado.lower()
     dictamen = str(getattr(glosa, "dictamen", "") or "").strip()
 
     # Los rechazos duros primero: lo que jamás se auto-envía.
@@ -177,6 +217,7 @@ def evaluar_candidata(db: Any, glosa: Any) -> dict:
         "confianza": confianza,
         "riesgo": nivel,
         "soportes": soportes,
+        "modelo_utilizado": modelo_utilizado,
     }
 
 
@@ -193,6 +234,7 @@ def _registrar(db: Any, glosa_id: Optional[int], decision: dict, actor: str) -> 
             riesgo=(decision.get("riesgo", "") or "")[:20],
             soportes_analizados=json.dumps(decision.get("soportes", []), ensure_ascii=False)[:4000],
             actor=actor[:120],
+            modelo_utilizado=(decision.get("modelo_utilizado", "") or "")[:100],
         )
     )
 
@@ -201,6 +243,14 @@ def procesar(db: Any, limite: int = 50) -> dict:
     """El worker. LA PRIMERA LÍNEA ES EL FLAG: apagado, no toca nada."""
     if not habilitado():  # ← salvaguarda nº 1: aborta aquí mismo
         return {"estado": "deshabilitado", "detalle": "AUTO_PILOT_ENABLED no está activo."}
+
+    # Bloqueo del indexador (hotfix 03-09-2026): con el índice de soportes a
+    # medio construir el ciclo entero ABORTA — sin evaluar, sin escribir, sin
+    # registrar. El siguiente ciclo lo reintenta cuando el índice esté quieto.
+    construyendo, motivo = indexador_en_construccion()
+    if construyendo:
+        logger.warning(f"[AUTO-PILOT] Ciclo abortado por el indexador: {motivo}")
+        return {"estado": "abortado_por_indexador", "detalle": motivo}
 
     from app.models.db import GlosaRecord
     from app.services.motor_vencimientos import ESTADOS_CERRADOS
@@ -228,6 +278,7 @@ def procesar(db: Any, limite: int = 50) -> dict:
                 "confianza": None,
                 "riesgo": "",
                 "soportes": [],
+                "modelo_utilizado": _modelo_utilizado_de(glosa),
             }
         _registrar(db, glosa.id, decision, ACTOR_MAQUINA)
         if decision["decision"] == "CANDIDATA":
@@ -267,6 +318,7 @@ def liberar(db: Any, glosa_id: int, usuario_email: str) -> dict:
             "confianza": None,
             "riesgo": "",
             "soportes": [],
+            "modelo_utilizado": _modelo_utilizado_de(glosa),
         },
         usuario_email,
     )

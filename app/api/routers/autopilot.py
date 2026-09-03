@@ -39,6 +39,28 @@ class BatchAprobarBody(BaseModel):
     dry_run: bool = False
 
 
+class BitacoraDecisionDTO(BaseModel):
+    """Una fila de la bitácora inmutable del Auto-Pilot (hotfix 03-09-2026:
+    incluye `modelo_utilizado` para la trazabilidad del fallback de modelos —
+    si el dictamen decidido lo produjo Anthropic o el fallback de Groq)."""
+
+    id: int
+    creado_en: Optional[str] = None
+    glosa_id: Optional[int] = None
+    decision: str = ""
+    regla_aplicada: str = ""
+    confianza: Optional[float] = None
+    riesgo: str = ""
+    soportes_analizados: list[str] = Field(default_factory=list)
+    actor: str = ""
+    modelo_utilizado: str = ""
+
+
+class BitacoraRespuestaDTO(BaseModel):
+    total: int
+    decisiones: list[BitacoraDecisionDTO]
+
+
 from app.services.texto_fijo_detector import (
     aplicar_texto_fijo_si_corresponde,
     clasificar_texto_fijo,
@@ -460,6 +482,10 @@ def borradores_auto_pilot(
                 "codigo_glosa": g.codigo_glosa,
                 "valor_objetado": g.valor_objetado,
                 "workflow_state": g.workflow_state,
+                # Hotfix 03-09-2026: la nota distingue un borrador normal de
+                # una glosa detenida por el cortacircuito OCR (ERROR_OCR).
+                "nota_workflow": g.nota_workflow,
+                "modelo_ia": g.modelo_ia,
             }
             for g in filas
         ],
@@ -485,7 +511,11 @@ def liberar_borrador(
     return resultado
 
 
-@router.get("/bitacora", summary="Bitácora inmutable de decisiones del Auto-Pilot")
+@router.get(
+    "/bitacora",
+    summary="Bitácora inmutable de decisiones del Auto-Pilot",
+    response_model=BitacoraRespuestaDTO,
+)
 def bitacora_auto_pilot(
     glosa_id: Optional[int] = Query(None),
     limite: int = Query(100, ge=1, le=500),
@@ -507,20 +537,21 @@ def bitacora_auto_pilot(
         except Exception:
             return []
 
-    return {
-        "total": len(filas),
-        "decisiones": [
-            {
-                "id": f.id,
-                "creado_en": f.creado_en.isoformat() if f.creado_en else None,
-                "glosa_id": f.glosa_id,
-                "decision": f.decision,
-                "regla_aplicada": f.regla_aplicada,
-                "confianza": f.confianza,
-                "riesgo": f.riesgo,
-                "soportes_analizados": _soportes(f.soportes_analizados),
-                "actor": f.actor,
-            }
+    return BitacoraRespuestaDTO(
+        total=len(filas),
+        decisiones=[
+            BitacoraDecisionDTO(
+                id=f.id,
+                creado_en=f.creado_en.isoformat() if f.creado_en else None,
+                glosa_id=f.glosa_id,
+                decision=f.decision or "",
+                regla_aplicada=f.regla_aplicada or "",
+                confianza=f.confianza,
+                riesgo=f.riesgo or "",
+                soportes_analizados=_soportes(f.soportes_analizados),
+                actor=f.actor or "",
+                modelo_utilizado=f.modelo_utilizado or "",
+            )
             for f in filas
         ],
-    }
+    )
