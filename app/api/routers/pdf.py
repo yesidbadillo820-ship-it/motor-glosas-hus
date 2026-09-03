@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from app.api.deps import get_auditor_o_superior
 from app.core.config import get_settings
 from app.models.db import UsuarioRecord
-from app.services.pdf_service import PdfService
+from app.services.pdf_service import ETIQUETA_ERROR_OCR, ErrorOCR, PdfService
 
 router = APIRouter(tags=["pdf"])
 
@@ -31,11 +31,16 @@ async def pdf_ocr(
         raise HTTPException(400, "PDF muy grande (>30 MB)")
 
     pdf_svc = PdfService()
-    texto, metodo = await pdf_svc.extraer_con_ocr(
-        contenido,
-        anthropic_api_key=cfg.anthropic_api_key,
-        anthropic_model=cfg.anthropic_model,
-    )
+    try:
+        texto, metodo = await pdf_svc.extraer_con_ocr(
+            contenido,
+            anthropic_api_key=cfg.anthropic_api_key,
+            anthropic_model=cfg.anthropic_model,
+        )
+    except ErrorOCR as e:
+        # Cortacircuito OCR (03-09-2026): el corte de red no se disfraza de
+        # «texto vacío» — se informa para que el gestor reintente.
+        raise HTTPException(503, f"{ETIQUETA_ERROR_OCR}: {str(e)[:300]}")
     return {
         "metodo": metodo,
         "caracteres": len(texto),

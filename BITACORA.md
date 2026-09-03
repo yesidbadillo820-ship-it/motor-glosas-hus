@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 02-09-2026
+**Última actualización:** 03-09-2026
 
 ---
 
@@ -89,6 +89,42 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 03-09-2026 — Tres escudos de resiliencia antes de encender el Auto-Pilot
+
+El auditor revisó el piloto automático y puso una condición para encenderlo:
+tres protecciones contra fallas de infraestructura (rama
+`hotfix/autopilot-resiliencia`). Quedaron así:
+
+1. **La bitácora dice qué modelo decidió.** Cada fila de la bitácora del
+   Auto-Pilot ahora guarda la columna nueva `modelo_utilizado`: el nombre del
+   modelo de IA que produjo el dictamen sobre el que se decidió — el principal
+   (Claude, de Anthropic) o el de respaldo (Groq). Así, si un día el respaldo
+   escribe algo flojo, se sabe exactamente en cuáles glosas trabajó. La tabla
+   vieja se actualiza sola al arrancar el motor (migración automática).
+2. **Con el índice de soportes a medio armar, la máquina no decide.** Antes de
+   evaluar una sola glosa, el ciclo del Auto-Pilot le pregunta al indexador de
+   soportes si está reconstruyéndose («construyendo: true»). Si es así — o si
+   ni siquiera se puede leer su estado —, el ciclo entero se cancela sin tocar
+   nada y lo reintenta el siguiente. La razón: un índice incompleto hace ver
+   «sin soportes» facturas que sí tienen su expediente completo, y sobre esa
+   mentira no se puede calcular confianza ni riesgo.
+3. **Si el OCR se corta, la glosa se frena — no sale un dictamen a ciegas.**
+   Cuando la lectura de PDFs escaneados con Gemini se corta por red (se venció
+   el tiempo o se cayó la conexión, el clásico «WinError» de Windows), el
+   análisis de esa glosa se detiene en el acto: queda en
+   **PENDIENTE_APROBACION_HUMANA** con la marca **ERROR_OCR** en la nota (y un
+   aviso rojo ⛔ en la bandeja de Borradores), sin dictamen. Antes ese corte se
+   ignoraba en silencio y el dictamen salía argumentado sobre soportes que
+   nadie leyó. Un error de la API con respuesta (cuota agotada, clave mala)
+   sigue el camino de siempre; solo el corte de red frena.
+
+Todo con sus pruebas (21 nuevas) y la suite completa en verde.
+
+**PENDIENTE.** Encender `AUTO_PILOT_ENABLED` sigue siendo decisión del
+auditor; con estos tres escudos la condición técnica quedó cumplida. Al
+desplegar: `git pull` + reiniciar uvicorn (la columna nueva de la bitácora se
+agrega sola al arrancar).
 
 ### 03-09-2026 — V2, Pilar 2: el piloto automático, con la máquina a raya
 

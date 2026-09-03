@@ -461,6 +461,25 @@ async def lifespan(app: FastAPI):
                 pass
             logger.warning(f"MIGRACIÓN {tabla}.{col_name}: {e}")
 
+    # Bitácora del Auto-Pilot: trazabilidad del fallback de modelos. La tabla
+    # nació en el Pilar 2 sin esta columna; un servidor que ya la creó con
+    # create_all() necesita el ALTER para no reventar al registrar decisiones.
+    try:
+        if _tiene_tabla("auto_pilot_bitacora") and not _tiene_columna(
+            "auto_pilot_bitacora", "modelo_utilizado"
+        ):
+            logger.warning("MIGRACIÓN: Agregando columna 'modelo_utilizado' a auto_pilot_bitacora")
+            db.execute(
+                text("ALTER TABLE auto_pilot_bitacora ADD COLUMN modelo_utilizado VARCHAR(100)")
+            )
+            db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN auto_pilot_bitacora.modelo_utilizado: {e}")
+
     # Las glosas que ya estaban cargadas no traen marcada la glosa total (la
     # columna nació después). Se deduce igual que al importar: sin causal
     # propia, es el desglose de una reclamación glosada entera por el FURIPS.

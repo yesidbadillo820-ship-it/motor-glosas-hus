@@ -1539,3 +1539,7 @@ class AutoPilotBitacoraRecord(Base):
     soportes_analizados = Column(Text)
     # "auto-pilot" para la máquina; el correo del gestor cuando libera.
     actor = Column(String(120), index=True)
+    # Trazabilidad del fallback (03-09-2026): el modelo que produjo el
+    # dictamen sobre el que se decidió — Claude (Anthropic) o el fallback
+    # de Groq, tal como quedó en historial.modelo_ia al generarlo.
+    modelo_utilizado = Column(String(100))
