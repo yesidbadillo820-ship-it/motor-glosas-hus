@@ -14,7 +14,7 @@ import re
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
@@ -1190,6 +1190,404 @@ async def resultado_analisis(
     if e["estado"] == "error":
         return {"estado": "error", "status": e.get("status") or 500, "detail": e.get("detail")}
     return {"estado": "en_curso"}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  PROCESAMIENTO MASIVO (V2, Pilar 1) — CSV con muchas glosas + ZIP de PDFs
+#  ---------------------------------------------------------------------------
+#  El auditor sube un CSV (hasta 500 glosas) y un ZIP con sus soportes. Cada
+#  glosa se procesa por EXACTAMENTE la misma lógica del análisis single
+#  (`_analizar_impl`) —así no hay retroceso en lo estabilizado—, unas cuantas
+#  a la vez con `concurrent.futures`, en el fondo, sin bloquear el servidor.
+#  Al terminar queda un Excel consolidado con todos los dictámenes.
+# ══════════════════════════════════════════════════════════════════════════
+_MASIVO_MAX_FILAS = 500
+_MASIVO_MAX_CONCURRENCIA = 8
+
+
+def _norm_cabecera(s: str) -> str:
+    import unicodedata
+
+    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode()
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+# Sinónimos aceptados por columna del CSV (encabezado tolerante a tildes/espacios).
+_MASIVO_COLS = {
+    "eps": ["eps", "entidad", "pagador"],
+    "etapa": ["etapa"],
+    "numero_factura": ["numero factura", "numero_factura", "factura", "no factura", "nro factura"],
+    "valor_aceptado": ["valor aceptado", "valor_aceptado"],
+    "tabla_excel": ["texto", "tabla excel", "tabla_excel", "glosa", "observacion", "detalle"],
+    "pdfs": ["pdfs", "pdf", "soportes", "archivos", "anexos"],
+    "modo_respuesta": ["modo", "modo respuesta", "modo_respuesta"],
+    "fecha_radicacion": ["fecha radicacion", "fecha_radicacion"],
+    "fecha_recepcion": ["fecha recepcion", "fecha_recepcion"],
+}
+
+
+def _parsear_csv_glosas(csv_bytes: bytes) -> list[dict]:
+    """CSV → lista de dicts normalizados. Detecta el separador (coma o punto y
+    coma) y mapea los encabezados con tolerancia a tildes/mayúsculas."""
+    import csv as _csv
+    import io as _io
+
+    texto = csv_bytes.decode("utf-8-sig", errors="replace")
+    muestra = texto[:4096]
+    try:
+        dialecto = _csv.Sniffer().sniff(muestra, delimiters=",;\t")
+    except Exception:
+        dialecto = _csv.excel
+        dialecto.delimiter = ";" if muestra.count(";") > muestra.count(",") else ","
+    lector = _csv.DictReader(_io.StringIO(texto), dialect=dialecto)
+    # Mapa: encabezado real → campo canónico.
+    canon: dict[str, str] = {}
+    for real in lector.fieldnames or []:
+        n = _norm_cabecera(real)
+        for campo, sinonimos in _MASIVO_COLS.items():
+            if n in sinonimos:
+                canon[real] = campo
+                break
+    filas = []
+    for cruda in lector:
+        fila: dict[str, str] = {}
+        for real, val in cruda.items():
+            campo = canon.get(real)
+            if campo:
+                fila[campo] = (val or "").strip()
+        if any(fila.values()):
+            filas.append(fila)
+    return filas
+
+
+def _extraer_zip(zip_bytes: Optional[bytes]) -> dict[str, bytes]:
+    """ZIP → {nombre_de_archivo_en_minúsculas: bytes}. Nombre por su basename."""
+    import io as _io
+    import zipfile as _zip
+
+    mapa: dict[str, bytes] = {}
+    if not zip_bytes:
+        return mapa
+    try:
+        with _zip.ZipFile(_io.BytesIO(zip_bytes)) as z:
+            for info in z.infolist():
+                if info.is_dir():
+                    continue
+                base = os.path.basename(info.filename)
+                if base:
+                    mapa[base.lower()] = z.read(info)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[MASIVO] ZIP ilegible: {e}")
+    return mapa
+
+
+def _pdfs_de_fila(fila: dict, zip_map: dict[str, bytes]) -> list[tuple[str, bytes, str]]:
+    """Los PDF de una glosa: los que nombra su columna `pdfs` (separados por ;
+    o ,), o —si no la trae— los del ZIP cuyo nombre contiene la factura."""
+    archivos: list[tuple[str, bytes, str]] = []
+    nombres = [n.strip() for n in re.split(r"[;,]", fila.get("pdfs", "") or "") if n.strip()]
+    if nombres:
+        for n in nombres:
+            data = zip_map.get(os.path.basename(n).lower())
+            if data:
+                archivos.append((os.path.basename(n), data, "application/pdf"))
+    elif fila.get("numero_factura"):
+        fac = fila["numero_factura"].strip().lower()
+        for nombre, data in zip_map.items():
+            if fac and fac in nombre:
+                archivos.append((nombre, data, "application/pdf"))
+    return archivos
+
+
+def _texto_plano(html: str) -> str:
+    s = re.sub(r"<br\s*/?>", "\n", html or "", flags=re.IGNORECASE)
+    s = re.sub(r"<[^>]+>", " ", s)
+    s = s.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    return re.sub(r"[ \t]{2,}", " ", s).strip()[:32000]  # tope de celda de Excel
+
+
+def _construir_xlsx_masivo(filas: list[dict]) -> bytes:
+    import io as _io
+
+    from openpyxl import Workbook
+
+    cols = [
+        "NUMERO FACTURA",
+        "CODIGO GLOSA",
+        "VALOR OBJETADO",
+        "TIPO RESPUESTA",
+        "ETAPA PROCESAL",
+        "ACCION IA",
+        "ESTADO",
+        "DICTAMEN",
+        "ERROR",
+    ]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "DICTAMENES"
+    ws.append(cols)
+    for f in filas:
+        ws.append(
+            [
+                f.get("numero_factura", ""),
+                f.get("codigo_glosa", ""),
+                f.get("valor_objetado", ""),
+                f.get("tipo", ""),
+                f.get("etapa_procesal", ""),
+                f.get("accion_ia", ""),
+                f.get("estado", ""),
+                f.get("dictamen", ""),
+                f.get("error", ""),
+            ]
+        )
+    buf = _io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def _procesar_una_masiva(
+    *,
+    job_id: str,
+    indice: int,
+    fila: dict,
+    zip_map: dict[str, bytes],
+    defaults: dict,
+    overrides: dict,
+    current_user: UsuarioRecord,
+) -> None:
+    """Procesa UNA glosa del lote en su propio hilo, con su propia sesión de
+    base de datos y su propio servicio, corriendo la misma `_analizar_impl` del
+    camino single. Nunca lanza: un fallo se registra como fila con error."""
+    import asyncio
+    from io import BytesIO
+
+    from starlette.datastructures import Headers
+
+    from app.services import resultados_masivo as _rm
+
+    factura = fila.get("numero_factura", "") or ""
+    base = {"numero_factura": factura}
+    texto = fila.get("tabla_excel", "") or ""
+    if not texto:
+        _rm.registrar_fila(
+            job_id, {**base, "estado": "error", "error": "fila sin texto de glosa"}, es_error=True
+        )
+        return
+
+    _fab_db = overrides.get(get_db, get_db)
+    _fab_svc = overrides.get(get_glosa_service, get_glosa_service)
+    _gen_db = _fab_db()
+    if hasattr(_gen_db, "__next__"):
+        db = next(_gen_db)
+        _cerrar_db = lambda: next(_gen_db, None)  # noqa: E731
+    else:
+        db = _gen_db
+        _cerrar_db = getattr(db, "close", lambda: None)
+    service = _fab_svc()
+
+    pdfs = _pdfs_de_fila(fila, zip_map)
+    ups = [
+        UploadFile(file=BytesIO(d), filename=n, headers=Headers({"content-type": ct}))
+        for n, d, ct in pdfs
+    ]
+    try:
+        res = asyncio.run(
+            _analizar_impl(
+                eps=fila.get("eps") or defaults.get("eps") or "",
+                etapa=fila.get("etapa") or defaults.get("etapa") or "RESPUESTA A GLOSA",
+                fecha_radicacion=fila.get("fecha_radicacion") or None,
+                fecha_recepcion=fila.get("fecha_recepcion") or None,
+                valor_aceptado=fila.get("valor_aceptado") or "0",
+                tabla_excel=texto,
+                numero_factura=factura or None,
+                numero_radicado=None,
+                tono=defaults.get("tono") or "conciliador",
+                modo_respuesta=fila.get("modo_respuesta")
+                or defaults.get("modo_respuesta")
+                or "defender",
+                valor_aceptado_parcial=0.0,
+                usar_pdf_nativo_soportes=False,
+                trace_id=f"{job_id}:{indice}",
+                archivos=ups or None,
+                db=db,
+                service=service,
+                current_user=current_user,
+            )
+        )
+        _rm.registrar_fila(
+            job_id,
+            {
+                "numero_factura": factura or getattr(res, "factura", "") or "",
+                "codigo_glosa": getattr(res, "codigo_glosa", "") or "",
+                "valor_objetado": getattr(res, "valor_objetado", "") or "",
+                "tipo": getattr(res, "tipo", "") or "",
+                "etapa_procesal": getattr(res, "etapa_procesal", "") or "",
+                "accion_ia": getattr(res, "accion_ia", "") or "",
+                "dictamen": _texto_plano(getattr(res, "dictamen", "") or ""),
+                "estado": "ok",
+                "error": "",
+            },
+        )
+    except Exception as e:  # noqa: BLE001 — se registra, el lote sigue
+        logger.error(f"[MASIVO {job_id}] glosa {indice} ({factura}) cayó: {e}", exc_info=True)
+        _rm.registrar_fila(
+            job_id, {**base, "estado": "error", "error": str(e)[:300]}, es_error=True
+        )
+    finally:
+        try:
+            _cerrar_db()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _orquestar_masivo(
+    *,
+    job_id: str,
+    filas: list[dict],
+    zip_map: dict[str, bytes],
+    defaults: dict,
+    overrides: dict,
+    current_user: UsuarioRecord,
+    concurrencia: int,
+) -> None:
+    """Reparte el lote entre varios hilos (concurrent.futures) y, al terminar,
+    arma el Excel consolidado. Corre en un hilo aparte para no bloquear."""
+    import concurrent.futures as _cf
+
+    from app.services import resultados_masivo as _rm
+
+    try:
+        with _cf.ThreadPoolExecutor(max_workers=concurrencia) as ex:
+            futuros = [
+                ex.submit(
+                    _procesar_una_masiva,
+                    job_id=job_id,
+                    indice=i,
+                    fila=fila,
+                    zip_map=zip_map,
+                    defaults=defaults,
+                    overrides=overrides,
+                    current_user=current_user,
+                )
+                for i, fila in enumerate(filas)
+            ]
+            for _ in _cf.as_completed(futuros):
+                pass
+        _rm.cerrar_ok(job_id, _construir_xlsx_masivo(_rm.filas(job_id)))
+        logger.info(f"[MASIVO {job_id}] lote terminado: {len(filas)} glosas")
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"[MASIVO {job_id}] orquestación cayó: {e}", exc_info=True)
+        _rm.cerrar_error(job_id, str(e))
+
+
+@router.post(
+    "/analizar/masivo",
+    status_code=202,
+    summary="Analizar un LOTE de glosas (CSV + ZIP de PDFs)",
+    description=(
+        "Recibe un CSV con hasta 500 glosas y un ZIP con sus PDF. Encola el "
+        "lote, lo procesa en el fondo (varias a la vez) con la misma lógica del "
+        "análisis single, y deja un Excel consolidado. Devuelve el job_id; el "
+        "avance se sigue con GET /analizar/masivo/{job_id} y el archivo con "
+        "GET /analizar/masivo/{job_id}/resultado."
+    ),
+)
+@limiter.limit("6/minute")
+async def analizar_masivo(
+    request: Request,
+    csv: UploadFile = File(..., description="CSV con las glosas (hasta 500 filas)"),
+    zip: Optional[UploadFile] = File(None, description="ZIP con los PDF de soporte"),
+    eps: Optional[str] = Form(None, description="EPS por defecto si el CSV no la trae"),
+    etapa: Optional[str] = Form("RESPUESTA A GLOSA"),
+    tono: Optional[str] = Form("conciliador"),
+    modo_respuesta: Optional[str] = Form("defender"),
+    concurrencia: int = Form(4, description="Glosas en paralelo (1-8)"),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    import threading
+    import uuid
+
+    from app.services import resultados_masivo as _rm
+
+    csv_bytes = await csv.read()
+    zip_bytes = await zip.read() if zip is not None else None
+
+    filas = _parsear_csv_glosas(csv_bytes)
+    if not filas:
+        raise HTTPException(status_code=400, detail="El CSV no trae glosas legibles.")
+    if len(filas) > _MASIVO_MAX_FILAS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El lote trae {len(filas)} glosas; el máximo es {_MASIVO_MAX_FILAS}.",
+        )
+    zip_map = _extraer_zip(zip_bytes)
+    conc = max(1, min(_MASIVO_MAX_CONCURRENCIA, int(concurrencia or 4)))
+
+    job_id = uuid.uuid4().hex
+    _rm.abrir(job_id, len(filas))
+    defaults = {
+        "eps": eps,
+        "etapa": etapa,
+        "tono": tono,
+        "modo_respuesta": modo_respuesta,
+    }
+    overrides = dict(getattr(request.app, "dependency_overrides", {}) or {})
+    threading.Thread(
+        target=_orquestar_masivo,
+        kwargs=dict(
+            job_id=job_id,
+            filas=filas,
+            zip_map=zip_map,
+            defaults=defaults,
+            overrides=overrides,
+            current_user=current_user,
+            concurrencia=conc,
+        ),
+        daemon=True,
+    ).start()
+    return {"job_id": job_id, "estado": "en_curso", "total": len(filas), "concurrencia": conc}
+
+
+@router.get(
+    "/analizar/masivo/{job_id}",
+    summary="Avance de un lote de análisis masivo",
+)
+async def masivo_estado(
+    job_id: str,
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    from app.services import resultados_masivo as _rm
+
+    e = _rm.consultar(job_id)
+    if e is None:
+        raise HTTPException(status_code=404, detail="No hay un lote con ese identificador.")
+    return e
+
+
+@router.get(
+    "/analizar/masivo/{job_id}/resultado",
+    summary="Descargar el Excel consolidado de un lote",
+)
+async def masivo_resultado(
+    job_id: str,
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    from app.services import resultados_masivo as _rm
+
+    e = _rm.consultar(job_id)
+    if e is None:
+        raise HTTPException(status_code=404, detail="No hay un lote con ese identificador.")
+    archivo = _rm.obtener_archivo(job_id)
+    if archivo is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"El lote todavía no termina ({e['hechas']}/{e['total']}).",
+        )
+    return Response(
+        content=archivo,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="dictamenes_lote_{job_id}.xlsx"'},
+    )
 
 
 @router.post(
