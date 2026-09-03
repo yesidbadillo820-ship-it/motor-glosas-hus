@@ -90,6 +90,33 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 03-09-2026 — Tres candados tras el caso TA0301 (dictamen a ciegas)
+
+Probando la glosa TA0301 en producción, el auditor encontró que el motor
+redactó un dictamen «sin contrato» cuando en realidad el índice de soportes
+estaba a medio reconstruirse — el motor no veía el expediente, no es que no
+existiera. Tres candados (rama `hotfix/analisis-rag-ceguera`):
+
+1. **Candado por ceguera temporal (HTTP 423).** Si el índice de soportes
+   está reconstruyéndose, el botón Analizar responde de una: «el índice se
+   está reconstruyendo, espere un momento» — SIN llamar a la IA y sin
+   guardar nada. Cero dictámenes a ciegas. Ojo operativo: mientras el
+   índice se reconstruye (por ejemplo, tras un «Reindexar soportes»), los
+   análisis mostrarán ese aviso; es lo ordenado y es lo correcto.
+2. **El botón «Marcar como RESPONDIDA» se apaga solo.** Si el control de
+   calidad encuentra hallazgos graves, el puntaje está en zona roja, o la
+   confianza de la IA no supera el umbral del 85 %, el botón de estado
+   final sale GRIS (deshabilitado) con la lista de motivos — ya no existe
+   el «marcar de todos modos» en esos casos. El camino es corregir primero.
+3. **Prohibido citar artículos de memoria.** El modelo citó el «Art. 20 del
+   Decreto 4747» cuando el correcto era el 23 — el número salió de su
+   memoria, no del expediente. El prompt del analizador ahora prohíbe
+   escribir números de artículo, inciso, numeral o parágrafo que no estén
+   textualmente en el contexto que se le inyectó; si el número no está,
+   cita la norma sin número y describe el mandato por su contenido.
+
+Con sus 9 pruebas nuevas y la suite completa en verde.
+
 ### 03-09-2026 — La pantalla se vuelve clínica: pantalla dividida, tablero y semáforo
 
 Rediseño visual ordenado por el auditor, montado SOBRE el sistema de diseño
