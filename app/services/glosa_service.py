@@ -8,6 +8,7 @@ import time
 from datetime import datetime, timedelta
 
 from app.services import reglas_casos_fno as _rcf
+from app.services import ubicacion_soportes as _ubic
 from typing import Optional
 
 import httpx
@@ -10795,6 +10796,32 @@ class GlosaService:
                     logger.info(f"[MIPRES] con_mipres={_con_mipres}")
             except Exception as _e_mip:
                 logger.debug(f"[MIPRES] no aplicada: {_e_mip}")
+
+            # 03-09-2026 (V2, Pilar 3) — EL FOLIO EXACTO, NO «ESTÁ ADJUNTO».
+            # Decir «la epicrisis está adjunta» no prueba nada: al auditor de la
+            # EPS le toca buscarla. Acá Python abre los PDF, encuentra el
+            # documento que la glosa echa de menos y el escrito cita el folio
+            # REAL donde está. Si no aparece en ningún folio, no se cita nada:
+            # la ubicación no se inventa.
+            try:
+                _docs_pedidos = _ubic.documentos_que_pide_la_glosa(texto_base)
+                _pdfs_crudos = list(pdfs_raw_para_multimodal or [])
+                if arg_ia and _docs_pedidos and _pdfs_crudos:
+                    _hallazgos = _ubic.ubicar_documentos(_pdfs_crudos, _docs_pedidos)
+                    _parr_folio = _ubic.parrafo_ubicacion_soportes(_hallazgos)
+                    if _parr_folio and "ÍNTEGRAMENTE VISIBLE" not in arg_ia.upper():
+                        arg_ia = arg_ia.rstrip() + " " + _parr_folio
+                        _correcciones_previas.append(
+                            "Ubiqué en los PDF el soporte que la entidad echa de menos y el "
+                            "escrito ahora cita el folio exacto: "
+                            + "; ".join(
+                                f"{h['documento']} → folio {h['folio']} de {h['archivo']}"
+                                for h in _hallazgos[:3]
+                            )
+                        )
+                        logger.info(f"[FOLIOS-REALES] {_hallazgos}")
+            except Exception as _e_fol:
+                logger.debug(f"[FOLIOS-REALES] no aplicada: {_e_fol}")
 
             arg_limpio = arg_ia.replace("<br/>", " ").replace("*", "")
             # Ronda 17 (26-jun-2026): aplicar normalización de MAYÚSCULAS
