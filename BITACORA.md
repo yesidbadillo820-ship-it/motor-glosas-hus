@@ -90,6 +90,35 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 03-09-2026 — El Auto-Pilot queda ENCENDIDO y con su prueba en vivo
+
+Con los tres escudos en verde, el auditor dio la orden: encender el
+interruptor. Quedó así:
+
+- **El arranque enciende el interruptor.** `AUTO_PILOT_ENABLED` queda en
+  `true` en los dos arranques oficiales: el de Docker (`docker-compose.yml`,
+  que además ahora sí le pasa la variable al contenedor — tenía el mismo
+  defecto silencioso del incidente del agente de lotes de julio) y el del PC
+  con Windows (`tools/servidor_motor_local.cmd`). El `.env` local sigue
+  mandando: con `AUTO_PILOT_ENABLED=0` ahí, se apaga sin tocar el código.
+- **Encendido no significa suelto.** El worker corre solo cuando un
+  coordinador lo dispara; lo que pasa las reglas queda en cuarentena
+  (bandeja 📤 Borradores) y libera una persona con su clic. Las cuatro
+  salvaguardas y los tres escudos siguen intactos.
+- **Nuevo bot de prueba en vivo:** `tools\probar_auto_pilot.py`. Corre un
+  ciclo del worker sobre las glosas recientes y muestra las tres evidencias:
+  el conteo del ciclo, los borradores en cuarentena y la bitácora con
+  confianza, riesgo y el modelo que escribió cada dictamen
+  (`modelo_utilizado`). Se probó primero en una base de demostración: la
+  candidata de $180.000 con confianza 95 % quedó en cuarentena, y la de
+  $2.300.000, la abstención y la de confianza 50 % quedaron rechazadas con
+  su porqué escrito.
+
+**PARA CORRER LA PRUEBA EN VIVO (en el PC del servidor):** `git pull`,
+reiniciar el motor, y `venv\Scripts\python.exe tools\probar_auto_pilot.py
+--limite 5` (piloto corto primero, como siempre). Pegar la salida en el chat
+para dejar constancia.
+
 ### 03-09-2026 — Tres escudos de resiliencia antes de encender el Auto-Pilot
 
 El auditor revisó el piloto automático y puso una condición para encenderlo:
@@ -121,10 +150,9 @@ tres protecciones contra fallas de infraestructura (rama
 
 Todo con sus pruebas (21 nuevas) y la suite completa en verde.
 
-**PENDIENTE.** Encender `AUTO_PILOT_ENABLED` sigue siendo decisión del
-auditor; con estos tres escudos la condición técnica quedó cumplida. Al
-desplegar: `git pull` + reiniciar uvicorn (la columna nueva de la bitácora se
-agrega sola al arrancar).
+**PENDIENTE (resuelto el mismo día — ver la entrada de arriba).** Encender
+`AUTO_PILOT_ENABLED` era decisión del auditor; la dio ese mismo día y el
+interruptor quedó encendido desde el arranque.
 
 ### 03-09-2026 — V2, Pilar 2: el piloto automático, con la máquina a raya
 

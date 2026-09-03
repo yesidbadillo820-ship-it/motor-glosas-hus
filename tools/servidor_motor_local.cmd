@@ -64,6 +64,14 @@ if exist "%REPO%\config\soportes_root.txt" (
   )
 )
 set "SOPORTES_LOCAL_ROOT=%REPO%\data\soportes"
+rem Auto-Pilot Zero-Touch (V2 Pilar 2 + escudos de resiliencia).
+rem ENCENDIDO por orden del auditor (03-09-2026) tras dejar los tres
+rem escudos en verde. Encendido NO radica nada solo: el worker corre
+rem cuando un coordinador lo dispara, lo que pasa sus reglas queda en
+rem cuarentena PENDIENTE_APROBACION_HUMANA y libera una persona.
+rem Para apagarlo sin tocar este archivo: AUTO_PILOT_ENABLED=0 en el
+rem .env (el .env se lee despues y le gana a este valor por defecto).
+set "AUTO_PILOT_ENABLED=true"
 if not exist "%REPO%\data\soportes" mkdir "%REPO%\data\soportes"
 set "LOG=%REPO%\data\servidor.log"
 
