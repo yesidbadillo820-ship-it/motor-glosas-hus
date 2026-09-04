@@ -74,6 +74,24 @@ CATALOGO_BOTS: tuple[BotHUS, ...] = (
         riesgo="Correr piloto de 1 factura antes del masivo.",
     ),
     _b(
+        id="coosalud-radicar",
+        nombre="Radicar respuestas en COOSALUD (autónomo)",
+        sistema="COOSALUD",
+        que_hace=(
+            "Toma del libro de radicación las glosas que un humano ya aprobó y "
+            "las radica solo en el portal, guardando el comprobante."
+        ),
+        donde_corre="pc_hus",
+        disparo="cola",
+        archivo="tools/radicar_glosas_coosalud.py",
+        comando_pc="py tools/radicar_glosas_coosalud.py",
+        parametros_ayuda="--limite N --piloto-ok (sin eso, radica UNA sola).",
+        riesgo=(
+            "PILOTO OBLIGATORIO: radica 1 factura y se detiene. Revísela en el "
+            "portal antes de pedir el masivo con --piloto-ok."
+        ),
+    ),
+    _b(
         id="coosalud-verificar",
         nombre="Verificar radicación COOSALUD",
         sistema="COOSALUD",
