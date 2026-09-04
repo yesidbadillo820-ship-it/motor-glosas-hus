@@ -1,5 +1,31 @@
 # Registro de cambios
 
+## Sesión 04-sep-2026 (hotfix) — Rescate de filas RECLAMADAS
+
+Tapa una fuga del Pilar 1: `reclamar_una` marcaba la fila `RECLAMADA` y, si el
+bot moría en el paso siguiente (playwright ausente, navegador que no arranca,
+portal que no abre), la fila quedaba invisible para todos — los demás equipos
+solo ven `PENDIENTE` y las personas miran las atoradas.
+
+- **`radicacion_eps.rescatar_reclamada()`** — devuelve la fila a `PENDIENTE`,
+  escribe el diagnóstico en `ultimo_error` y limpia el sello del equipo. Solo
+  actúa sobre `RECLAMADA`: cualquier otro estado responde `no_rescatable`, y en
+  particular `EN_PORTAL_SIN_CONFIRMAR` no se trae de vuelta jamás.
+- **Cortacircuito** — a `MAX_INTENTOS_RESCATE` (3) muta a `HUMANO_REQUERIDO` en
+  vez de seguir rebotando. El contador NO se incrementa en el rescate:
+  `reclamar_una` ya lo sumó al entregar la fila, y volver a sumarlo haría
+  saltar el corte a las dos vueltas en vez de a las tres.
+- **`POST /radicacion/{id}/rescatar`** — puerta del agente (token de máquina).
+- **`radicador_comun`** — `ColaMotor.rescatar()` (se traga los fallos de red:
+  se llama cuando el bot ya se está muriendo) y perímetro de rescate en
+  `correr()` alrededor del import de playwright, del arranque del navegador y
+  de `abrir_sesion`. `SesionNoDisponible` sigue yendo a `humano_requerido`, no
+  a la cola: un portal con captcha no es un equipo enfermo.
+- **27 pruebas nuevas** (`tests/test_api/test_rescate_fila_reclamada.py`),
+  incluida la caída del worker con la fila en la mano y el ciclo completo de
+  tres intentos hasta el cortacircuito.
+- Máquina de estados actualizada en `docs/ARQUITECTURA_V3_PILAR1_RPA.md`.
+
 ## Sesión 04-sep-2026 — V3 Pilar 2: Pre-Auditoría Concurrente (backend)
 
 El HIS del hospital consulta el motor **antes de timbrar** una factura y recibe

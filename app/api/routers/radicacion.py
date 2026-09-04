@@ -228,6 +228,27 @@ def fallida(
     return r
 
 
+@router.post("/{radicacion_id}/rescatar", summary="El bot se cayó con la fila en la mano")
+def rescatar(
+    radicacion_id: int,
+    body: ErrorIn,
+    db: Session = Depends(get_db),
+    _: None = Depends(verificar_token_agente),
+):
+    """Devuelve a la cola una fila que quedó RECLAMADA por una caída temprana
+    del bot (playwright sin instalar, Chrome sin abrir, el navegador que no
+    arranca), para que otro equipo sano la tome.
+
+    A los 3 intentos deja de rebotar y pasa a HUMANO_REQUERIDO. Una fila que
+    ya salió de RECLAMADA no se toca: responde `no_rescatable` y dice en qué
+    estado está — nunca se trae de vuelta algo que ya se pulsó en el portal.
+    """
+    r = svc.rescatar_reclamada(db, radicacion_id, body.error)
+    if r.get("estado") == "no_existe":
+        raise HTTPException(404, "No existe esa radicación.")
+    return r
+
+
 @router.post("/{radicacion_id}/humano-requerido", summary="No es automatizable")
 def humano_requerido(
     radicacion_id: int,

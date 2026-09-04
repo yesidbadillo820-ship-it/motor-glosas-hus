@@ -90,6 +90,41 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 04-09-2026 (tarde, 6) — Las glosas que se perdían cuando el bot se caía
+
+**El hueco.** Cuando un bot de radicación pide una glosa, el motor se la
+entrega y la marca como «tomada». Si el bot se moría en el segundo siguiente
+—porque a ese PC le falta un programa, porque el navegador no arrancó, porque
+el portal no abrió—, esa glosa **se quedaba tomada para siempre**:
+
+- los demás computadores no la veían, porque solo miran las que están libres;
+- las personas tampoco, porque la bandeja muestra las atoradas;
+- y la glosa desaparecía sin que nadie se enterara.
+
+Nadie la había perdido de vista a propósito: sencillamente no había forma de
+saber que existía.
+
+**Lo que se hizo.** Ahora el bot, al caerse, **suelta la glosa antes de
+morirse**: la devuelve a la cola para que otro computador sano la tome, y deja
+escrito de qué se murió («a este PC le falta playwright», «no arrancó el
+navegador»). El auditor ve el motivo en la bandeja, en la columna del último
+error.
+
+**Para que no rebote sin fin.** A los **3 intentos**, la glosa deja de dar
+vueltas y pasa a «la revisa una persona». Si un computador falló tres veces en
+el mismo punto, no es mala suerte: le falta algo, y una cuarta pasada no lo va
+a arreglar sola.
+
+**Lo que sigue intacto, y es lo importante.** Una glosa que **ya se pulsó en el
+portal** NO se devuelve a la cola por nada del mundo. Ahí no se sabe si quedó
+radicada, y devolverla sería invitar a radicarla dos veces ante la EPS — el
+daño que este módulo existe para evitar. Esa sigue saliendo solo por la
+bandeja, cuando una persona mira el portal y dice qué pasó.
+
+27 pruebas nuevas, entre ellas la caída del bot con la glosa en la mano.
+
+---
+
 ### 04-09-2026 (tarde, 5) — Arranca el Pilar 2: el motor revisa la factura ANTES de timbrarla
 
 **El cambio de reloj.** Hasta hoy el hospital audita **después**: la EPS glosa

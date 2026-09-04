@@ -133,12 +133,18 @@ toda la lógica de arriba.
 
 ```
 PENDIENTE ─▶ RECLAMADA ─▶ EN_PORTAL_SIN_CONFIRMAR ─▶ RADICADA
-                  │                 │
-                  │                 └─▶ VERIFICAR_MANUAL ─▶ RADICADA
-                  │                                      └─▶ PENDIENTE
-                  ├─▶ FALLIDA            (reintentable)
-                  └─▶ HUMANO_REQUERIDO   (captcha, token, portal cambiado,
-                                          dictamen obsoleto)
+     ▲            │                 │
+     │            │                 └─▶ VERIFICAR_MANUAL ─▶ RADICADA
+     │            │                                      └─▶ PENDIENTE
+     │            ├─▶ FALLIDA            (reintentable)
+     │            └─▶ HUMANO_REQUERIDO   (captcha, token, portal cambiado,
+     │                                    dictamen obsoleto)
+     │
+     └── RESCATE: el bot se cayó ANTES de tocar el portal (04-09-2026).
+         Vuelve a la cola para que otro equipo la tome; a los 3 intentos
+         (`MAX_INTENTOS_RESCATE`) pasa a HUMANO_REQUERIDO en vez de seguir
+         rebotando. SOLO desde RECLAMADA: una fila que ya se pulsó en el
+         portal NO se trae de vuelta jamás — ver §7.
 ```
 
 | Estado | Significa |
