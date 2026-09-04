@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 04-09-2026
+**Última actualización:** 04-09-2026 (tarde)
 
 ---
 
@@ -10496,6 +10496,31 @@ solo 3 notas rechazadas por CUV en la grilla (332871, 332846, 332847, a la
 espera de SISTEMAS) más la nota nueva 332519 con su triada armada; y el acta
 863 de FAMISANAR quedó armada desde el detalle 7883 de la EPS (586 facturas,
 $987 millones conciliados al peso, en xlsm y xlsx).
+
+### 04-09-2026 (tarde) — Nace el BOT RPA del paquete GI (Dispensario de punta a punta)
+
+El auditor amplió las instrucciones y quedó construido el **bot que arma el
+paquete completo en un solo comando**
+(`tools/glosas_dispensario/bot_lote_dispensario.py`): pide el código GI,
+crea la carpeta del paquete con su subcarpeta `soportes`, genera las
+respuestas (heredando la directriz CL: las médicas/mixtas con causal CL van
+a la hoja "PARA GESTION MEDICA" y el bot no las toca), **busca el PDF de
+cada factura en las carpetas de radicación de la unidad Y:** y lo copia al
+paquete, **lee cada PDF con lectura en cascada** (pdfplumber → PyPDF2 → OCR
+con Tesseract para escaneadas, `extraer_factura_pdf.py`) y ancla a la
+respuesta SOLO lo que de verdad se leyó (paciente y valor total — lo
+ilegible no se inventa), **cruza cada glosa de tarifas con el tarifario del
+contrato 440** que entregó Contratación (`tarifario_440.py`: anexo 6.2 por
+CUPS/código IPS y anexos de medicamentos por CUM, 12.128 códigos indexados)
+citando la tarifa pactada exacta, corre el robot del portal (piloto primero)
+y deja las evidencias en el PDF del paquete. Todo con sus pruebas (9 en
+total con las de la directriz).
+
+**Probado con datos reales:** en el lote del 04-09, 59 de las 80 objeciones
+de tarifas encontraron su tarifa pactada en el anexo y la citan con código,
+descripción y valor (las 21 sin pacto son códigos FMO de farmacia — a esas
+no se les cita nada, regla de no invención). Quedó entregada la **versión
+CON TARIFAS** del Excel del lote 04-sep.
 
 ---
 

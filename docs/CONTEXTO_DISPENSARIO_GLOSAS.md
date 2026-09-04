@@ -291,3 +291,28 @@ Stop-Process -Name python, py -Force -ErrorAction SilentlyContinue
    bot impide ese cruce y daña la conciliación. Las objeciones excluidas
    conservan su número de la grilla, así el robot responde las demás sin
    correrse de fila.
+
+## El bot RPA del paquete GI (`bot_lote_dispensario.py`, 04-09-2026)
+
+Orquesta el lote completo en un solo comando (pide el GI en pantalla):
+
+    py tools\glosas_dispensario\bot_lote_dispensario.py --excel "D:\...\GLOSAS_X.xlsx"
+
+1. Crea `D:\USUARIO CARTERA\Documents\<GI>\soportes`.
+2. Genera las respuestas con `gen_lote.py` (hereda la directriz CL).
+3. Busca el PDF de cada factura en las carpetas de radicación de `Y:` y lo
+   copia a `soportes`.
+4. Lee cada PDF con la cascada pdfplumber → PyPDF2 → OCR
+   (`extraer_factura_pdf.py`) y ancla a la respuesta SOLO lo que se leyó
+   (paciente y valor total). Nada leído = nada agregado.
+5. Cruza cada glosa de tarifas con el tarifario del contrato 440
+   (`tarifario_440.py`: anexo 6.2 de servicios por CUPS/código IPS y anexos
+   de medicamentos por CUM) y cita la tarifa pactada exacta; sin
+   coincidencia no cita nada.
+6. Corre el robot del portal (`--piloto HUS...` primero, siempre) y deja las
+   evidencias de la corrida en `<GI>\<GI>_EVIDENCIAS.pdf`.
+
+Con `--sin-cargue` prepara todo (carpeta, soportes, Excel enriquecido) sin
+tocar el portal. Los tarifarios se pasan con `--tarifario-servicios` y
+`--tarifario-medicamentos` (por defecto busca en
+`D:\USUARIO CARTERA\Documents\TARIFARIO_440\`).
