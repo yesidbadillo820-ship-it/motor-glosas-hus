@@ -163,3 +163,125 @@ def test_cascada_sin_texto_ni_ocr_no_inventa(tmp_path):
     datos = extraer_datos_factura(ruta)
     assert datos["paciente"] is None and datos["total"] is None
     assert not datos["ok"] and datos["metodo"].startswith("SIN_LECTURA")
+
+
+# ── El constructor con trazabilidad (parrafo de evidencia) ──────────────────
+def _datos_pdf(**kw):
+    base = dict(
+        archivo="HUS0000500001.pdf",
+        metodo="pdfplumber",
+        ok=True,
+        paciente=None,
+        total=None,
+        servicios=[],
+    )
+    base.update(kw)
+    return base
+
+
+def test_parrafo_completo_cita_pdf_paciente_servicio_y_coincidencia():
+    from bot_lote_dispensario import parrafo_evidencia
+
+    tarifa = dict(precio=180000, descripcion="CONSULTA NEUROLOGIA", fuente="anexo 6.2 · SOAT")
+    p = parrafo_evidencia(
+        _datos_pdf(paciente="RODRIGUEZ GOMEZ MARIA", total=500000),
+        ("890275H CONSULTA NEUROLOGIA 180000", 180000),
+        tarifa,
+        valor_objetado=999,
+        cups="890275H",
+    )
+    assert p.index("AL REVISAR EL DOCUMENTO DE SOPORTE HUS0000500001.PDF") == 0
+    assert "SE EVIDENCIA LA ATENCION PRESTADA AL USUARIO RODRIGUEZ GOMEZ MARIA" in p
+    assert (
+        "EL DOCUMENTO DETALLA EL COBRO DEL SERVICIO 890275H CONSULTA NEUROLOGIA 180000 POR VALOR DE $180.000"
+        in p
+    )
+    assert "AL CRUZAR ESTA EVIDENCIA CON EL CONTRATO 440-DIGSA-DMBUG-2025" in p
+    assert "CORRESPONDE EXACTAMENTE A LA TARIFA PACTADA EN EL ANEXO 6.2 ($180.000" in p
+    assert "CAUSAL DE GLOSA ES INFUNDADA" in p
+
+
+def test_parrafo_sin_coincidencia_no_afirma_exactitud():
+    from bot_lote_dispensario import parrafo_evidencia
+
+    tarifa = dict(precio=180000, descripcion="CONSULTA", fuente="anexo 6.2 · SOAT")
+    p = parrafo_evidencia(
+        _datos_pdf(paciente="PEREZ JUAN"),
+        ("CONSULTA 175000", 175000),  # valor leido DISTINTO de la tarifa
+        tarifa,
+        valor_objetado=999,
+        cups="890275H",
+    )
+    assert "EXACTAMENTE" not in p and "INFUNDADA" not in p
+    assert "LA TARIFA PACTADA PARA EL CODIGO 890275H" in p and "$180.000" in p
+
+
+def test_parrafo_valor_objetado_igual_a_tarifa_sin_pdf():
+    from bot_lote_dispensario import parrafo_evidencia
+
+    tarifa = dict(precio=35136, descripcion="HEMOGRAMA", fuente="anexo 6.2 · LAB")
+    p = parrafo_evidencia(None, None, tarifa, valor_objetado=35136, cups="902210AMB")
+    assert p.startswith("AL VERIFICAR EL CONTRATO 440-DIGSA-DMBUG-2025")
+    assert "VALOR OBJETADO CORRESPONDE EXACTAMENTE" in p
+
+
+def test_parrafo_sin_datos_ni_tarifa_es_none():
+    from bot_lote_dispensario import parrafo_evidencia
+
+    assert parrafo_evidencia(None, None, None, 1000, "X") is None
+    assert parrafo_evidencia(_datos_pdf(), None, None, 1000, "X") is None  # PDF sin datos legibles
+
+
+def test_hallar_servicio_en_pdf_por_codigo_y_por_descripcion():
+    from bot_lote_dispensario import hallar_servicio_en_pdf
+
+    filas = [
+        ["1", "890201", "CONSULTA GENERAL", "35.136"],
+        ["2", "873501H", "FLUOROSCOPIA COMO GUIA", "137.591"],
+    ]
+    s = hallar_servicio_en_pdf(filas, "873501H", "OTRA COSA")
+    assert s and "FLUOROSCOPIA" in s[0] and s[1] == 137591
+    s2 = hallar_servicio_en_pdf(filas, "999999", "CONSULTA GENERAL MEDICINA")
+    assert s2 and "CONSULTA GENERAL" in s2[0] and s2[1] == 35136
+    assert hallar_servicio_en_pdf(filas, "111111", "NADA QUE VER AQUI") is None
+
+
+def test_apertura_entra_despues_del_encabezado_y_antes_del_argumento(tmp_path):
+    ruta = tmp_path / "resp.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Respuestas Glosa"
+    ws.append(
+        [
+            "Factura",
+            "# Objeción",
+            "Cód.",
+            "Servicio",
+            "Valor Objetado",
+            "Valor Aceptado",
+            "Cod Respuesta",
+            "Detalle Respuesta",
+        ]
+    )
+    detalle = (
+        "ESE HUS NO ACEPTA LA GLOSA APLICADA A LA FACTURA HUS0000500001. FRENTE AL CARGO "
+        "OBJETADO BAJO EL CONCEPTO TA0601: EL ARGUMENTO DEL MOTOR. POR LO EXPUESTO, "
+        "SE SOLICITA EL LEVANTAMIENTO TOTAL."
+    )
+    ws.append(["HUS0000500001", 1, "TA0601", "890201 - CONSULTA", 1000, 0, "RE9901", detalle])
+    wb.save(ruta)
+
+    n = enriquecer_excel(
+        ruta, apertura_por_linea={("HUS0000500001", 1): "AL REVISAR EL SOPORTE X."}
+    )
+    assert n == 1
+    d = list(load_workbook(ruta)["Respuestas Glosa"].iter_rows(min_row=2, values_only=True))[0][7]
+    k_enc = d.index("BAJO EL CONCEPTO TA0601:")
+    assert k_enc < d.index("AL REVISAR EL SOPORTE X.") < d.index("EL ARGUMENTO DEL MOTOR")
+    # idempotente
+    assert (
+        enriquecer_excel(
+            ruta, apertura_por_linea={("HUS0000500001", 1): "AL REVISAR EL SOPORTE X."}
+        )
+        == 0
+    )
