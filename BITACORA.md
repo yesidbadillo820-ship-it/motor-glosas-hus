@@ -90,6 +90,28 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 04-09-2026 (tarde, 4) — Frente ADRES: validador de ARCHIVOS PLANOS de la Circular 022
+- Nuevo bot **`tools/adres/validar_planos_adres.py`** + doble clic
+  **`VALIDAR_PLANOS_ADRES.cmd`** (Python puro, no instala nada): valida los
+  archivos planos ANTES de radicarlos ante la ADRES.
+- Qué revisa: **(1) la nomenclatura del nombre** de los 5 archivos de la
+  Circular — FURIPS1, FURIPS2 y FURTRAN (prefijo + habilitación de 12
+  dígitos + fecha DDMMAAAA), FUCTAS2 (aseguradora de 6 dígitos + período
+  MMAAAA) y FURCEN (código del evento + fecha + hora HHMM) — con fechas y
+  horas que existan de verdad; **(2) las reglas generales**: solo comas como
+  separador, sin comillas, sin caracteres raros, fechas DD/MM/AAAA, números
+  sin puntos ni comas, sin rellenos de ceros o espacios, longitudes MÁXIMAS;
+  **(3) la malla campo a campo** de FURIPS 1 (102 campos) y FURIPS 2 (9),
+  reutilizando las tablas ya construidas de `validar_furips.py`.
+- El reporte sale en **CSV (se abre en Excel) y JSON** con: archivo, línea,
+  campo que falla, valor y descripción del error.
+- 20 pruebas automáticas en verde (nomenclaturas malas, fecha 32/13, hora
+  25:61, comillas, miles, decimales, ceros de relleno, obligatorios vacíos,
+  archivo vacío, JSON avisado).
+- OJO: las mallas campo a campo de **FURTRAN, FUCTAS y FURCEN (Tablas 3, 4 y
+  5)** quedaron como punto de extensión — hace falta volver a subir la
+  Circular al chat para cargarlas sin inventar nada (pendiente).
+
 ### 04-09-2026 (tarde, 3) — Glosas ADRES: ya se puede REASIGNAR el área (y dejarlas todas en FACTURACIÓN)
 
 **Lo que reportó Yesid.** En Glosas ADRES, las glosas de la causal 4506 (las
@@ -10402,6 +10424,12 @@ TARIFAS).
 - **La pronunciación escrita es aproximada.** Cuando haya con quién
   confirmarla (un hablante o un curso formal), conviene repasarla.
 
+
+### Validador de archivos planos ADRES (04-09)
+- **Cargar las mallas de FURTRAN, FUCTAS y FURCEN (Tablas 3, 4 y 5):** volver
+  a subir al chat la Circular 022 de 2023 (el Word que se subió en julio ya
+  no está en el entorno) para copiar los campos exactos SIN inventar. Hoy el
+  bot ya valida su nomenclatura y las reglas generales.
 
 ### Objeciones del ADRES en DGH (28-08, al cierre)
 - **~~Cargar las 40 facturas que faltan~~ — HECHO en su mayor parte.** Al cierre
