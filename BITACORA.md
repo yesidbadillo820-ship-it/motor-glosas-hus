@@ -151,6 +151,22 @@ pantalla se hace después.
 
 ---
 
+### 04-09-2026 (noche) — Validador de planos: informe EXCEL detallado
+- El auditor corrió el validador con sus FURIPS reales (3 reclamaciones,
+  262 líneas de servicios) y pidió el reporte en **Excel detallado** en vez
+  del CSV. Hecho: ahora el bot entrega `REPORTE_PLANOS_ADRES_<fecha>.xlsx`
+  con 5 hojas — **RESUMEN** (semáforo por archivo + los errores más
+  repetidos para corregir en bloque), **HALLAZGOS** (solo errores y
+  advertencias, con filtros), **POR CAMPO** (agrupado: qué campo corregir,
+  cuántas veces y en qué líneas), **AVISOS** (los informativos aparte, para
+  que no estorben) y **LEYENDA**. CSV y JSON siguen disponibles con
+  `--formato`.
+- En sus archivos reales encontró de una vez: una coma de más en la línea 3
+  del FURIPS1 (corre todos los campos), registros INVIMA de 17 caracteres
+  donde la Circular permite 15, descripciones con comillas y comas
+  internas, naturaleza del evento '1' en vez de '01' y espacios de relleno.
+- 21 pruebas automáticas en verde.
+
 ### 04-09-2026 (tarde, 4) — Frente ADRES: validador de ARCHIVOS PLANOS de la Circular 022
 - Nuevo bot **`tools/adres/validar_planos_adres.py`** + doble clic
   **`VALIDAR_PLANOS_ADRES.cmd`** (Python puro, no instala nada): valida los
