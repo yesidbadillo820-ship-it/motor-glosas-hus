@@ -90,6 +90,30 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 04-09-2026 (noche, 4) — Entregado el Excel del lote 04-sep, y un tercer hueco de lectura tapado
+
+**Lo que se entregó.** El Excel del lote del 04 de septiembre quedó armado y
+en manos del auditor: **88 respuestas para cargar** (63 facturas, $17.060.666
+objetados) más las **6 objeciones CL** de glosas médicas y mixtas aisladas en
+su hoja, que las trabaja el equipo médico. De las 88 líneas, 62 tienen su
+tarifa del contrato 440 identificada y 59 la citan en el texto.
+
+**Con una salvedad dicha de frente:** ese archivo se generó desde el
+computador de Claude, que **no ve la unidad `Y:`**, así que ninguna factura
+pudo leerse en PDF y las columnas del cotejo salieron sin el valor facturado.
+Para que el cotejo salga completo hay que correr el mismo bot en el equipo de
+cartera, donde sí están los soportes. Las respuestas son las mismas.
+
+**El tercer error de lectura.** Revisando el lector contra renglones como los
+que traen las facturas reales aparecieron dos casos más en los que no se leía
+ningún valor: cuando el PDF devuelve **el renglón entero dentro de una sola
+celda** (`890275H CONSULTA 1 192.600 192.600`), las letras del código hacían
+descartar toda la línea; y una celda escrita `$ 192.600` perdía el valor por
+el espacio. Ahora se mira palabra por palabra, así que en el mismo renglón
+pueden convivir el código, la fecha, el NIT y los importes sin que ninguno se
+confunda con plata.
+
+
 ### 04-09-2026 (noche, 3) — La respuesta ahora se escribe según lo que dice el cotejo
 
 **Lo que faltaba.** El cotejo ya sabía si el cobro estaba a tarifa, si el
@@ -11352,6 +11376,21 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     al tórax se le descontaron $7.800 cuando se aceptó por $758.700.
 
 ### Dispensario — respuesta de glosas SIMED y conciliación
+0. **(04-09, lo primero de mañana) Correr el lote del 04 de septiembre.** El
+   Excel ya está entregado (`respuestas_glosa_DISPENSARIO_04SEP_FINAL.xlsx`,
+   88 respuestas / 63 facturas / $17.060.666). Dos pasos, en el equipo de
+   cartera y no en el chat, porque allá sí se ven los soportes de la `Y:`:
+   primero **volver a generarlo con el bot** para que las columnas del cotejo
+   salgan llenas (el que se entregó salió sin el valor facturado), y después
+   el cargue: piloto con HUS0000542497 y luego `--todas --reporte`. Falta el
+   **código GI** del paquete para la carpeta y el PDF de evidencias. Las 6
+   objeciones CL de la hoja "PARA GESTION MEDICA" no las sube el bot: van al
+   equipo médico.
+0-bis. **Pedirle a Contratación el modificatorio de tarifas 2026 y la
+   resolución del hospital.** Es el documento que tumba de una sola vez las
+   43 glosas del lote 04-sep que vienen con el aumento del año (24 al 7% y 19
+   al 31,25% por encima del anexo). El bot ya las tiene marcadas una por una
+   en la hoja «COTEJO DE COBRO».
 10. **Las 3 facturas de junio** (518186 / 515107 / 515773): en el pantallazo
     de pendientes del 05-08 **ya no figuran por cargar**. Verificar en el
     portal cómo quedaron radicadas (¿respuesta cargada o cerradas por
