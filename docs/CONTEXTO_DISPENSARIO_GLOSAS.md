@@ -282,3 +282,12 @@ Stop-Process -Name python, py -Force -ErrorAction SilentlyContinue
 8. **El portal del DMBUG NO siempre tiene `RE9901`** como código de respuesta
    válido — depende del tipo de glosa. Si el dropdown rechaza el código del
    Excel, mirar qué códigos ofrece el portal y ajustar el Excel.
+9. **Directriz del 03-09-2026 — las CL médicas/mixtas NO las responde el bot.**
+   Si la glosa es de tipo Médica o Mixta y el servicio tiene causal `CL`, el
+   generador (`gen_lote.py`) la omite del cargue y la aísla en la hoja
+   **"PARA GESTION MEDICA"** del mismo Excel: esas quedan a gestión manual del
+   equipo médico. La razón: cuando el equipo médico revisa y acepta la glosa,
+   debe cruzar una nota crédito — y una respuesta genérica ya cargada por el
+   bot impide ese cruce y daña la conciliación. Las objeciones excluidas
+   conservan su número de la grilla, así el robot responde las demás sin
+   correrse de fila.
