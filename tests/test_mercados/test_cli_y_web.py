@@ -47,7 +47,7 @@ def test_el_catalogo_esta_completo():
 
 def test_todos_los_comandos_existen():
     validos = set(construir_parser()._subparsers._group_actions[0].choices)
-    assert validos == {"patrones", "ficha", "revisar", "detectar", "medir", "exportar"}
+    assert validos == {"patrones", "ficha", "revisar", "vela", "detectar", "medir", "exportar"}
 
 
 def test_listar_los_patrones(capsys):
@@ -182,3 +182,71 @@ def test_el_grafico_no_se_lleva_el_historico_entero(velas):
     """Un CSV de veinte años dentro del HTML lo volvería inabrible en el celular."""
     datos = construir_datos(velas, "X")
     assert len(datos["grafico"]) <= 120
+
+
+# ------------------------------------------------------- ver la vela dibujada
+# Duda razonable del usuario: «el CSV son solo datos, no dice nada de velas».
+# Sí lo dice: una vela ES esos cuatro números. El comando lo demuestra.
+
+
+def test_el_dibujo_marca_los_cuatro_precios():
+    from mercados.dibujo import en_texto
+
+    v = Vela(date(2026, 8, 28), 1.1652, 1.1659, 1.1578, 1.1585)
+    texto = en_texto(v)
+    for etiqueta in ("máximo", "apertura", "cierre", "mínimo"):
+        assert etiqueta in texto
+    for precio in ("1.16590", "1.16520", "1.15850", "1.15780"):
+        assert precio in texto
+
+
+def test_la_vela_que_sube_va_hueca_y_la_que_baja_llena():
+    """La forma lleva el significado; el color no entra en la consola."""
+    from mercados.dibujo import en_texto
+
+    sube = Vela(date(2026, 1, 2), 10.0, 11.0, 9.5, 10.8)
+    baja = Vela(date(2026, 1, 3), 10.8, 11.0, 9.5, 10.0)
+    assert "█" not in en_texto(sube)
+    assert "█" in en_texto(baja)
+
+
+def test_las_medidas_son_las_que_el_libro_pide():
+    """«Mecha inferior de al menos dos veces el cuerpo» — la cuenta, hecha."""
+    from mercados.dibujo import medidas
+
+    martillo = Vela(date(2026, 1, 2), 10.0, 10.25, 8.0, 10.2)
+    texto = "\n".join(medidas(martillo))
+    assert "mecha inferior" in texto
+    assert "veces el cuerpo" in texto
+
+
+def test_una_vela_sin_cuerpo_no_divide_por_cero():
+    from mercados.dibujo import medidas
+
+    doji = Vela(date(2026, 1, 2), 10.0, 10.5, 9.5, 10.0)
+    assert "no tiene cuerpo" in "\n".join(medidas(doji))
+
+
+def test_el_comando_vela_dice_que_patrones_encajan(tmp_path, velas):
+    csv = tmp_path / "h.csv"
+    csv.write_text(
+        "Fecha,Apertura,Máximo,Mínimo,Cierre\n"
+        + "\n".join(f"{v.fecha},{v.apertura},{v.maximo},{v.minimo},{v.cierre}" for v in velas),
+        encoding="utf-8",
+    )
+    lineas = []
+    assert main(["vela", str(csv), "--cuantas", "3"], salida=lineas.append) == 0
+    texto = "\n".join(lineas)
+    assert "cuerpo" in texto and "mecha superior" in texto
+    assert "PATRONES QUE ENCAJAN" in texto or "Ningún patrón" in texto
+
+
+def test_pedir_una_fecha_que_no_esta_lo_dice_con_el_rango(tmp_path, velas):
+    csv = tmp_path / "h.csv"
+    csv.write_text(
+        "Fecha,Apertura,Máximo,Mínimo,Cierre\n"
+        + "\n".join(f"{v.fecha},{v.apertura},{v.maximo},{v.minimo},{v.cierre}" for v in velas),
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit, match="No hay sesión"):
+        main(["vela", str(csv), "--fecha", "1999-01-01"], salida=lambda _: None)

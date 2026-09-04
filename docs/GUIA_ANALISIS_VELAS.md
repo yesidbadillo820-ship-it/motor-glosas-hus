@@ -48,12 +48,51 @@ encontró, en vez de fallar sin explicación.
 python -m mercados patrones                 # los 28, con lo que promete el libro
 python -m mercados ficha martillo           # una ficha completa
 python -m mercados revisar                  # valida el catálogo contra los detectores
+python -m mercados vela historico.csv       # ver una sesión dibujada
 python -m mercados detectar historico.csv   # qué patrones hay ahí
 python -m mercados medir historico.csv      # ¿cumplen lo que prometen?
 python -m mercados exportar historico.csv   # genera la aplicación del celular
 ```
 
 `medir` acepta `--sesiones 1|3|5|10`: a cuántas sesiones vista comparar.
+
+### «El CSV son solo datos, no dice nada de velas»
+
+Sí lo dice: **una vela japonesa ES esos cuatro números.** No hay nada más.
+
+| En el archivo | En el dibujo |
+|---|---|
+| Apertura y Cierre | el **cuerpo** de la vela |
+| cuál de los dos quedó arriba | **hueca** (subió) o **llena** (bajó) |
+| Máximo | la **mecha de arriba** |
+| Mínimo | la **mecha de abajo** |
+
+TradingView pinta exactamente eso. El gráfico no añade **ni un dato** que no
+esté en el archivo: es la misma información, dibujada.
+
+Para verlo con sus propios datos:
+
+```
+python -m mercados vela historico.csv --fecha 2026-08-28
+```
+
+```
+   │     ← máximo   1,16590
+  ┌─┐    ← apertura 1,16520
+  │█│
+  │█│
+  └─┘    ← cierre   1,15850
+   │     ← mínimo   1,15780
+
+  color          roja (cerró bajando)
+  cuerpo         0,00670
+  mecha superior 0,00070   0,1 veces el cuerpo
+  mecha inferior 0,00070   0,1 veces el cuerpo
+
+  PATRONES QUE ENCAJAN AQUÍ
+    · Elefante Rojo (Bajista)
+    · Marubozu Negra (Bajista)
+```
 
 ## 3. Cómo se lee la medición
 
@@ -168,6 +207,7 @@ diciendo de quién son, y ofrece contrastarlas.
 
 | Archivo | Qué hace |
 |---|---|
+| `mercados/dibujo.py` | Dibuja una vela en la consola, para ver que el CSV ya es la vela. |
 | `mercados/dominio.py` | La vela y sus medidas: cuerpo, mechas, rango, color. Los umbrales. |
 | `mercados/patrones.py` | Los 28 detectores y el buscador. |
 | `mercados/catalogo/patrones.json` | El texto del libro: cómo identificarlo, significado, página. |
@@ -178,7 +218,7 @@ diciendo de quién son, y ofrece contrastarlas.
 | `mercados/plantilla_web.html` | La aplicación: HTML, CSS y JavaScript. |
 | `mercados/cli.py` | `python -m mercados patrones\|ficha\|revisar\|detectar\|medir\|exportar` |
 
-Pruebas: `python -m pytest tests/test_mercados -q` (112).
+Pruebas: `python -m pytest tests/test_mercados -q` (130).
 
 ## Fuente
 

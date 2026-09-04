@@ -1,5 +1,21 @@
 # Registro de cambios
 
+## Sesión 04-sep-2026 — «El CSV son solo datos, no dice nada de velas»
+
+Duda razonable del usuario, y merecía una respuesta demostrable en vez de una
+explicación: **una vela japonesa ES esos cuatro números**. El cuerpo va de la
+apertura al cierre, hueca o llena según cuál quedó arriba, y las mechas hasta
+el máximo y el mínimo. TradingView pinta exactamente eso; el gráfico no añade
+ni un dato que no esté en el archivo.
+
+- **`mercados/dibujo.py` + `python -m mercados vela`**: dibuja una sesión en la
+  consola con cada precio señalado donde le corresponde, las cuentas del libro
+  ya hechas («mecha inferior 2,3 veces el cuerpo») y qué patrones encajan ahí.
+- Se guarda el **índice** de la sesión, no la vela: dos sesiones con los mismos
+  cuatro precios son iguales entre sí, y buscarlas por valor habría devuelto la
+  primera en vez de la pedida.
+- **11 pruebas nuevas** (130 en `tests/test_mercados`, 599 en total).
+
 ## Sesión 31-ago-2026 (cierre) — Análisis de velas japonesas (`mercados/`)
 
 Módulo independiente que detecta los 28 patrones del libro de Luis M. González
