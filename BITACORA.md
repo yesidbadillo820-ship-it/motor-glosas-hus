@@ -90,6 +90,67 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 04-09-2026 (tarde, 4) — Arranca el Pilar 2: el motor revisa la factura ANTES de timbrarla
+
+**El cambio de reloj.** Hasta hoy el hospital audita **después**: la EPS glosa
+y cartera pelea la plata durante meses. La Pre-Auditoría Concurrente le da
+vuelta al reloj — **el sistema del hospital (el HIS) nos consulta ANTES de
+timbrar la factura electrónica** y el motor le contesta si esa factura va a ser
+glosada y por cuánto. Cada peso corregido antes de timbrar es un peso que nunca
+entra en cartera.
+
+**Cómo funciona en la práctica.** El facturador le da guardar a la factura; el
+HIS nos manda los datos y, **en menos de 10 segundos**, recibe una de tres
+respuestas:
+
+- **APROBADO** — timbre tranquilo.
+- **ADVERTENCIA** — revise esto antes de timbrar.
+- **BLOQUEO** — hay algo que corregir sí o sí.
+
+Y con la respuesta viene la lista de reparos, cada uno con **el código de glosa
+oficial** con el que la EPS lo objetaría, y **cuánta plata está en juego**.
+
+**Qué revisa, sin ayuda de la IA (son cuentas, no opiniones).**
+- Que la factura **sume**: cantidad × valor de cada línea, y las líneas contra
+  el total.
+- Que ninguna línea **pase la tarifa pactada** con esa EPS. Si no hay tarifa
+  cargada, el motor **se calla** en vez de estimar: no inventa precios.
+- Que el procedimiento **corresponda al sexo** del paciente (un parto en un
+  paciente masculino no pasa).
+- Que **corresponda a la edad**: UCI neonatal en un adulto, UCI de adultos en
+  un niño.
+- **Múltiples cirugías por vías que se excluyen**: una colecistectomía es
+  abierta o laparoscópica, nunca las dos. Facturar ambas es cobrar dos veces.
+- Que las **fechas cuadren**: egreso antes del ingreso, días de estancia de
+  más, más días de UCI que de hospitalización.
+- **Doble facturación**: el mismo procedimiento dos veces el mismo día.
+- Que hubiera **contrato vigente** el día de la atención (el caso de AURORA,
+  que se venció el 31-08, sale solo).
+- **UCI sin criterio escrito**: si se factura UCI y la epicrisis no nombra
+  ningún criterio de gravedad (APACHE II, SOFA, vasopresores, ventilación
+  mecánica), avisa — es exactamente la glosa que pone la EPS.
+
+**Y después, la IA.** Solo al final se le pregunta a la IA una cosa: si cada
+servicio facturado tiene respaldo en la epicrisis. **La IA nunca bloquea una
+factura**: levanta la mano y la pertinencia la decide el médico auditor. Si la
+IA se demora o se cae, la factura se dictamina igual con todo lo anterior — y
+la respuesta lo dice, para que nadie confunda «no encontramos nada» con «no
+alcanzamos a mirar».
+
+**Queda constancia de todo.** Cada consulta deja una fila con la factura, el
+dictamen, la plata en riesgo y cuánto tardó. Sirve para responder tres
+preguntas que hoy no tienen respuesta: ¿esta factura pasó por pre-auditoría?,
+¿cuánta plata evitamos que se glosara este mes?, ¿se timbró a pesar del
+bloqueo?
+
+**Lo que este pilar NO hace.** No detiene la caja: nosotros dictaminamos, el
+facturador decide. Y no reemplaza al médico auditor.
+
+Esta entrega es **solo el motor y sus pruebas** (108 pruebas nuevas). La
+pantalla se hace después.
+
+---
+
 ### 04-09-2026 (tarde, 3) — Glosas ADRES: ya se puede REASIGNAR el área (y dejarlas todas en FACTURACIÓN)
 
 **Lo que reportó Yesid.** En Glosas ADRES, las glosas de la causal 4506 (las

@@ -143,6 +143,13 @@ class Settings(BaseSettings):
     groq_model_fallback_1: str = "qwen/qwen3-32b"
     groq_model_fallback_2: str = "llama-3.3-70b-versatile"
     groq_model_fallback_3: str = "llama-3.1-8b-instant"
+
+    # Modelo del cruce clínico de la PRE-AUDITORÍA CONCURRENTE (V3, Pilar 2).
+    # A propósito NO es `groq_model`: ese es un razonador (gpt-oss-120b) y su
+    # cadena de pensamiento se descuenta del tiempo. La pre-auditoría le
+    # responde al facturador mientras espera frente a la pantalla y tiene un
+    # techo duro de 10 segundos, así que usa un modelo rápido de una pasada.
+    preauditoria_modelo: str = "llama-3.3-70b-versatile"
     anthropic_model: str = "claude-sonnet-4-5"
     # Modelo Gemini para OCR de PDF escaneados (no escribe dictamenes).
     #

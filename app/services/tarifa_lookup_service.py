@@ -776,3 +776,50 @@ def formato_texto_banner(info: dict) -> str:
         "el valor pactado exacto. Argumenta que la EPS no puede desconocer "
         "lo que ella misma pactó (Art. 1602 C.Civil; Art. 871 C.Comercio).\n"
     )
+
+
+def tarifa_pactada_de(
+    db: Session,
+    eps: str,
+    cups: str,
+    valor_soat_base: float = 0.0,
+) -> Optional[dict]:
+    """El valor pactado de un CUPS para una EPS, sin nada de la glosa.
+
+    Nace con la Pre-Auditoría Concurrente (V3, Pilar 2): allí no hay glosa
+    todavía —se está mirando una factura ANTES de timbrarla—, así que las
+    heurísticas de `evaluar_glosa_tarifa` (deducir el facturado del objetado,
+    leer el motivo de la EPS) no aplican y confundirían.
+
+    Cadena: tarifa contratada de la EPS → catálogo oficial HUS/SOAT.
+    Devuelve None cuando NO hay con qué comparar. Ese None es una respuesta:
+    significa «no opino», y quien llama debe callar en vez de estimar.
+    """
+    tarifa = _buscar(db, eps, cups)
+    if tarifa is not None:
+        pactado = calcular_valor_pactado(tarifa, valor_soat_base=valor_soat_base)
+        if pactado > 0:
+            return {
+                "valor_pactado": float(pactado),
+                "fuente": "TARIFA_CONTRATADA",
+                "descripcion": tarifa.descripcion or "",
+                "contrato_numero": tarifa.contrato_numero or "",
+                "codigo_cups": tarifa.codigo_cups or cups,
+                "tipo_tarifa": tarifa.tipo_tarifa or "VALOR_FIJO",
+            }
+        # SOAT_PORCENTAJE sin base SOAT: hay tarifa pero no se puede calcular.
+        return None
+
+    from app.services.tarifas_oficiales import tarifa_a_banner_dict
+
+    oficial = tarifa_a_banner_dict(cups)
+    if not oficial or float(oficial.get("valor_pactado") or 0.0) <= 0:
+        return None
+    return {
+        "valor_pactado": float(oficial["valor_pactado"]),
+        "fuente": "CATALOGO_OFICIAL",
+        "descripcion": oficial.get("descripcion") or "",
+        "contrato_numero": oficial.get("contrato_numero") or "",
+        "codigo_cups": oficial.get("codigo_cups") or cups,
+        "tipo_tarifa": oficial.get("tipo_tarifa") or "VALOR_FIJO",
+    }

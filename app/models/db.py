@@ -1615,3 +1615,76 @@ class RadicacionEpsRecord(Base):
     actor = Column(String(120), index=True)
 
     __table_args__ = (Index("ix_radicaciones_eps_estado_eps", "estado", "eps"),)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  V3 · PILAR 2 — PRE-AUDITORÍA CONCURRENTE (antes de timbrar la factura)
+#  (arquitectura: docs/ARQUITECTURA_V3_PILAR2_PREAUDITORIA.md)
+# ══════════════════════════════════════════════════════════════════════════
+
+# El dictamen de la pre-auditoría. Tres estados y nada más: o la factura
+# sale, o sale con reparo, o no sale.
+PA_APROBADO = "APROBADO"
+PA_ADVERTENCIA = "ADVERTENCIA"
+PA_BLOQUEO = "BLOQUEO"
+
+# Qué debe hacer el facturador con el dictamen. Va en el contrato de salida
+# para que el HIS no tenga que interpretar el estado por su cuenta.
+PA_ACCION_TIMBRAR = "TIMBRAR"
+PA_ACCION_REVISAR = "REVISAR_ANTES_DE_TIMBRAR"
+PA_ACCION_CORREGIR = "CORREGIR_ANTES_DE_TIMBRAR"
+
+
+class PreAuditoriaEventoRecord(Base):
+    """Una fila por CADA evaluación que pide el HIS antes de timbrar.
+
+    Es un libro de eventos, no un estado: la fila se inserta y no se toca
+    más. Sirve para tres preguntas que hoy nadie puede responder:
+
+      · «¿esta factura pasó por la pre-auditoría, y qué le dijimos?»
+      · «¿cuánta plata evitamos que se glosara este mes?»
+      · «¿el facturador timbró a pesar del bloqueo?» (se cruza con la
+        factura real cuando llega la glosa).
+
+    Se guarda el payload que mandó el HIS TAL CUAL llegó. Si mañana una
+    regla resulta equivocada, se puede repetir la evaluación sobre los
+    mismos datos sin depender de que el HIS los conserve.
+    """
+
+    __tablename__ = "pre_auditoria_eventos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    # Identificación de lo evaluado. La factura puede venir provisional
+    # (aún no se timbra), por eso NO es única.
+    factura = Column(String(50), index=True)
+    eps = Column(String(200), index=True)
+    # Huella del payload: mismo contenido → misma huella. Permite ver que
+    # el HIS reintentó la misma factura sin cambiar nada.
+    huella_payload = Column(String(64), index=True)
+
+    # ── El dictamen ──
+    estado = Column(String(20), index=True)  # APROBADO / ADVERTENCIA / BLOQUEO
+    recomendacion_accion = Column(String(40))
+    valor_en_riesgo = Column(Float, default=0.0)
+    valor_factura = Column(Float, default=0.0)
+    total_alertas = Column(Integer, default=0)
+
+    # ── Lo que se tuvo a la vista y lo que se produjo (JSON en texto) ──
+    payload_base = Column(Text)
+    alertas = Column(Text)
+
+    # ── Trazabilidad de la cadena ──
+    # OK / OMITIDO_SIN_IA / OMITIDO_POR_TIEMPO / TIMEOUT / ERROR
+    cruce_clinico_estado = Column(String(30), index=True)
+    modelo_utilizado = Column(String(100))
+    duracion_ms = Column(Integer, default=0)
+    duracion_reglas_ms = Column(Integer, default=0)
+    duracion_ia_ms = Column(Integer, default=0)
+
+    # Quién pidió la evaluación: "his" cuando entra por token de máquina,
+    # el correo del usuario cuando la dispara una persona desde la pantalla.
+    actor = Column(String(120), index=True)
+
+    __table_args__ = (Index("ix_pre_auditoria_estado_creado", "estado", "creado_en"),)

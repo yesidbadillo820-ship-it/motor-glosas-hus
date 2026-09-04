@@ -1,5 +1,40 @@
 # Registro de cambios
 
+## Sesión 04-sep-2026 — V3 Pilar 2: Pre-Auditoría Concurrente (backend)
+
+El HIS del hospital consulta el motor **antes de timbrar** una factura y recibe
+un dictamen en menos de 10 segundos. Solo backend y pruebas; la pantalla queda
+para después.
+
+- **`POST /pre-auditoria/evaluar`** — sincrónico, dos puertas: el HIS con
+  `X-Agente-Token` (comparado con `compare_digest`) y el auditor con su sesión.
+  Contrato rígido de salida: `status`, `alertas`, `valor_en_riesgo`,
+  `recomendacion_accion`, más trazabilidad.
+- **Cadena de validación (Chain of Responsibility)** en
+  `app/services/preauditoria_reglas_duras.py`: aritmética, topes tarifarios,
+  cruce de género y de edad, vías quirúrgicas excluyentes, coherencia de fechas
+  y estancia, doble facturación, contrato vigente y UCI sin criterio escrito.
+  Todas deterministas; ninguna inventa (sin tarifa cargada, la regla calla).
+- **Cruce clínico con Groq** (`preauditoria_cruce_clinico.py`) al final de la
+  cadena, con reloj propio: tope de 6 s y corte por `asyncio.wait_for`. Sus
+  hallazgos son siempre ADVERTENCIA — la IA nunca bloquea una factura. Modelo
+  dedicado (`preauditoria_modelo`, por defecto `llama-3.3-70b-versatile`): el
+  `groq_model` general es un razonador y no cabe en el presupuesto de tiempo.
+- **Presupuesto de latencia** en `preauditoria_concurrente.py`: techo duro de
+  10 s (reglas + IA + escritura), con degradación elegante si la IA falla.
+- **Tabla `pre_auditoria_eventos`** — un evento por evaluación, con el payload
+  tal como llegó, el dictamen, la plata en riesgo y los tiempos por tramo.
+- **Códigos de glosa oficiales** del Manual Único (`catalogo_glosas.py`)
+  proyectados por tipo de servicio; una prueba impide que se cuele un código
+  inventado.
+- `tarifa_lookup_service.tarifa_pactada_de()` y
+  `reglas_casos_fno.sexo_exigido_por_el_procedimiento()`: dos accesos públicos
+  a lógica que ya existía, para no duplicarla.
+- **108 pruebas nuevas** (64 de reglas, 44 de la ruta), con los casos que pidió
+  el auditor: múltiples cirugías por vías excluyentes y estancia en UCI
+  injustificada.
+- Arquitectura: `docs/ARQUITECTURA_V3_PILAR2_PREAUDITORIA.md`.
+
 ## Sesión 04-sep-2026 — «El CSV son solo datos, no dice nada de velas»
 
 Duda razonable del usuario, y merecía una respuesta demostrable en vez de una
