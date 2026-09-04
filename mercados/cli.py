@@ -15,7 +15,8 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from . import catalogo
-from .datos import ArchivoIlegible, formato, leer_csv, resumen
+from .datos import ArchivoIlegible, decimales, formato, leer_csv, resumen
+from .dibujo import en_texto, medidas
 
 from .medicion import CASOS_MINIMOS, HORIZONTES, medir_todo
 from .patrones import PATRONES, POR_CLAVE, buscar
@@ -101,6 +102,46 @@ def cmd_revisar(args, salida: Salida) -> int:
     return 1 if avisos else 0
 
 
+def cmd_vela(args, salida: Salida) -> int:
+    """Dibuja una sesión: sirve para ver que el CSV YA es la vela.
+
+    La duda que responde es razonable: «esos son solo datos, no dicen nada de
+    velas». Sí lo dicen — el cuerpo va de la apertura al cierre, y las mechas
+    hasta el máximo y el mínimo. TradingView pinta exactamente eso.
+    """
+    velas = _cargar(args, salida)
+    # Se guarda el ÍNDICE, no solo la vela: dos sesiones con los mismos cuatro
+    # precios son iguales entre sí, y buscarlas por valor devolvería la
+    # primera, no la que se pidió.
+    if args.fecha:
+        elegidas = [(i, v) for i, v in enumerate(velas) if v.fecha.isoformat() == args.fecha]
+        if not elegidas:
+            raise SystemExit(
+                f"No hay sesión del {args.fecha} en este archivo. "
+                f"Van del {velas[0].fecha} al {velas[-1].fecha}."
+            )
+    else:
+        desde = max(0, len(velas) - args.cuantas)
+        elegidas = list(enumerate(velas))[desde:]
+
+    dec = decimales(velas[-1].cierre)
+    apariciones = buscar(velas)
+    for indice, v in elegidas:
+        salida(f"\n{'=' * 46}\n  Sesión del {v.fecha}\n{'=' * 46}")
+        salida(en_texto(v, decimales=dec))
+        salida("")
+        for linea in medidas(v, decimales=dec):
+            salida(f"  {linea}")
+        encontrados = [a.patron for a in apariciones if a.indice == indice]
+        if encontrados:
+            salida("\n  PATRONES QUE ENCAJAN AQUÍ")
+            for p in encontrados:
+                salida(f"    · {p.nombre} ({p.sentimiento.etiqueta})")
+        else:
+            salida("\n  Ningún patrón del libro encaja en esta sesión.")
+    return 0
+
+
 def cmd_detectar(args, salida: Salida) -> int:
     velas = _cargar(args, salida)
     claves = [args.patron] if args.patron else None
@@ -183,6 +224,11 @@ def construir_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("revisar", help="Validar el catálogo contra los detectores.")
 
+    p = sub.add_parser("vela", help="Ver una sesión dibujada, con sus medidas.")
+    p.add_argument("archivo", help="CSV exportado del bróker o de TradingView.")
+    p.add_argument("--fecha", help="Una sesión concreta (AAAA-MM-DD).")
+    p.add_argument("--cuantas", type=int, default=1, help="Cuántas de las últimas.")
+
     p = sub.add_parser("detectar", help="Buscar patrones en un CSV de precios.")
     p.add_argument("archivo", help="CSV exportado del bróker o de TradingView.")
     p.add_argument("--patron", help="Buscar solo uno.")
@@ -211,6 +257,7 @@ def main(argv: Sequence[str] | None = None, salida: Salida = print) -> int:
         "patrones": cmd_patrones,
         "ficha": cmd_ficha,
         "revisar": cmd_revisar,
+        "vela": cmd_vela,
         "detectar": cmd_detectar,
         "medir": cmd_medir,
         "exportar": cmd_exportar,
