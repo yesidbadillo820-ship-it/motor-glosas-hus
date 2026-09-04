@@ -126,15 +126,39 @@ def _buscar_total(texto: str) -> int | None:
     return max(candidatos) if candidatos else None  # el total es el mayor de los totales
 
 
+RE_IMPORTE_EN_LINEA = re.compile(r"\d[\d.,]{2,}")
+
+
+def _filas_del_texto(texto: str) -> list[list[str]]:
+    """Las líneas del texto que parecen renglones de cobro, partidas en celdas.
+
+    Muchas facturas electrónicas no dibujan la tabla: pdfplumber no encuentra
+    nada con `extract_tables` y el detalle del servicio se perdía. Como el
+    cotejo del cobro depende de ese renglón, se rescata del texto plano: cada
+    línea con al menos un número largo se parte por espacios, igual que si
+    fueran columnas.
+    """
+    filas = []
+    for linea in texto.splitlines():
+        limpia = " ".join(linea.split())
+        if len(limpia) < 8 or not RE_IMPORTE_EN_LINEA.search(limpia):
+            continue
+        filas.append(limpia.split(" "))
+    return filas
+
+
 def extraer_datos_factura(ruta: Path | str) -> dict:
     """Datos de la factura para la redacción. Lo ilegible queda en None."""
     ruta = Path(ruta)
     texto, tablas, metodo = extraer_texto(ruta)
+    servicios = [[str(c or "").strip() for c in fila] for fila in tablas[:200]]
+    if texto:  # respaldo: el detalle también se busca en el texto plano
+        servicios += _filas_del_texto(texto)[: max(0, 200 - len(servicios))]
     return dict(
         archivo=ruta.name,
         metodo=metodo,
         ok=bool(texto),
         paciente=_buscar_paciente(texto) if texto else None,
         total=_buscar_total(texto) if texto else None,
-        servicios=[[str(c or "").strip() for c in fila] for fila in tablas[:200]],
+        servicios=servicios,
     )
