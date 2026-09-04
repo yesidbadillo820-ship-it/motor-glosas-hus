@@ -10522,6 +10522,18 @@ descripción y valor (las 21 sin pacto son códigos FMO de farmacia — a esas
 no se les cita nada, regla de no invención). Quedó entregada la **versión
 CON TARIFAS** del Excel del lote 04-sep.
 
+**Ajuste del mismo dia — el constructor de respuestas con TRAZABILIDAD:** el
+auditor pidio eliminar las aperturas genericas y que cada respuesta se
+redacte sobre la evidencia leida. Ahora el bot arma un **parrafo de
+evidencia** que entra justo despues del encabezado de la respuesta: abre
+citando el PDF fuente ("AL REVISAR EL DOCUMENTO DE SOPORTE <archivo>..."),
+nombra al paciente extraido, cita el servicio y el valor leidos del PDF, y
+cruza con la tarifa pactada del contrato 440. Regla dura de honestidad:
+**"CORRESPONDE EXACTAMENTE" solo se afirma cuando los numeros de verdad
+coinciden**; si no coinciden o no se leyo el dato, se cita la tarifa pactada
+sin afirmar coincidencias (y lo ilegible no se menciona). 6 pruebas nuevas
+(15 en el modulo).
+
 ---
 
 ## 3) PENDIENTE
