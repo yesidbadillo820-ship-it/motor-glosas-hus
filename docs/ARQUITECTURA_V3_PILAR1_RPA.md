@@ -227,9 +227,36 @@ y la sesión queda guardada. Un radicador headless **no puede** pasar eso en
 frío. Se implementó de la forma honesta:
 
 - con **sesión sembrada válida** → radica solo, escondido;
-- **sin ella** → marca `HUMANO_REQUERIDO` con el motivo y dice cómo sembrarla.
+- **sin ella** → marca `HUMANO_REQUERIDO` con el motivo y dice cómo entrar.
 
 No se promete autonomía donde no la hay, ni siquiera cuando la matriz lo dijo.
+
+**Corrección del 04-09-2026 (tarde).** La primera versión solo sabía leer una
+sesión guardada (`storage_state`), y ese es justamente el camino que el propio
+repositorio advierte como poco fiable: al lanzar el navegador desde Playwright,
+reCAPTCHA lo detecta como automatizado y **se niega a validar**. Es decir, el
+radicador quedaba colgando del único camino que suele fallar.
+
+Ahora el camino preferente es **`--cdp`**: el auditor abre SU Chrome con el
+puerto de depuración, entra al portal a mano —resolviendo el captcha como una
+persona— y el bot se engancha a esa pestaña. reCAPTCHA nunca ve un robot porque
+nunca lo hubo en el login.
+
+```
+chrome.exe --remote-debugging-port=9222 --user-data-dir="C:\temp-notas\zonaser-chrome"
+py tools/radicar_glosas_mutual_ser.py --cdp http://127.0.0.1:9222
+```
+
+Dos detalles que no son adorno:
+
+- **Ese Chrome es del auditor y no se cierra** al terminar (`cerrar` es un
+  no-op en modo CDP). Cerrarle el navegador a alguien a mitad de su trabajo
+  sería inaceptable.
+- **Enganchado pero sin sesión, no se pulsa nada.** Si la pestaña no tiene el
+  portal abierto, el radicador levanta `SesionNoDisponible` en vez de empezar a
+  hacer clics a ciegas — la misma doctrina del cortacircuito OCR.
+- En Windows «localhost» resuelve a IPv6 y Chrome escucha en IPv4: el helper
+  prueba `127.0.0.1` solo. Ese tropiezo ya costó tiempo una vez.
 
 **2. «Radicar» aquí significa CERRAR, no redactar.** Los tres bots reutilizan
 el paso final del portal —`terminar_respuesta` en COOSALUD, `enviar_finalizar`

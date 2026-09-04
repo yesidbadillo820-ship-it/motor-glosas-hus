@@ -289,12 +289,126 @@ class TestMutualSerNoFingeAutonomia:
         import radicar_glosas_mutual_ser as bot
 
         args = SimpleNamespace(
-            storage_state=str(tmp_path / "no_existe.json"), con_cabeza=False, lento=False
+            storage_state=str(tmp_path / "no_existe.json"),
+            con_cabeza=False,
+            lento=False,
+            cdp="",
         )
         with pytest.raises(bot.SesionNoDisponible) as e:
             bot.abrir_sesion(None, args)
         assert "reCAPTCHA" in str(e.value)
-        assert "--con-cabeza" in str(e.value), "no dice cómo sembrar la sesión"
+        # El consejo tiene que ser el CAMINO FIABLE, no el que el repositorio
+        # advierte que falla. Antes decía «--con-cabeza» a secas y eso mandaba
+        # al auditor de frente contra el captcha (04-09-2026).
+        assert "--cdp" in str(e.value), "no ofrece el camino que de verdad funciona"
+        assert "9222" in str(e.value), "no dice cómo abrir su Chrome"
+
+    def test_se_engancha_al_chrome_del_auditor(self, monkeypatch):
+        """El camino recomendado: la sesión humana ya validada."""
+        import radicador_comun
+        import radicar_glosas_mutual_ser as bot
+
+        class _Page:
+            url = "https://zonaser.mutualser.org/glosas"
+
+            def set_default_navigation_timeout(self, *_a):
+                pass
+
+            def set_default_timeout(self, *_a):
+                pass
+
+            def on(self, *_a):
+                pass
+
+        class _Ctx:
+            pages = [_Page()]
+
+        class _Browser:
+            contexts = [_Ctx()]
+            cerrado = False
+
+            def close(self):
+                _Browser.cerrado = True
+
+        monkeypatch.setattr(radicador_comun, "conectar_cdp", lambda pw, url: _Browser())
+        monkeypatch.setattr(bot, "conectar_cdp", lambda pw, url: _Browser())
+        monkeypatch.setattr(
+            "responder_glosas_mutual_ser._login_ok", lambda page: True, raising=False
+        )
+
+        args = SimpleNamespace(
+            cdp="http://127.0.0.1:9222", storage_state="x", con_cabeza=False, lento=False
+        )
+        page, cerrar = bot.abrir_sesion(None, args)
+        assert page is not None
+        cerrar()
+        assert _Browser.cerrado is False, (
+            "el radicador cerró el Chrome del auditor: ese navegador no es suyo"
+        )
+
+    def test_conectado_pero_sin_sesion_no_pulsa_nada(self, monkeypatch):
+        """Enganchado al Chrome pero sin login: NO se toca el portal."""
+        import radicar_glosas_mutual_ser as bot
+
+        class _Page:
+            url = "about:blank"
+
+            def set_default_navigation_timeout(self, *_a):
+                pass
+
+            def set_default_timeout(self, *_a):
+                pass
+
+            def on(self, *_a):
+                pass
+
+        class _Ctx:
+            pages = [_Page()]
+
+        class _Browser:
+            contexts = [_Ctx()]
+
+        monkeypatch.setattr(bot, "conectar_cdp", lambda pw, url: _Browser())
+        monkeypatch.setattr(
+            "responder_glosas_mutual_ser._login_ok", lambda page: False, raising=False
+        )
+        args = SimpleNamespace(
+            cdp="http://127.0.0.1:9222", storage_state="x", con_cabeza=False, lento=False
+        )
+        with pytest.raises(bot.SesionNoDisponible) as e:
+            bot.abrir_sesion(None, args)
+        assert "no hay sesión abierta" in str(e.value)
+
+    def test_el_helper_cdp_prueba_ipv4_cuando_localhost_falla(self, monkeypatch):
+        """En Windows «localhost» resuelve a IPv6 y Chrome escucha en IPv4."""
+        import radicador_comun
+
+        intentos = []
+
+        class _PW:
+            class chromium:
+                @staticmethod
+                def connect_over_cdp(url):
+                    intentos.append(url)
+                    if "127.0.0.1" not in url:
+                        raise RuntimeError("ECONNREFUSED")
+                    return "browser"
+
+        assert radicador_comun.conectar_cdp(_PW, "http://localhost:9222") == "browser"
+        assert intentos == ["http://localhost:9222", "http://127.0.0.1:9222"]
+
+    def test_si_no_hay_chrome_lo_dice_con_el_comando_exacto(self):
+        import radicador_comun
+
+        class _PW:
+            class chromium:
+                @staticmethod
+                def connect_over_cdp(url):
+                    raise RuntimeError("no hay nadie ahí")
+
+        with pytest.raises(radicador_comun.SesionNoDisponible) as e:
+            radicador_comun.conectar_cdp(_PW, "http://127.0.0.1:9222")
+        assert "--remote-debugging-port=9222" in str(e.value)
 
     def test_el_catalogo_avisa_del_captcha(self):
         from app.services import bots_hus

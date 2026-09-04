@@ -123,9 +123,10 @@ CATALOGO_BOTS: tuple[BotHUS, ...] = (
         comando_pc="py tools/radicar_glosas_mutual_ser.py",
         parametros_ayuda="--limite N --piloto-ok · --storage-state <sesión>",
         riesgo=(
-            "MUTUAL SER PIDE reCAPTCHA: hay que sembrar la sesión UNA vez con "
-            "responder_glosas_mutual_ser.py --con-cabeza. Sin sesión válida, las "
-            "glosas se marcan HUMANO_REQUERIDO. PILOTO OBLIGATORIO de 1 factura."
+            "MUTUAL SER PIDE reCAPTCHA. Lo fiable es engancharse a SU Chrome: "
+            "ábralo con --remote-debugging-port=9222, entre al portal a mano, y "
+            "corra el bot con --cdp http://127.0.0.1:9222. Sin sesión, las glosas "
+            "se marcan HUMANO_REQUERIDO. PILOTO OBLIGATORIO de 1 factura."
         ),
     ),
     _b(
