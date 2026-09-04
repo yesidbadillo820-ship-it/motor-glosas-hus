@@ -171,6 +171,22 @@ _RE_SEXO_F = re.compile(
 )
 
 
+def sexo_exigido_por_el_procedimiento(descripcion: str) -> str | None:
+    """«F», «M» o None: el sexo que exige un procedimiento por su nombre.
+
+    Los mismos patrones del Caso I, expuestos para quien YA tiene el sexo del
+    paciente como dato y no necesita leerlo del texto. Lo usa la
+    pre-auditoría concurrente (V3, Pilar 2), donde el HIS manda el sexo en el
+    payload y solo falta saber qué exige el procedimiento facturado.
+    """
+    d = descripcion or ""
+    if _RE_PROC_FEMENINO.search(d):
+        return "F"
+    if _RE_PROC_MASCULINO.search(d):
+        return "M"
+    return None
+
+
 def incoherencia_biologica(texto: str) -> str | None:
     """Devuelve el motivo si la glosa evidencia un procedimiento incompatible
     con el sexo registrado del paciente; None si no.

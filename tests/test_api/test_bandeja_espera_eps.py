@@ -284,6 +284,70 @@ class TestUnSoloPatronParaLosTres:
         assert '"portal": self.portal' in comun and '"equipo": self.equipo' in comun
 
 
+class TestElBotRespondeAunqueFaltePlaywright:
+    """CI en rojo desde el 04-09 por un guardián que sobraba.
+
+    `abrir_sesion` empezaba llamando a `_exigir_playwright()`, que ante la
+    ausencia de la librería mata el proceso con `sys.exit(2)`. Dos problemas:
+
+      · **Era inalcanzable en producción.** `radicador_comun.correr()` importa
+        `sync_playwright` y abre su contexto ANTES de llamar a `abrir_sesion`:
+        si faltara, el proceso ni llega hasta ahí.
+      · **Donde sí se alcanzaba, hacía daño.** Mataba el proceso en vez de
+        dejar que la función diera su respuesta honesta —`SesionNoDisponible`—,
+        que es la que manda la glosa a manos de una persona con el instructivo
+        del `--cdp`. Y en el runner de CI, que no instala playwright, tumbaba
+        tres pruebas en toda rama que se abriera.
+
+    Estas pruebas fijan la conducta: la decisión de «no hay sesión» se toma
+    mirando el disco, no el navegador.
+    """
+
+    @pytest.fixture
+    def sin_playwright(self, monkeypatch):
+        """Simula un PC (o un runner de CI) sin playwright instalado."""
+        import responder_glosas_coosalud
+        import responder_glosas_mutual_ser
+        import responder_glosas_simed
+
+        for modulo in (
+            responder_glosas_mutual_ser,
+            responder_glosas_simed,
+            responder_glosas_coosalud,
+        ):
+            monkeypatch.setattr(modulo, "sync_playwright", None, raising=False)
+
+    def test_mutual_ser_avisa_en_vez_de_matar_el_proceso(self, sin_playwright, tmp_path):
+        import radicar_glosas_mutual_ser as bot
+
+        args = SimpleNamespace(
+            storage_state=str(tmp_path / "no_existe.json"),
+            con_cabeza=False,
+            lento=False,
+            cdp="",
+        )
+        with pytest.raises(bot.SesionNoDisponible) as e:
+            bot.abrir_sesion(None, args)
+        assert "--cdp" in str(e.value)
+
+    @pytest.mark.parametrize("modulo", ["radicar_glosas_simed", "radicar_glosas_coosalud"])
+    def test_ningun_radicador_conserva_el_guardian_que_sobraba(self, modulo):
+        """El mismo guardián estaba copiado en los tres bots. Si vuelve a
+        aparecer en cualquiera, esta prueba lo delata."""
+        import importlib
+        import inspect
+
+        fuente = inspect.getsource(importlib.import_module(modulo).abrir_sesion)
+        assert "_exigir_playwright()" not in fuente
+
+    def test_mutual_ser_tampoco_lo_conserva(self):
+        import inspect
+
+        import radicar_glosas_mutual_ser as bot
+
+        assert "_exigir_playwright()" not in inspect.getsource(bot.abrir_sesion)
+
+
 class TestMutualSerNoFingeAutonomia:
     def test_sin_sesion_sembrada_no_intenta_el_captcha(self, tmp_path):
         import radicar_glosas_mutual_ser as bot

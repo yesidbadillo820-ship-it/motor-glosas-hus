@@ -42,9 +42,15 @@ PORTAL = "COOSALUD"
 
 
 def abrir_sesion(pw, args):
-    from responder_glosas_coosalud import _exigir_playwright, cargar_credenciales, login
+    from responder_glosas_coosalud import cargar_credenciales, login
 
-    _exigir_playwright()
+    # OJO: acá NO se vuelve a exigir playwright. `radicador_comun.correr()` ya
+    # importó `sync_playwright` y abrió el contexto antes de llamar a esta
+    # función: si faltara, el proceso ni habría llegado hasta acá. La llamada
+    # que había era inalcanzable en producción y, donde sí se alcanzaba (una
+    # prueba, un PC sin playwright), mataba el proceso con `sys.exit(2)` en vez
+    # de dejar que `abrir_sesion` diera su respuesta honesta —
+    # `SesionNoDisponible`— que es la que manda la glosa a manos de una persona.
     usuario, clave = cargar_credenciales()
     navegador = pw.chromium.launch(headless=not args.con_cabeza, slow_mo=300 if args.lento else 0)
     page = navegador.new_page()

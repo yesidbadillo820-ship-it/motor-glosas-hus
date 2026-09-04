@@ -82,9 +82,15 @@ def abrir_sesion(pw, args):
     Si ninguno sirve, NO se adivina: se levanta `SesionNoDisponible` y la
     glosa queda marcada para que la haga una persona.
     """
-    from responder_glosas_mutual_ser import _exigir_playwright, _login_ok
+    from responder_glosas_mutual_ser import _login_ok
 
-    _exigir_playwright()
+    # OJO: acá NO se vuelve a exigir playwright. `radicador_comun.correr()` ya
+    # importó `sync_playwright` y abrió el contexto antes de llamar a esta
+    # función: si faltara, el proceso ni habría llegado hasta acá. La llamada
+    # que había era inalcanzable en producción y, donde sí se alcanzaba (una
+    # prueba, un PC sin playwright), mataba el proceso con `sys.exit(2)` en vez
+    # de dejar que `abrir_sesion` diera su respuesta honesta —
+    # `SesionNoDisponible`— que es la que manda la glosa a manos de una persona.
 
     if getattr(args, "cdp", ""):
         from responder_glosas_mutual_ser import PORTAL_BASE
