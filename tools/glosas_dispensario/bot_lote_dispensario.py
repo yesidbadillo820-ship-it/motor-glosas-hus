@@ -13,19 +13,24 @@ Qué hace, en orden:
      médico).
   3. Recorre UNA vez las carpetas de soportes de radicación de la unidad Y:,
      arma el índice de PDF por factura y copia el de cada factura a `soportes`.
-  4. Lee cada PDF con la cascada pdfplumber → PyPDF2 → OCR
-     (extraer_factura_pdf.py) y arma el PARRAFO DE EVIDENCIA de cada
-     respuesta: abre citando el PDF fuente, nombra al paciente, cita el
-     servicio y el valor leidos, y cruza con la tarifa pactada del contrato
-     440 — "corresponde exactamente" SOLO se afirma cuando los numeros
-     coinciden. Nada leido ni pactado = nada agregado (no se inventa).
-  5. COTEJO DE COBRO (cotejo_tarifa.py): compara el valor que de verdad se
-     facturó —leído del PDF— contra la tarifa pactada y escribe al lado de
-     cada respuesta si hay mayor valor cobrado, cuánto, y la RESPUESTA
-     SUGERIDA. Si la misma diferencia porcentual se repite en el lote, es la
-     actualización de tarifas del año y NO se sugiere aceptar. El Excel del
-     cargue conserva el Valor Aceptado en 0: aceptar una glosa lo decide el
-     auditor, no el bot.
+  4. COTEJO DE COBRO (cotejo_tarifa.py): lee cada PDF con la cascada
+     pdfplumber → PyPDF2 → OCR (extraer_factura_pdf.py), saca el valor por el
+     que de verdad se facturó el servicio y lo compara con la tarifa pactada.
+     Escribe al lado de cada respuesta si hay mayor valor cobrado, cuánto, y
+     la RESPUESTA SUGERIDA. Si la misma diferencia porcentual se repite en el
+     lote, es la actualización de tarifas del año y NO se sugiere aceptar. El
+     Excel del cargue conserva el Valor Aceptado en 0: aceptar una glosa lo
+     decide el auditor, no el bot.
+  5. LA REDACCION, por escenario: el argumento de cada respuesta lo dicta el
+     veredicto del cotejo, con las mismas cifras verificadas —
+       · cobro a tarifa    → el valor facturado ES lo pactado: causal infundada;
+       · vigencia 2026     → el mayor valor es el ajuste de los parágrafos 3
+                             y 4 del contrato: el cobro es válido;
+       · sobrecobro real   → se redacta la aceptación parcial (solo entra al
+                             texto que se sube con --redactar-aceptacion).
+     Fuera de esos tres manda la redacción prudente, que cita el PDF y el
+     anexo pero no proclama cifras sin cotejo. Nada leido ni pactado = nada
+     agregado (no se inventa).
   6. Si no se pasa --sin-cargue, corre el robot del portal
      (responder_glosas_simed.py) con el Excel del paquete.
   7. Convierte las evidencias de la corrida (los .png del robot) en el PDF
@@ -226,6 +231,85 @@ def hallar_servicio_en_pdf(
         fila_txt = " ".join(str(c) for c in fila).upper()
         if palabras and sum(1 for p in palabras if p in fila_txt) >= max(2, len(palabras) // 2):
             return resultado(fila)
+    return None
+
+
+def _quien(datos_pdf: dict | None) -> str:
+    """«DEL USUARIO X» solo si el PDF trajo el nombre. Sin nombre, nada: el
+    paciente no se inventa."""
+    paciente = (datos_pdf or {}).get("paciente")
+    return f" DEL USUARIO {paciente}" if paciente else ""
+
+
+def parrafo_por_escenario(
+    cotejo: dict,
+    datos_pdf: dict | None,
+    servicio_pdf: tuple | None,
+    cups: str = "",
+    servicio: str = "",
+) -> str | None:
+    """Redacta el argumento según el escenario matemático que dictó el cotejo.
+
+    Tres caminos, uno por veredicto, todos con las mismas cifras que el
+    cotejo verificó (nada se recalcula acá, para que el texto y las columnas
+    del Excel no puedan contradecirse):
+
+      1. COBRO A TARIFA  → el valor facturado ES la tarifa: causal infundada.
+      2. MAYOR VALOR POR VIGENCIA → el mayor valor es la actualización 2026
+         de los parágrafos 3 y 4: el cobro es contractualmente válido.
+      3. MAYOR VALOR VERIFICADO → hay sobrecobro real: se plantea la
+         aceptación parcial por la diferencia.
+
+    Fuera de esos tres (sin cotejo posible, o cobro por debajo de lo pactado)
+    devuelve None y manda la redacción prudente de `parrafo_evidencia`, que
+    no proclama cifras sin cotejo.
+
+    OJO con el escenario 3: este texto acepta una glosa. Quien decide subirlo
+    al portal es el auditor (`--redactar-aceptacion`), nunca el bot solo.
+    """
+    archivo = str((datos_pdf or {}).get("archivo") or "").upper()
+    fuente = f" {archivo}" if archivo else ""
+    # El servicio se nombra como lo conoce la EPS (código y descripción del
+    # export), no con la fila cruda del PDF: esa lleva cantidades y valores
+    # sueltos que dentro de la frase se leen como un error. La fila leída
+    # queda en la columna FUENTE DEL COTEJO, que es donde sirve.
+    etiqueta = " ".join(f"{cups} {servicio}".split()).strip() or (
+        servicio_pdf[0] if servicio_pdf else "EL SERVICIO GLOSADO"
+    )
+    facturado = cotejo.get("valor_facturado")
+    pactada = cotejo.get("tarifa")
+    veredicto = cotejo.get("veredicto")
+
+    if veredicto == cotejo_tarifa.A_TARIFA:
+        return (
+            f"AL REVISAR EL SOPORTE{fuente}, SE EVIDENCIA LA ATENCION{_quien(datos_pdf)}. "
+            f"EL VALOR FACTURADO DE {_plata(facturado)} POR EL SERVICIO {etiqueta} "
+            "CORRESPONDE A LA TARIFA PACTADA EXACTA EN EL CONTRATO 440-DIGSA-DMBUG-2025, "
+            "POR LO QUE LA CAUSAL DE GLOSA ES INFUNDADA."
+        )
+
+    if veredicto == cotejo_tarifa.POR_VIGENCIA:
+        return (
+            f"VERIFICANDO LA FACTURA{fuente}{_quien(datos_pdf)}, EL VALOR COBRADO DE "
+            f"{_plata(facturado)} POR EL SERVICIO {etiqueta} REFLEJA LA ACTUALIZACION DE "
+            "TARIFAS DE LA VIGENCIA 2026 CONTEMPLADA EN LOS PARAGRAFOS 3 Y 4 DEL CONTRATO "
+            "440-DIGSA-DMBUG-2025 (MODIFICATORIO CONTRACTUAL Y RESOLUCION TARIFARIA DE LA "
+            "ESE HOSPITAL UNIVERSITARIO DE SANTANDER), DOCUMENTOS QUE SE REMITEN CON LA "
+            "PRESENTE RESPUESTA. EL COBRO ES CONTRACTUALMENTE VALIDO."
+        )
+
+    if veredicto == cotejo_tarifa.SOBRECOBRO:
+        return (
+            f"VALIDADO EL SOPORTE{fuente}{_quien(datos_pdf)}, LA TARIFA PACTADA PARA EL "
+            f"CODIGO {cups} ES DE {_plata(pactada)} Y SE FACTURO {_plata(facturado)}. "
+            f"SE ACEPTA LA GLOSA POR EL MAYOR VALOR COBRADO DE {_plata(cotejo['aceptar'])}"
+            + (
+                ", Y SE SOLICITA EL LEVANTAMIENTO DE LOS "
+                f"{_plata(cotejo['resto'])} RESTANTES, POR CORRESPONDER A VALOR PACTADO."
+                if cotejo.get("resto")
+                else "."
+            )
+        )
     return None
 
 
@@ -512,6 +596,15 @@ def main() -> int:
         "--sin-cargue", action="store_true", help="Preparar todo sin subir al portal"
     )
     parser.add_argument(
+        "--redactar-aceptacion",
+        action="store_true",
+        help=(
+            "En las líneas con sobrecobro verificado, escribir la aceptación en el texto "
+            "que se sube al portal. Sin esta bandera la aceptación queda solo como "
+            "sugerencia en el Excel, para que la decida el auditor."
+        ),
+    )
+    parser.add_argument(
         "--con-cabeza", action="store_true", help="Mostrar el navegador en el cargue"
     )
     parser.add_argument(
@@ -611,58 +704,24 @@ def main() -> int:
         indent=1,
     )
 
-    # 4. El constructor con TRAZABILIDAD: por cada línea, el párrafo que cita
-    # el PDF fuente, el paciente, el servicio leído y el cruce con el contrato.
-    # Solo se plasma lo que de verdad se leyó o está pactado.
-    aperturas: dict[tuple[str, int], str] = {}
-    con_pdf = con_coincidencia = 0
+    # 4. COTEJO DE COBRO: ¿de verdad se está cobrando de más?
+    # Va ANTES de redactar porque el texto de la respuesta depende del
+    # escenario que dicte el cotejo. Primero se elige, de la línea leída en el
+    # PDF, cuál es el valor unitario; con eso y la tarifa pactada se calculan
+    # los factores que se repiten en el lote (esos son actualización de
+    # tarifas del año, no sobrecobro) y recién entonces se dicta el veredicto.
     servicios_hallados: dict[tuple[str, int], tuple] = {}
+    elegidos: dict[tuple[str, int], tuple[int | None, str]] = {}
     for d in lineas:
         clave = (d["factura"], d["num"])
         datos = extraidos.get(d["factura"])
-        servicio_pdf = (
+        serv = (
             hallar_servicio_en_pdf(datos.get("servicios"), d.get("cups"), d.get("serv"))
             if datos
             else None
         )
-        if servicio_pdf:
-            servicios_hallados[clave] = servicio_pdf
-        parrafo = parrafo_evidencia(
-            datos,
-            servicio_pdf,
-            tarifa_por_linea.get(clave),
-            int(d.get("valor") or 0),
-            d.get("cups", ""),
-        )
-        if parrafo:
-            aperturas[clave] = parrafo
-            con_pdf += 1 if datos else 0
-            con_coincidencia += 1 if "EXACTAMENTE" in parrafo else 0
-    if aperturas:
-        n = enriquecer_excel(excel_resp, apertura_por_linea=aperturas)
-        print(
-            f"[4/7] Respuestas con trazabilidad: {n} líneas "
-            f"({con_pdf} citan el PDF leído, {con_coincidencia} verifican coincidencia exacta con la tarifa)"
-        )
-    else:
-        print(
-            "[4/7] Sin tarifas ni datos de PDF que citar: las respuestas van con el texto del motor."
-        )
-    if sin_pdf:
-        print(
-            f"      SIN SOPORTE EN Y: ({len(sin_pdf)}): {', '.join(sin_pdf[:12])}"
-            + ("..." if len(sin_pdf) > 12 else "")
-        )
-
-    # 5. COTEJO DE COBRO: ¿de verdad se está cobrando de más?
-    # Primero se elige, de la línea leída en el PDF, cuál es el valor unitario;
-    # con eso y la tarifa pactada se calculan los factores que se repiten en el
-    # lote (esos son actualización de tarifas del año, no sobrecobro) y recién
-    # entonces se dicta el veredicto de cada línea.
-    elegidos: dict[tuple[str, int], tuple[int | None, str]] = {}
-    for d in lineas:
-        clave = (d["factura"], d["num"])
-        serv = servicios_hallados.get(clave)
+        if serv:
+            servicios_hallados[clave] = serv
         precio = (tarifa_de_cotejo.get(clave) or {}).get("precio")
         elegidos[clave] = cotejo_tarifa.elegir_valor_facturado(serv[2] if serv else [], precio)
     factores = cotejo_tarifa.factores_repetidos(
@@ -704,7 +763,7 @@ def main() -> int:
     resumen = Counter(c["veredicto"] for c in cotejos.values())
     sugerido = sum(c["aceptar"] for c in cotejos.values())
     print(
-        f"[5/7] Cotejo de cobro en {escritas} líneas: "
+        f"[4/7] Cotejo de cobro en {escritas} líneas: "
         f"{resumen[cotejo_tarifa.SOBRECOBRO]} con mayor valor VERIFICADO, "
         f"{resumen[cotejo_tarifa.POR_VIGENCIA]} por actualización de vigencia (revisar), "
         f"{resumen[cotejo_tarifa.A_TARIFA] + resumen[cotejo_tarifa.POR_DEBAJO]} cobradas a tarifa "
@@ -715,6 +774,64 @@ def main() -> int:
             f"      Valor sugerido a aceptar en total: {_plata(sugerido)} — el Excel del cargue "
             "SIGUE CON VALOR ACEPTADO EN 0: la aceptación la decide usted en la hoja "
             "'COTEJO DE COBRO'."
+        )
+
+    # 5. LA REDACCIÓN, por escenario: el argumento de cada respuesta lo dicta
+    # el veredicto del cotejo (a tarifa / vigencia 2026 / sobrecobro real), y
+    # usa exactamente las mismas cifras verificadas. Fuera de esos tres casos
+    # manda la redacción prudente, que no proclama cifras sin cotejo.
+    aperturas: dict[tuple[str, int], str] = {}
+    por_escenario = Counter()
+    con_pdf = 0
+    for d in lineas:
+        clave = (d["factura"], d["num"])
+        datos = extraidos.get(d["factura"])
+        servicio_pdf = servicios_hallados.get(clave)
+        cot = cotejos[clave]
+        parrafo = parrafo_por_escenario(
+            cot, datos, servicio_pdf, d.get("cups", ""), d.get("serv", "")
+        )
+        if (
+            parrafo
+            and cot["veredicto"] == cotejo_tarifa.SOBRECOBRO
+            and not args.redactar_aceptacion
+        ):
+            # El texto acepta una glosa: no se sube sin que el auditor lo pida.
+            # Queda en la columna RESPUESTA SUGERIDA y en la hoja de trabajo.
+            parrafo = None
+        if parrafo:
+            por_escenario[cot["veredicto"]] += 1
+        else:
+            parrafo = parrafo_evidencia(
+                datos,
+                servicio_pdf,
+                tarifa_por_linea.get(clave),
+                int(d.get("valor") or 0),
+                d.get("cups", ""),
+            )
+        if parrafo:
+            aperturas[clave] = parrafo
+            con_pdf += 1 if datos else 0
+    if aperturas:
+        n = enriquecer_excel(excel_resp, apertura_por_linea=aperturas)
+        print(
+            f"[5/7] Respuestas redactadas: {n} líneas ({con_pdf} citan el PDF leído). "
+            f"Por escenario: {por_escenario[cotejo_tarifa.A_TARIFA]} a tarifa exacta, "
+            f"{por_escenario[cotejo_tarifa.POR_VIGENCIA]} defendidas por vigencia 2026, "
+            f"{por_escenario[cotejo_tarifa.SOBRECOBRO]} con aceptación redactada."
+        )
+        if resumen[cotejo_tarifa.SOBRECOBRO] and not args.redactar_aceptacion:
+            print(
+                f"      {resumen[cotejo_tarifa.SOBRECOBRO]} línea(s) con sobrecobro NO llevan la "
+                "aceptación en el texto que se sube: está en la columna RESPUESTA SUGERIDA. "
+                "Para que el texto la lleve, corra con --redactar-aceptacion."
+            )
+    else:
+        print("[5/7] Sin datos de PDF ni tarifas: las respuestas van con el texto del motor.")
+    if sin_pdf:
+        print(
+            f"      SIN SOPORTE EN Y: ({len(sin_pdf)}): {', '.join(sin_pdf[:12])}"
+            + ("..." if len(sin_pdf) > 12 else "")
         )
 
     # 6. Cargue al portal

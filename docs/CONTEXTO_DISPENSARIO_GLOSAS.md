@@ -360,3 +360,30 @@ cotejo ingenuo habría sugerido aceptar glosas en todo el lote.
 0 y `RE9901`: la columna es una sugerencia para que el auditor decida y, si
 acepta, la escriba él. Aceptar una glosa es decisión del hospital, y además
 tiene que poder cruzar la nota crédito (misma razón de la directriz CL).
+
+### La redacción sigue al cotejo
+
+El argumento de cada respuesta lo dicta el veredicto, con **las mismas cifras
+que el cotejo verificó** (el texto no recalcula nada, así no puede contradecir
+a las columnas):
+
+| Escenario | Cómo queda redactada la respuesta |
+|---|---|
+| **Cobro a tarifa** | «AL REVISAR EL SOPORTE *archivo*, SE EVIDENCIA LA ATENCION DEL USUARIO *paciente*. EL VALOR FACTURADO DE *valor* POR EL SERVICIO *cups descripción* CORRESPONDE A LA TARIFA PACTADA EXACTA EN EL CONTRATO 440, POR LO QUE LA CAUSAL DE GLOSA ES INFUNDADA.» |
+| **Vigencia 2026** | «VERIFICANDO LA FACTURA *archivo* DEL USUARIO *paciente*, EL VALOR COBRADO DE *valor* POR EL SERVICIO *cups descripción* REFLEJA LA ACTUALIZACION DE TARIFAS DE LA VIGENCIA 2026 CONTEMPLADA EN LOS PARAGRAFOS 3 Y 4 DEL CONTRATO 440 (MODIFICATORIO Y RESOLUCION TARIFARIA), DOCUMENTOS QUE SE REMITEN. EL COBRO ES CONTRACTUALMENTE VALIDO.» |
+| **Sobrecobro real** | «VALIDADO EL SOPORTE *archivo* DEL USUARIO *paciente*, LA TARIFA PACTADA PARA EL CODIGO *cups* ES DE *tarifa* Y SE FACTURO *valor*. SE ACEPTA LA GLOSA POR EL MAYOR VALOR COBRADO DE *diferencia*, Y SE SOLICITA EL LEVANTAMIENTO DE LOS *resto* RESTANTES.» |
+
+Fuera de esos tres casos (sin cotejo posible, o cobrado por debajo de lo
+pactado) manda la redacción prudente de siempre: cita el PDF y el anexo, pero
+**no proclama cifras que no se cotejaron** (la lección del caso HUS0000542497).
+
+Lo que se lee del PDF entra tal cual —archivo, paciente, valor— y lo que no se
+pudo leer sencillamente no se menciona. El servicio se nombra con el código y
+la descripción del export, no con la fila cruda del PDF: esa lleva cantidades
+y valores sueltos que dentro de la frase se leen como un error, y queda en la
+columna FUENTE DEL COTEJO, que es donde sirve.
+
+**El texto del sobrecobro no se sube solo.** Como acepta una glosa, por
+defecto no entra en la respuesta que se carga al portal: queda en la columna
+RESPUESTA SUGERIDA y en la hoja de trabajo. Para que sí entre, el auditor
+corre el bot con `--redactar-aceptacion`.
