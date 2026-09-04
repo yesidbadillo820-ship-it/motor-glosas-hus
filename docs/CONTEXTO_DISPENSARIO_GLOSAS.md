@@ -300,8 +300,17 @@ Orquesta el lote completo en un solo comando (pide el GI en pantalla):
 
 1. Crea `D:\USUARIO CARTERA\Documents\<GI>\soportes`.
 2. Genera las respuestas con `gen_lote.py` (hereda la directriz CL).
-3. Busca el PDF de cada factura en las carpetas de radicación de `Y:` y lo
-   copia a `soportes`.
+3. Recorre **una sola vez** las carpetas de radicación de `Y:` y arma el
+   índice de soportes por factura, para copiar el PDF de cada una a
+   `soportes`. Las carpetas vienen así:
+
+       Y:\9.SEPTIEMBRE - SOPORTES RADICACION\DISPENSARIO\LILIANA\
+           ENV-233972-OK\HUS552002\FEV_900006037_HUS552002.pdf
+
+   o sea, una carpeta por factura con varios soportes adentro. El bot escoge
+   el archivo `FEV_...` (la factura electrónica, que es la que trae el detalle
+   del cobro) y, si no está, cualquier otro soporte de esa carpeta. Entre
+   meses manda el más reciente.
 4. Lee cada PDF con la cascada pdfplumber → PyPDF2 → OCR
    (`extraer_factura_pdf.py`) y ancla a la respuesta SOLO lo que se leyó
    (paciente y valor total). Nada leído = nada agregado.
@@ -309,10 +318,45 @@ Orquesta el lote completo en un solo comando (pide el GI en pantalla):
    (`tarifario_440.py`: anexo 6.2 de servicios por CUPS/código IPS y anexos
    de medicamentos por CUM) y cita la tarifa pactada exacta; sin
    coincidencia no cita nada.
-6. Corre el robot del portal (`--piloto HUS...` primero, siempre) y deja las
+6. **COTEJO DE COBRO** (ver abajo): compara lo que de verdad se facturó
+   contra lo pactado y escribe el veredicto y la respuesta sugerida.
+7. Corre el robot del portal (`--piloto HUS...` primero, siempre) y deja las
    evidencias de la corrida en `<GI>\<GI>_EVIDENCIAS.pdf`.
 
 Con `--sin-cargue` prepara todo (carpeta, soportes, Excel enriquecido) sin
 tocar el portal. Los tarifarios se pasan con `--tarifario-servicios` y
 `--tarifario-medicamentos` (por defecto busca en
 `D:\USUARIO CARTERA\Documents\TARIFARIO_440\`).
+
+## El COTEJO DE COBRO (`cotejo_tarifa.py`, 04-09-2026)
+
+Responde la pregunta que importa cuando la EPS glosa por mayor valor cobrado:
+**¿de verdad estamos cobrando de más, y de cuánto?** El bot compara el valor
+que leyó en el PDF de la factura contra la tarifa pactada en el anexo del
+contrato 440 y escribe al lado de cada respuesta siete columnas nuevas:
+VALOR FACTURADO (PDF), TARIFA PACTADA (440), DIFERENCIA, ¿SOBRECOBRO?,
+VALOR SUGERIDO A ACEPTAR, RESPUESTA SUGERIDA y FUENTE DEL COTEJO. Lo que hay
+que decidir queda además en la hoja **"COTEJO DE COBRO"**, que es el paquete
+de trabajo del auditor, y en el archivo `cotejo_cobro_<GI>.json`.
+
+Los veredictos:
+
+| Veredicto | Qué significa | Qué sugiere |
+|---|---|---|
+| `SIN COTEJO` | no se leyó el PDF, el código no está pactado, o la línea trae varios valores y no se sabe cuál es el unitario | nada: revisar a mano |
+| `COBRO A TARIFA` | lo facturado es exactamente lo pactado (± $2 de redondeo) | no aceptar, la glosa es infundada |
+| `COBRO POR DEBAJO DE LO PACTADO` | se facturó menos que la tarifa | no aceptar |
+| `MAYOR VALOR VERIFICADO` | se cobró de más y es un caso aislado | aceptar la diferencia (o lo objetado, lo que sea menor) |
+| `MAYOR VALOR POR VIGENCIA` | se cobró de más, pero la misma diferencia porcentual se repite en el lote | no aceptar: sustentar con la resolución de tarifas del año |
+
+Ese último veredicto es el que evita el error caro. En el lote del 04-09-2026,
+24 facturas venían al 7% sobre el anexo y 19 al 31,25%: eso no es un error de
+cobro, es la actualización de tarifas de la vigencia 2026 que los **parágrafos
+3 y 4 del contrato 440** prevén (SOAT 2026 menos 20%, y para las tarifas
+propias de la ESE un modificatorio que reconoce el incremento del año). Un
+cotejo ingenuo habría sugerido aceptar glosas en todo el lote.
+
+**El bot nunca acepta solo.** El Excel del cargue conserva `Valor Aceptado` en
+0 y `RE9901`: la columna es una sugerencia para que el auditor decida y, si
+acepta, la escriba él. Aceptar una glosa es decisión del hospital, y además
+tiene que poder cruzar la nota crédito (misma razón de la directriz CL).
