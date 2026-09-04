@@ -29,7 +29,7 @@
 | 8 | **Objeciones de otras EPS** | Bots que arman el Excel de OBJECIONES para DGH desde el archivo de cada entidad: FAMISANAR, SAVIA, EMSSANAR, Mutual Ser, FOMAG (Horus). | Cada uno con su `tools/organizar_objeciones_*.py` y su README. Si DGH devuelve errores, está `corregir_errores_dgh.py` y Claude los analiza. |
 | 9 | **Informes de cartera y conciliaciones** | Consolidados de estado de cartera por entidad (formato FAMISANAR), análisis de actas (ej. PROTEGER EPS) e informes en Word para la mesa. | Usted sube el Excel de la entidad al chat; Claude entrega el informe verificado al centavo. |
 | 10 | **Caja de bots del PC del auditor** | Bots de doble clic entregados POR CHAT (no van al repo porque procesan datos reales): ORGANIZAR ARCHIVOS, BAJAR PESO EXCEL, PARTIR/UNIR archivos grandes, OCR a PDF (PC y celular), UNIR EXCELES, CORREOS DE PAGOS, AUTORIZACIONES RIPS, DE1601 (NUEVA EPS), HERRAMIENTAS DE IMÁGENES. | Se piden por chat, llegan en ZIP, se descomprimen y doble clic al `.bat`. Si uno falla, pegue la pantalla del error en el chat. |
-| 11 | **Módulos personales de estudio** | Dos programas aparte, que no tocan el motor: **ICFES** (`icfes/`, preparación para el Saber 11) y **noruego** (`noruego/`, curso de idioma para el celular). Cada uno con su aplicación web que funciona sin internet. | Doble clic en `tools\ICFES.cmd` o `tools\NORUEGO.cmd`. Guías: `docs/GUIA_SISTEMA_ICFES.md` y `docs/GUIA_CURSO_NORUEGO.md`. |
+| 11 | **Módulos personales de estudio** | Tres programas aparte, que no tocan el motor: **ICFES** (`icfes/`, preparación para el Saber 11), **noruego** (`noruego/`, curso de idioma para el celular) y **velas japonesas** (`mercados/`, detecta los 28 patrones en su histórico y mide si de verdad cumplen). Cada uno con su aplicación web que funciona sin internet. | Doble clic en `tools\ICFES.cmd` o `tools\NORUEGO.cmd`; el de velas se corre con `python -m mercados`. Guías: `docs/GUIA_SISTEMA_ICFES.md`, `docs/GUIA_CURSO_NORUEGO.md` y `docs/GUIA_ANALISIS_VELAS.md`. |
 
 **Regla de oro:** no importa en qué chat esté — todo lo trabajado se anota en
 esta bitácora al terminar, y por eso cualquier chat nuevo "se acuerda" de todo.
@@ -920,6 +920,86 @@ Son nombres parecidos y entidades distintas; el motor ya las separa.
 **Falta:** correr las pruebas 3, 4 y 5 (AU0201, SO0102, FA0205) y repetir la
 prueba 2 **adjuntando los PDF de soportes**, porque sin ellos no se pudo
 comprobar si el dictamen cita la nota operatoria.
+
+### 31-08-2026 (cierre) — Análisis de velas japonesas (carpeta `mercados/`)
+
+**Qué se pidió.** A partir de un libro de patrones de velas japonesas, un
+programa que analice mercados bursátiles.
+
+**Lo primero, porque es lo que decide todo lo demás.** El pedido tenía dos
+mitades y solo una se podía hacer con honestidad:
+
+- **Detectar los patrones sí se puede.** «Martillo = cuerpo pequeño, mecha
+  inferior de al menos el doble del cuerpo, sin mecha arriba, después de una
+  bajada» es aritmética sobre cuatro precios. Se programa y se comprueba.
+- **Predecir el precio no.** Ni el libro ni la evidencia pública sostienen que
+  un patrón por sí solo lo permita. Hacer un programa que diga «compre ahora»
+  habría sido inventar —lo que las reglas de este repositorio prohíben— y con
+  la plata de usted detrás.
+
+**Entonces se hizo la tercera cosa, que es la que de verdad vale: MEDIRLO.**
+
+El libro afirma que «la probabilidad de que el precio vaya en la dirección que
+esperas es al menos por encima de un 50 %», y a cada patrón le pone una
+etiqueta —«fiabilidad muy alta», «baja»— **sin publicar un solo número que lo
+respalde**. En vez de repetírselo, el programa lo comprueba contra su propio
+histórico: busca cada aparición del patrón y cuenta qué pasó de verdad en las
+sesiones siguientes.
+
+**Lo que quedó hecho:**
+
+1. **Los 28 patrones del libro** programados uno por uno, cada uno con su
+   caso de prueba construido a mano.
+2. **El catálogo**: qué dice el libro de cada patrón, con la página, para poder
+   volver a la fuente.
+3. **Lector de CSV** que traga lo que exporte cualquier plataforma: cabecera en
+   español o en inglés, separador de coma o de punto y coma, decimales con coma
+   o con punto, y el orden al derecho o al revés. Si falta una columna, dice
+   cuál.
+4. **La medición**, con tres cuidados que la hacen creíble:
+   - **el número de casos** — por debajo de 30 apariciones no se concluye nada,
+     y lo dice;
+   - **la tasa base** — cuántas veces el precio fue en esa dirección *en todas
+     las sesiones*. Si un patrón no le gana a su base, no está diciendo nada:
+     en un mercado que sube, cualquier señal alcista «acierta»;
+   - **la corrección por preguntar 112 cosas a la vez** (ver abajo).
+5. **Aplicación para el celular** con cuatro pantallas, instalable y sin
+   internet.
+
+**El hallazgo falso que se cazó a tiempo.** Al probar con datos **totalmente
+inventados al azar** —donde por construcción no puede haber ningún patrón que
+sirva— salió uno acertando 19 puntos por encima de su base sobre 37 casos. No
+era un hallazgo: es que se hacen 112 preguntas de una sentada (28 patrones × 4
+horizontes) y, con el margen de error de siempre, **una de cada veinte parece
+buena por pura casualidad**. Se aplicó la corrección estadística que reparte el
+margen entre todas las preguntas, y los hallazgos falsos desaparecieron: con
+datos al azar, ninguno. Los márgenes salen más anchos, y eso es exactamente lo
+honesto.
+
+**Dos cosas que el programa dice de frente:**
+
+- **No predice.** En la consola y en las cuatro pantallas: «esto mide lo que ya
+  pasó; ningún patrón por sí solo es una razón para comprar o vender».
+- **Una definición del libro está incompleta.** La «Cubierta de la Nube Oscura»
+  no exige, en este libro, que la segunda vela cierre por debajo de la mitad de
+  la primera, condición que sí pide la literatura clásica. Se programó lo que
+  dice el libro y el aviso queda marcado en pantalla, en vez de arreglarlo por
+  detrás.
+
+**El color no lleva el significado.** El verde y el rojo de las velas fallan la
+prueba de daltonismo (la misma que ya había hecho cambiar el semáforo del
+ICFES). Por eso la sesión que sube se dibuja **hueca** y la que baja **llena**,
+y toda etiqueta de dirección lleva ▲ o ▼ junto a la palabra. Es además la forma
+original japonesa, así que lo correcto y lo tradicional coinciden.
+
+**Lo que se probó:** 112 pruebas automáticas y la aplicación recorrida completa
+en un navegador de celular (las cuatro pantallas, 28 fichas desplegables, 120
+velas dibujadas, sin errores y sin salirse del ancho).
+
+**Cómo se usa:** `python -m mercados medir su_historico.csv`.
+Guía completa: `docs/GUIA_ANALISIS_VELAS.md`.
+
+---
 
 ### 31-08-2026 (noche) — Curso de noruego para el celular (carpeta `noruego/`)
 
@@ -9955,6 +10035,19 @@ TARIFAS).
 
 ## 3) PENDIENTE
 
+### Análisis de velas (31-08, cierre)
+- **Probarlo con un histórico de verdad.** Todo se comprobó con datos
+  simulados. Falta exportar el CSV de un activo real —cuantos más años, mejor—
+  y correr `python -m mercados medir`. Es ahí donde se va a ver si algún patrón
+  del libro aguanta la prueba.
+- **Ojo con el número de casos.** Con dos o tres años de sesiones diarias, casi
+  ningún patrón llega a las 30 apariciones que hacen falta. Para que la
+  medición diga algo hay que traer histórico largo.
+- **La «Cubierta de la Nube Oscura» está marcada para revisión** (ver arriba).
+  Si algún día se decide usar la definición clásica, hay que añadir la
+  condición a mano y volver a medir.
+
+
 ### Curso de noruego (31-08, noche)
 - **Probarlo en SU celular.** Aquí se probó en un navegador de celular
   simulado; falta verlo en el teléfono real: que se instale con «Agregar a la
@@ -10758,6 +10851,16 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
   son para que el área los mire, no se unieron por parecido.
 
 ## 4) PARA MAÑANA
+
+### Análisis de velas — lo primero
+1. **Exportar un histórico real** desde el bróker o TradingView (CSV, cuantos
+   más años mejor) y correr:
+   `python -m mercados medir ese_archivo.csv --sesiones 5`
+2. **Leer la columna «ventaja», no la de «acierta».** Un 60 % no dice nada si
+   la base también es 60 %.
+3. **Desconfiar de todo lo que tenga menos de 30 casos**, por bonito que se
+   vea el porcentaje. El programa lo avisa, pero conviene tenerlo en la cabeza.
+
 
 ### Curso de noruego — lo primero
 1. **Bajar los cambios y armar la aplicación:** `git pull` y doble clic en

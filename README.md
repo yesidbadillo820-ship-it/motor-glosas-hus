@@ -69,6 +69,21 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 Guía completa: [`docs/GUIA_CURSO_NORUEGO.md`](docs/GUIA_CURSO_NORUEGO.md).
 
+## Módulo aparte: análisis de velas japonesas
+
+`mercados/` detecta los 28 patrones de velas japonesas sobre el histórico que
+usted exporte del bróker (CSV) y **mide si cumplen lo que el libro promete**:
+contra la tasa base, con el número de casos a la vista y corrigiendo por las
+112 preguntas que se hacen a la vez. **No predice precios ni genera señales de
+compra o venta.**
+
+```bash
+python -m mercados medir historico.csv        # ¿los patrones cumplen?
+python -m mercados exportar historico.csv     # la app del celular
+```
+
+Guía: `docs/GUIA_ANALISIS_VELAS.md`.
+
 ## Requisitos
 
 - Python 3.10+
