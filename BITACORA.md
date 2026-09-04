@@ -133,6 +133,51 @@ de factura, que es la factura electrónica.
 
 ---
 
+### 04-09-2026 (tarde, 7) — La Pre-Auditoría ya habla el idioma del HIS, y tiene pantalla
+
+**Llegó el archivo de verdad.** Yesid sacó del SINAC el RIPS de la factura
+HUS558039 y con eso se acabó de adivinar. El HIS manda el **RIPS de la
+Resolución 2275 de 2023** — la misma estructura con la que se le reporta al
+Ministerio—, y el motor ahora la recibe tal cual, sin que el hospital tenga
+que transformar nada.
+
+**Lo que el archivo enseñó, y que no se sabía.**
+
+- **El RIPS no trae la EPS.** El único NIT que viene es el del propio
+  hospital. Sin EPS no se puede cruzar la tarifa pactada ni el contrato
+  vigente: esas dos revisiones **se callan y lo dicen**, en vez de inventar
+  un pagador.
+- **El RIPS no trae epicrisis ni notas.** Entonces el cruce clínico con IA
+  no corre — no hay texto que cruzar—, y **la factura se evalúa igual** con
+  las reglas de siempre. Nada se detiene por eso.
+- **No trae el total de la factura:** se suma de los valores de cada
+  servicio.
+
+Si algún día el HIS puede mandar la EPS y las notas al lado del RIPS, el
+motor las usa automáticamente. Mientras tanto, cada respuesta trae una lista
+de **«lo que no se pudo revisar y por qué»**, aparte de los reparos, para que
+nadie confunda «esto está bien» con «esto no lo miramos».
+
+**La pantalla nueva: Pre-Auditoría.** En el menú lateral, al lado de Glosas
+ADRES. Muestra, factura por factura, qué le contestamos al HIS: el dictamen
+(aprobado / advertencia / bloqueo), cuántos reparos, cuánta plata está en
+juego y el valor de la factura. Al hacer clic en una fila se abren los
+reparos, cada uno con el código de glosa oficial con el que la EPS lo
+objetaría.
+
+**Arriba, cuatro cifras.** La que importa es **DINERO SALVADO**, y está
+definida con cuidado: solo cuenta las facturas que fueron **bloqueadas y
+después volvieron a pasar** — o sea, las que de verdad se corrigieron antes
+de timbrar. Una factura bloqueada que nunca volvió **no se cuenta**: no
+sabemos si la corrigieron o si la timbraron igual, y esa plata sale aparte
+como **riesgo sin resolver**. Es una cifra que se puede defender ante
+gerencia sin que nadie la tumbe con una pregunta.
+
+70 pruebas nuevas, incluidas las que corren sobre el archivo real del HIS.
+No se tocó ninguna otra pantalla.
+
+---
+
 ### 04-09-2026 (tarde, 6) — Las glosas que se perdían cuando el bot se caía
 
 **El hueco.** Cuando un bot de radicación pide una glosa, el motor se la
