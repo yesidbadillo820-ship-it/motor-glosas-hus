@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 01-09-2026
+**Última actualización:** 04-09-2026
 
 ---
 
@@ -89,6 +89,73 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 04-09-2026 — Las objeciones de FAMISANAR: el código que FAMISANAR escribe no es el que DGH entiende
+
+**Lo que se pidió.** Armar el archivo de objeciones de FAMISANAR (1 de
+septiembre) para subirlo a Dinámica Gerencial, como el de COOSALUD o el del
+ADRES. Llegaron dos archivos: las **398 objeciones** de FAMISANAR (14 facturas,
+$31.439.029) y el **export de servicios facturados del DGH** (831 renglones de
+esas mismas 14 facturas).
+
+**El problema, que ya no es nuevo.** Es el mismo del ADRES en agosto: FAMISANAR
+y el hospital hablan idiomas distintos. FAMISANAR nombra los dispositivos con
+su propio catálogo IUM —`91022534`, «LINEA INFUSION E INYECCION - JERINGA 1ML
+25G x 16 mm»— y el DGH los tiene como `FMQ3616-1`, «JERINGA 1ML + TAPON PARA
+DOSIS UNITARIA». Con los medicamentos pasa algo más fino: FAMISANAR escribe
+`P32606-02` donde el HUS tiene `32606-2` (la letra de adelante y un cero de
+relleno). Si el archivo se sube así, DGH no reconoce el renglón.
+
+**Qué tan grave era.** Se midió sobre el archivo real, corriendo el bot como
+estaba:
+
+| | Como estaba | Con el cruce |
+|---|---|---|
+| Renglones con un código que DGH reconoce | **184 de 398 (46 %)** | **395 de 398 (99 %)** |
+| Renglones con un código que NO existe en el DGH | 191 | **0** |
+| Renglones sin código | 23 | 3 |
+| Centro de costo (`CTNCENCOS`) lleno | **0** | **395** |
+
+**Lo que se hizo.** `tools/organizar_objeciones_famisanar.py` aprendió a leer el
+export de servicios del DGH (`--servicios-dgh`) y a buscar, **dentro de esa
+misma factura**, de qué servicio habla cada objeción: por código (tolerando las
+tres formas de escribirlo), por nombre (separando número y unidad, `1ML` = `1
+ML`, y probando lo que va después del guion, porque FAMISANAR antepone la
+categoría) y por valor. Cuando en toda la factura un valor lo tiene un solo
+servicio, eso identifica el renglón aunque el código y el nombre sean de otro
+catálogo; cuando lo comparten varios, desempata el nombre. Cada renglón queda
+marcado con su confianza (ALTA / MEDIA / BAJA / SIN CRUCE) y hay un reporte
+aparte (`--reporte-cruce`) con las hojas CRUCE, REVISAR y RESUMEN.
+
+**La regla que no se rompió:** si el cruce no es confiable **no se inventa un
+servicio** — queda lo que decía el texto y el renglón se manda a REVISAR. De
+las 398: 263 ALTA, 46 MEDIA, 86 BAJA y **3 sin cruce** (las 3 son objeciones
+donde FAMISANAR no nombró ningún servicio: una SO0101 de epicrisis con el texto
+cortado, una CO0601 que sólo trae el texto de la norma y una FA0502 «incluido
+en derechos de sala»).
+
+**Dos cosas que aparecieron por el camino.**
+
+1. **La palabra «VALOR» se estaba yendo a `SLNSERPRO`.** Cuando FAMISANAR deja
+   la etiqueta CÓDIGO vacía —«… FMQ0113 CATETER INTRAVENOSO 20 CÓDIGO   VALOR
+   UNITARIO FACTURADO…»— el bot tomaba la palabra siguiente como si fuera el
+   código. Ahora se exige que el código traiga al menos un dígito y, cuando la
+   etiqueta va vacía, se recupera el código que está **pegado adelante del
+   nombre** (que es donde FAMISANAR lo pone en esos casos).
+
+2. **FAMISANAR busca algunos códigos en el catálogo CUPS y no en el del
+   hospital.** Las 4 objeciones AU5802 de HUS0000549272 dicen «BIOPSIA DE
+   MUSCULO O TENDON EXTRAOCULAR, código 150101»; en el DGH el `150101` es
+   **ENSURE CLINICAL** (fórmula enteral), y el valor, la cantidad y el número
+   de renglones cuadran exacto con esa línea. El cruce las deja amarradas al
+   servicio correcto pero con el aviso «el nombre del servicio no coincide»,
+   para que el auditor lo confirme. Son 11 renglones con ese aviso.
+
+**Archivos entregados:** `OBJECIONES_FAMISANAR_01-09-2026.xlsx` (el que se
+sube, 398 renglones en las 16 columnas de siempre) y
+`CRUCE_FAMISANAR_01-09-2026.xlsx` (el respaldo del auditor, 100 renglones en
+REVISAR). Guía actualizada en `tools/README_organizar_objeciones_famisanar.md`;
+67 tests en `tests/test_tools/test_organizar_objeciones_famisanar.py`.
 
 ### 01-09-2026 — Guardar una glosa ya no lo devuelve al inicio de la página (y la base maestra de servicios)
 
@@ -9147,6 +9214,18 @@ siguen escondidas para el gestor, como estaban.
 
 ## 3) PENDIENTE
 
+### FAMISANAR — objeciones del 1 de septiembre (04-09)
+- **Revisar los 100 renglones de la hoja REVISAR** de
+  `CRUCE_FAMISANAR_01-09-2026.xlsx`: 86 de confianza BAJA (se ubicaron por
+  valor, hay que confirmar que sea ese servicio), 11 con el aviso de que el
+  nombre no coincide y 3 sin cruce (esas se completan a mano).
+- **Piloto de una factura en DGH** antes del cargue completo (regla del repo).
+  La más limpia para el piloto es HUS0000549272 (68 objeciones, todas ALTA o
+  MEDIA) o HUS0000548556 (3 objeciones, las tres ALTA).
+- **HUS0000543238 es la pesada:** 155 objeciones y 70 en revisión. Casi todas
+  son dispositivos con nomenclatura IUM; si el maestro de equivalencias
+  FAMISANAR→HUS aparece, se cargan con `--mapa-servicios` y quedan en ALTA.
+
 ### Curso de noruego (31-08, noche)
 - **Probarlo en SU celular.** Aquí se probó en un navegador de celular
   simulado; falta verlo en el teléfono real: que se instale con «Agregar a la
@@ -9950,6 +10029,11 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
   son para que el área los mire, no se unieron por parecido.
 
 ## 4) PARA MAÑANA
+
+### FAMISANAR — lo primero
+1. Revisar la hoja **REVISAR** del cruce y hacer el **piloto de una factura** en
+   DGH con `OBJECIONES_FAMISANAR_01-09-2026.xlsx`. Si el piloto entra bien,
+   cargar el resto.
 
 ### Curso de noruego — lo primero
 1. **Bajar los cambios y armar la aplicación:** `git pull` y doble clic en

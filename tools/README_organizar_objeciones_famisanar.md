@@ -33,7 +33,9 @@ archivo completo de 16 columnas, un .xlsx por factura (o consolidado).
   código CUPS (`903867`, `735301`, `890202`, …).
 - ⚠️ Filas cortas tipo **"AUD EXTRA - …"** no traen código en el texto →
   `SLNSERPRO` queda **vacío** (igual que las estancias en los archivos del
-  Dispensario). El bot avisa cuántas quedaron así en el log.
+  Dispensario). El bot avisa cuántas quedaron así en el log. Con
+  `--servicios-dgh` la mayoría se resuelve igual: el nombre del insumo sí está
+  en el texto y el valor termina de identificarlo (sección 3).
 
 ### Homologación FAMISANAR → HUS (automática)
 
@@ -45,26 +47,109 @@ homologa solo (se desactiva con `--sin-homologar`):
 | CUPS (6 dígitos) | Tal cual — estándar nacional | `903867` → `903867` |
 | Medicamentos con letra U/P | Se quita la letra de FAMISANAR | `U20162259-04` → `20162259-04` (METOCLOPRAMIDA, verificado contra EMSSANAR) |
 | Dispositivos 9101xxxx | Equivalencia FMQ fija, confirmada contra el archivo de trabajo LOTE_02 | `91017235` → `FMQ0112` (catéter IV 18, $5.800 idéntico); `91012136` → `FMQ0182-1` (llave 3 vías); `91017424` → `FMQ0952` (electrodo ECG adulto, 3×$800); `91017278` → `FMQ0159` (bolsa recolectora orina, $18.100 idéntico) |
-| Dispositivos NUEVOS sin equivalencia | Quedan tal cual + WARNING en el log | agregarlos con `--mapa-servicios equivalencias.json` (`{"9101XXXX": "FMQNNNN", ...}`) — pisa/extiende las fijas |
+| Dispositivos NUEVOS sin equivalencia | Quedan tal cual + WARNING en el log | lo mejor es pasar `--servicios-dgh` (sección 3, resuelve el código solo); si no, agregarlos con `--mapa-servicios equivalencias.json` (`{"9101XXXX": "FMQNNNN", ...}`) — pisa/extiende las fijas |
 
-## 3) Mapeo de campos (FAMISANAR → 16 columnas)
+> **Ojo:** la homologación por reglas sólo alcanza para los CUPS y los
+> medicamentos. Los dispositivos que FAMISANAR nombra con su catálogo IUM
+> (`91022534`, `91018425`…) **no existen en el DGH**: si se cargan así, el
+> renglón no se reconoce. Para eso está el cruce contra el export de servicios
+> facturados — sección 3.
+
+## 3) El cruce contra los servicios facturados del DGH (`--servicios-dgh`)
+
+Con el **export de servicios facturados del DGH** (el DGReport: `SERVICIOS DGH`,
+`DESCRIPCION INSTITUCIONAL`, `SLNSERPRO_CUPS`, `CODIGO_MEDICAMENTO`,
+`NOM_CENTRO_COSTO`, `FACTURA`, `CAT_SERVICIOS`, `Vr_SERVICIO`) el bot busca,
+**dentro de esa misma factura**, de qué servicio habla cada objeción. Cuando lo
+encuentra:
+
+- `SLNSERPRO` queda con el **código real del hospital** (el que DGH reconoce),
+  no con el que escribió FAMISANAR;
+- `CTNCENCOS` queda con el **centro de costo** de ese renglón (antes salía
+  vacío en todas las filas).
+
+### Cómo lo busca
+
+Puntúa cada renglón del DGH por tres cosas:
+
+- **código** — contra las tres columnas de código del DGH, tolerando las formas
+  en que FAMISANAR los escribe (`P32606-02` = `32606-2`, `U41072-10` =
+  `41072-10`, `903437H` = `903437`);
+- **nombre** — palabra por palabra, separando número y unidad (`1ML` = `1 ML`) y
+  probando también lo que va después del guion, porque FAMISANAR antepone la
+  categoría (`LINEA INFUSION E INYECCION - JERINGA 1 ML…`);
+- **valor** — unitario y del renglón. Si en toda la factura ese valor lo tiene
+  un solo servicio, identifica la línea aunque el código y el nombre sean de
+  otro catálogo. Si lo comparten varios, desempata el nombre.
+
+Cada renglón queda con su **nivel de confianza**:
+
+| Confianza | Qué significa |
+|---|---|
+| **ALTA** | coincide el código (o el nombre exacto) **y** el valor |
+| **MEDIA** | coincide una cosa fuerte y el valor la respalda |
+| **BAJA** | se ubicó por valor o por parecido flojo — **verificar antes de subir** |
+| **SIN CRUCE** | el texto no nombra ningún servicio; se completa a mano |
+
+**Nunca se inventa un servicio.** Sin cruce confiable queda lo que se sabía por
+el texto y el renglón se reporta.
+
+### El reporte de trabajo (`--reporte-cruce`)
+
+Un Excel aparte —no es el que se sube— con tres hojas:
+
+| Hoja | Contenido |
+|---|---|
+| `CRUCE` | fila por fila: qué se leyó del texto, con qué renglón del DGH cruzó y por qué |
+| `REVISAR` | sólo lo que hay que confirmar a mano (BAJA, sin cruce o con aviso) |
+| `RESUMEN` | por factura: objeciones, valor objetado y cuántas quedan por revisar |
+
+Un aviso que vale la pena mirar: **"el nombre del servicio en el archivo de
+FAMISANAR no coincide con el del DGH"**. Pasa cuando FAMISANAR buscó el código
+en el catálogo CUPS y no en el del hospital (ej. `150101`, que en el DGH es una
+fórmula enteral y en CUPS una biopsia). El cruce por valor suele ser el
+correcto, pero hay que confirmarlo.
+
+### Qué cambia en la práctica
+
+Corrida real del 1 de septiembre (398 objeciones, 14 facturas, $31.439.029):
+
+| | Sin `--servicios-dgh` | Con `--servicios-dgh` |
+|---|---|---|
+| `SLNSERPRO` que el DGH reconoce | 184 (46 %) | **395 (99 %)** |
+| `SLNSERPRO` con un código que no existe en el DGH | 191 | **0** |
+| `SLNSERPRO` vacío | 23 | 3 |
+| `CTNCENCOS` lleno | 0 | **395** |
+
+---
+
+## 4) Mapeo de campos (FAMISANAR → 16 columnas)
 
 | Salida | Origen | Cómo |
 |---|---|---|
 | `CRNCXC` | `NRO_FACTURA` | Formato largo: `HUS532670` → `HUS0000532670`. |
 | `CRNCONOBJ` | `CODIGO_DEVOLUCION` | Ya viene de 6 caracteres (`CL0801`, `CO0701`…): tal cual. Red de seguridad: si viniera de 4 se completa con `--codigo-sufijo`. |
-| `SLNSERPRO` | texto de `OBSERVACION` | Regex sobre "CÓDIGO &lt;x&gt;" (acepta dígitos, letras y guiones; con o sin tilde). Vacío si no hay. |
+| `SLNSERPRO` | texto de `OBSERVACION` (+ export del DGH) | Regex sobre "CÓDIGO &lt;x&gt;" (acepta dígitos, letras y guiones; con o sin tilde) o, si la etiqueta viene vacía, el código pegado adelante del nombre. Con `--servicios-dgh` se reemplaza por el código real del hospital. Vacío si no hay nada. |
 | `CROVALOBJ` | `VALOR DEVOLUCION` | Directo (número). |
 | `CRDOBSERV` | `OBSERVACION` | `"<código> <texto>$<valor>"`. Colapsa las corridas largas de espacios del export. Anti-duplicado con cuidado: quita un `$monto` final SOLO si es el mismo valor de la objeción; si es otro monto (p. ej. el valor unitario facturado), se conserva. |
 | `CDFECDOC`, `CROFECOBJ` | — | `--fecha` (default hoy), FECHA CORTA sin horas. |
 | `CDCONSEC` | — | Consecutivo POR FACTURA (1-1-1, 2-2-2…), como texto; standalone reinicia en 1. |
 | `CROTIPOBJ` | — | Por factura: solo TA/FA/SO/AU/CO → 0; solo CL → 1; mezcla con CL → 2. |
+| `CTNCENCOS` | export del DGH | Centro de costo del renglón que cruzó. Vacío sin `--servicios-dgh`. |
 | `CROCLAOBJ`, `GENUSUARIO4` | — | `0` (número) y `'999'` (texto). |
 | resto | — | Vacíos. Formatos de celda 1:1 con los archivos reales. |
 
-## 4) Comandos típicos
+## 5) Comandos típicos
 
 ```cmd
+:: Con el export del DGH (lo recomendado: SLNSERPRO y centro de costo reales)
+py tools\organizar_objeciones_famisanar.py ^
+  --entrada       "FAMISANAR_1_SEPTIEMBRE.xlsx" ^
+  --servicios-dgh "SERVICIOS_FACTURADOS_DGH.xlsx" ^
+  --salida        "OBJECIONES_FAMISANAR_01-09-2026.xlsx" --consolidado ^
+  --reporte-cruce "CRUCE_FAMISANAR_01-09-2026.xlsx" ^
+  --fecha 2026-09-01
+
 :: Un archivo por factura (lo normal)
 py tools\organizar_objeciones_famisanar.py ^
   --entrada "FAMISANAR_11.35.1.xlsx" ^
@@ -76,7 +161,7 @@ py tools\organizar_objeciones_famisanar.py ^
   --salida  "OBJECIONES_FAMISANAR_UNIFICADO.xlsx" --consolidado
 ```
 
-## 5) Argumentos del CLI
+## 6) Argumentos del CLI
 
 | Flag | Default | Uso |
 |---|---|---|
@@ -86,17 +171,19 @@ py tools\organizar_objeciones_famisanar.py ^
 | `--consolidado` | off | Un solo Excel con todas las facturas. |
 | `--fecha` | hoy | `YYYY-MM-DD` para `CDFECDOC`/`CROFECOBJ`. |
 | `--codigo-sufijo` | `01` | Solo red de seguridad para códigos de 4 chars. |
+| `--servicios-dgh` | — | Export de servicios facturados del DGH: resuelve `SLNSERPRO` y llena `CTNCENCOS` (sección 3). |
+| `--reporte-cruce` | — | Excel de trabajo con el detalle del cruce (necesita `--servicios-dgh`). |
 | `--mapa-codigos` | — | JSON para forzar códigos de objeción puntuales. |
 | `--consecutivo` | `1` | Número inicial del consecutivo por factura. |
 | `--log` | — | Log adicional a archivo. |
 
-## 6) Instalación (una vez)
+## 7) Instalación (una vez)
 
 ```cmd
 py -m pip install openpyxl
 ```
 
-## 7) Verificación de referencia
+## 8) Verificación de referencia
 
 Probado contra `FAMISANAR_11.35.1.xlsx` real: 37 objeciones, 2 facturas
 (`HUS0000532670`: 19, `HUS0000525618`: 18), $4.256.442 glosados, 30 códigos de
