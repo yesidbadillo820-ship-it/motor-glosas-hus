@@ -11,17 +11,24 @@ Qué hace, en orden:
      las objeciones CL de glosas Médica/Mixta NO se responden (van a la hoja
      "PARA GESTION MEDICA" y quedan intactas para la nota crédito del equipo
      médico).
-  3. Busca el PDF de cada factura del lote en las carpetas de soportes de
-     radicación de la unidad Y: y lo copia a `soportes`.
+  3. Recorre UNA vez las carpetas de soportes de radicación de la unidad Y:,
+     arma el índice de PDF por factura y copia el de cada factura a `soportes`.
   4. Lee cada PDF con la cascada pdfplumber → PyPDF2 → OCR
      (extraer_factura_pdf.py) y arma el PARRAFO DE EVIDENCIA de cada
      respuesta: abre citando el PDF fuente, nombra al paciente, cita el
      servicio y el valor leidos, y cruza con la tarifa pactada del contrato
      440 — "corresponde exactamente" SOLO se afirma cuando los numeros
      coinciden. Nada leido ni pactado = nada agregado (no se inventa).
-  5. Si no se pasa --sin-cargue, corre el robot del portal
+  5. COTEJO DE COBRO (cotejo_tarifa.py): compara el valor que de verdad se
+     facturó —leído del PDF— contra la tarifa pactada y escribe al lado de
+     cada respuesta si hay mayor valor cobrado, cuánto, y la RESPUESTA
+     SUGERIDA. Si la misma diferencia porcentual se repite en el lote, es la
+     actualización de tarifas del año y NO se sugiere aceptar. El Excel del
+     cargue conserva el Valor Aceptado en 0: aceptar una glosa lo decide el
+     auditor, no el bot.
+  6. Si no se pasa --sin-cargue, corre el robot del portal
      (responder_glosas_simed.py) con el Excel del paquete.
-  6. Convierte las evidencias de la corrida (los .png del robot) en el PDF
+  7. Convierte las evidencias de la corrida (los .png del robot) en el PDF
      del paquete <GI>_EVIDENCIAS.pdf y deja todo dentro de la carpeta GI.
 
 Reglas: piloto antes de masivo (use --piloto HUS...), credenciales del portal
@@ -32,14 +39,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 
 AQUI = Path(__file__).resolve().parent
 REPO = AQUI.parents[1]
+sys.path.insert(0, str(AQUI))
+
+import cotejo_tarifa  # noqa: E402  (el cotejo de lo facturado contra lo pactado)
 
 RUTAS_SOPORTES_DEFECTO = [
     r"Y:\2. FEBRERO 2026 - SOPORTES RADICACION CARPETA 2",
@@ -74,25 +86,65 @@ def factura_corta(fac: str) -> str:
     return str(fac).replace("HUS", "").lstrip("0") or "0"
 
 
-def buscar_pdf_factura(fac: str, rutas: list[str]) -> Path | None:
-    """Busca el PDF de la factura en las carpetas de radicación (la más
-    reciente primero). Acepta nombres que contengan HUS0000123456 o el
-    número corto; carpetas caídas o sin permiso se saltan con aviso."""
-    corta = factura_corta(fac)
-    patrones = [f"*{fac}*.pdf", f"*HUS*{corta}*.pdf", f"*{corta}*.pdf"]
-    for raiz in reversed(rutas):  # el mes más reciente primero
+RE_FACTURA_EN_NOMBRE = re.compile(r"HUS0*(\d{4,})", re.IGNORECASE)
+
+
+def indexar_soportes(rutas: list[str]) -> dict[str, list[Path]]:
+    """Recorre UNA sola vez las carpetas de radicación y arma el índice
+    {número de factura → PDF que le corresponde}.
+
+    Las carpetas de la unidad Y: vienen así:
+
+        Y:\\9.SEPTIEMBRE - SOPORTES RADICACION\\DISPENSARIO\\LILIANA\\
+            ENV-233972-OK\\HUS552002\\FEV_900006037_HUS552002.pdf
+
+    o sea: la factura está en el nombre del archivo Y en el de su carpeta, y
+    dentro de esa carpeta hay varios soportes (epicrisis, autorización...).
+    Por eso el índice ordena los candidatos: primero la factura electrónica
+    (los archivos `FEV_...`, que son los que traen el detalle del cobro),
+    luego los que nombran la factura, y de último el resto de la carpeta.
+    Entre meses manda el más reciente (el último de `rutas`).
+
+    Recorrer una vez y no una por factura es lo que hace viable el lote: son
+    ocho carpetas de red con decenas de miles de archivos.
+    """
+    indice: dict[str, list[tuple[tuple[int, int], Path]]] = {}
+    for orden_raiz, raiz in enumerate(reversed(rutas)):  # el mes más reciente primero
         base = Path(raiz)
         if not base.is_dir():
             continue
-        for patron in patrones:
-            try:
-                hallado = next(base.rglob(patron), None)
-            except OSError as e:
-                print(f"    (no pude recorrer {raiz}: {e})")
-                break
-            if hallado:
-                return hallado
-    return None
+        try:
+            archivos = list(base.rglob("*.pdf"))
+        except OSError as e:
+            print(f"    (no pude recorrer {raiz}: {e})")
+            continue
+        for pdf in archivos:
+            en_nombre = {m.group(1).lstrip("0") for m in RE_FACTURA_EN_NOMBRE.finditer(pdf.name)}
+            en_carpeta = {
+                m.group(1).lstrip("0") for m in RE_FACTURA_EN_NOMBRE.finditer(pdf.parent.name)
+            }
+            for clave in en_nombre | en_carpeta:
+                if clave in en_nombre:
+                    prioridad = 0 if pdf.name.upper().startswith("FEV") else 1
+                else:
+                    prioridad = 2  # solo lo nombra la carpeta: es otro soporte
+                indice.setdefault(clave, []).append(((orden_raiz, prioridad), pdf))
+    return {
+        clave: [ruta for _, ruta in sorted(cands, key=lambda c: c[0])]
+        for clave, cands in indice.items()
+    }
+
+
+def buscar_en_indice(indice: dict[str, list[Path]], fac: str) -> Path | None:
+    """El PDF de la factura dentro del índice ya recorrido."""
+    candidatos = indice.get(factura_corta(fac))
+    return candidatos[0] if candidatos else None
+
+
+def buscar_pdf_factura(fac: str, rutas: list[str]) -> Path | None:
+    """Busca el PDF de UNA factura (recorre las carpetas). Para un lote entero
+    use `indexar_soportes` una vez y luego `buscar_en_indice`."""
+    return buscar_en_indice(indexar_soportes(rutas), fac)
 
 
 def frase_anclaje(fac: str, datos: dict) -> str | None:
@@ -116,12 +168,12 @@ def _plata(v) -> str:
 
 def hallar_servicio_en_pdf(
     servicios: list[list], cups: str, descripcion: str
-) -> tuple[str, int | None] | None:
+) -> tuple[str, int | None, list[int]] | None:
     """Ubica en las filas extraídas del PDF la del servicio glosado: primero
     por el código (con o sin sufijo), luego por palabras de la descripción.
-    Devuelve (texto de la fila, último valor numérico de la fila) o None."""
-    import re
-
+    Devuelve (texto de la fila, último valor de la fila, todos sus importes)
+    o None. Los importes van completos porque el cotejo necesita distinguir
+    el valor unitario del total de la línea."""
     cod = re.sub(r"\s", "", str(cups or "")).upper()
     pelado = re.sub(r"[A-Z]+$", "", cod)
     palabras = [
@@ -130,27 +182,50 @@ def hallar_servicio_en_pdf(
         if p not in ("PARA", "COMO")
     ]
 
-    def valor_de(fila: list) -> int | None:
+    def importes_de(fila: list) -> list[int]:
+        """Los valores en pesos de la fila, sin confundirlos con los códigos.
+
+        El código del servicio (890275H, HUS0000542497) tiene letras y el
+        centro de costo son dígitos sueltos: leerlos como plata fue el error
+        que hacía ver un cobro de $890.275 donde había uno de $192.600. Por eso
+        mandan los números escritos como dinero —con separador de miles o con
+        $—, y solo si la fila no trae ninguno se miran los dígitos pelados.
+        """
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
         from _dinero import a_entero  # noqa: PLC0415  (el UNICO lector de pesos)
 
-        nums = []
+        con_formato, pelados = [], []
+        # Se mira token por token: pdfplumber a veces devuelve el renglón
+        # entero en una sola celda ("890275H CONSULTA 1 192.600 192.600"), y
+        # mirando la celda completa no se leía ningún valor.
         for celda in fila:
-            if not re.search(r"\d", str(celda)):
-                continue
-            n = a_entero(celda)
-            if n >= 100:  # descartar cantidades y códigos cortos
-                nums.append(n)
-        return nums[-1] if nums else None
+            for texto in str(celda or "").split():
+                if not re.search(r"\d", texto):
+                    continue
+                limpio = re.sub(r"[\s$]", "", texto).upper().rstrip(".,")
+                if re.search(r"[A-ZÑ]", limpio):  # 890275H, HUS0000542497, "12UND"
+                    continue
+                if limpio in (cod, pelado):  # el código del servicio, no un valor
+                    continue
+                n = a_entero(texto)
+                if n < 100:  # cantidades y códigos cortos
+                    continue
+                (con_formato if re.search(r"[.,]", limpio) else pelados).append(n)
+        return con_formato or pelados
+
+    def resultado(fila: list) -> tuple[str, int | None, list[int]]:
+        importes = importes_de(fila)
+        texto = " ".join(" ".join(str(c) for c in fila).split())[:120]
+        return texto, (importes[-1] if importes else None), importes
 
     for fila in servicios or []:
         fila_txt = " ".join(str(c) for c in fila).upper()
         if cod and (cod in fila_txt or (pelado and pelado in fila_txt)):
-            return " ".join(" ".join(str(c) for c in fila).split())[:120], valor_de(fila)
+            return resultado(fila)
     for fila in servicios or []:
         fila_txt = " ".join(str(c) for c in fila).upper()
         if palabras and sum(1 for p in palabras if p in fila_txt) >= max(2, len(palabras) // 2):
-            return " ".join(" ".join(str(c) for c in fila).split())[:120], valor_de(fila)
+            return resultado(fila)
     return None
 
 
@@ -179,7 +254,7 @@ def parrafo_evidencia(
             + "."
         )
         if servicio_pdf:
-            texto_serv, valor_serv = servicio_pdf
+            texto_serv, valor_serv = servicio_pdf[0], servicio_pdf[1]
             frases.append(
                 "EL DOCUMENTO DETALLA EL COBRO DEL SERVICIO "
                 + texto_serv
@@ -218,6 +293,123 @@ def parrafo_evidencia(
                 "EL ANEXO TARIFARIO DEL CONTRATO, FILA QUE SE REMITE CON LA PRESENTE RESPUESTA."
             )
     return " ".join(frases) if frases else None
+
+
+COLUMNAS_COTEJO = [
+    "VALOR FACTURADO (PDF)",
+    "TARIFA PACTADA (440)",
+    "DIFERENCIA",
+    "¿SOBRECOBRO?",
+    "VALOR SUGERIDO A ACEPTAR",
+    "RESPUESTA SUGERIDA",
+    "FUENTE DEL COTEJO",
+]
+COLORES_VEREDICTO = {
+    cotejo_tarifa.SOBRECOBRO: "FFC7CE",  # rojo claro: sí hay que aceptar algo
+    cotejo_tarifa.POR_VIGENCIA: "FFEB9C",  # ámbar: revisar antes de aceptar
+    cotejo_tarifa.A_TARIFA: "C6EFCE",  # verde: la glosa es infundada
+    cotejo_tarifa.POR_DEBAJO: "C6EFCE",
+    cotejo_tarifa.SIN_COTEJO: "D9D9D9",  # gris: falta información
+}
+
+
+def agregar_cotejo_excel(ruta_excel: Path, cotejos: dict[tuple[str, int], dict]) -> int:
+    """Escribe al lado de cada respuesta el cotejo del cobro: qué se facturó de
+    verdad (leído del PDF), qué se pactó en el contrato, la diferencia y la
+    RESPUESTA SUGERIDA.
+
+    Las columnas van al final de la hoja "Respuestas Glosa": el robot del
+    portal busca sus columnas por nombre, así que no lo estorban. Y el
+    "Valor Aceptado" del cargue NO se toca —sigue en 0—: la sugerencia es para
+    que el auditor decida, porque aceptar una glosa es decisión del hospital,
+    no del bot. Además deja la hoja "COTEJO DE COBRO" con lo que hay que
+    revisar (sobrecobros y diferencias por vigencia), que es el paquete de
+    trabajo del auditor."""
+    from openpyxl import load_workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    wb = load_workbook(ruta_excel)
+    ws = wb["Respuestas Glosa"]
+    encabezados = [str(c.value or "") for c in ws[1]]
+    if COLUMNAS_COTEJO[0] in encabezados:
+        inicio = encabezados.index(COLUMNAS_COTEJO[0]) + 1
+    else:
+        inicio = ws.max_column + 1
+        for i, nombre in enumerate(COLUMNAS_COTEJO):
+            c = ws.cell(row=1, column=inicio + i, value=nombre)
+            c.font = Font(bold=True, color="FFFFFF")
+            c.fill = PatternFill("solid", fgColor="1F4E78")
+            c.alignment = Alignment(vertical="center", wrap_text=True)
+        for i, ancho in enumerate([18, 18, 14, 26, 16, 90, 46]):
+            ws.column_dimensions[get_column_letter(inicio + i)].width = ancho
+
+    escritas = 0
+    for fila in ws.iter_rows(min_row=2):
+        clave = (str(fila[0].value or "").strip(), int(fila[1].value or 0))
+        cot = cotejos.get(clave)
+        if not cot:
+            continue
+        valores = [
+            cot.get("valor_facturado"),
+            cot.get("tarifa"),
+            cot.get("diferencia"),
+            cot["veredicto"]
+            + (f" (+{cot['porcentaje']}%)" if cot.get("porcentaje") and cot["diferencia"] else ""),
+            cot.get("aceptar") or 0,
+            cot["respuesta"],
+            cot.get("fuente", ""),
+        ]
+        for i, v in enumerate(valores):
+            c = ws.cell(row=fila[0].row, column=inicio + i, value=v)
+            c.alignment = Alignment(wrap_text=i >= 3, vertical="top")
+            if i < 3 or i == 4:
+                c.number_format = '"$"#,##0'
+            if i == 3:
+                c.fill = PatternFill(
+                    "solid", fgColor=COLORES_VEREDICTO.get(cot["veredicto"], "D9D9D9")
+                )
+        escritas += 1
+
+    revisar = {
+        k: v
+        for k, v in cotejos.items()
+        if v["veredicto"] in (cotejo_tarifa.SOBRECOBRO, cotejo_tarifa.POR_VIGENCIA)
+    }
+    if "COTEJO DE COBRO" in wb.sheetnames:
+        del wb["COTEJO DE COBRO"]
+    if revisar:
+        hoja = wb.create_sheet("COTEJO DE COBRO")
+        cols = ["Factura", "# Objeción", *COLUMNAS_COTEJO[:-1]]
+        hoja.append(cols)
+        for i, _ in enumerate(cols, 1):
+            c = hoja.cell(row=1, column=i)
+            c.font = Font(bold=True, color="FFFFFF")
+            c.fill = PatternFill("solid", fgColor="9C0006")
+            c.alignment = Alignment(vertical="center", wrap_text=True)
+        for (fac, num), v in sorted(revisar.items()):
+            hoja.append(
+                [
+                    fac,
+                    num,
+                    v.get("valor_facturado"),
+                    v.get("tarifa"),
+                    v.get("diferencia"),
+                    v["veredicto"],
+                    v.get("aceptar") or 0,
+                    v["respuesta"],
+                ]
+            )
+        for i, ancho in enumerate([16, 11, 18, 18, 14, 26, 16, 110], 1):
+            hoja.column_dimensions[get_column_letter(i)].width = ancho
+        for rr in hoja.iter_rows(min_row=2):
+            rr[7].alignment = Alignment(wrap_text=True, vertical="top")
+            for c in rr[2:5] + (rr[6],):
+                c.number_format = '"$"#,##0'
+            rr[5].fill = PatternFill("solid", fgColor=COLORES_VEREDICTO.get(rr[5].value, "D9D9D9"))
+        hoja.freeze_panes = "A2"
+    wb.save(ruta_excel)
+    return escritas
 
 
 def enriquecer_excel(
@@ -335,6 +527,10 @@ def main() -> int:
         help="Anexos de medicamentos y dispositivos del contrato 440 (CUM)",
     )
     args = parser.parse_args()
+    # gen_lote.py corre desde otra carpeta: las rutas relativas que escriba el
+    # auditor deben quedar absolutas antes de pasárselas.
+    args.excel = args.excel.expanduser().resolve()
+    args.base = args.base.expanduser().resolve()
 
     asegurar_dependencias()
     from extraer_factura_pdf import extraer_datos_factura
@@ -347,12 +543,12 @@ def main() -> int:
     carpeta_gi = args.base / gi
     soportes = carpeta_gi / "soportes"
     soportes.mkdir(parents=True, exist_ok=True)
-    print(f"[1/6] Carpeta del paquete: {carpeta_gi}")
+    print(f"[1/7] Carpeta del paquete: {carpeta_gi}")
 
     # 2. Generar respuestas (gen_lote hereda la exclusión CL médica/mixta)
     excel_resp = carpeta_gi / f"respuestas_glosa_{gi}.xlsx"
     dump = carpeta_gi / f"dump_{gi}.json"
-    print("[2/6] Generando respuestas con gen_lote.py (directriz CL incluida)...")
+    print("[2/7] Generando respuestas con gen_lote.py (directriz CL incluida)...")
     r = subprocess.run(
         [sys.executable, str(AQUI / "gen_lote.py"), str(args.excel), str(excel_resp), str(dump)],
         cwd=AQUI,
@@ -367,17 +563,20 @@ def main() -> int:
     # 2b. Tarifario del contrato 440: la tarifa de cada glosa de tarifas
     # (el párrafo de evidencia la citará; sin pacto no se cita nada)
     indice = cargar_tarifario(args.tarifario_servicios, args.tarifario_medicamentos)
-    tarifa_por_linea: dict[tuple[str, int], dict] = {}
+    tarifa_por_linea: dict[tuple[str, int], dict] = {}  # la que se cita en la respuesta
+    tarifa_de_cotejo: dict[tuple[str, int], dict] = {}  # la de TODAS las líneas, para el cotejo
     if indice:
         for d in lineas:
-            if not str(d.get("tipo", "")).startswith(("TARIFA", "LISTA_PRECIOS")):
-                continue
             t = tarifa_de(indice, d.get("cups"))
-            if t:
+            if not t:
+                continue
+            tarifa_de_cotejo[(d["factura"], d["num"])] = t
+            if str(d.get("tipo", "")).startswith(("TARIFA", "LISTA_PRECIOS")):
                 tarifa_por_linea[(d["factura"], d["num"])] = t
         print(
             f"      Tarifario cargado ({len(indice)} códigos): "
-            f"{len(tarifa_por_linea)} glosas con tarifa pactada hallada"
+            f"{len(tarifa_de_cotejo)} glosas con tarifa pactada hallada "
+            f"({len(tarifa_por_linea)} de ellas se citan en la respuesta)"
         )
     else:
         print(
@@ -386,10 +585,12 @@ def main() -> int:
         )
 
     # 3. Soportes de radicación desde la unidad Y: + lectura en cascada
-    print("[3/6] Buscando el PDF de cada factura en las carpetas de radicación...")
+    print("[3/7] Recorriendo las carpetas de radicación (una sola pasada)...")
+    indice_soportes = indexar_soportes(args.rutas_soportes)
+    print(f"      Soportes indexados: {len(indice_soportes)} facturas con PDF a la vista")
     extraidos, sin_pdf = {}, []
     for fac in facturas:
-        pdf = buscar_pdf_factura(fac, args.rutas_soportes)
+        pdf = buscar_en_indice(indice_soportes, fac)
         if pdf is None:
             sin_pdf.append(fac)
             continue
@@ -415,6 +616,7 @@ def main() -> int:
     # Solo se plasma lo que de verdad se leyó o está pactado.
     aperturas: dict[tuple[str, int], str] = {}
     con_pdf = con_coincidencia = 0
+    servicios_hallados: dict[tuple[str, int], tuple] = {}
     for d in lineas:
         clave = (d["factura"], d["num"])
         datos = extraidos.get(d["factura"])
@@ -423,6 +625,8 @@ def main() -> int:
             if datos
             else None
         )
+        if servicio_pdf:
+            servicios_hallados[clave] = servicio_pdf
         parrafo = parrafo_evidencia(
             datos,
             servicio_pdf,
@@ -437,12 +641,12 @@ def main() -> int:
     if aperturas:
         n = enriquecer_excel(excel_resp, apertura_por_linea=aperturas)
         print(
-            f"[4/6] Respuestas con trazabilidad: {n} líneas "
+            f"[4/7] Respuestas con trazabilidad: {n} líneas "
             f"({con_pdf} citan el PDF leído, {con_coincidencia} verifican coincidencia exacta con la tarifa)"
         )
     else:
         print(
-            "[4/6] Sin tarifas ni datos de PDF que citar: las respuestas van con el texto del motor."
+            "[4/7] Sin tarifas ni datos de PDF que citar: las respuestas van con el texto del motor."
         )
     if sin_pdf:
         print(
@@ -450,9 +654,72 @@ def main() -> int:
             + ("..." if len(sin_pdf) > 12 else "")
         )
 
-    # 5. Cargue al portal
+    # 5. COTEJO DE COBRO: ¿de verdad se está cobrando de más?
+    # Primero se elige, de la línea leída en el PDF, cuál es el valor unitario;
+    # con eso y la tarifa pactada se calculan los factores que se repiten en el
+    # lote (esos son actualización de tarifas del año, no sobrecobro) y recién
+    # entonces se dicta el veredicto de cada línea.
+    elegidos: dict[tuple[str, int], tuple[int | None, str]] = {}
+    for d in lineas:
+        clave = (d["factura"], d["num"])
+        serv = servicios_hallados.get(clave)
+        precio = (tarifa_de_cotejo.get(clave) or {}).get("precio")
+        elegidos[clave] = cotejo_tarifa.elegir_valor_facturado(serv[2] if serv else [], precio)
+    factores = cotejo_tarifa.factores_repetidos(
+        [
+            (
+                elegidos[(d["factura"], d["num"])][0],
+                (tarifa_de_cotejo.get((d["factura"], d["num"])) or {}).get("precio"),
+            )
+            for d in lineas
+        ]
+    )
+    cotejos: dict[tuple[str, int], dict] = {}
+    for d in lineas:
+        clave = (d["factura"], d["num"])
+        valor, motivo = elegidos[clave]
+        t = tarifa_de_cotejo.get(clave)
+        cot = cotejo_tarifa.cotejar(
+            valor, t, int(d.get("valor") or 0), d.get("cups", ""), factores, motivo
+        )
+        serv = servicios_hallados.get(clave)
+        datos = extraidos.get(d["factura"]) or {}
+        cot["fuente"] = " | ".join(
+            x
+            for x in (
+                datos.get("archivo", ""),
+                f"línea del PDF: {serv[0]}" if serv else "",
+                (t or {}).get("fuente", ""),
+            )
+            if x
+        )
+        cotejos[clave] = cot
+    escritas = agregar_cotejo_excel(excel_resp, cotejos)
+    json.dump(
+        {f"{k[0]}#{k[1]}": v for k, v in cotejos.items()},
+        open(carpeta_gi / f"cotejo_cobro_{gi}.json", "w", encoding="utf-8"),
+        ensure_ascii=False,
+        indent=1,
+    )
+    resumen = Counter(c["veredicto"] for c in cotejos.values())
+    sugerido = sum(c["aceptar"] for c in cotejos.values())
+    print(
+        f"[5/7] Cotejo de cobro en {escritas} líneas: "
+        f"{resumen[cotejo_tarifa.SOBRECOBRO]} con mayor valor VERIFICADO, "
+        f"{resumen[cotejo_tarifa.POR_VIGENCIA]} por actualización de vigencia (revisar), "
+        f"{resumen[cotejo_tarifa.A_TARIFA] + resumen[cotejo_tarifa.POR_DEBAJO]} cobradas a tarifa "
+        f"o por debajo, {resumen[cotejo_tarifa.SIN_COTEJO]} sin cotejo posible."
+    )
+    if sugerido:
+        print(
+            f"      Valor sugerido a aceptar en total: {_plata(sugerido)} — el Excel del cargue "
+            "SIGUE CON VALOR ACEPTADO EN 0: la aceptación la decide usted en la hoja "
+            "'COTEJO DE COBRO'."
+        )
+
+    # 6. Cargue al portal
     if args.sin_cargue:
-        print("[5/6] --sin-cargue: el Excel queda listo; corra el robot cuando quiera.")
+        print("[6/7] --sin-cargue: el Excel queda listo; corra el robot cuando quiera.")
     else:
         reporte = carpeta_gi / f"reporte_{gi}.csv"
         cmd = [
@@ -468,14 +735,14 @@ def main() -> int:
         if args.con_cabeza:
             cmd.append("--con-cabeza")
         print(
-            f"[5/6] Corriendo el robot del portal ({'piloto ' + args.piloto if args.piloto else 'todas'})..."
+            f"[6/7] Corriendo el robot del portal ({'piloto ' + args.piloto if args.piloto else 'todas'})..."
         )
         subprocess.run(cmd, cwd=REPO)
 
-        # 6. Evidencias del paquete
+        # 7. Evidencias del paquete
         pdf_ev = evidencias_a_pdf(gi, [args.piloto] if args.piloto else facturas, carpeta_gi)
         print(
-            f"[6/6] Evidencias del paquete: {pdf_ev if pdf_ev else 'sin pantallazos de hoy (¿corrió el robot?)'}"
+            f"[7/7] Evidencias del paquete: {pdf_ev if pdf_ev else 'sin pantallazos de hoy (¿corrió el robot?)'}"
         )
 
     print(f"\nPaquete {gi} listo en {carpeta_gi}")

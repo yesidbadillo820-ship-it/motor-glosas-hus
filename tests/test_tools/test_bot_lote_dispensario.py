@@ -83,6 +83,26 @@ def test_busca_el_pdf_en_el_mes_mas_reciente_primero(tmp_path):
     assert buscar_pdf_factura("HUS0000999999", [str(viejo), str(nuevo)]) is None
 
 
+def test_indice_toma_la_factura_electronica_de_la_carpeta_de_la_factura(tmp_path):
+    """La estructura real de la unidad Y: una carpeta por factura con varios
+    soportes adentro. El que sirve para el cotejo es el FEV (la factura)."""
+    from bot_lote_dispensario import buscar_en_indice, indexar_soportes
+
+    mes = tmp_path / "9.SEPTIEMBRE - SOPORTES RADICACION"
+    carpeta = mes / "DISPENSARIO" / "LILIANA" / "ENV-233972-OK" / "HUS552002"
+    carpeta.mkdir(parents=True)
+    (carpeta / "epicrisis.pdf").write_bytes(b"%PDF")
+    (carpeta / "FEV_900006037_HUS552002.pdf").write_bytes(b"%PDF")
+    (carpeta / "anexo autorizacion HUS552002.pdf").write_bytes(b"%PDF")
+
+    indice = indexar_soportes([str(mes)])
+    hallado = buscar_en_indice(indice, "HUS0000552002")
+    assert hallado is not None and hallado.name == "FEV_900006037_HUS552002.pdf"
+    # los demás soportes de la carpeta quedan como alternativas, no se pierden
+    assert len(indice["552002"]) == 3
+    assert buscar_en_indice(indice, "HUS0000552003") is None
+
+
 # ── No invencion y enriquecimiento del Excel ────────────────────────────────
 def test_sin_datos_leidos_no_hay_frase_de_anclaje():
     assert frase_anclaje("HUS0000500001", dict(paciente=None, total=None)) is None
@@ -247,6 +267,57 @@ def test_hallar_servicio_en_pdf_por_codigo_y_por_descripcion():
     s2 = hallar_servicio_en_pdf(filas, "999999", "CONSULTA GENERAL MEDICINA")
     assert s2 and "CONSULTA GENERAL" in s2[0] and s2[1] == 35136
     assert hallar_servicio_en_pdf(filas, "111111", "NADA QUE VER AQUI") is None
+
+
+def test_el_codigo_del_servicio_no_se_lee_como_si_fuera_plata():
+    """890275H no son $890.275: confundirlos hacía ver sobrecobros falsos."""
+    from bot_lote_dispensario import hallar_servicio_en_pdf
+
+    fila = [["890275H", "CONSULTA", "DE", "PRIMERA", "VEZ", "1", "192.600", "192.600"]]
+    s = hallar_servicio_en_pdf(fila, "890275H", "CONSULTA DE PRIMERA VEZ")
+    assert s and s[2] == [192600, 192600] and s[1] == 192600
+    # el número de la factura tampoco es un valor
+    fila2 = [["HUS0000542497", "890201", "CONSULTA", "35.136"]]
+    s2 = hallar_servicio_en_pdf(fila2, "890201", "CONSULTA")
+    assert s2 and s2[2] == [35136]
+
+
+def test_lee_los_valores_aunque_la_fila_venga_en_una_sola_celda():
+    """pdfplumber a veces devuelve el renglón entero en una celda; y en la
+    fila conviven fechas, NIT y el código, que no son plata."""
+    from bot_lote_dispensario import hallar_servicio_en_pdf
+
+    entera = [["890275H CONSULTA DE PRIMERA VEZ 1 192.600 192.600"]]
+    assert hallar_servicio_en_pdf(entera, "890275H", "CONSULTA")[2] == [192600, 192600]
+
+    con_ruido = [["890275H", "CONSULTA", "2026-08-19", "900006037", "1", "$ 192.600"]]
+    assert hallar_servicio_en_pdf(con_ruido, "890275H", "CONSULTA")[2] == [192600]
+
+    # cantidad 3: quedan el unitario y el total, y el cotejo sabe cuál usar
+    tres = [["902210AMB", "HEMOGRAMA", "3", "17.556", "52.668"]]
+    assert hallar_servicio_en_pdf(tres, "902210AMB", "HEMOGRAMA")[2] == [17556, 52668]
+
+
+def test_lee_el_detalle_aunque_el_pdf_no_dibuje_la_tabla(tmp_path):
+    """Muchas facturas electrónicas no tienen tabla: el renglón del cobro se
+    rescata del texto, o el cotejo se quedaría sin con qué comparar."""
+    pymupdf = pytest.importorskip("pymupdf")
+    pytest.importorskip("pdfplumber")
+    from bot_lote_dispensario import hallar_servicio_en_pdf
+    from extraer_factura_pdf import extraer_datos_factura
+
+    ruta = tmp_path / "factura.pdf"
+    doc = pymupdf.open()
+    pagina = doc.new_page()
+    pagina.insert_text((50, 80), "FACTURA ELECTRONICA DE VENTA HUS0000542497")
+    pagina.insert_text((50, 110), "890275H CONSULTA DE PRIMERA VEZ 1 192.600 192.600")
+    doc.save(ruta)
+    doc.close()
+
+    datos = extraer_datos_factura(ruta)
+    assert datos["servicios"], "sin tabla dibujada el detalle debe salir del texto"
+    s = hallar_servicio_en_pdf(datos["servicios"], "890275H", "CONSULTA DE PRIMERA VEZ")
+    assert s and s[2] == [192600, 192600]
 
 
 def test_apertura_entra_despues_del_encabezado_y_antes_del_argumento(tmp_path):

@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 04-09-2026 (tarde)
+**Última actualización:** 04-09-2026 (noche)
 
 ---
 
@@ -89,6 +89,49 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 04-09-2026 (noche, 2) — El bot ya dice si DE VERDAD estamos cobrando de más
+
+**Lo que faltaba.** El bot defendía siempre al hospital: toda glosa por mayor
+valor cobrado la contestaba pidiendo el levantamiento. Pero a veces la EPS
+tiene razón, y contestar «no aceptamos» cuando sí se cobró de más solo alarga
+el pleito y deja la plata quieta.
+
+**Lo que se hizo.** El bot abre el PDF de la factura, busca el renglón del
+servicio glosado, saca **el valor por el que realmente se facturó** y lo
+compara con **la tarifa pactada en el anexo del contrato 440**. Al lado de
+cada respuesta, en el mismo Excel, quedan siete columnas nuevas: valor
+facturado, tarifa pactada, diferencia, si hay sobrecobro, cuánto se sugiere
+aceptar, la **RESPUESTA SUGERIDA** redactada, y de qué archivo salió cada
+cifra. Lo que hay que decidir queda además en una hoja aparte,
+**«COTEJO DE COBRO»**, para no tener que leer las 88 filas.
+
+**La trampa que se descubrió a tiempo.** En el lote del 04-09, 24 facturas
+venían al 7% por encima del anexo y 19 al 31,25%. Un cotejo ingenuo habría
+gritado «sobrecobro» en todo el lote y nos habría hecho aceptar glosas que no
+proceden: ese mayor valor **es la actualización de tarifas del año 2026**, que
+el propio contrato prevé en los parágrafos 3 y 4 (SOAT 2026 menos 20% para
+unas, y para las tarifas propias de la ESE un modificatorio que reconoce el
+incremento). Por eso el bot mira todo el lote antes de opinar: si la misma
+diferencia porcentual se repite en varias facturas, la marca como
+**vigencia** y dice que NO se acepte sin antes sustentar con la resolución.
+El sobrecobro suelto, el que no le pasa a nadie más, sí lo marca verificado y
+propone: «se acepta la glosa por $X por mayor valor cobrado».
+
+**Nunca acepta solo.** El Excel del cargue sigue con Valor Aceptado en 0. La
+sugerencia es para que usted decida y la escriba, por lo mismo de la directriz
+CL: si el hospital acepta, la nota crédito tiene que poder cruzar.
+
+**Además, dos errores de lectura corregidos** que hacían ver cobros que no
+existían: el código del servicio (890275H) se estaba leyendo como si fueran
+$890.275, y de las facturas que no dibujan la tabla no se sacaba ningún
+renglón. También se aceleró la búsqueda de soportes en la unidad `Y:`: ahora
+se recorre **una sola vez** y se prefiere el archivo `FEV_...` de cada carpeta
+de factura, que es la factura electrónica.
+
+29 pruebas nuevas (80 en total en esta línea de trabajo).
+
+---
 
 ### 04-09-2026 (tarde, 7) — La Pre-Auditoría ya habla el idioma del HIS, y tiene pantalla
 
