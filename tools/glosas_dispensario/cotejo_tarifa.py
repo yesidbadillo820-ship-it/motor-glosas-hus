@@ -143,6 +143,10 @@ def cotejar(
         diferencia=None,
         porcentaje=None,
         aceptar=0,
+        # Lo que se pide levantar cuando la aceptación es parcial. Lo calcula
+        # el cotejo y no la redacción, para que el texto de la respuesta y las
+        # columnas del Excel no puedan decir cifras distintas.
+        resto=0,
         respuesta=f"SIN COTEJO: {falta}. Revisar a mano antes de decidir.",
     )
     if not valor_facturado or not precio:
@@ -214,5 +218,10 @@ def cotejar(
             f"MAYOR VALOR COBRADO VERIFICADO POR {a_texto(diferencia)} ({detalle_cifras}). "
             "Sin valor objetado en el detalle: definir con el auditor cuánto aceptar."
         )
-    base.update(veredicto=SOBRECOBRO, aceptar=aceptable, respuesta=respuesta)
+    base.update(
+        veredicto=SOBRECOBRO,
+        aceptar=aceptable,
+        resto=max(0, objetado - aceptable) if objetado else 0,
+        respuesta=respuesta,
+    )
     return base

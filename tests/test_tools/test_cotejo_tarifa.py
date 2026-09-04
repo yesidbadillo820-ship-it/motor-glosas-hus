@@ -122,6 +122,88 @@ def test_los_porcentajes_se_reportan_para_que_el_auditor_verifique():
     assert c["valor_facturado"] == 192600 and c["tarifa"] == 180000
 
 
+# ── La redacción por escenario ──────────────────────────────────────────────
+def _pdf(archivo="FEV_900006037_HUS542497.PDF", paciente="RODRIGUEZ GOMEZ MARIA"):
+    return dict(archivo=archivo, metodo="pdfplumber", ok=True, paciente=paciente, total=192600)
+
+
+def test_escenario_1_cobro_a_tarifa_declara_causal_infundada():
+    from bot_lote_dispensario import parrafo_por_escenario
+
+    cot = cotejar(180000, _tarifa(180000), 113500, "890275H")
+    p = parrafo_por_escenario(
+        cot,
+        _pdf(),
+        ("890275H CONSULTA 1 180.000 180.000", 180000, [180000]),
+        "890275H",
+        "CONSULTA DE PRIMERA VEZ POR NEUROLOGIA",
+    )
+    assert p.startswith("AL REVISAR EL SOPORTE FEV_900006037_HUS542497.PDF")
+    assert "SE EVIDENCIA LA ATENCION DEL USUARIO RODRIGUEZ GOMEZ MARIA" in p
+    assert "EL VALOR FACTURADO DE $180.000" in p
+    assert "TARIFA PACTADA EXACTA EN EL CONTRATO 440-DIGSA-DMBUG-2025" in p
+    assert "CAUSAL DE GLOSA ES INFUNDADA" in p
+    # el servicio se nombra como lo conoce la EPS, sin la fila cruda del PDF
+    assert "890275H CONSULTA DE PRIMERA VEZ POR NEUROLOGIA" in p
+    assert "1 180.000 180.000" not in p
+
+
+def test_escenario_2_vigencia_2026_defiende_el_mayor_valor():
+    from bot_lote_dispensario import parrafo_por_escenario
+
+    factores = factores_repetidos([(192600, 180000), (247765, 231556), (114236, 106762)])
+    cot = cotejar(192600, _tarifa(180000), 113500, "890275H", factores)
+    p = parrafo_por_escenario(cot, _pdf(), None, "890275H", "CONSULTA NEUROLOGIA")
+    assert "EL VALOR COBRADO DE $192.600" in p
+    assert "ACTUALIZACION DE TARIFAS DE LA VIGENCIA 2026" in p
+    assert "PARAGRAFOS 3 Y 4 DEL CONTRATO 440-DIGSA-DMBUG-2025" in p
+    assert "EL COBRO ES CONTRACTUALMENTE VALIDO" in p
+    # defiende, no acepta
+    assert "SE ACEPTA" not in p
+
+
+def test_escenario_3_sobrecobro_real_redacta_la_aceptacion_parcial():
+    from bot_lote_dispensario import parrafo_por_escenario
+
+    cot = cotejar(192600, _tarifa(180000), 113500, "890275H")  # caso aislado
+    p = parrafo_por_escenario(cot, _pdf(), None, "890275H")
+    assert p.startswith("VALIDADO EL SOPORTE FEV_900006037_HUS542497.PDF")
+    assert "LA TARIFA PACTADA PARA EL CODIGO 890275H ES DE $180.000 Y SE FACTURO $192.600" in p
+    assert "SE ACEPTA LA GLOSA POR EL MAYOR VALOR COBRADO DE $12.600" in p
+    assert "LEVANTAMIENTO DE LOS $100.900 RESTANTES" in p
+
+
+def test_fuera_de_los_tres_escenarios_no_se_redacta_nada():
+    """Sin cotejo o cobrado por debajo: manda la redacción prudente."""
+    from bot_lote_dispensario import parrafo_por_escenario
+
+    assert parrafo_por_escenario(cotejar(None, _tarifa(180000), 113500, "X"), _pdf(), None) is None
+    assert parrafo_por_escenario(cotejar(100000, _tarifa(180000), 50000, "X"), _pdf(), None) is None
+
+
+def test_la_redaccion_no_inventa_el_paciente():
+    from bot_lote_dispensario import parrafo_por_escenario
+
+    cot = cotejar(180000, _tarifa(180000), 113500, "890275H")
+    p = parrafo_por_escenario(cot, _pdf(paciente=None), None, "890275H")
+    assert "USUARIO" not in p and "$180.000" in p
+    # y sin PDF tampoco se cita un archivo que no existe
+    sin_pdf = parrafo_por_escenario(cot, None, None, "890275H")
+    assert "SOPORTE," in sin_pdf and ".PDF" not in sin_pdf
+
+
+def test_el_texto_usa_las_mismas_cifras_que_las_columnas():
+    """El texto y el Excel no pueden decir cifras distintas."""
+    from bot_lote_dispensario import parrafo_por_escenario
+
+    cot = cotejar(300000, _tarifa(180000), 50000, "890275H")
+    p = parrafo_por_escenario(cot, _pdf(), None, "890275H")
+    from _dinero import a_texto
+
+    assert a_texto(cot["aceptar"]) in p and a_texto(cot["tarifa"]) in p
+    assert a_texto(cot["valor_facturado"]) in p
+
+
 # ── Las columnas en el Excel ────────────────────────────────────────────────
 def _excel_respuestas(ruta, filas=1):
     wb = Workbook()

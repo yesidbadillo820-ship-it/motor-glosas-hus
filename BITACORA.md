@@ -90,6 +90,45 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 04-09-2026 (noche, 3) — La respuesta ahora se escribe según lo que dice el cotejo
+
+**Lo que faltaba.** El cotejo ya sabía si el cobro estaba a tarifa, si el
+mayor valor era el aumento del año o si había sobrecobro de verdad, pero la
+respuesta que se sube al portal seguía diciendo lo mismo en los tres casos.
+
+**Lo que se hizo.** El texto ahora lo dicta el veredicto, y usa exactamente
+las mismas cifras que el cotejo verificó, así que el texto y las columnas del
+Excel nunca pueden decir cosas distintas:
+
+- **Cobrado a tarifa:** la respuesta afirma que el valor facturado es la
+  tarifa pactada exacta del contrato 440 y que la causal es infundada.
+- **Aumento de la vigencia 2026:** la respuesta explica que el mayor valor es
+  la actualización de tarifas que prevén los parágrafos 3 y 4 del contrato
+  (modificatorio y resolución del hospital) y que el cobro es válido. Esta es
+  la que sirve para las 43 glosas del lote del 04-09.
+- **Sobrecobro real:** la respuesta reconoce la tarifa pactada, el valor
+  facturado y acepta la glosa por la diferencia, pidiendo el levantamiento
+  del resto.
+
+**Con un freno en el tercer caso.** Ese texto acepta una glosa, así que por
+defecto NO se sube: queda en la columna RESPUESTA SUGERIDA y en la hoja de
+trabajo, para que usted decida. Si quiere que se suba redactado, se corre el
+bot con `--redactar-aceptacion`.
+
+**Lo que no cambió, y es lo que protege al hospital.** Cuando no se pudo
+cotejar (sin PDF, código que no está en el anexo, o una línea con varios
+valores donde no se sabe cuál es el unitario), sigue mandando la redacción
+prudente: cita el soporte y el anexo, pero no proclama ninguna cifra. Es la
+lección del caso de la factura 542497.
+
+**Un detalle de presentación que se corrigió a tiempo:** el servicio se nombra
+con su código y su descripción, no con el renglón crudo del PDF, que metía
+cantidades y valores sueltos en mitad de la frase que lee la EPS.
+
+6 pruebas nuevas (87 en total en esta línea de trabajo).
+
+---
+
 ### 04-09-2026 (noche, 2) — El bot ya dice si DE VERDAD estamos cobrando de más
 
 **Lo que faltaba.** El bot defendía siempre al hospital: toda glosa por mayor
