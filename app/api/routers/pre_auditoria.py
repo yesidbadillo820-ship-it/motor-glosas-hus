@@ -25,8 +25,8 @@ import json
 import secrets
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_auditor_o_superior, oauth2_scheme
@@ -35,6 +35,7 @@ from app.database import get_db
 from app.models.db import PreAuditoriaEventoRecord, UsuarioRecord
 from app.services import preauditoria_concurrente as motor
 from app.services.preauditoria_contrato import PayloadFactura, RespuestaPreAuditoria
+from app.services.preauditoria_rips import RipsFactura, es_rips, traducir
 
 router = APIRouter(prefix="/pre-auditoria", tags=["pre-auditoria-concurrente"])
 
@@ -65,19 +66,54 @@ def quien_pregunta(
     return usuario.email
 
 
+def _leer_cuerpo(cuerpo: dict) -> tuple[PayloadFactura, list[str]]:
+    """Entiende las dos formas que puede llegar, y dice cuál es cuál.
+
+    · **RIPS** (Res. 2275/2023) — lo que manda el HIS del hospital. Se
+      reconoce por el arreglo `usuarios` y se traduce.
+    · **Forma interna** — la que usan las pruebas y cualquier otro llamador.
+
+    Un cuerpo que no es ninguna de las dos se rechaza con 422 diciendo qué
+    faltó: un 500 acá dejaría al facturador sin saber si timbrar o no.
+    """
+    if es_rips(cuerpo):
+        try:
+            rips = RipsFactura.model_validate(cuerpo)
+        except ValidationError as e:
+            raise HTTPException(422, f"El RIPS no se pudo leer: {e.errors()[:3]}") from e
+        return traducir(rips)
+
+    try:
+        payload = PayloadFactura.model_validate(cuerpo)
+    except ValidationError as e:
+        raise HTTPException(422, f"La factura no se pudo leer: {e.errors()[:3]}") from e
+    if not payload.items and not payload.factura:
+        raise HTTPException(
+            422,
+            "No hay nada que evaluar: el cuerpo no trae `usuarios` (RIPS) ni "
+            "`items`/`factura`. Revise que el HIS esté enviando el RIPS completo.",
+        )
+    return payload, []
+
+
 @router.post("/evaluar", response_model=RespuestaPreAuditoria)
 async def evaluar_factura(
-    payload: PayloadFactura,
+    cuerpo: dict = Body(...),
     db: Session = Depends(get_db),
     actor: str = Depends(quien_pregunta),
 ) -> RespuestaPreAuditoria:
     """Dictamina una factura ANTES de que el HIS la timbre.
 
-    Responde siempre: aunque la IA esté caída o la base tenga un mal momento,
-    el facturador recibe el dictamen de las reglas duras. Lo único que devuelve
-    error es una factura que no se puede leer (422, de Pydantic).
+    Recibe el **RIPS** de la Resolución 2275/2023 tal como lo produce el HIS
+    (ver `app/services/preauditoria_rips.py`), o la forma interna del motor.
+
+    Responde siempre: aunque la IA esté caída, aunque el RIPS no traiga EPS ni
+    notas clínicas, aunque la base tenga un mal momento, el facturador recibe
+    el dictamen de las reglas duras. Lo único que devuelve error es un cuerpo
+    que no se puede leer (422).
     """
-    return await motor.evaluar(db, payload, actor=actor)
+    payload, omisiones = _leer_cuerpo(cuerpo)
+    return await motor.evaluar(db, payload, actor=actor, omisiones=omisiones)
 
 
 # ── Consulta del libro (solo personas) ──────────────────────────────────
@@ -117,6 +153,21 @@ def _dto(e: PreAuditoriaEventoRecord) -> EventoDTO:
         duracion_ms=int(e.duracion_ms or 0),
         actor=e.actor or "",
     )
+
+
+@router.get("/resumen", summary="Cifras del tablero de pre-auditoría")
+def resumen(
+    db: Session = Depends(get_db),
+    _: UsuarioRecord = Depends(get_auditor_o_superior),
+) -> dict:
+    """Cuánto se evaluó, cómo salió y cuánta plata se salvó de verdad.
+
+    «Dinero salvado» son las facturas que fueron BLOQUEADAS y después
+    volvieron a pasar: se corrigieron antes de timbrar. Una bloqueada que
+    nunca volvió NO se cuenta — no sabemos qué hicieron con ella, y va aparte
+    en `riesgo_sin_resolver`.
+    """
+    return motor.resumen(db)
 
 
 @router.get("/eventos", response_model=list[EventoDTO])

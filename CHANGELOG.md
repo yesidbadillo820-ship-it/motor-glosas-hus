@@ -1,5 +1,36 @@
 # Registro de cambios
 
+## Sesión 04-sep-2026 — V3 Pilar 2: mapeo RIPS real + tablero
+
+Con el primer archivo real del HIS (`Rips_HUS558039.json`) se ajusta el
+endpoint al formato normativo y se construye la pantalla.
+
+- **`app/services/preauditoria_rips.py`** — modelos Pydantic del RIPS
+  (Res. 2275/2023) y traductor a `PayloadFactura`. Se traduce en vez de
+  reescribir las reglas: las nueve duras y sus 108 pruebas no se tocaron.
+  Lee las siete familias de servicios (`consultas`, `procedimientos`,
+  `urgencias`, `hospitalizacion`, `recienNacidos`, `medicamentos`,
+  `otrosServicios`) con `extra="ignore"` y arreglos en `null` tolerados.
+- **`POST /pre-auditoria/evaluar`** acepta el RIPS (se reconoce por
+  `usuarios`) o la forma interna; 422 explícito si no es ninguna.
+- **Tres huecos del RIPS, dichos en voz alta** en el campo `omisiones` de la
+  respuesta, no como alertas: sin EPS (no se cruza tarifa ni contrato), sin
+  notas clínicas (nuevo estado `OMITIDO_SIN_NOTAS`, la IA no corre y no
+  aborta) y sin total de factura. `eps` deja de ser obligatoria en
+  `PayloadFactura`.
+- **Con varios usuarios en una factura no se cruzan sexo ni edad**: el RIPS
+  no dice de quién es cada servicio cuando se leen juntos. La plata sí se
+  suma toda.
+- **`GET /pre-auditoria/resumen`** y `preauditoria_concurrente.resumen()` —
+  dinero salvado = facturas BLOQUEADAS que después volvieron a pasar; las que
+  nunca volvieron van aparte en `riesgo_sin_resolver`. Una sola consulta.
+- **Pantalla Pre-Auditoría** en `static/index.html` (panel `p-pre-auditoria`,
+  entrada de menú, prefijo `preAud*` porque `pa*` ya estaba tomado):
+  tarjetas, tabla con filtros por dictamen y factura, y modal de reparos.
+  Verificada en Chromium a 1280/900/480/360 px.
+- **70 pruebas nuevas**: 21 del traductor sobre el archivo real, 20 del
+  endpoint y el tablero, 29 de la pantalla.
+
 ## Sesión 04-sep-2026 (hotfix) — Rescate de filas RECLAMADAS
 
 Tapa una fuga del Pilar 1: `reclamar_una` marcaba la fila `RECLAMADA` y, si el

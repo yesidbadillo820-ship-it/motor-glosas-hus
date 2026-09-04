@@ -17,6 +17,25 @@ cartera. Corregir después cuesta un ciclo completo de glosa y respuesta.
 
 ## 2. Cómo se conecta el HIS
 
+**Actualizado el 04-09-2026 con el primer archivo real.** El HIS (SINAC) no
+manda una factura a nuestra medida: manda el **RIPS de la Resolución 2275 de
+2023**, la misma estructura con la que se le reporta al Ministerio. El motor
+la recibe tal cual y la traduce (`app/services/preauditoria_rips.py`); las
+nueve reglas duras no cambiaron.
+
+Lo que se aprendió del archivo `Rips_HUS558039.json`:
+
+| El RIPS… | Consecuencia |
+|---|---|
+| **No trae la EPS.** `numDocumentoIdObligado` es el NIT del propio hospital | Sin EPS no hay tarifa pactada ni contrato que cruzar: esas dos reglas se callan y la respuesta lo dice en `omisiones` |
+| **No trae texto clínico.** Ni epicrisis ni notas | El cruce clínico se omite limpio (`OMITIDO_SIN_NOTAS`), sin gastar red y sin abortar |
+| **No trae el total de la factura** | Se suma de los `vrServicio`; la regla que compara líneas contra el total no opina |
+| Los servicios van anidados: `usuarios[] → servicios → consultas[]` etc. | Se leen las siete familias de la norma |
+
+Los dos datos que faltan pueden llegar como **acompañantes** al lado del RIPS
+(`eps`, `notasClinicas`). Si el HIS los agrega, el motor los usa; si no, sigue
+sin ellos y lo dice. Nunca se adivinan.
+
 El HIS manda un **JSON** con la factura que está a punto de timbrar y recibe
 un **JSON** con el dictamen. Una sola llamada, sincrónica:
 
@@ -89,7 +108,10 @@ facturador quiere ver **todos** los reparos de una vez, no de uno en uno.
 ```
 
 Más los metadatos de trazabilidad (`evento_id`, `duracion_ms`,
-`cruce_clinico`, `modelo_utilizado`). El HIS puede ignorarlos; el hospital no.
+`cruce_clinico`, `modelo_utilizado`) y **`omisiones`**: lo que NO se pudo
+revisar y por qué. Las omisiones van aparte de las alertas a propósito — no
+son un reparo a la factura, son un límite de lo que se tuvo a la vista, y
+meterlas en el semáforo lo volvería inútil.
 
 **Los códigos de glosa son los oficiales** del Manual Único (Anexo Técnico 3),
 tomados de `app/services/catalogo_glosas.py`. No se inventa ninguno: la alerta
@@ -108,6 +130,22 @@ No se edita nunca. Sirve para tres preguntas que hoy no tienen respuesta:
 - ¿esta factura pasó por la pre-auditoría y qué le dijimos?
 - ¿cuánta plata evitamos que se glosara este mes?
 - ¿se timbró a pesar del bloqueo? (se cruza cuando llega la glosa real)
+
+## 5.bis. El tablero
+
+Pantalla **Pre-Auditoría** en el portal (`p-pre-auditoria`). Lee
+`pre_auditoria_eventos` y muestra factura, fecha, dictamen, reparos, valor en
+riesgo y si hubo cruce clínico. Al hacer clic en una fila se abren sus
+reparos con la causal oficial de cada uno.
+
+**Dinero salvado.** Es la cifra que va a mirar gerencia, así que se define
+estrecho: la suma del `valor_en_riesgo` de las facturas que fueron
+**BLOQUEADAS y después volvieron a pasar**. Se corrigieron antes de timbrar.
+
+Lo que NO se cuenta: una bloqueada que nunca volvió. No sabemos si la
+corrigieron, si la timbraron igual o si la dejaron quieta. Esa plata va
+aparte, en **riesgo sin resolver**. Inflar la primera cifra con la segunda
+sería la forma más rápida de que nadie vuelva a creerle al tablero.
 
 ## 6. Lo que este pilar NO hace
 
