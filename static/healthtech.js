@@ -446,9 +446,157 @@
       .catch(function (e) { _toast('Error', e.message, 'error'); });
   };
 
+  /* ════ BANDEJA «EN ESPERA DE EPS» (V3, Pilar 1) ═══════════════════════
+     Lo que ya se radicó en el portal —con su número y la huella del
+     comprobante— y, sobre todo, lo que se quedó atorado: los envíos que no
+     se pudieron confirmar y los portales que piden una persona.
+
+     La regla de oro de este circuito se ve aquí: una radicación dudosa NO
+     vuelve sola a la cola. Sale de la duda cuando alguien mira el portal y
+     dice qué pasó. Estos botones son ese «alguien».
+  ═════════════════════════════════════════════════════════════════════ */
+
+  var _ESTADOS_ATORADOS = ['EN_PORTAL_SIN_CONFIRMAR', 'VERIFICAR_MANUAL'];
+
+  HT.esAtorada = function (estado) { return _ESTADOS_ATORADOS.indexOf(estado) !== -1; };
+
+  function _pillEstado(e) {
+    var mapa = {
+      RADICADA: ['#059669', '✓ radicada en la EPS'],
+      EN_PORTAL_SIN_CONFIRMAR: ['#dc2626', '⚠ enviada sin confirmar'],
+      VERIFICAR_MANUAL: ['#dc2626', '⚠ hay que mirar el portal'],
+      HUMANO_REQUERIDO: ['#d97706', '✋ la hace una persona'],
+      PENDIENTE: ['#1565c0', '⏳ en cola'],
+      RECLAMADA: ['#1565c0', '⏳ radicando ahora'],
+      FALLIDA: ['#6b7280', '✗ falló (reintentable)'],
+    };
+    var c = mapa[e] || ['#6b7280', e || '—'];
+    return '<span class="ht-badge" style="background:' + c[0] + ';color:#fff;border-color:transparent">' + _esc(c[1]) + '</span>';
+  }
+
+  function _huella(sha) {
+    if (!sha) return '<span style="color:var(--text4)">sin comprobante</span>';
+    /* La huella completa no cabe y no se lee; los primeros 16 identifican y
+       el title trae la de verdad, que es la que vale ante la Supersalud. */
+    return '<span class="ht-dato" title="SHA-256 del comprobante: ' + _esc(sha) + '">' +
+      _esc(sha.slice(0, 16)) + '…</span>';
+  }
+
+  function _filaEspera(f) {
+    var atorada = HT.esAtorada(f.estado);
+    var acciones = '';
+    if (atorada) {
+      acciones =
+        '<button class="ht-btn ht-btn-esmeralda" style="padding:.3rem .7rem;font-size:.72rem" ' +
+        'onclick="HT.resolverRadicacion(' + f.id + ',true)" ' +
+        'title="Miré el portal y SÍ quedó radicada">✔ Sí quedó</button> ' +
+        '<button class="ht-btn ht-btn-carmesi" style="padding:.3rem .7rem;font-size:.72rem" ' +
+        'onclick="HT.resolverRadicacion(' + f.id + ',false)" ' +
+        'title="Miré el portal y NO quedó: vuelve a la cola">✖ No quedó</button>';
+    } else if (f.estado === 'HUMANO_REQUERIDO') {
+      acciones =
+        '<button class="ht-btn ht-btn-esmeralda" style="padding:.3rem .7rem;font-size:.72rem" ' +
+        'onclick="HT.resolverRadicacion(' + f.id + ',true)" ' +
+        'title="La radiqué a mano en el portal">✔ La radiqué a mano</button>';
+    }
+    return '<tr>' +
+      '<td style="padding:.45rem .6rem" class="ht-dato">' + _esc(f.eps || '—') + '</td>' +
+      '<td style="padding:.45rem .6rem" class="ht-dato">' + _esc(f.portal || '—') + '</td>' +
+      '<td style="padding:.45rem .6rem">' + _pillEstado(f.estado) + '</td>' +
+      '<td style="padding:.45rem .6rem" class="ht-dato">' + _esc(f.radicado_numero || '—') + '</td>' +
+      '<td style="padding:.45rem .6rem">' + _huella(f.comprobante_sha256) + '</td>' +
+      '<td style="padding:.45rem .6rem;color:var(--text3);font-size:.72rem">' + _esc((f.ultimo_error || '').slice(0, 90)) + '</td>' +
+      '<td style="padding:.45rem .6rem;white-space:nowrap">' + acciones + '</td>' +
+    '</tr>';
+  }
+
+  HT.abrirBandejaEspera = function () {
+    var viejo = document.getElementById('ht-espera');
+    if (viejo) viejo.remove();
+    var ov = document.createElement('div');
+    ov.id = 'ht-espera';
+    ov.className = 'ht-kb-overlay';
+    ov.innerHTML =
+      '<div class="ht-kb-head">' +
+        '<div>' +
+          '<h3 style="margin:0;font-size:1rem;color:var(--text)">📮 En espera de EPS — libro de radicación</h3>' +
+          '<p style="margin:.15rem 0 0;font-size:.74rem;color:var(--text3)">Lo radicado con su comprobante, y lo que quedó atorado esperando a una persona.</p>' +
+        '</div>' +
+        '<div style="display:flex;gap:.5rem">' +
+          '<button class="ht-btn ht-btn-neutro" onclick="HT.abrirBandejaEspera()">⟳ Actualizar</button>' +
+          '<button class="ht-btn ht-btn-neutro" onclick="document.getElementById(\'ht-espera\').remove()">✕ Cerrar</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="ht-espera-cuerpo" style="flex:1;overflow:auto">' + _skel([28, 28, 28, 28]) + '</div>';
+    document.body.appendChild(ov);
+
+    fetch('/radicacion/cola?limite=500', { headers: _authH() })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) {
+        var filas = d.filas || [];
+        var atoradas = filas.filter(function (f) { return HT.esAtorada(f.estado) || f.estado === 'HUMANO_REQUERIDO'; });
+        var resto = filas.filter(function (f) { return atoradas.indexOf(f) === -1; });
+        var cuerpo = document.getElementById('ht-espera-cuerpo');
+        if (!cuerpo) return;
+        if (!filas.length) {
+          cuerpo.innerHTML = '<div class="ht-estado">El libro está vacío: todavía no se ha encolado ninguna radicación.</div>';
+          return;
+        }
+        var cab = '<thead><tr style="text-align:left;color:var(--text3);font-size:.74rem">' +
+          '<th style="padding:.45rem .6rem">Entidad</th><th style="padding:.45rem .6rem">Portal</th>' +
+          '<th style="padding:.45rem .6rem">Estado</th><th style="padding:.45rem .6rem">Radicado</th>' +
+          '<th style="padding:.45rem .6rem">Huella del comprobante</th><th style="padding:.45rem .6rem">Detalle</th>' +
+          '<th></th></tr></thead>';
+        var resumen = Object.keys(d.por_estado || {}).map(function (k) {
+          return _pillEstado(k) + ' <b>' + d.por_estado[k] + '</b>';
+        }).join(' &nbsp; ');
+        cuerpo.innerHTML =
+          '<div style="margin:.2rem 0 .9rem;font-size:.78rem">' + resumen + '</div>' +
+          (atoradas.length
+            ? '<h4 style="margin:.6rem 0 .3rem;font-size:.85rem;color:var(--ht-carmesi)">Necesitan que usted mire el portal (' + atoradas.length + ')</h4>' +
+              '<table style="width:100%;border-collapse:collapse;font-size:.8rem">' + cab +
+              '<tbody>' + atoradas.map(_filaEspera).join('') + '</tbody></table>'
+            : '<div class="ht-estado" style="border-style:solid">Nada atorado. Ninguna radicación quedó a medias.</div>') +
+          (resto.length
+            ? '<h4 style="margin:1.2rem 0 .3rem;font-size:.85rem;color:var(--text2)">El resto del libro (' + resto.length + ')</h4>' +
+              '<table style="width:100%;border-collapse:collapse;font-size:.8rem">' + cab +
+              '<tbody>' + resto.map(_filaEspera).join('') + '</tbody></table>'
+            : '');
+      })
+      .catch(function (e) {
+        var cuerpo = document.getElementById('ht-espera-cuerpo');
+        if (cuerpo) cuerpo.innerHTML = '<div class="ht-estado ht-estado-error">⚠️ No se pudo leer el libro de radicación (' + _esc(e.message) + ').</div>';
+      });
+  };
+
+  HT.resolverRadicacion = function (id, quedoRadicada) {
+    var pregunta = quedoRadicada
+      ? '✔ Confirmar que SÍ quedó radicada\n\nUsted miró el portal y la respuesta está allá. La glosa pasará a «radicada en la EPS» y saldrá del semáforo de urgencia.\n\n¿Confirma?'
+      : '✖ Confirmar que NO quedó radicada\n\nUsted miró el portal y la respuesta NO está. La glosa vuelve a la cola para intentarlo otra vez.\n\n¿Confirma?';
+    if (!confirm(pregunta)) return;
+    var radicado = '';
+    if (quedoRadicada) {
+      radicado = prompt('Número de radicado que muestra el portal (si lo tiene a la vista; puede dejarlo vacío):', '') || '';
+    }
+    fetch('/radicacion/' + id + '/verificar', {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, _authH()),
+      body: JSON.stringify({ quedo_radicada: !!quedoRadicada, radicado_numero: radicado }),
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) { _toast('No se pudo resolver', res.d.detail || 'Error', 'error'); return; }
+        _toast(quedoRadicada ? '✓ Confirmada' : '↩ De vuelta a la cola',
+          quedoRadicada ? 'Queda como radicada en la EPS.' : 'Se intentará de nuevo.', 'success');
+        HT.abrirBandejaEspera();
+      })
+      .catch(function (e) { _toast('Error', e.message, 'error'); });
+  };
+
   /* ── Cero saltos entre ventanas: los flujos viejos entran aquí ────── */
   window.verGlosa = function (id) { HT.abrirSplitView(id); };
   window.verBorradoresAutoPilot = function () { HT.abrirKanbanBorradores(); };
+  window.verBandejaEsperaEPS = function () { HT.abrirBandejaEspera(); };
 
   HT.iniciarTema();
 })();
