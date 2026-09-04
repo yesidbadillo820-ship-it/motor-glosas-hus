@@ -2,9 +2,12 @@
 
 Tres bloqueos ordenados por el auditor tras un dictamen redactado a ciegas:
 
-1. CEGUERA TEMPORAL: con el indexador de soportes en «construyendo: true»,
-   /analizar devuelve HTTP 423 (Locked) y NO llama al LLM. Cero dictámenes
-   a ciegas sobre un expediente que el índice todavía no ha visto.
+1. CEGUERA TEMPORAL — REVERTIDO EL 04-09-2026. Aquel candado devolvía
+   HTTP 423 mientras el indexador trabajaba. La intención era buena pero la
+   medida fue desproporcionada: el escaneo dura HORAS y paralizaba toda la
+   operación. Se quitó. Lo que queda —y es lo correcto— es la protección POR
+   FACTURA en glosa_service: mientras el índice se arma, el dictamen no
+   afirma que falte un soporte, pero el análisis SÍ corre.
 2. ERROR HUMANO: si el Quality Gate encuentra hallazgos graves o la
    confianza no supera el umbral, el botón «Marcar como RESPONDIDA» queda
    deshabilitado (gris) — contrato verificado sobre el frontend.
@@ -105,27 +108,28 @@ def _post_analizar(cliente):
     )
 
 
-class TestBloqueoPorCegueraTemporal:
-    def test_indice_construyendo_devuelve_423_y_no_llama_al_llm(self, entorno, monkeypatch):
+class TestElIndexadorYaNoParalizaNada:
+    """04-09-2026: el candado global se destruyó. Estas pruebas impiden que
+    vuelva — un análisis NO se aborta porque el índice esté trabajando."""
+
+    def test_con_el_indice_construyendo_el_analisis_SIGUE(self, entorno, monkeypatch):
         cliente, centinela = entorno
         _stub_indexador(monkeypatch, construyendo=True)
         r = _post_analizar(cliente)
-        assert r.status_code == 423, r.text
-        detalle = r.json()["detail"].lower()
-        assert "índice" in detalle or "indice" in detalle
-        assert "reconstruy" in detalle or "construy" in detalle
-        assert centinela.llamado is False  # cero dictámenes a ciegas
+        assert r.status_code != 423, (
+            "volvió el candado global: el escaneo dura horas y esto paraliza la operación entera"
+        )
+        # Llegó hasta la IA (el centinela levanta IANoDisponibleError → 503).
+        assert centinela.llamado is True, "el análisis se detuvo antes de la IA"
 
-    def test_con_el_indice_quieto_el_flujo_llega_a_la_ia(self, entorno, monkeypatch):
+    def test_con_el_indice_quieto_tambien(self, entorno, monkeypatch):
         cliente, centinela = entorno
         _stub_indexador(monkeypatch, construyendo=False)
         r = _post_analizar(cliente)
-        # El centinela levanta IANoDisponibleError → 503: se pasó el candado
-        # y se llegó a la etapa de IA (aquí NO aplica el 423).
         assert r.status_code == 503, r.text
         assert centinela.llamado is True
 
-    def test_estado_del_indexador_ilegible_no_bloquea_el_analisis(self, entorno, monkeypatch):
+    def test_sin_indexador_tampoco_se_bloquea(self, entorno, monkeypatch):
         import app.services.soportes_autodiscovery_service as sas
 
         cliente, centinela = entorno
@@ -135,8 +139,31 @@ class TestBloqueoPorCegueraTemporal:
 
         monkeypatch.setattr(sas, "get_indexer", _explota)
         r = _post_analizar(cliente)
-        assert r.status_code == 503  # siguió al LLM (centinela), no 423
+        assert r.status_code == 503
         assert centinela.llamado is True
+
+    def test_una_glosa_sin_pdfs_se_defiende_igual(self, entorno, monkeypatch):
+        """El caso real del auditor: glosas de prueba sin un solo soporte.
+
+        El motor tiene que argumentar con el texto, los CUPS y la norma — no
+        quedarse esperando un expediente que no existe.
+        """
+        cliente, centinela = entorno
+        _stub_indexador(monkeypatch, construyendo=True)  # y encima escaneando
+        r = _post_analizar(cliente)
+        assert r.status_code != 423
+        assert centinela.llamado is True, (
+            "sin PDFs el motor se bloqueó en vez de defender con lo que hay"
+        )
+
+    def test_el_candado_no_esta_en_el_codigo(self):
+        """Guardia de texto: que nadie lo reponga sin darse cuenta."""
+        import inspect
+
+        from app.api.routers import analizar as mod
+
+        fuente = inspect.getsource(mod._analizar_impl)
+        assert "status_code=423" not in fuente, "volvió el HTTP 423 al endpoint"
 
 
 class TestRefuerzoRagNormativo:

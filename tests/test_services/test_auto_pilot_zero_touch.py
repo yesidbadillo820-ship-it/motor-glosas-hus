@@ -34,6 +34,33 @@ def _caso(nombre: str) -> tuple[dict, str]:
     return datos, glosa_txt
 
 
+@pytest.fixture(autouse=True)
+def _indexador_quieto(monkeypatch):
+    """El indexador de soportes, quieto, para TODAS las pruebas de este archivo.
+
+    Por qué hace falta (04-09-2026). Estas pruebas se escribieron ANTES de que
+    `procesar()` tuviera su escudo del indexador. Desde que existe, un ciclo
+    aborta si el índice está reconstruyéndose — y durante la suite completa hay
+    un scheduler de reindexación corriendo de fondo que puede ponerlo en
+    «construyendo» en cualquier momento. Resultado: fallas intermitentes que no
+    dicen nada del Auto-Pilot.
+
+    El escudo NO se deja sin probar: tiene sus pruebas dedicadas en
+    `test_autopilot_resiliencia.py`, que lo fuerzan a propósito. Aquí solo se
+    quita de en medio una dependencia del entorno que no es lo que se mide.
+    """
+    import app.services.soportes_autodiscovery_service as sas
+
+    class _IndiceQuieto:
+        def stats(self):
+            return {"construyendo": False, "facturas_indexadas": 0}
+
+        def lookup(self, factura, auto_rebuild=True):
+            return []
+
+    monkeypatch.setattr(sas, "get_indexer", lambda: _IndiceQuieto())
+
+
 @pytest.fixture
 def db():
     eng = create_engine(
