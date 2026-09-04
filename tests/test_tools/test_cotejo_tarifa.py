@@ -187,9 +187,14 @@ def test_la_redaccion_no_inventa_el_paciente():
     cot = cotejar(180000, _tarifa(180000), 113500, "890275H")
     p = parrafo_por_escenario(cot, _pdf(paciente=None), None, "890275H")
     assert "USUARIO" not in p and "$180.000" in p
-    # y sin PDF tampoco se cita un archivo que no existe
-    sin_pdf = parrafo_por_escenario(cot, None, None, "890275H")
-    assert "SOPORTE," in sin_pdf and ".PDF" not in sin_pdf
+    # Sin PDF no se cita un soporte que nadie abrió: se nombra la fuente real
+    # del valor, que es la factura en el sistema de cartera del hospital.
+    sin_pdf = parrafo_por_escenario(cot, None, None, "890275H", "", "HUS0000542497")
+    assert ".PDF" not in sin_pdf and "SOPORTE" not in sin_pdf
+    assert "HUS0000542497 EN EL SISTEMA DE CARTERA" in sin_pdf
+    # y si ni siquiera se sabe el número de factura, tampoco se inventa
+    anonimo = parrafo_por_escenario(cot, None, None, "890275H")
+    assert "SISTEMA DE CARTERA" in anonimo and "HUS" not in anonimo
 
 
 def test_el_texto_usa_las_mismas_cifras_que_las_columnas():
@@ -319,3 +324,22 @@ def test_el_robot_del_portal_sigue_leyendo_el_excel_con_las_columnas_nuevas(tmp_
     assert [o["num"] for o in objeciones] == [1, 2]
     assert all(o["aceptado"] == 0 for o in objeciones)  # el bot no acepta nada solo
     assert all(o["detalle"] == "TEXTO" for o in objeciones)
+
+
+def test_el_valor_del_dgh_solo_se_usa_cuando_encaja_con_un_patron():
+    """El total de la factura sirve de valor facturado solo si es la tarifa
+    exacta o el aumento del año: una factura de varios servicios daría un
+    número más alto y haría ver un sobrecobro que no existe."""
+    from cotejo_tarifa import valor_desde_dgh
+
+    assert valor_desde_dgh(180000, 180000, 1, set())[0] == 180000  # tarifa exacta
+    assert valor_desde_dgh(192600, 180000, 1, {1.07})[0] == 192600  # aumento del año
+    # el mismo número sin el patrón del lote no se usa
+    assert valor_desde_dgh(192600, 180000, 1, set())[0] is None
+    # una factura con varias objeciones: su total no es el del servicio glosado
+    assert valor_desde_dgh(192600, 180000, 3, {1.07})[0] is None
+    # un total desproporcionado (la factura trae más servicios) se rechaza
+    valor, motivo = valor_desde_dgh(2500000, 180000, 1, {1.07})
+    assert valor is None and "hace falta el PDF" in motivo
+    # sin tarifa pactada no hay con qué comparar
+    assert valor_desde_dgh(192600, None, 1, {1.07})[0] is None

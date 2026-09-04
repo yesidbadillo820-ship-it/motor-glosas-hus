@@ -247,6 +247,7 @@ def parrafo_por_escenario(
     servicio_pdf: tuple | None,
     cups: str = "",
     servicio: str = "",
+    factura: str = "",
 ) -> str | None:
     """Redacta el argumento según el escenario matemático que dictó el cotejo.
 
@@ -269,6 +270,19 @@ def parrafo_por_escenario(
     """
     archivo = str((datos_pdf or {}).get("archivo") or "").upper()
     fuente = f" {archivo}" if archivo else ""
+    # De dónde salió el valor facturado, dicho con precisión: el soporte que
+    # se leyó, o —cuando el PDF no estaba a la mano— la factura en el sistema
+    # de cartera del hospital. Nunca se cita un documento que no se abrió.
+    if archivo:
+        visto = f"AL REVISAR EL SOPORTE{fuente}"
+        verificado = f"VERIFICANDO LA FACTURA{fuente}"
+        validado = f"VALIDADO EL SOPORTE{fuente}"
+    else:
+        visto = verificado = validado = (
+            f"VERIFICADA LA FACTURA {factura} EN EL SISTEMA DE CARTERA DE LA ESE"
+            if factura
+            else "VERIFICADO EL VALOR FACTURADO EN EL SISTEMA DE CARTERA DE LA ESE"
+        )
     # El servicio se nombra como lo conoce la EPS (código y descripción del
     # export), no con la fila cruda del PDF: esa lleva cantidades y valores
     # sueltos que dentro de la frase se leen como un error. La fila leída
@@ -282,7 +296,7 @@ def parrafo_por_escenario(
 
     if veredicto == cotejo_tarifa.A_TARIFA:
         return (
-            f"AL REVISAR EL SOPORTE{fuente}, SE EVIDENCIA LA ATENCION{_quien(datos_pdf)}. "
+            f"{visto}, SE EVIDENCIA LA ATENCION{_quien(datos_pdf)}. "
             f"EL VALOR FACTURADO DE {_plata(facturado)} POR EL SERVICIO {etiqueta} "
             "CORRESPONDE A LA TARIFA PACTADA EXACTA EN EL CONTRATO 440-DIGSA-DMBUG-2025, "
             "POR LO QUE LA CAUSAL DE GLOSA ES INFUNDADA."
@@ -290,7 +304,7 @@ def parrafo_por_escenario(
 
     if veredicto == cotejo_tarifa.POR_VIGENCIA:
         return (
-            f"VERIFICANDO LA FACTURA{fuente}{_quien(datos_pdf)}, EL VALOR COBRADO DE "
+            f"{verificado}{_quien(datos_pdf)}, EL VALOR COBRADO DE "
             f"{_plata(facturado)} POR EL SERVICIO {etiqueta} REFLEJA LA ACTUALIZACION DE "
             "TARIFAS DE LA VIGENCIA 2026 CONTEMPLADA EN LOS PARAGRAFOS 3 Y 4 DEL CONTRATO "
             "440-DIGSA-DMBUG-2025 (MODIFICATORIO CONTRACTUAL Y RESOLUCION TARIFARIA DE LA "
@@ -300,7 +314,7 @@ def parrafo_por_escenario(
 
     if veredicto == cotejo_tarifa.SOBRECOBRO:
         return (
-            f"VALIDADO EL SOPORTE{fuente}{_quien(datos_pdf)}, LA TARIFA PACTADA PARA EL "
+            f"{validado}{_quien(datos_pdf)}, LA TARIFA PACTADA PARA EL "
             f"CODIGO {cups} ES DE {_plata(pactada)} Y SE FACTURO {_plata(facturado)}. "
             f"SE ACEPTA LA GLOSA POR EL MAYOR VALOR COBRADO DE {_plata(cotejo['aceptar'])}"
             + (
@@ -724,15 +738,44 @@ def main() -> int:
             servicios_hallados[clave] = serv
         precio = (tarifa_de_cotejo.get(clave) or {}).get("precio")
         elegidos[clave] = cotejo_tarifa.elegir_valor_facturado(serv[2] if serv else [], precio)
-    factores = cotejo_tarifa.factores_repetidos(
-        [
-            (
-                elegidos[(d["factura"], d["num"])][0],
-                (tarifa_de_cotejo.get((d["factura"], d["num"])) or {}).get("precio"),
-            )
-            for d in lineas
-        ]
-    )
+    # Cuántas objeciones trae cada factura: el total del DGH solo sirve de
+    # valor del servicio cuando la factura tiene una sola.
+    objeciones_por_factura = Counter(d["factura"] for d in lineas)
+
+    def _precio(clave):
+        return (tarifa_de_cotejo.get(clave) or {}).get("precio")
+
+    # Los factores del lote se calculan con lo mejor que haya de cada línea —el
+    # PDF si se leyó, y si no el total del DGH—: son los que dejan ver que un
+    # mismo porcentaje de más se repite y es la actualización del año.
+    candidatos = []
+    for d in lineas:
+        clave = (d["factura"], d["num"])
+        valor = elegidos[clave][0]
+        if not valor and objeciones_por_factura[d["factura"]] == 1:
+            valor = int(d.get("valor_factura") or 0) or None
+        candidatos.append((valor, _precio(clave)))
+    factores = cotejo_tarifa.factores_repetidos(candidatos)
+
+    # Y ahora sí, con los factores conocidos, se decide si el total del DGH
+    # puede usarse para cada línea que no tenga lectura del PDF.
+    origen: dict[tuple[str, int], str] = {}
+    for d in lineas:
+        clave = (d["factura"], d["num"])
+        if elegidos[clave][0]:
+            origen[clave] = "PDF"
+            continue
+        valor, motivo = cotejo_tarifa.valor_desde_dgh(
+            int(d.get("valor_factura") or 0),
+            _precio(clave),
+            objeciones_por_factura[d["factura"]],
+            factores,
+        )
+        if valor:
+            elegidos[clave] = (valor, "")
+            origen[clave] = "DGH"
+        elif motivo and not elegidos[clave][1]:
+            elegidos[clave] = (None, motivo)
     cotejos: dict[tuple[str, int], dict] = {}
     for d in lineas:
         clave = (d["factura"], d["num"])
@@ -748,6 +791,11 @@ def main() -> int:
             for x in (
                 datos.get("archivo", ""),
                 f"línea del PDF: {serv[0]}" if serv else "",
+                (
+                    f"valor total de la factura {d['factura']} según el sistema de cartera (DGH)"
+                    if origen.get(clave) == "DGH"
+                    else ""
+                ),
                 (t or {}).get("fuente", ""),
             )
             if x
@@ -789,7 +837,7 @@ def main() -> int:
         servicio_pdf = servicios_hallados.get(clave)
         cot = cotejos[clave]
         parrafo = parrafo_por_escenario(
-            cot, datos, servicio_pdf, d.get("cups", ""), d.get("serv", "")
+            cot, datos, servicio_pdf, d.get("cups", ""), d.get("serv", ""), d["factura"]
         )
         if (
             parrafo

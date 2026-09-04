@@ -93,6 +93,45 @@ def elegir_valor_facturado(
     )
 
 
+def valor_desde_dgh(
+    valor_factura: int | None,
+    tarifa: int | None,
+    lineas_de_la_factura: int,
+    factores_del_lote: set[float] | None = None,
+) -> tuple[int | None, str]:
+    """Segunda fuente del valor facturado: el total de la factura en el DGH.
+
+    Cuando el PDF no está a la mano, el sistema de cartera del hospital sí
+    tiene el valor por el que se facturó. Ese total equivale al valor del
+    servicio glosado SOLO si la factura es de ese único servicio, cosa que no
+    consta en el export; por eso se acepta únicamente cuando el número encaja
+    con un patrón reconocido:
+
+      · es la tarifa pactada exacta, o
+      · su diferencia porcentual es una de las que se repiten en el lote (la
+        actualización de tarifas del año).
+
+    Cualquier otro total se rechaza: una factura de varios servicios daría un
+    número más alto y haría ver un sobrecobro inventado.
+    """
+    if not valor_factura or not tarifa or tarifa <= 0:
+        return None, "el sistema no reporta el valor facturado de esta factura"
+    if lineas_de_la_factura != 1:
+        return None, (
+            f"la factura trae {lineas_de_la_factura} objeciones: su valor total no es "
+            "el del servicio glosado"
+        )
+    if abs(valor_factura - tarifa) <= TOLERANCIA_PESOS:
+        return valor_factura, ""
+    f = factor(valor_factura, tarifa)
+    if f and f in (factores_del_lote or set()):
+        return valor_factura, ""
+    return None, (
+        f"el valor de la factura ({a_texto(valor_factura)}) no encaja con la tarifa pactada "
+        "ni con la actualización del año: hace falta el PDF para cotejar"
+    )
+
+
 def factor(valor_facturado: int | None, tarifa: int | None) -> float | None:
     """Cuántas veces la tarifa pactada cabe en lo facturado (1,07 = 7% más)."""
     if not valor_facturado or not tarifa or tarifa <= 0:
