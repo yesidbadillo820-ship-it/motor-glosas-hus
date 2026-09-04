@@ -1753,39 +1753,24 @@ async def _analizar_impl(
         f"eps={eps} | tono={tono} | modo={modo_respuesta}"
     )
 
-    # ── Candado por ceguera temporal (hotfix 03-09-2026, caso TA0301) ────
+    # ── POR QUÉ AQUÍ YA NO HAY UN CANDADO (04-09-2026) ───────────────────
     #
-    # Con el indexador de soportes a medio reconstruir, el motor «no ve» el
-    # expediente y el dictamen sale argumentado sobre un vacío que no es
-    # real (el caso TA0301 afirmó que no había contrato porque el índice
-    # estaba en construyendo:true). Regla del auditor: cero dictámenes a
-    # ciegas — se responde 423 (Locked) ANTES de gastar un token de IA, y
-    # se reintenta cuando el índice esté quieto. Si el estado del indexador
-    # no se puede leer (p. ej. despliegue sin raíz de soportes), no se
-    # bloquea: eso ya lo cubre el flujo normal.
-    try:
-        from app.services.soportes_autodiscovery_service import get_indexer
-
-        _indice_construyendo = bool(get_indexer().stats().get("construyendo"))
-    except Exception:
-        _indice_construyendo = False
-    if _indice_construyendo:
-        logger.warning(
-            f"[{req_id}] [CANDADO-423] Índice de soportes reconstruyéndose: "
-            f"análisis detenido antes de llamar a la IA."
-        )
-        _publicar_progreso(
-            _tid, "error", {"mensaje": "Índice de soportes en reconstrucción (423)."}
-        )
-        raise HTTPException(
-            status_code=423,
-            detail=(
-                "El índice de soportes se está reconstruyendo en este momento: "
-                "analizar ahora produciría un dictamen a ciegas (sin ver el "
-                "expediente completo). Espere un momento y vuelva a intentar — "
-                "no se llamó a la IA ni se guardó nada."
-            ),
-        )
+    # Del 03 al 04 de septiembre este punto devolvía HTTP 423 cuando el
+    # indexador de soportes estaba reconstruyéndose. La intención era buena
+    # —evitar dictámenes «a ciegas» como el del caso TA0301— pero la medida
+    # fue desproporcionada y paralizó la operación: el escaneo del servidor de
+    # radicación dura HORAS (473.581 archivos), y hasta que terminara no se
+    # podía analizar ni una sola glosa.
+    #
+    # La protección de verdad nunca estuvo aquí: vive en glosa_service, POR
+    # FACTURA, y es la correcta —«todavía no sé» no es «no está»—: mientras el
+    # índice se arma, el dictamen no acusa la falta de un soporte que quizá sí
+    # exista. Eso basta, y no detiene a nadie.
+    #
+    # Regla que queda: el análisis usa los PDFs que HAYA —los ya indexados de
+    # esa factura, o los que el auditor suba a mano— y si no hay ninguno,
+    # argumenta con el texto de la glosa, los CUPS y la base normativa. Sin
+    # PDFs no se bloquea: se defiende con lo que hay.
 
     # ── El selector y el texto tienen que hablar de la misma EPS ──────────
     #

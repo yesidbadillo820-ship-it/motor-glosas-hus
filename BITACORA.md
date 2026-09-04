@@ -90,6 +90,44 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 04-09-2026 — Se quita el candado que paralizaba los análisis
+
+**El error fue nuestro y se corrige.** El día anterior se puso un bloqueo: si
+el buscador de soportes estaba armándose, el botón «Analizar con IA» contestaba
+un error y no dejaba trabajar. La intención era buena —evitar dictámenes «a
+ciegas»— pero la medida fue desproporcionada: **ese escaneo dura horas**
+(473.581 archivos por la red), así que en la práctica dejaba el motor inservible
+media jornada. Se eliminó.
+
+**La protección buena ya existía y se queda.** Vive por factura, no por
+servidor: mientras el índice se arma, el dictamen **no afirma que falte un
+soporte** —dice «todavía no se sabe»—, pero el análisis corre igual. «Todavía no
+sé» no es «no está», y eso no tiene por qué detener a nadie.
+
+**Sin PDFs también se defiende.** Si una glosa no tiene soportes —como las de
+prueba— el motor ya no se traba: argumenta con el texto de la glosa, los CUPS y
+la base normativa. Usa los PDFs que haya: los que el buscador alcanzó a indexar
+para esa factura, o los que usted suba a mano.
+
+**Y el buscador deja de empezar de cero.** Dos arreglos de fondo:
+
+1. **El índice se guarda en disco.** Al reiniciar el motor —cosa que pasa
+   varias veces al día por el autodespliegue— ya no se pierde: se recupera al
+   instante y el buscador responde desde el primer segundo.
+2. **Solo se relee lo que cambió.** Cada carpeta guarda una huella (cuándo
+   cambió y cuántas cosas tiene). Si está igual que la última vez, no se vuelve
+   a abrir. Lo que antes eran horas, en las pasadas siguientes es un repaso.
+
+**Un tercer defecto que salió de paso.** El buscador **vaciaba su índice al
+empezar** a reconstruirlo: durante todas esas horas contestaba vacío a todo el
+mundo. O sea, el motor quedaba ciego justo mientras trabajaba — que es, en el
+fondo, lo que había motivado el candado. Ahora arma el índice nuevo aparte y lo
+cambia de golpe al final; mientras tanto sigue contestando con el anterior.
+
+Con 10 pruebas nuevas para el buscador y las del bloqueo reescritas para que
+el candado no pueda volver sin que una prueba lo delate.
+
+
 ### 04-09-2026 (tarde, 2) — Mutual Ser: engancharse al Chrome del auditor
 
 **El defecto que se corrigió.** El radicador de Mutual Ser que se entregó por
