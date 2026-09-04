@@ -132,6 +132,73 @@ class ColaMotor:
             pass
 
 
+# ─── Engancharse al Chrome del auditor (CDP) ────────────────────────────
+
+
+def conectar_cdp(pw, url: str):
+    """Se conecta al Chrome NORMAL del auditor, ya autenticado.
+
+    Por qué existe: hay portales —Mutual Ser -- que ponen reCAPTCHA. Un
+    navegador lanzado por Playwright se detecta como automatizado y el captcha
+    se NIEGA a validar, por bien que se disfrace. La salida que ya usaba el bot
+    de respuestas es no pelear: el auditor abre SU Chrome, entra a mano
+    (resolviendo el captcha como una persona), y el bot se engancha a esa
+    pestaña. reCAPTCHA nunca ve un robot porque nunca lo hubo en el login.
+
+    El auditor abre su Chrome así, una vez:
+
+        chrome.exe --remote-debugging-port=9222 ^
+                   --user-data-dir="C:\\temp-notas\\zonaser-chrome"
+
+    Devuelve (browser, page). NO cierra ese Chrome: es del auditor.
+    """
+    # En Windows «localhost» suele resolver a IPv6 (::1) y Chrome escucha en
+    # IPv4 (127.0.0.1) -> ECONNREFUSED. Se prueban las variantes solas: es un
+    # tropiezo que ya costó tiempo una vez y no tiene por qué costarlo otra.
+    candidatos = [url]
+    for alias in ("localhost", "::1", "0.0.0.0"):
+        if alias in url:
+            candidatos.append(url.replace(alias, "127.0.0.1"))
+
+    browser = None
+    ultimo_error: Optional[Exception] = None
+    for u in dict.fromkeys(candidatos):  # sin repetidos, en orden
+        try:
+            browser = pw.chromium.connect_over_cdp(u)
+            if u != url:
+                logger.info(f"Conectado usando {u} (fallback IPv4).")
+            break
+        except Exception as e:  # noqa: BLE001
+            ultimo_error = e
+
+    if browser is None:
+        raise SesionNoDisponible(
+            f"No pude conectarme a su Chrome en {url} (ni por 127.0.0.1).\n"
+            "Ábralo así y deje la sesión del portal iniciada:\n"
+            "    chrome.exe --remote-debugging-port=9222 "
+            '--user-data-dir="C:\\temp-notas\\zonaser-chrome"\n'
+            f"Compruebe http://127.0.0.1:9222/json/version y reintente. Detalle: {ultimo_error}"
+        )
+    return browser
+
+
+def pagina_del_portal(browser, marca_url: str):
+    """De todas las pestañas abiertas, la que ya está en el portal.
+
+    El auditor puede tener el correo, el Excel y media internet abiertos: se
+    busca la pestaña del portal, y si no hay ninguna se usa la primera.
+    """
+    ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+    page = next(
+        (pg for pg in ctx.pages if marca_url in pg.url),
+        ctx.pages[0] if ctx.pages else ctx.new_page(),
+    )
+    page.set_default_navigation_timeout(120000)
+    page.set_default_timeout(30000)
+    page.on("dialog", lambda d: d.accept())
+    return page
+
+
 # ─── El molde de la línea de órdenes ────────────────────────────────────
 
 

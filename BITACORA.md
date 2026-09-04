@@ -90,6 +90,34 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 04-09-2026 (tarde, 2) — Mutual Ser: engancharse al Chrome del auditor
+
+**El defecto que se corrigió.** El radicador de Mutual Ser que se entregó por
+la mañana solo sabía entrar con una «sesión guardada». Y ese es justo el camino
+que el propio repositorio advierte que falla: cuando el navegador lo abre el
+robot, el reCAPTCHA lo detecta y **se niega a validar**. O sea, el bot colgaba
+del único camino poco fiable.
+
+**Cómo se entra ahora.** El auditor abre SU Chrome de siempre con un puerto de
+depuración, entra al portal a mano —resolviendo el captcha como una persona— y
+el bot se engancha a esa ventana. El captcha nunca ve un robot porque nunca lo
+hubo en el login.
+
+    chrome.exe --remote-debugging-port=9222 --user-data-dir="C:\temp-notas\zonaser-chrome"
+    py tools\radicar_glosas_mutual_ser.py --cdp http://127.0.0.1:9222
+
+**Tres cuidados que quedaron por escrito y con prueba:**
+
+1. **Ese Chrome no se cierra.** Es del auditor; el bot se desengancha y ya.
+2. **Enganchado pero sin sesión, no se toca el portal.** Si la ventana no tiene
+   el portal abierto, el bot se detiene y lo dice, en vez de hacer clics a
+   ciegas.
+3. **El aviso ahora manda por el camino bueno.** Antes decía «corra con
+   --con-cabeza», que es precisamente lo que choca contra el captcha.
+
+COOSALUD y SIMED no cambian: entran con usuario y contraseña.
+
+
 ### 04-09-2026 (tarde) — Pilar 1 completo: la bandeja y los tres portales
 
 **La bandeja «En espera de EPS».** Botón nuevo 📮 en la barra. Muestra el libro
