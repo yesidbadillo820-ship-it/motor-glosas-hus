@@ -25,6 +25,7 @@ import logging
 import os
 import socket
 import sys
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -125,6 +126,18 @@ class ColaMotor:
             f"{self.base}/radicacion/{rid}/humano-requerido", json={"error": motivo[:4000]}
         )
 
+    def rescatar(self, rid: int, error: str) -> None:
+        """«Me caí con esta fila en la mano»: que vuelva a la cola.
+
+        Se traga cualquier fallo de red a propósito. Esto se llama JUSTO
+        cuando el bot ya se está muriendo; si además reventara acá, el
+        auditor vería una traza en vez del motivo real de la caída.
+        """
+        try:
+            self._c.post(f"{self.base}/radicacion/{rid}/rescatar", json={"error": error[:4000]})
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"No se pudo devolver la fila {rid} a la cola: {e}")
+
     def cerrar(self) -> None:
         try:
             self._c.close()
@@ -220,6 +233,23 @@ def parser_comun(descripcion: str, evidencias_por_defecto: str) -> argparse.Argu
 # ─── El motor del bot: igual para los tres portales ─────────────────────
 
 
+def _soltar_la_fila(cola: ColaMotor, rid: int, contexto: str, error: Exception) -> int:
+    """El bot se cayó con la fila en la mano. Se devuelve y se explica.
+
+    Sin esto, la fila se quedaba RECLAMADA para siempre: invisible para los
+    demás equipos —que solo ven las PENDIENTE— e invisible para las personas
+    —que miran las atoradas—. La glosa desaparecía sin que nadie se enterara.
+    """
+    detalle = f"{contexto}: {type(error).__name__}: {error}"
+    cola.rescatar(rid, detalle)
+    sys.stderr.write(
+        f"\n  [!] {detalle}\n"
+        "      La glosa volvió a la cola: otro equipo la puede tomar.\n"
+        "      A los 3 intentos deja de rebotar y la revisa una persona.\n\n"
+    )
+    return 2
+
+
 def correr(
     portal: str,
     args: Any,
@@ -257,18 +287,46 @@ def correr(
             logger.info(f"No hay nada pendiente de radicar en {portal}.")
             return 0
 
-        from playwright.sync_api import sync_playwright
+        # Desde acá el bot tiene una fila EN LA MANO: está RECLAMADA y ningún
+        # otro equipo la ve. Todo lo que pueda fallar de aquí a que el bucle
+        # tome el control tiene que devolverla a la cola.
+        rid_en_mano = int(primera["radicacion_id"])
 
-        with sync_playwright() as pw:
+        try:
+            from playwright.sync_api import sync_playwright
+        except Exception as e:  # noqa: BLE001
+            # Falta la librería, o está rota. El mensaje de la excepción dice
+            # cuál de las dos, y el auditor necesita saberlo para arreglarlo.
+            return _soltar_la_fila(cola, rid_en_mano, "este PC no pudo cargar playwright", e)
+
+        # `ExitStack` para entrar al gestor DENTRO del try y dejar el cuerpo
+        # fuera: con un `with` normal, un fallo al arrancar el navegador se
+        # llevaría la fila puesta.
+        pila = ExitStack()
+        try:
+            pw = pila.enter_context(sync_playwright())
+        except Exception as e:  # noqa: BLE001
+            # El navegador no arrancó (falta `playwright install chromium`,
+            # no hay permisos, el driver murió). La fila no puede quedarse acá.
+            return _soltar_la_fila(cola, rid_en_mano, "no arrancó el navegador", e)
+
+        with pila:
             try:
                 page, cerrar = abrir_sesion(pw, args)
             except SesionNoDisponible as e:
                 # El portal exige una persona. Se devuelve la fila reclamada
                 # al lugar correcto y se dice por qué, sin fingir autonomía.
-                cola.humano_requerido(int(primera["radicacion_id"]), str(e))
+                cola.humano_requerido(rid_en_mano, str(e))
                 sys.stderr.write(f"\n  [!] {e}\n\n")
                 return 3
+            except Exception as e:  # noqa: BLE001
+                # Cualquier otra caída abriendo el portal: no es que el portal
+                # pida una persona, es que ESTE equipo no pudo. Otro sí podrá.
+                return _soltar_la_fila(cola, rid_en_mano, "no se pudo abrir el portal", e)
 
+            # De acá en adelante manda el bucle, y ahí cada fila llega sola a
+            # un estado propio: radicada, dudosa o fallida. Ninguna se queda
+            # RECLAMADA, así que el rescate ya no hace falta.
             try:
                 fila = primera
                 while fila is not None and sum(parte.values()) < tope:
