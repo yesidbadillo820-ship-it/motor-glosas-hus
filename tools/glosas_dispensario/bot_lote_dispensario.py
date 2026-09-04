@@ -195,19 +195,22 @@ def hallar_servicio_en_pdf(
         from _dinero import a_entero  # noqa: PLC0415  (el UNICO lector de pesos)
 
         con_formato, pelados = [], []
+        # Se mira token por token: pdfplumber a veces devuelve el renglón
+        # entero en una sola celda ("890275H CONSULTA 1 192.600 192.600"), y
+        # mirando la celda completa no se leía ningún valor.
         for celda in fila:
-            texto = str(celda or "").strip()
-            if not re.search(r"\d", texto):
-                continue
-            limpio = re.sub(r"[\s$]", "", texto).upper().rstrip(".,")
-            if re.search(r"[A-ZÑ]", limpio):  # 890275H, HUS0000542497, "12 UND"
-                continue
-            if limpio in (cod, pelado):  # el código del servicio, no un valor
-                continue
-            n = a_entero(texto)
-            if n < 100:  # cantidades y códigos cortos
-                continue
-            (con_formato if re.search(r"[.,]", limpio) else pelados).append(n)
+            for texto in str(celda or "").split():
+                if not re.search(r"\d", texto):
+                    continue
+                limpio = re.sub(r"[\s$]", "", texto).upper().rstrip(".,")
+                if re.search(r"[A-ZÑ]", limpio):  # 890275H, HUS0000542497, "12UND"
+                    continue
+                if limpio in (cod, pelado):  # el código del servicio, no un valor
+                    continue
+                n = a_entero(texto)
+                if n < 100:  # cantidades y códigos cortos
+                    continue
+                (con_formato if re.search(r"[.,]", limpio) else pelados).append(n)
         return con_formato or pelados
 
     def resultado(fila: list) -> tuple[str, int | None, list[int]]:
