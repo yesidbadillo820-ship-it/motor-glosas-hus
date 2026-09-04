@@ -282,6 +282,22 @@ def test_el_codigo_del_servicio_no_se_lee_como_si_fuera_plata():
     assert s2 and s2[2] == [35136]
 
 
+def test_lee_los_valores_aunque_la_fila_venga_en_una_sola_celda():
+    """pdfplumber a veces devuelve el renglón entero en una celda; y en la
+    fila conviven fechas, NIT y el código, que no son plata."""
+    from bot_lote_dispensario import hallar_servicio_en_pdf
+
+    entera = [["890275H CONSULTA DE PRIMERA VEZ 1 192.600 192.600"]]
+    assert hallar_servicio_en_pdf(entera, "890275H", "CONSULTA")[2] == [192600, 192600]
+
+    con_ruido = [["890275H", "CONSULTA", "2026-08-19", "900006037", "1", "$ 192.600"]]
+    assert hallar_servicio_en_pdf(con_ruido, "890275H", "CONSULTA")[2] == [192600]
+
+    # cantidad 3: quedan el unitario y el total, y el cotejo sabe cuál usar
+    tres = [["902210AMB", "HEMOGRAMA", "3", "17.556", "52.668"]]
+    assert hallar_servicio_en_pdf(tres, "902210AMB", "HEMOGRAMA")[2] == [17556, 52668]
+
+
 def test_lee_el_detalle_aunque_el_pdf_no_dibuje_la_tabla(tmp_path):
     """Muchas facturas electrónicas no tienen tabla: el renglón del cobro se
     rescata del texto, o el cotejo se quedaría sin con qué comparar."""
