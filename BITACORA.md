@@ -10534,6 +10534,15 @@ coinciden**; si no coinciden o no se leyo el dato, se cita la tarifa pactada
 sin afirmar coincidencias (y lo ilegible no se menciona). 6 pruebas nuevas
 (15 en el modulo).
 
+**Y la leccion del caso HUS0000542497 (hallada por el auditor):** la
+respuesta citaba la tarifa del anexo ($180.000) sin cotejarla con lo
+facturado, mientras el argumento decia "el valor facturado ES la tarifa
+pactada" — una contradiccion que la EPS podia usar para ratificar con el
+propio soporte del hospital. Regla nueva del constructor: **sin cotejo
+verificado no se proclama cifra** — se cita que el codigo esta pactado y se
+remite la fila, sin valor; la cifra solo aparece cuando coincide con el
+valor leido del PDF o con el objetado.
+
 ---
 
 ## 3) PENDIENTE

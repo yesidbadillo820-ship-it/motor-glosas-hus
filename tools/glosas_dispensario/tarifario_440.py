@@ -16,21 +16,12 @@ que no estén pactadas (regla de no invención).
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-def _num(v) -> int | None:
-    if v in (None, ""):
-        return None
-    s = str(v).replace("$", "").replace(" ", "").strip()
-    if s.count(",") and s.count("."):
-        s = s.replace(".", "").replace(",", ".")
-    elif s.count(","):
-        s = s.replace(",", ".")
-    try:
-        return round(float(s))
-    except ValueError:
-        return None
+from _dinero import a_entero  # noqa: E402  (el UNICO lector de pesos de tools/)
 
 
 def _norm_cod(c) -> str:
@@ -76,7 +67,7 @@ def cargar_tarifario(ruta_servicios: Path | None, ruta_medicamentos: Path | None
                         )
                         i_pre = next(i for v, i in encabezado.items() if "PRECIO" in v)
                     continue
-                precio = _num(fila[i_pre]) if i_pre < len(fila) else None
+                precio = a_entero(fila[i_pre]) if i_pre < len(fila) else None
                 des = fila[i_des] if i_des is not None and i_des < len(fila) else ""
                 if i_ips is not None and i_ips < len(fila):
                     anotar(fila[i_ips], precio, des, f"anexo 6.2 · {hoja.strip()}")
@@ -107,7 +98,7 @@ def cargar_tarifario(ruta_servicios: Path | None, ruta_medicamentos: Path | None
                         i_pre = next(i for v, i in arriba.items() if "PRECIO" in v)
                         encabezado = True
                     continue
-                precio = _num(fila[i_pre]) if i_pre < len(fila) else None
+                precio = a_entero(fila[i_pre]) if i_pre < len(fila) else None
                 nom = fila[i_nom] if i_nom is not None and i_nom < len(fila) else ""
                 cod = _norm_cod(fila[i_cod] if i_cod < len(fila) else "")
                 anotar(cod, precio, nom, f"tarifas del contrato · {hoja.strip()}")

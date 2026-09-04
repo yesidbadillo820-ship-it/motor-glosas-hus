@@ -131,15 +131,16 @@ def hallar_servicio_en_pdf(
     ]
 
     def valor_de(fila: list) -> int | None:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from _dinero import a_entero  # noqa: PLC0415  (el UNICO lector de pesos)
+
         nums = []
         for celda in fila:
-            limpio = str(celda).replace("$", "").replace(" ", "").replace(".", "").replace(",", ".")
-            try:
-                n = int(float(limpio))
-                if n >= 100:  # descartar cantidades y códigos cortos
-                    nums.append(n)
-            except ValueError:
+            if not re.search(r"\d", str(celda)):
                 continue
+            n = a_entero(celda)
+            if n >= 100:  # descartar cantidades y códigos cortos
+                nums.append(n)
         return nums[-1] if nums else None
 
     for fila in servicios or []:
@@ -209,9 +210,12 @@ def parrafo_evidencia(
                 "DE GLOSA ES INFUNDADA."
             )
         else:
+            # SIN COTEJO NO SE PROCLAMA CIFRA: citar un valor del anexo que no
+            # coincide con lo facturado le sirve a la EPS para ratificar con
+            # el propio soporte del hospital (caso HUS0000542497, 04-09-2026).
             frases.append(
-                base + f"LA TARIFA PACTADA PARA EL CODIGO {cups} ({tarifa['descripcion']}) "
-                f"ES DE {pactada}, FILA QUE SE REMITE CON LA PRESENTE RESPUESTA."
+                base + f"EL CODIGO {cups} ({tarifa['descripcion']}) SE ENCUENTRA PACTADO EN "
+                "EL ANEXO TARIFARIO DEL CONTRATO, FILA QUE SE REMITE CON LA PRESENTE RESPUESTA."
             )
     return " ".join(frases) if frases else None
 
@@ -372,8 +376,8 @@ def main() -> int:
             if t:
                 tarifa_por_linea[(d["factura"], d["num"])] = t
         print(
-            f"      Tarifario cargado ({len(indice):,} códigos): "
-            f"{len(tarifa_por_linea)} glosas con tarifa pactada hallada".replace(",", ".")
+            f"      Tarifario cargado ({len(indice)} códigos): "
+            f"{len(tarifa_por_linea)} glosas con tarifa pactada hallada"
         )
     else:
         print(
