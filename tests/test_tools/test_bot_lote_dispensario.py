@@ -213,7 +213,10 @@ def test_parrafo_sin_coincidencia_no_afirma_exactitud():
         cups="890275H",
     )
     assert "EXACTAMENTE" not in p and "INFUNDADA" not in p
-    assert "LA TARIFA PACTADA PARA EL CODIGO 890275H" in p and "$180.000" in p
+    # sin cotejo NO se proclama la cifra del anexo (evita ratificacion con
+    # el propio soporte): se cita la fila pactada, sin valor
+    assert "$180.000" not in p
+    assert "SE ENCUENTRA PACTADO EN EL ANEXO TARIFARIO" in p and "890275H" in p
 
 
 def test_parrafo_valor_objetado_igual_a_tarifa_sin_pdf():
