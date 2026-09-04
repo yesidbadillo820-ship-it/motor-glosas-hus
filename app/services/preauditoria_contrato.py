@@ -197,7 +197,11 @@ class PayloadFactura(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     factura: str = Field(default="", max_length=50)
-    eps: str = Field(..., min_length=1, max_length=200)
+    # Ya no es obligatoria (04-09-2026): el RIPS que manda el HIS NO trae la
+    # EPS —`numDocumentoIdObligado` es el NIT del propio hospital—. Sin EPS,
+    # las reglas que la necesitan (tarifa pactada, contrato vigente) se callan
+    # y la respuesta lo dice en `omisiones`. No se adivina.
+    eps: str = Field(default="", max_length=200)
     regimen: str = Field(default="", max_length=40)
     paciente: Paciente = Field(default_factory=Paciente)
     atencion: Atencion = Field(default_factory=Atencion)
@@ -244,7 +248,7 @@ class CruceClinico(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    # OK / OMITIDO_SIN_IA / OMITIDO_POR_TIEMPO / TIMEOUT / ERROR
+    # OK / OMITIDO_SIN_NOTAS / OMITIDO_SIN_IA / OMITIDO_POR_TIEMPO / TIMEOUT / ERROR
     estado: str = "OMITIDO_SIN_IA"
     modelo_utilizado: str = ""
     duracion_ms: int = 0
@@ -271,6 +275,12 @@ class RespuestaPreAuditoria(BaseModel):
     valor_factura: float = 0.0
     duracion_ms: int = 0
     cruce_clinico: CruceClinico = Field(default_factory=CruceClinico)
+    # Lo que NO se pudo revisar y por qué («sin EPS no se cruzó la tarifa»,
+    # «factura con 3 usuarios: el cruce de sexo y edad no aplica»). Va aparte
+    # de las alertas a propósito: no es un reparo a la factura, es un límite
+    # de lo que se tuvo a la vista, y el facturador tiene derecho a saberlo
+    # sin que le ensucie el semáforo.
+    omisiones: list[str] = Field(default_factory=list)
 
 
 def estado_de(alertas: list[Alerta]) -> str:

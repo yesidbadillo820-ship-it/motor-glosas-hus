@@ -204,6 +204,17 @@ async def cruzar_cups_contra_epicrisis(
                 "clínico no alcanzó a correr."
             ),
         )
+    if not (payload.epicrisis or "").strip():
+        # Sin texto clínico no hay nada que cruzar: el RIPS del HIS no trae
+        # epicrisis ni notas (04-09-2026). Se omite LIMPIAMENTE, sin gastar
+        # red y sin abortar: la factura ya se dictaminó con las reglas duras.
+        return [], CruceClinico(
+            estado="OMITIDO_SIN_NOTAS",
+            detalle=(
+                "El payload no trae notas clínicas ni epicrisis; el cruce clínico "
+                "no tiene con qué trabajar."
+            ),
+        )
     if not os.getenv("GROQ_API_KEY", ""):
         return [], CruceClinico(
             estado="OMITIDO_SIN_IA",

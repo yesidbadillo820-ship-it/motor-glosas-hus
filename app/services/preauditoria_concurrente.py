@@ -35,7 +35,12 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.core.logging_utils import logger
-from app.models.db import PreAuditoriaEventoRecord
+from app.models.db import (
+    PA_ADVERTENCIA,
+    PA_APROBADO,
+    PA_BLOQUEO,
+    PreAuditoriaEventoRecord,
+)
 from app.services.preauditoria_contrato import (
     Alerta,
     CruceClinico,
@@ -52,6 +57,71 @@ from app.services.preauditoria_reglas_duras import Contexto, correr_reglas_duras
 PRESUPUESTO_TOTAL_S = 10.0
 # Lo que se aparta para escribir la fila del evento y serializar la respuesta.
 RESERVA_ESCRITURA_S = 0.5
+
+
+# Una factura cuenta como CORREGIDA cuando, después de un BLOQUEO, el HIS la
+# vuelve a mandar y esa vez pasa. Es la única señal honesta que tenemos: el
+# motor no ve la caja, así que no puede afirmar que alguien acató nada si la
+# factura nunca volvió.
+ESTADOS_QUE_PASAN = (PA_APROBADO, PA_ADVERTENCIA)
+
+
+def resumen(db: Session, limite_facturas: int = 5000) -> dict:
+    """Las cifras del tablero de pre-auditoría.
+
+    **Dinero salvado** es la suma del `valor_en_riesgo` de las facturas que
+    fueron BLOQUEADAS y después volvieron a evaluarse sin bloqueo: se
+    corrigieron antes de timbrar, y esa plata no entró a cartera.
+
+    Lo que NO se cuenta como salvado: una factura bloqueada que nunca volvió.
+    No sabemos si la corrigieron, si la timbraron igual o si la dejaron
+    quieta — y decir «salvamos» sin saberlo sería inventar una cifra que
+    después nadie puede sostener ante gerencia. Esa plata va aparte, en
+    `riesgo_sin_resolver`.
+
+    Una sola consulta ordenada y un recorrido en memoria: nada de una
+    consulta por factura.
+    """
+    filas = (
+        db.query(
+            PreAuditoriaEventoRecord.factura,
+            PreAuditoriaEventoRecord.estado,
+            PreAuditoriaEventoRecord.valor_en_riesgo,
+            PreAuditoriaEventoRecord.creado_en,
+        )
+        .order_by(PreAuditoriaEventoRecord.id.asc())
+        .limit(limite_facturas)
+        .all()
+    )
+
+    por_estado: dict[str, int] = {}
+    # Por factura: el mayor riesgo bloqueado y si después pasó.
+    bloqueado: dict[str, float] = {}
+    paso_despues: dict[str, bool] = {}
+
+    for factura, estado, riesgo, _creado in filas:
+        estado = estado or ""
+        por_estado[estado] = por_estado.get(estado, 0) + 1
+        clave = (factura or "").strip()
+        if not clave:
+            continue
+        if estado == PA_BLOQUEO:
+            bloqueado[clave] = max(bloqueado.get(clave, 0.0), float(riesgo or 0.0))
+            paso_despues[clave] = False
+        elif estado in ESTADOS_QUE_PASAN and clave in bloqueado:
+            paso_despues[clave] = True
+
+    salvado = round(sum(v for k, v in bloqueado.items() if paso_despues.get(k)), 2)
+    sin_resolver = round(sum(v for k, v in bloqueado.items() if not paso_despues.get(k)), 2)
+
+    return {
+        "evaluaciones": len(filas),
+        "por_estado": por_estado,
+        "facturas_bloqueadas": len(bloqueado),
+        "facturas_corregidas": sum(1 for k in bloqueado if paso_despues.get(k)),
+        "dinero_salvado": salvado,
+        "riesgo_sin_resolver": sin_resolver,
+    }
 
 
 def huella_de(payload: PayloadFactura) -> str:
@@ -74,11 +144,14 @@ def _alerta_de_cruce_incompleto(cruce: CruceClinico) -> Optional[Alerta]:
         estado del despliegue, no un riesgo de esta factura: no se levanta
         alerta —se avisaría en todas, y una advertencia que sale siempre
         deja de leerse—. Queda en el campo `cruce_clinico` de la respuesta.
+      · Lo mismo si el payload no trae notas clínicas (OMITIDO_SIN_NOTAS):
+        el RIPS del HIS nunca las trae, y avisar en cada factura sería
+        ruido. Queda en `cruce_clinico` y en `omisiones`.
       · Si la IA existía y esta factura específica se quedó sin revisar
         (TIMEOUT, ERROR o sin tiempo), SÍ se avisa: esta cuenta recibió
         menos revisión que las demás y el facturador tiene derecho a saberlo.
     """
-    if cruce.estado in ("OK", "OMITIDO_SIN_IA"):
+    if cruce.estado in ("OK", "OMITIDO_SIN_IA", "OMITIDO_SIN_NOTAS"):
         return None
     return Alerta(
         codigo_glosa="",
@@ -137,6 +210,7 @@ async def evaluar(
     payload: PayloadFactura,
     actor: str = "his",
     ahora: Optional[datetime] = None,
+    omisiones: Optional[list[str]] = None,
 ) -> RespuestaPreAuditoria:
     """Evalúa una factura antes de timbrarla y deja constancia.
 
@@ -170,6 +244,7 @@ async def evaluar(
         valor_factura=valor_factura,
         duracion_ms=int((time.monotonic() - arranque) * 1000),
         cruce_clinico=cruce,
+        omisiones=list(omisiones or []),
     )
     respuesta.evento_id = _guardar_evento(db, payload, respuesta, duracion_reglas_ms, actor)
     return respuesta
