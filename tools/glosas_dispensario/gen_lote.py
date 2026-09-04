@@ -52,6 +52,9 @@ c = {
     ).items()
 }
 i_tt = H.index("TipoObjecionTramite") if "TipoObjecionTramite" in H else None
+# El valor total de la factura no viene en todos los export; sin él, el
+# cotejo simplemente se queda sin esa segunda fuente.
+i_vf = H.index("FacturaCartera.Valor") if "FacturaCartera.Valor" in H else None
 
 
 def es_cl_para_medicos(tipo_tramite: str, code: str) -> bool:
@@ -73,6 +76,11 @@ for r in det.iter_rows(min_row=2, values_only=True):
     cups = norm(r[c["sc"]])
     serv = norm(r[c["sd"]])
     valor = int(r[c["vl"]] or r[c["vh"]] or 0)
+    # El valor TOTAL de la factura, como lo tiene el sistema de cartera del
+    # hospital. Sirve de segunda fuente para el cotejo cuando el PDF no está
+    # a la mano: si la factura es de un solo servicio, ese total ES el valor
+    # facturado del servicio glosado.
+    valor_factura = int(r[i_vf] or 0) if i_vf is not None else 0
     obs = r[c["ob"]]
     # La numeración es POSICIONAL (el orden de la grilla del portal): las
     # excluidas también cuentan, para que el robot responda cada objeción
@@ -92,6 +100,7 @@ for r in det.iter_rows(min_row=2, values_only=True):
             cups=cups,
             serv=serv,
             valor=valor,
+            valor_factura=valor_factura,
             obs=norm(obs),
             tipo=t,
             detalle=det_txt,
