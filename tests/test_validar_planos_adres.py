@@ -196,3 +196,40 @@ def test_archivo_valido_y_reportes(tmp_path):
     assert (tmp_path / "rep.json").exists() and (tmp_path / "rep.csv").exists()
     contenido = (tmp_path / "rep.csv").read_text(encoding="utf-8-sig")
     assert "NOMBRE DEL ARCHIVO" in contenido
+
+
+def test_reporte_xlsx_detallado(tmp_path):
+    openpyxl = __import__("pytest").importorskip("openpyxl")
+    from validar_planos_adres import Hallazgo, escribir_xlsx
+
+    hallazgos = [
+        Hallazgo(
+            "FURIPS1X.txt",
+            1,
+            "3 - Número de factura",
+            '"X"',
+            "El campo contiene comillas dobles.",
+            ERROR,
+        ),
+        Hallazgo(
+            "FURIPS1X.txt",
+            2,
+            "4 - Consecutivo",
+            "000123",
+            "Relleno con ceros a la izquierda.",
+            ERROR,
+        ),
+        Hallazgo("FURIPS1X.txt", 0, "Archivo", "", "Aviso informativo.", "INFO"),
+    ]
+    meta = [{"archivo": "FURIPS1X.txt", "tipo": "FURIPS1", "lineas": 2}]
+    destino = tmp_path / "rep.xlsx"
+    escribir_xlsx(hallazgos, meta, destino)
+
+    wb = openpyxl.load_workbook(destino)
+    assert wb.sheetnames == ["RESUMEN", "HALLAZGOS", "POR CAMPO", "AVISOS", "LEYENDA"]
+    assert wb["HALLAZGOS"].max_row == 3  # encabezado + 2 errores (el INFO va en AVISOS)
+    assert wb["AVISOS"].max_row == 2
+    filas_resumen = [
+        str(v) for fila in wb["RESUMEN"].iter_rows(values_only=True) for v in fila if v
+    ]
+    assert any("CON ERRORES" in v for v in filas_resumen)
