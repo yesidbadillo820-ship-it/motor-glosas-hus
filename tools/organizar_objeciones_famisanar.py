@@ -19,6 +19,7 @@ SLNSERPRO vacío (igual que las estancias en los archivos del Dispensario).
 MAPEO DE CAMPOS (FAMISANAR → 16 columnas):
     CRNCXC       ← NRO_FACTURA          (HUS532670 → HUS0000532670, 10 dígitos)
     CRNCONOBJ    ← CODIGO_DEVOLUCION    (ya viene de 6: CL0801, CO0701, TA0801…)
+    CTNCENCOS    ← SIEMPRE vacía (regla del área)
     SLNSERPRO    ← extraído del texto ("CÓDIGO <x>") y HOMOLOGADO al código HUS:
                    CUPS tal cual; medicamentos U/P → se quita la letra
                    (U20162259-04 → 20162259-04); dispositivos 9101xxxx → código
@@ -289,8 +290,11 @@ def homologar_cod_servicio(cod: str, mapa: dict[str, str] | None = None) -> tupl
 #
 # Con el export de servicios facturados del DGH (--servicios-dgh) se busca, en
 # ESA factura, de qué servicio habla la objeción: código, nombre y valor. Lo
-# que se escribe en SLNSERPRO es entonces el código real del hospital, y de
-# paso se llena CTNCENCOS (centro de costo), que hasta ahora salía vacío.
+# que se escribe en SLNSERPRO es entonces el código real del hospital.
+#
+# OJO: el cruce NO llena CTNCENCOS. Esa columna va siempre vacía en el archivo
+# de FAMISANAR (regla del área); el centro de costo sólo se muestra en el
+# reporte de cruce, como pista para ubicar el renglón.
 #
 # Regla que no se rompe: si el cruce no es confiable NO se inventa un servicio
 # — queda lo que se sabía por el texto y el renglón se reporta para revisión.
@@ -767,8 +771,12 @@ GRUPO_CLINICO = "CL"
 
 
 def crotipobj_factura(grupos: set[str]) -> int:
-    """Tipo de objeción de la factura según sus grupos de concepto (2 letras):
-    solo administrativos (TA/FA/SO/AU/CO…) → 0; solo CL → 1; mezcla con CL → 2.
+    """Tipo de objeción de la factura según sus grupos de concepto (2 letras).
+
+    Los tres valores que reconoce DGH: **0 = ADMINISTRATIVA** (sólo TA/FA/SO/
+    AU/CO…), **1 = MEDICA** (sólo CL) y **2 = MIXTA** (CL junto con cualquier
+    administrativa). Se decide por FACTURA, no por renglón: todas las
+    objeciones de una misma factura salen con el mismo valor.
     """
     tiene_cl = GRUPO_CLINICO in grupos
     tiene_admin = any(g != GRUPO_CLINICO for g in grupos)
@@ -826,9 +834,9 @@ def construir_registros(
 
     Con `servicios_dgh` (el export de servicios facturados del DGH) se busca
     además, factura por factura, de qué servicio habla cada objeción: cuando
-    el cruce es confiable, SLNSERPRO queda con el código REAL del hospital y
-    CTNCENCOS con su centro de costo. Si no lo es, se deja lo que se sabía por
-    el texto y el renglón queda marcado para revisión.
+    el cruce es confiable, SLNSERPRO queda con el código REAL del hospital. Si
+    no lo es, se deja lo que se sabía por el texto y el renglón queda marcado
+    para revisión. CTNCENCOS va siempre vacía (ver el comentario abajo).
 
     `trazas`, si se pasa, recibe un dict por objeción con el detalle del cruce
     (qué se leyó del texto, con qué renglón del DGH cruzó y por qué). Va aparte
@@ -881,7 +889,6 @@ def construir_registros(
 
         # Cruce contra los servicios que el DGH tiene facturados en ESA factura.
         cruce = Cruce()
-        centro_costo = None
         if servicios_dgh is not None:
             cruce = resolver_servicio(
                 cod_famisanar or cod_servicio, observacion, valor, servicios_dgh.get(crncxc, [])
@@ -890,7 +897,6 @@ def construir_registros(
             if cruce.linea is not None:
                 # Manda el código del hospital: es el que DGH reconoce.
                 cod_servicio = cruce.linea.codigo or cod_servicio
-                centro_costo = cruce.linea.centro_costo or None
         # Dispositivos FAMISANAR (9101xxxx…) sin equivalencia HUS: se reportan
         # para completar el mapa con el maestro, pero sólo los que el cruce
         # contra el DGH tampoco pudo ubicar — con el export a la mano la
@@ -917,7 +923,13 @@ def construir_registros(
                 "CRNCONOBJ": codigo,
                 "SLNSERPRO": cod_servicio or None,
                 "IDRIPS": None,
-                "CTNCENCOS": centro_costo,
+                # CTNCENCOS va SIEMPRE vacía en el archivo de FAMISANAR (regla
+                # del área). El export del DGH sólo trae el NOMBRE del centro
+                # de costo ("URGENCIAS ADULTOS") y esta columna es de código,
+                # así que llenarla con el nombre sería escribir un dato que no
+                # corresponde. El nombre sí queda en el reporte de cruce, para
+                # que el auditor pueda ubicar el renglón.
+                "CTNCENCOS": None,
                 "CROVALOBJ": valor,
                 "CRDOBSERV": construir_crdobserv(codigo, observacion, valor),
                 "CROTIPOBJ": 0,  # placeholder: se calcula por factura abajo
@@ -935,7 +947,7 @@ def construir_registros(
                     "cod_dgh": cruce.linea.codigo if cruce.linea else "",
                     "servicio_dgh": cruce.linea.descripcion if cruce.linea else "",
                     "unitario_dgh": cruce.linea.unitario if cruce.linea else "",
-                    "centro_costo": centro_costo or "",
+                    "centro_costo": cruce.linea.centro_costo if cruce.linea else "",
                     "confianza": cruce.confianza,
                     "motivos": cruce.motivos,
                     "puntaje": cruce.puntaje,
@@ -1286,8 +1298,7 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Export de servicios facturados del DGH (columnas SERVICIOS DGH, "
         "DESCRIPCION INSTITUCIONAL, NOM_CENTRO_COSTO, FACTURA, CAT_SERVICIOS, "
-        "Vr_SERVICIO). Con él, SLNSERPRO queda con el código real del hospital y "
-        "CTNCENCOS con el centro de costo.",
+        "Vr_SERVICIO). Con él, SLNSERPRO queda con el código real del hospital.",
     )
     parser.add_argument(
         "--reporte-cruce",

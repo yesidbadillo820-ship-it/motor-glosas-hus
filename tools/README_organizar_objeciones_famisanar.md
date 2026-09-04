@@ -64,9 +64,13 @@ Con el **export de servicios facturados del DGH** (el DGReport: `SERVICIOS DGH`,
 encuentra:
 
 - `SLNSERPRO` queda con el **código real del hospital** (el que DGH reconoce),
-  no con el que escribió FAMISANAR;
-- `CTNCENCOS` queda con el **centro de costo** de ese renglón (antes salía
-  vacío en todas las filas).
+  no con el que escribió FAMISANAR.
+
+> **`CTNCENCOS` va SIEMPRE vacía**, con cruce o sin él — es la regla del área
+> para el archivo de FAMISANAR. El export del DGH sólo trae el **nombre** del
+> centro de costo («URGENCIAS ADULTOS») y esa columna es de código, así que
+> llenarla con el nombre sería escribir un dato que no corresponde. El nombre
+> sí aparece en el reporte de cruce, como pista para ubicar el renglón.
 
 ### Cómo lo busca
 
@@ -119,7 +123,6 @@ Corrida real del 1 de septiembre (398 objeciones, 14 facturas, $31.439.029):
 | `SLNSERPRO` que el DGH reconoce | 184 (46 %) | **395 (99 %)** |
 | `SLNSERPRO` con un código que no existe en el DGH | 191 | **0** |
 | `SLNSERPRO` vacío | 23 | 3 |
-| `CTNCENCOS` lleno | 0 | **395** |
 
 ---
 
@@ -134,8 +137,8 @@ Corrida real del 1 de septiembre (398 objeciones, 14 facturas, $31.439.029):
 | `CRDOBSERV` | `OBSERVACION` | `"<código> <texto>$<valor>"`. Colapsa las corridas largas de espacios del export. Anti-duplicado con cuidado: quita un `$monto` final SOLO si es el mismo valor de la objeción; si es otro monto (p. ej. el valor unitario facturado), se conserva. |
 | `CDFECDOC`, `CROFECOBJ` | — | `--fecha` (default hoy), FECHA CORTA sin horas. |
 | `CDCONSEC` | — | Consecutivo POR FACTURA (1-1-1, 2-2-2…), como texto; standalone reinicia en 1. |
-| `CROTIPOBJ` | — | Por factura: solo TA/FA/SO/AU/CO → 0; solo CL → 1; mezcla con CL → 2. |
-| `CTNCENCOS` | export del DGH | Centro de costo del renglón que cruzó. Vacío sin `--servicios-dgh`. |
+| `CROTIPOBJ` | — | **0 = ADMINISTRATIVA** (solo TA/FA/SO/AU/CO…), **1 = MEDICA** (solo CL), **2 = MIXTA** (CL junto con administrativas). Se decide **por factura**: todas sus objeciones salen con el mismo valor. |
+| `CTNCENCOS` | — | **Siempre vacía** (regla del área), aunque el cruce sepa el centro de costo. |
 | `CROCLAOBJ`, `GENUSUARIO4` | — | `0` (número) y `'999'` (texto). |
 | resto | — | Vacíos. Formatos de celda 1:1 con los archivos reales. |
 

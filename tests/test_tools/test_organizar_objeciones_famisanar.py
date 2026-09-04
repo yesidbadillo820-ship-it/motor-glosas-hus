@@ -643,14 +643,29 @@ class TestConstruirRegistrosConCruce:
             trazas=trazas,
         )
         assert regs[0]["SLNSERPRO"] == "FMQ0113"
-        assert regs[0]["CTNCENCOS"] == "URGENCIAS ADULTOS"
         # El código IUM de FAMISANAR (91022534) queda con el del hospital.
         assert regs[1]["SLNSERPRO"] == "FMQ3616-1"
-        assert regs[1]["CTNCENCOS"] == "SALA DE PARTOS"
         # AUD EXTRA sin servicio: no se inventa nada.
         assert regs[2]["SLNSERPRO"] is None
-        assert regs[2]["CTNCENCOS"] is None
         assert trazas[2]["confianza"] == "SIN CRUCE"
+
+    def test_ctncencos_va_siempre_vacia(self, tmp_path):
+        """Regla del área: en el archivo de FAMISANAR esa columna va en blanco,
+        aunque el cruce sepa el centro de costo (el export sólo trae el nombre
+        y la columna es de código). El dato sí queda en el reporte de cruce."""
+        entrada, dgh = self._archivos(tmp_path)
+        trazas: list[dict] = []
+        regs = org.construir_registros(
+            entrada,
+            fecha=_FECHA,
+            consecutivo=1,
+            codigo_sufijo="01",
+            mapa_codigos=None,
+            servicios_dgh=org.leer_servicios_dgh(dgh),
+            trazas=trazas,
+        )
+        assert all(reg["CTNCENCOS"] is None for reg in regs)
+        assert trazas[0]["centro_costo"] == "URGENCIAS ADULTOS"
 
     def test_los_registros_conservan_las_16_columnas(self, tmp_path):
         entrada, dgh = self._archivos(tmp_path)
@@ -779,7 +794,7 @@ class TestCliCruce:
         headers = [c.value for c in ws[1]]
         fila = dict(zip(headers, [c.value for c in ws[2]], strict=True))
         assert fila["SLNSERPRO"] == "FMQ0113"
-        assert fila["CTNCENCOS"] == "URGENCIAS ADULTOS"
+        assert fila["CTNCENCOS"] is None
         assert reporte.is_file()
 
     def test_reporte_sin_export_del_dgh_avisa(self, tmp_path):

@@ -151,6 +151,26 @@ en derechos de sala»).
    servicio correcto pero con el aviso «el nombre del servicio no coincide»,
    para que el auditor lo confirme. Son 11 renglones con ese aviso.
 
+**Corrección del mismo día (la pidió Yesid).** Dos reglas del formato que ya
+venían de chats anteriores y que yo no respeté:
+
+1. **`CTNCENCOS` va SIEMPRE vacía** en el archivo de FAMISANAR. Yo la había
+   llenado con el centro de costo que traía el cruce, creyendo que ayudaba
+   (venía del arreglo del ADRES del 28-08, donde sí se pedía llenarla). No es
+   lo mismo: el export del DGH sólo trae el **nombre** del centro
+   («URGENCIAS ADULTOS») y esa columna es de código. Corregido en el bot, con
+   prueba que lo fija, y las 395 celdas borradas del archivo del auditor. El
+   nombre del centro sigue apareciendo en el reporte de cruce, como pista.
+2. **`CROTIPOBJ` = 0 ADMINISTRATIVA / 1 MEDICA / 2 MIXTA**, por factura. Se
+   revisó el archivo entregado: las 14 facturas estaban bien clasificadas (13
+   en 0 y HUS0000542699 en 2, porque mezcla CL0601 con cobertura). Quedó
+   escrito así en el código y en la guía para que no se vuelva a interpretar.
+
+El auditor completó a mano las 3 objeciones que quedaron sin cruce:
+HUS0000549506 (SO0101, estancia) → `105M01`; HUS0000546202 (CO0601) →
+`FMQ0952` y (FA0502) → `FMQ3605`. Con eso el archivo quedó con los 398
+renglones identificados.
+
 **Archivos entregados:** `OBJECIONES_FAMISANAR_01-09-2026.xlsx` (el que se
 sube, 398 renglones en las 16 columnas de siempre) y
 `CRUCE_FAMISANAR_01-09-2026.xlsx` (el respaldo del auditor, 100 renglones en
