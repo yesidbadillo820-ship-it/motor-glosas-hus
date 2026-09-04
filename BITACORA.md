@@ -90,6 +90,44 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 04-09-2026 (noche, 5) — La primera factura de verdad destapó dos falsos positivos
+
+**La prueba.** Se le pasó a la Pre-Auditoría una factura real del share:
+HUS559077, de $141.720.044, con 531 KB de servicios. Contestó en **32
+milisegundos** (el compromiso con el facturador son 10 segundos, así que
+sobra tiempo de aquí a la esquina). Pero levantó **63 alertas**, y dos
+fuentes de ese ruido eran errores nuestros.
+
+**1. Cuarenta y ocho alertas de tarifa que nadie podía resolver.** El
+archivo del HIS **no dice qué EPS paga** la factura. Sin saber quién paga no
+existe «tarifa pactada» — pero el motor, al no encontrarla, se iba a comparar
+contra el catálogo de precios propio del hospital y cantaba diferencia. Y
+para colmo, en el mismo mensaje avisaba que la tarifa NO se había revisado.
+El tablero se contradecía a sí mismo, y eso es lo más rápido para que un
+auditor deje de creerle.
+
+**Ahora:** sin EPS, el motor **se calla** en materia de tarifas y lo dice. El
+día que el HIS mande el campo, la revisión vuelve a operar igual que siempre.
+
+**2. Un insumo bloqueado por «servicio pediátrico en un paciente adulto».**
+Era el material FMQ0098. En un insumo, «pediátrico» es un **calibre** —una
+sonda pediátrica se le pone a un adulto todos los días—, no una restricción
+de paciente.
+
+**Ahora:** la revisión de edad mira **servicios**, no artículos. En un insumo
+o un medicamento, la palabra que nombra una edad es una talla o una dosis. La
+regla sigue igual de firme donde sí importa: una **estancia** en UCI
+pediátrica facturada a un adulto se sigue bloqueando.
+
+Con las dos correcciones, esa misma factura pasa de 63 alertas a unas 15
+—estancia, UCI y servicios repetidos—, que son las que el facturador de
+verdad puede revisar antes de timbrar.
+
+9 pruebas nuevas, incluidas las que impiden que arreglar esto haya debilitado
+las reglas donde sirven.
+
+---
+
 ### 04-09-2026 (noche, 4) — Entregado el Excel del lote 04-sep, y un tercer hueco de lectura tapado
 
 **Lo que se entregó.** El Excel del lote del 04 de septiembre quedó armado y
