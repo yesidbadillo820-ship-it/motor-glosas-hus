@@ -90,6 +90,43 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 04-09-2026 (tarde, 3) — Glosas ADRES: ya se puede REASIGNAR el área (y dejarlas todas en FACTURACIÓN)
+
+**Lo que reportó Yesid.** En Glosas ADRES, las glosas de la causal 4506 (las
+que "trabajan dos áreas": FACTURACIÓN los gestores, PERTINENCIA las médicas)
+salían en la columna «Clasificación» para repartirlas. Pero **una vez asignada
+una, quedaba en piedra**: si por error humano se ponía PERTINENCIA cuando era
+FACTURACIÓN, ya no había forma de corregirla en la pantalla. Y en esta factura
+las quería todas en FACTURACIÓN.
+
+**Qué pasaba de verdad.** El servidor **siempre** permitió reasignar (es
+reversible y deja testigo de quién y cuándo), y desde el 31-08 el permiso está
+abierto a los gestores (auditor o superior). El hueco era **solo la pantalla**:
+la celda mostraba texto plano en cuanto la glosa quedaba asignada, así que el
+selector desaparecía. Además, la pantalla seguía pidiendo SUPER_ADMIN aunque el
+servidor ya la había abierto a los gestores — el mismo tipo de descuido de
+«backend abierto, pantalla cerrada».
+
+**Lo que quedó.**
+- El selector de área queda **siempre** en las glosas de doble área: se puede
+  cambiar cuantas veces haga falta, con el área actual ya marcada y quién la
+  asignó a la vista. Un error humano ya no queda encerrado.
+- La pantalla ahora usa **el mismo permiso del servidor** (auditor o superior),
+  no SUPER_ADMIN.
+- Un aviso arriba dice cuántas glosas de doble área tiene la factura y trae dos
+  botones: **«Todas a FACTURACIÓN»** y «Todas a PERTINENCIA», para dejarlas
+  todas en un área de una vez (reversible glosa por glosa). El aviso y el botón
+  **recuerdan** que el material de osteosíntesis y el de alto costo los revisa
+  el médico auditor, para no mandar a facturación algo que le toca al médico.
+
+Nada de esto abre pantallas nuevas ni toca otras causales: fuera de la 4506 el
+servidor sigue respondiendo con error.
+
+7 pruebas nuevas (1 de servidor: reasignar de PERTINENCIA a FACTURACIÓN y de
+vuelta; 6 de pantalla).
+
+---
+
 ### 04-09-2026 — Se quita el candado que paralizaba los análisis
 
 **El error fue nuestro y se corrige.** El día anterior se puso un bloqueo: si
@@ -127,6 +164,7 @@ cambia de golpe al final; mientras tanto sigue contestando con el anterior.
 Con 10 pruebas nuevas para el buscador y las del bloqueo reescritas para que
 el candado no pueda volver sin que una prueba lo delate.
 
+---
 
 ### 04-09-2026 (tarde, 2) — Mutual Ser: engancharse al Chrome del auditor
 
