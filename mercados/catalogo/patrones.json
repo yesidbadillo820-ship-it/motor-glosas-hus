@@ -1,0 +1,314 @@
+{
+ "fuente": {
+  "titulo": "Velas Japonesas: patrones simples y combinados. Significado e interpretación (nivel principiante e intermedio)",
+  "autor": "Luis M. González",
+  "sitio": "detrading.org",
+  "nota": "Las etiquetas de fiabilidad son afirmaciones del autor. El libro no publica ninguna medición que las respalde; por eso este módulo las contrasta contra el histórico real."
+ },
+ "patrones": [
+  {
+   "clave": "doji_libelula",
+   "pagina": 12,
+   "identificar": [
+    "Sombra o mecha inferior extremadamente larga.",
+    "Sombra o mecha superior muy pequeña o nula.",
+    "Poco o ningún cuerpo (cierre igual a la apertura).",
+    "Puede aparecer después de una fuerte tendencia bajista."
+   ],
+   "significado": "Hubo una gran venta al inicio de la sesión, pero antes de acabar el mercado toma fuerza alcista y cierra en el mismo precio de apertura: señal de debilitamiento bajista."
+  },
+  {
+   "clave": "martillo",
+   "pagina": 14,
+   "identificar": [
+    "Cuerpo pequeño, con el cierre muy cerca de la apertura.",
+    "Sombra inferior larga: como mínimo dos veces el tamaño del cuerpo.",
+    "Ninguna o muy poca sombra superior.",
+    "Aparece después de una tendencia bajista.",
+    "Puede ser de cualquier color."
+   ],
+   "significado": "Debilitamiento de la fuerza bajista. El libro advierte que por sí solo tiene fiabilidad moderada o baja: gana valor con una vela de confirmación al alza."
+  },
+  {
+   "clave": "martillo_invertido",
+   "pagina": 16,
+   "identificar": [
+    "Cuerpo pequeño, con el cierre muy cerca de la apertura.",
+    "Sombra superior larga: como mínimo dos veces el cuerpo.",
+    "Ninguna o muy poca sombra inferior.",
+    "Aparece después de una tendencia bajista."
+   ],
+   "significado": "Tras una caída, el precio intenta un rally que no se sostiene y retrocede para cerrar cerca de la apertura."
+  },
+  {
+   "clave": "lapida_doji",
+   "pagina": 18,
+   "identificar": [
+    "Sombra superior relativamente larga.",
+    "Sin sombra inferior.",
+    "Sin cuerpo (cierre igual a la apertura).",
+    "Aparece después de una tendencia alcista."
+   ],
+   "significado": "Un último impulso alcista que el mercado no pudo sostener: antes de cerrar, los precios caen de vuelta al punto de apertura."
+  },
+  {
+   "clave": "hombre_colgado",
+   "pagina": 20,
+   "identificar": [
+    "Cuerpo pequeño, cierre muy cerca de la apertura.",
+    "Sombra inferior larga: como mínimo dos veces el cuerpo.",
+    "Ninguna o muy poca sombra superior.",
+    "Aparece después de una tendencia alcista."
+   ],
+   "significado": "Mismo dibujo que el martillo, pero al final de una subida. El libro le da fiabilidad moderada o baja salvo que venga una vela de confirmación a la baja."
+  },
+  {
+   "clave": "estrella_fugaz",
+   "pagina": 22,
+   "identificar": [
+    "Cuerpo pequeño, cierre muy cerca de la apertura.",
+    "Sombra superior larga: como mínimo dos veces el cuerpo.",
+    "Ninguna o muy poca sombra inferior.",
+    "Aparece después de una tendencia alcista."
+   ],
+   "significado": "Los compradores empujan el precio arriba durante la sesión pero no lo sostienen. Fiabilidad moderada o baja sin vela de confirmación."
+  },
+  {
+   "clave": "marubozu_blanca",
+   "pagina": 25,
+   "identificar": [
+    "Cuerpo mediano o grande.",
+    "Ninguna sombra superior ni inferior.",
+    "Siempre verde (o blanca).",
+    "Aparece en cualquier parte de una tendencia alcista."
+   ],
+   "significado": "La apertura coincide con el mínimo y el cierre con el máximo: la fuerza alcista dominó toda la sesión. El propio libro le atribuye fiabilidad baja."
+  },
+  {
+   "clave": "elefante_verde",
+   "pagina": 27,
+   "identificar": [
+    "Cuerpo muy grande: al menos 3 veces el de las velas verdes promedio anteriores.",
+    "Ninguna o poca sombra superior e inferior.",
+    "Siempre verde (o blanca).",
+    "Suele marcar el inicio de una tendencia o la rotura de una resistencia."
+   ],
+   "significado": "Las fuerzas alcistas tomaron el control absoluto. Suele aparecer al inicio de una tendencia nueva."
+  },
+  {
+   "clave": "marubozu_negra",
+   "pagina": 29,
+   "identificar": [
+    "Cuerpo mediano o grande.",
+    "Ninguna sombra superior ni inferior.",
+    "Siempre roja (o negra).",
+    "Aparece en cualquier parte de una tendencia bajista."
+   ],
+   "significado": "La apertura coincide con el máximo y el cierre con el mínimo. El libro le atribuye fiabilidad relativamente baja."
+  },
+  {
+   "clave": "elefante_rojo",
+   "pagina": 31,
+   "identificar": [
+    "Cuerpo muy grande: al menos 3 veces el de las velas rojas promedio anteriores.",
+    "Ninguna o poca sombra superior e inferior.",
+    "Siempre roja (o negra).",
+    "Suele marcar el inicio de una tendencia o la rotura de un soporte."
+   ],
+   "significado": "Las fuerzas bajistas tomaron el control absoluto y arrinconaron a las alcistas."
+  },
+  {
+   "clave": "doji",
+   "pagina": 34,
+   "identificar": [
+    "Sombras relativamente cortas e iguales.",
+    "Poco o ningún cuerpo (cierre igual a la apertura).",
+    "Puede aparecer en cualquier lugar."
+   ],
+   "significado": "Indecisión: equilibrio de fuerzas. En un mercado lateral no dice nada; al final de una tendencia puede anunciar un cambio, pero todo depende de la vela siguiente."
+  },
+  {
+   "clave": "peonza",
+   "pagina": 36,
+   "identificar": [
+    "Cuerpo relativamente pequeño.",
+    "Mechas relativamente pequeñas, iguales o desiguales.",
+    "De cualquier color."
+   ],
+   "significado": "Indecisión con baja volatilidad y poca fuerza. Puede ser parte de una acumulación o distribución previa a una tendencia nueva."
+  },
+  {
+   "clave": "pauta_penetrante",
+   "pagina": 40,
+   "identificar": [
+    "Dos velas. La primera, roja y relativamente grande.",
+    "La segunda, verde, abre por debajo del mínimo de la anterior.",
+    "La segunda llena el hueco y cierra dentro del cuerpo de la primera, por encima de su mitad.",
+    "Tendencia previa bajista."
+   ],
+   "significado": "El mercado abre con más miedo todavía, pero los compradores toman el control durante la sesión y recuperan más de la mitad de la caída anterior."
+  },
+  {
+   "clave": "pauta_envolvente_alcista",
+   "pagina": 42,
+   "identificar": [
+    "Dos velas. La primera roja, de cuerpo relativamente pequeño.",
+    "La segunda verde, que cubre y sobrepasa por completo el cuerpo de la primera.",
+    "Tendencia previa bajista."
+   ],
+   "significado": "Los compradores no solo frenan la caída: se comen toda la sesión anterior."
+  },
+  {
+   "clave": "tres_soldados_blancos",
+   "pagina": 44,
+   "identificar": [
+    "Tres velas verdes consecutivas de tamaño relativamente grande.",
+    "Cada una cierra en un máximo por encima de la anterior.",
+    "Desde la segunda, cada apertura cae dentro del cuerpo de la vela anterior.",
+    "Tendencia previa bajista."
+   ],
+   "significado": "Tres sesiones seguidas en las que los compradores mandan sin dar respiro."
+  },
+  {
+   "clave": "harami_alcista",
+   "pagina": 46,
+   "identificar": [
+    "Una vela relativamente grande, que no llega a ser un elefante.",
+    "Seguida de una vela de cuerpo pequeño, con máximo y mínimo dentro del cuerpo de la anterior.",
+    "Tendencia previa necesariamente bajista."
+   ],
+   "significado": "El propio libro admite que su significado «es bastante abstracto y puede ser interpretado de varias maneras», y le pone fiabilidad baja."
+  },
+  {
+   "clave": "tres_estrellas_del_sur",
+   "pagina": 48,
+   "identificar": [
+    "Tres velas rojas consecutivas.",
+    "La primera, un marubozu abierto (apertura igual al máximo, cierre por encima del mínimo) con mecha inferior larga.",
+    "La segunda igual pero más pequeña, con el mínimo por encima del anterior.",
+    "La tercera, más pequeña aún y dentro del rango de la segunda.",
+    "Tendencia previa bajista."
+   ],
+   "significado": "La caída sigue, pero cada sesión con menos fuerza: los bajistas se están quedando sin aire."
+  },
+  {
+   "clave": "estrella_de_la_manana",
+   "pagina": 50,
+   "identificar": [
+    "Una gran vela roja (elefante).",
+    "Una peonza que abre formando un hueco a la baja.",
+    "Una tercera vela de cuerpo mediano que abre por encima del cuerpo de la peonza.",
+    "Tendencia previa bajista."
+   ],
+   "significado": "Caída fuerte, luego duda, luego los compradores retoman: la secuencia clásica de un suelo."
+  },
+  {
+   "clave": "bebe_abandonado_alcista",
+   "pagina": 52,
+   "identificar": [
+    "Una vela roja relativamente grande.",
+    "Una Doji que abre formando un hueco a la baja y queda aislada.",
+    "Una tercera vela que abre por encima del máximo de la Doji.",
+    "Tendencia previa bajista."
+   ],
+   "significado": "Como la estrella de la mañana, pero con la vela del medio completamente separada de las otras dos por huecos. El libro le da la fiabilidad más alta."
+  },
+  {
+   "clave": "toro_180",
+   "pagina": 54,
+   "identificar": [
+    "Dos velas elefante, con cuerpo mucho mayor que las anteriores.",
+    "La primera es un elefante bajista; la segunda, un elefante alcista.",
+    "Es significativo en la parte baja de una tendencia bajista."
+   ],
+   "significado": "Un giro de 180 grados: la sesión siguiente deshace por completo lo que hizo la anterior."
+  },
+  {
+   "clave": "tres_cuervos_negros",
+   "pagina": 56,
+   "identificar": [
+    "Tres velas rojas consecutivas de tamaño relativamente grande.",
+    "Cada una cierra en un mínimo por debajo de la anterior.",
+    "Desde la segunda, cada apertura cae dentro del cuerpo de la vela anterior.",
+    "Tendencia previa alcista."
+   ],
+   "significado": "Tres sesiones seguidas de dominio vendedor al final de una subida."
+  },
+  {
+   "clave": "estrella_vespertina",
+   "pagina": 58,
+   "identificar": [
+    "Una vela verde relativamente grande.",
+    "Una peonza que abre y cierra por encima del cuerpo de la anterior.",
+    "Una tercera vela roja que abre por debajo del cuerpo pequeño y cierra dentro del cuerpo de la primera.",
+    "Tendencia previa alcista."
+   ],
+   "significado": "El espejo de la estrella de la mañana: subida fuerte, duda, y los vendedores retoman."
+  },
+  {
+   "clave": "bebe_abandonado_bajista",
+   "pagina": 60,
+   "identificar": [
+    "Una gran vela verde.",
+    "Una Doji que abre formando un hueco al alza y queda aislada.",
+    "Una tercera vela que abre por debajo del mínimo de la Doji.",
+    "Tendencia previa alcista."
+   ],
+   "significado": "Techo con la vela del medio aislada por huecos a ambos lados."
+  },
+  {
+   "clave": "cubierta_de_la_nube_oscura",
+   "pagina": 62,
+   "identificar": [
+    "Una vela elefante verde.",
+    "Seguida de otra vela elefante roja.",
+    "La roja abre con hueco al alza, por encima del máximo de la verde.",
+    "Tendencia previa alcista."
+   ],
+   "significado": "El mercado abre eufórico por encima de todo lo anterior y termina la sesión cayendo con fuerza.",
+   "revisar": "El libro NO exige que la segunda vela cierre por debajo de la mitad del cuerpo de la primera, condición que sí pide la literatura clásica de velas japonesas. Aquí se implementa lo que dice el libro; si se quiere la definición clásica, hay que añadir esa condición a mano."
+  },
+  {
+   "clave": "harami_bajista",
+   "pagina": 64,
+   "identificar": [
+    "Una vela relativamente grande, que no llega a ser un elefante.",
+    "Seguida de una vela de cuerpo pequeño, con máximo y mínimo dentro del cuerpo de la anterior.",
+    "Tendencia previa necesariamente alcista."
+   ],
+   "significado": "El libro admite que su lectura «es bastante abstracta» y le pone fiabilidad baja."
+  },
+  {
+   "clave": "oso_180",
+   "pagina": 66,
+   "identificar": [
+    "Dos velas elefante, normalmente de tamaño igual o muy parecido.",
+    "La primera es un elefante alcista; la segunda, un elefante bajista.",
+    "Es significativo en la parte alta de una tendencia alcista."
+   ],
+   "significado": "El giro de 180 grados en sentido contrario al Toro 180."
+  },
+  {
+   "clave": "triple_formacion_alcista",
+   "pagina": 69,
+   "identificar": [
+    "Una vela verde grande (elefante).",
+    "Tres velas rojas pequeñas seguidas.",
+    "Otra vela verde de cuerpo grande, similar a la primera.",
+    "Tendencia previa necesariamente alcista."
+   ],
+   "significado": "Los vendedores intentan tres veces y no logran deshacer la vela grande: la fuerza alcista sigue mandando."
+  },
+  {
+   "clave": "triple_formacion_bajista",
+   "pagina": 71,
+   "identificar": [
+    "Una vela roja grande.",
+    "Tres velas verdes pequeñas seguidas.",
+    "Otra vela roja de cuerpo grande, muy similar a la primera.",
+    "Tendencia previa necesariamente bajista."
+   ],
+   "significado": "El espejo del anterior: los compradores intentan tres veces y no lo consiguen."
+  }
+ ]
+}

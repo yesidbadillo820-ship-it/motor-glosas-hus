@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Velas — análisis de patrones</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#0f1620">
+<style>
+/* ===========================================================================
+   Identidad propia. Los colores se definen en :root pelado (claro) y se
+   REDEFINEN en los dos ámbitos oscuros: el del sistema operativo y el del
+   interruptor. Ninguno se define solo dentro de un @media, porque entonces
+   el modo claro se quedaría sin ese color.
+   =========================================================================== */
+:root{
+  --fondo:#f6f7f9; --papel:#ffffff; --papel2:#eef1f5;
+  --tinta:#101820; --tinta2:#4c5764; --tinta3:#7c8794;
+  --linea:#dde2e9; --linea2:#c6ced8;
+  --acento:#2a78d6;          /* única serie de las gráficas */
+  --acento-suave:#e4eefb;
+  --alza:#0ca30c; --baja:#d03b3b;   /* SOLO refuerzo: la forma manda */
+  --aviso:#8a6100; --aviso-fondo:#fdf4e0;
+  --r:14px; --toque:48px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --fondo:#0f1620; --papel:#161f2b; --papel2:#1e2938;
+    --tinta:#eef2f7; --tinta2:#a9b5c4; --tinta3:#7a8797;
+    --linea:#26313f; --linea2:#37455a;
+    --acento:#3987e5; --acento-suave:#16283f;
+    --alza:#0ca30c; --baja:#d03b3b;
+    --aviso:#f0c14b; --aviso-fondo:#2a2211;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --fondo:#0f1620; --papel:#161f2b; --papel2:#1e2938;
+  --tinta:#eef2f7; --tinta2:#a9b5c4; --tinta3:#7a8797;
+  --linea:#26313f; --linea2:#37455a;
+  --acento:#3987e5; --acento-suave:#16283f;
+  --alza:#0ca30c; --baja:#d03b3b;
+  --aviso:#f0c14b; --aviso-fondo:#2a2211;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--fondo); color:var(--tinta);
+  font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-text-size-adjust:100%;
+  padding-bottom:calc(72px + env(safe-area-inset-bottom));
+}
+h1,h2,h3{line-height:1.25;margin:0}
+h1{font-size:1.35rem;letter-spacing:-.02em}
+h2{font-size:1.05rem;letter-spacing:-.01em}
+h3{font-size:.95rem}
+p{margin:0 0 var(--s3)}
+a{color:var(--acento)}
+.envoltorio{max-width:760px;margin:0 auto;padding:var(--s4)}
+
+/* --------------------------------------------------------------- cabecera */
+header.barra{
+  position:sticky;top:0;z-index:20;background:var(--papel);
+  border-bottom:1px solid var(--linea);
+  padding:var(--s3) var(--s4);padding-top:calc(var(--s3) + env(safe-area-inset-top));
+  display:flex;align-items:center;gap:var(--s3);
+}
+header.barra .quien{flex:1;min-width:0}
+header.barra .quien b{display:block;font-size:.95rem}
+header.barra .quien span{display:block;color:var(--tinta2);font-size:.78rem}
+.tema{
+  min-width:var(--toque);min-height:var(--toque);border:1px solid var(--linea);
+  background:var(--papel2);color:var(--tinta);border-radius:var(--r);
+  font-size:1.1rem;cursor:pointer;
+}
+
+/* ------------------------------------------------------------------ piezas */
+.tarjeta{
+  background:var(--papel);border:1px solid var(--linea);border-radius:var(--r);
+  padding:var(--s4);margin-bottom:var(--s4);
+}
+.rot{
+  font-size:.7rem;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--tinta3);font-weight:700;margin-bottom:var(--s2);
+}
+.cifra{font-size:2rem;font-weight:800;letter-spacing:-.03em;line-height:1.05}
+.cifra small{display:block;font-size:.78rem;font-weight:500;color:var(--tinta2);
+  letter-spacing:0;margin-top:2px}
+.rejilla{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
+.tenue{color:var(--tinta2)}
+.mini{font-size:.8rem}
+.num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+
+.aviso{
+  display:flex;gap:var(--s3);align-items:flex-start;
+  background:var(--aviso-fondo);border:1px solid color-mix(in srgb,var(--aviso) 35%,transparent);
+  border-radius:var(--r);padding:var(--s3);margin-bottom:var(--s4);
+  font-size:.86rem;line-height:1.5;
+}
+.aviso b{color:var(--aviso)}
+
+/* Chips de dirección: SIEMPRE con símbolo y palabra, nunca solo color.
+   Es la regla que evita que un daltónico lea lo contrario de lo que dice. */
+.chip{
+  display:inline-flex;align-items:center;gap:5px;
+  border:1px solid var(--linea2);border-radius:999px;
+  padding:2px 9px;font-size:.74rem;font-weight:600;white-space:nowrap;
+}
+.chip .g{font-size:.8rem}
+.chip.alcista{color:var(--alza);border-color:color-mix(in srgb,var(--alza) 45%,transparent)}
+.chip.bajista{color:var(--baja);border-color:color-mix(in srgb,var(--baja) 45%,transparent)}
+.chip.neutro{color:var(--tinta2)}
+
+.filtros{display:flex;gap:var(--s2);overflow-x:auto;padding-bottom:var(--s2);
+  margin-bottom:var(--s3);-webkit-overflow-scrolling:touch}
+.filtros button{
+  flex:0 0 auto;min-height:40px;padding:0 var(--s3);
+  border:1px solid var(--linea2);background:var(--papel);color:var(--tinta2);
+  border-radius:999px;font-size:.82rem;font-weight:600;cursor:pointer;
+}
+.filtros button[aria-pressed="true"]{
+  background:var(--acento);border-color:var(--acento);color:#fff;
+}
+
+details.patron{border:1px solid var(--linea);border-radius:var(--r);
+  background:var(--papel);margin-bottom:var(--s2);overflow:hidden}
+details.patron>summary{
+  list-style:none;cursor:pointer;padding:var(--s3) var(--s4);
+  display:flex;align-items:center;gap:var(--s3);min-height:var(--toque);
+}
+details.patron>summary::-webkit-details-marker{display:none}
+details.patron>summary .nom{flex:1;min-width:0;font-weight:600}
+details.patron>summary .nom small{display:block;font-weight:400;color:var(--tinta3);
+  font-size:.75rem}
+.cuerpo-patron{padding:0 var(--s4) var(--s4);border-top:1px solid var(--linea)}
+.cuerpo-patron ul{margin:0 0 var(--s3);padding-left:1.1rem}
+.cuerpo-patron li{margin-bottom:3px}
+
+table.datos{width:100%;border-collapse:collapse;font-size:.84rem}
+table.datos th,table.datos td{padding:7px 6px;text-align:right;
+  border-bottom:1px solid var(--linea)}
+table.datos th:first-child,table.datos td:first-child{text-align:left}
+table.datos th{color:var(--tinta3);font-size:.72rem;text-transform:uppercase;
+  letter-spacing:.06em;font-weight:700}
+.desliza{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+/* ---------------------------------------------------------------- barra ⟶ */
+.medida{display:grid;grid-template-columns:1fr;gap:2px;margin-bottom:var(--s3)}
+.medida .arriba{display:flex;align-items:baseline;gap:var(--s2)}
+.medida .arriba .n{flex:1;min-width:0;font-weight:600;font-size:.88rem}
+.pista{position:relative;height:22px;background:var(--papel2);
+  border-radius:5px;overflow:hidden}
+.pista .relleno{position:absolute;inset:0 auto 0 0;background:var(--acento);
+  border-radius:0 4px 4px 0}
+.pista .relleno.flojo{
+  background:repeating-linear-gradient(135deg,var(--linea2) 0 6px,transparent 6px 12px);
+  border:1px solid var(--linea2);
+}
+.pista .base{position:absolute;top:0;bottom:0;width:2px;background:var(--tinta);
+  opacity:.55}
+.pista .base::after{
+  content:"";position:absolute;left:-3px;top:-2px;width:8px;height:4px;
+  background:var(--tinta);opacity:.55;border-radius:2px;
+}
+
+/* -------------------------------------------------------------- navegación */
+nav.abajo{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;
+  background:var(--papel);border-top:1px solid var(--linea);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+nav.abajo button{
+  flex:1;min-height:64px;border:0;background:none;color:var(--tinta3);
+  font-size:.68rem;font-weight:600;cursor:pointer;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:3px;
+}
+nav.abajo button .ic{font-size:1.15rem}
+nav.abajo button[aria-current="page"]{color:var(--acento)}
+
+svg.grafico{display:block;width:100%;height:auto;touch-action:pan-y}
+.leyenda{display:flex;flex-wrap:wrap;gap:var(--s3);font-size:.78rem;
+  color:var(--tinta2);margin-top:var(--s2)}
+.leyenda span{display:inline-flex;align-items:center;gap:5px}
+.muestra{width:11px;height:16px;border:1.5px solid currentColor;border-radius:2px}
+.muestra.llena{background:currentColor}
+
+.vacio{text-align:center;color:var(--tinta2);padding:var(--s6) var(--s4)}
+.vacio .ic{font-size:2rem;display:block;margin-bottom:var(--s2)}
+</style>
+</head>
+<body>
+
+<header class="barra">
+  <div class="quien">
+    <b id="titulo">Velas</b>
+    <span id="subtitulo">—</span>
+  </div>
+  <button class="tema" id="btema" aria-label="Cambiar entre claro y oscuro">◐</button>
+</header>
+
+<main id="app" class="envoltorio"></main>
+
+<nav class="abajo" id="nav"></nav>
+
+<script>
+"use strict";
+/* Los datos los calcula Python y los inyecta aquí. La pantalla solo dibuja:
+   si el detector estuviera además escrito en JavaScript, tarde o temprano las
+   dos versiones dirían cosas distintas y nadie sabría cuál creer. */
+const D = /*<DATOS>*/{"titulo":"—","fuente":{},"horizontes":[1],"casosMinimos":30,"resumen":{"sesiones":0,"apariciones":0},"catalogo":[],"medicion":[],"grafico":[],"graficoDesde":0,"apariciones":[]}/*</DATOS>*/;
+
+const POR_CLAVE = Object.fromEntries(D.catalogo.map(p => [p.clave, p]));
+const VISTAS = [["resumen","📋","Resumen"],["patrones","🕯️","Patrones"],
+                ["medicion","📏","Medición"],["historial","📈","Histórico"]];
+
+let vista = "resumen";
+let horizonte = D.horizontes[0];
+let filtro = "todos";
+
+/* ------------------------------------------------------------- utilidades */
+function esc(s){ return String(s == null ? "" : s)
+  .replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function pct(x){ return (x*100).toFixed(0) + "%"; }
+function pctFino(x){ return (x*100).toFixed(1) + "%"; }
+function firmado(x){ return (x >= 0 ? "+" : "") + (x*100).toFixed(0) + "%"; }
+/* Los decimales dependen del tamaño del precio: dos bastan para una acción
+   de 4.200, pero convierten un EUR/USD de 1,1593 en «1,16» y borran el
+   movimiento entero. Tiene que coincidir con `decimales()` de datos.py. */
+function decimales(x){
+  const m = Math.abs(x);
+  return m >= 100 ? 2 : m >= 1 ? 5 : 6;
+}
+function numero(x){
+  const d = decimales(x);
+  return x.toLocaleString("es-CO", {minimumFractionDigits:d, maximumFractionDigits:d});
+}
+function fecha(iso){
+  if(!iso) return "—";
+  const [a,m,d] = iso.split("-");
+  return `${d}/${m}/${a}`;
+}
+/* Símbolo + palabra: el color nunca va solo. */
+function chip(sent, etiqueta){
+  const g = sent === "alcista" ? "▲" : sent === "bajista" ? "▼" : "●";
+  return `<span class="chip ${esc(sent)}"><span class="g" aria-hidden="true">${g}</span>${esc(etiqueta)}</span>`;
+}
+
+/* ============================================================== EL RESUMEN */
+function vResumen(){
+  const r = D.resumen;
+  const alH = D.medicion.filter(m => m.sesiones === horizonte);
+  const contradicen = alH.filter(m => m.contradice);
+  const concluyentes = alH.filter(m => m.medible && m.casos >= D.casosMinimos);
+  const cambio = r.primerCierre ? (r.ultimoCierre - r.primerCierre) / r.primerCierre : 0;
+
+  let h = `
+  <div class="aviso">
+    <span aria-hidden="true">⚖️</span>
+    <span><b>Esto mide lo que ya pasó; no predice lo que va a pasar.</b>
+    Un porcentaje alto sobre pocos casos no significa nada, y ningún patrón
+    por sí solo es una razón para comprar o vender.</span>
+  </div>
+
+  <div class="tarjeta">
+    <div class="rot">El histórico que cargó</div>
+    <div class="rejilla">
+      <div><div class="cifra num">${r.sesiones.toLocaleString("es-CO")}<small>sesiones</small></div></div>
+      <div><div class="cifra num">${r.apariciones.toLocaleString("es-CO")}<small>patrones encontrados</small></div></div>
+    </div>
+    <p class="mini tenue" style="margin:var(--s3) 0 0">
+      Del ${fecha(r.desde)} al ${fecha(r.hasta)} ·
+      cierre <span class="num">${numero(r.primerCierre)}</span> →
+      <span class="num">${numero(r.ultimoCierre)}</span>
+      (${firmado(cambio)} en todo el periodo)
+    </p>
+  </div>`;
+
+  if(concluyentes.length === 0){
+    h += `<div class="tarjeta">
+      <div class="rot">Lo que se puede concluir</div>
+      <p><b>Nada todavía.</b> Ningún patrón llegó a las ${D.casosMinimos} apariciones
+      que hacen falta para que un porcentaje signifique algo.</p>
+      <p class="mini tenue" style="margin:0">Cargue un histórico más largo:
+      con pocos años, los patrones raros salen dos o tres veces y con eso no se
+      puede afirmar nada.</p>
+    </div>`;
+  } else {
+    h += `<div class="tarjeta">
+      <div class="rot">Lo que dice su histórico</div>
+      <div class="cifra">${contradicen.length} de ${concluyentes.length}
+        <small>patrones con muestra suficiente que el libro vende como fiables
+        y estos datos NO respaldan, a ${horizonte} sesión(es)</small></div>`;
+    if(contradicen.length){
+      h += `<div style="margin-top:var(--s4)">`;
+      for(const m of contradicen.slice(0,6)){
+        const p = POR_CLAVE[m.clave];
+        h += `<div class="medida">
+          <div class="arriba"><span class="n">${esc(p.nombre)}</span>
+            <span class="mini tenue num">${m.casos} casos</span></div>
+          ${barra(m)}
+          <div class="mini tenue">El libro dice «${esc(p.fiabilidadLibro)}» ·
+            acierta ${pct(m.tasa)} contra una base de ${pct(m.base)}</div>
+        </div>`;
+      }
+      h += `</div>`;
+    } else {
+      h += `<p class="mini tenue" style="margin-top:var(--s3)">
+        Ninguno de los que tienen muestra suficiente queda por debajo de lo que
+        promete el libro. Eso no significa que sirvan para operar: significa que
+        con estos datos no se les puede llevar la contraria.</p>`;
+    }
+    h += `</div>`;
+  }
+
+  h += `<div class="tarjeta">
+    <div class="rot">De dónde salen los patrones</div>
+    <p class="mini">${esc(D.fuente.titulo || "")}<br>
+      <span class="tenue">${esc(D.fuente.autor || "")} · ${esc(D.fuente.sitio || "")}</span></p>
+    <p class="mini tenue" style="margin:0">${esc(D.fuente.nota || "")}</p>
+  </div>`;
+  return h;
+}
+
+/* ============================================================ LOS PATRONES */
+function vPatrones(){
+  const grupos = [["todos","Todos"],["alcista","▲ Alcistas"],["bajista","▼ Bajistas"],
+                  ["neutro","● Neutros"],["reversion","Reversión"],
+                  ["continuidad","Continuidad"]];
+  let h = `<div class="filtros" role="group" aria-label="Filtrar patrones">`;
+  for(const [id,txt] of grupos){
+    h += `<button aria-pressed="${filtro===id}" onclick="poner('${id}')">${esc(txt)}</button>`;
+  }
+  h += `</div>`;
+
+  const lista = D.catalogo.filter(p =>
+    filtro === "todos" || p.sentimiento === filtro || p.familia === filtro);
+  if(!lista.length) return h + `<div class="vacio"><span class="ic">🔍</span>
+    Ningún patrón con ese filtro.</div>`;
+
+  for(const p of lista){
+    const m = D.medicion.find(x => x.clave === p.clave && x.sesiones === horizonte);
+    h += `<details class="patron">
+      <summary>
+        <span class="nom">${esc(p.nombre)}
+          <small>${p.velas} vela(s) · ${esc(p.familiaEtiqueta)} · el libro: fiabilidad ${esc(p.fiabilidadLibro)}</small>
+        </span>
+        ${chip(p.sentimiento, p.sentimientoEtiqueta)}
+      </summary>
+      <div class="cuerpo-patron">
+        ${dibujoPatron(p)}
+        <div class="rot" style="margin-top:var(--s4)">Cómo identificarlo</div>
+        <ul>${p.identificar.map(l => `<li>${esc(l)}</li>`).join("")}</ul>
+        <div class="rot">Significado</div>
+        <p class="mini">${esc(p.significado)}</p>`;
+    if(p.revisar){
+      h += `<div class="aviso"><span aria-hidden="true">⚠️</span>
+        <span><b>Para revisar.</b> ${esc(p.revisar)}</span></div>`;
+    }
+    if(m){
+      h += `<div class="rot">En su histórico, a ${horizonte} sesión(es)</div>
+        ${m.medible ? `<div class="medida">
+            <div class="arriba"><span class="n num">${pct(m.tasa)}</span>
+              <span class="mini tenue num">${m.casos} apariciones</span></div>
+            ${barra(m)}
+          </div>` : ""}
+        <p class="mini tenue" style="margin:0">${esc(m.veredicto)}</p>`;
+    }
+    h += `<p class="mini tenue" style="margin:var(--s3) 0 0">Libro, página ${p.pagina}.</p>
+      </div></details>`;
+  }
+  return h;
+}
+
+/* Un dibujo del patrón con velas de ejemplo: el hueco es lo que se llena,
+   el cuerpo lo que se ve. Alcista = hueca, bajista = llena. */
+function dibujoPatron(p){
+  const ejemplos = {
+    1:[[50,90,10,52]], 2:[[70,95,60,35],[30,75,25,72]],
+    3:[[75,95,65,40],[35,45,20,32],[45,90,40,85]],
+    5:[[20,90,15,85],[80,85,70,72],[72,78,62,64],[64,70,55,58],[58,92,52,88]],
+  };
+  const velas = ejemplos[p.velas] || ejemplos[1];
+  const anchoVela = 26, sep = 12;
+  const W = velas.length * anchoVela + (velas.length - 1) * sep + 20;
+  const H = 110;
+  const y = v => H - 5 - (v / 100) * (H - 20);
+  let s = `<svg class="grafico" viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="Dibujo esquemático del patrón ${esc(p.nombre)}"
+    style="max-width:${W*2}px;margin:0 auto">`;
+  velas.forEach(([ap,hi,lo,ci], i) => {
+    const x = 10 + i * (anchoVela + sep);
+    const sube = ci >= ap;
+    const col = sube ? "var(--alza)" : "var(--baja)";
+    const arriba = y(Math.max(ap,ci)), abajo = y(Math.min(ap,ci));
+    s += `<line x1="${x+anchoVela/2}" y1="${y(hi)}" x2="${x+anchoVela/2}" y2="${y(lo)}"
+      stroke="${col}" stroke-width="2"/>`;
+    s += `<rect x="${x}" y="${arriba}" width="${anchoVela}" height="${Math.max(2, abajo-arriba)}"
+      rx="2" fill="${sube ? "var(--papel)" : col}" stroke="${col}" stroke-width="2"/>`;
+  });
+  s += `</svg>
+  <div class="leyenda">
+    <span style="color:var(--alza)"><i class="muestra"></i>hueca = cerró subiendo</span>
+    <span style="color:var(--baja)"><i class="muestra llena"></i>llena = cerró bajando</span>
+  </div>`;
+  return s;
+}
+
+/* ============================================================== LA MEDICIÓN */
+function vMedicion(){
+  let h = `<div class="aviso"><span aria-hidden="true">📏</span>
+    <span>La <b>base</b> es cuántas veces el precio fue en esa dirección
+    <em>en todas las sesiones</em>, patrón o no. Si un patrón no le gana a su
+    base, no está diciendo nada: en un mercado que sube, cualquier señal
+    alcista «acierta».</span></div>`;
+
+  h += `<div class="filtros" role="group" aria-label="Sesiones vista">`;
+  for(const s of D.horizontes){
+    h += `<button aria-pressed="${horizonte===s}" onclick="ponerHorizonte(${s})">
+      ${s} sesión${s>1?"es":""}</button>`;
+  }
+  h += `</div>`;
+
+  const filas = D.medicion
+    .filter(m => m.sesiones === horizonte && m.medible && m.casos > 0)
+    .sort((a,b) => b.casos - a.casos);
+
+  if(!filas.length) return h + `<div class="vacio"><span class="ic">🤷</span>
+    Ningún patrón con dirección apareció en este histórico.</div>`;
+
+  h += `<div class="tarjeta">`;
+  for(const m of filas){
+    const p = POR_CLAVE[m.clave];
+    const pocos = m.casos < D.casosMinimos;
+    h += `<div class="medida">
+      <div class="arriba">
+        <span class="n">${esc(p.nombre)}</span>
+        ${chip(p.sentimiento, p.sentimientoEtiqueta)}
+        <span class="mini tenue num">${m.casos}</span>
+      </div>
+      ${barra(m)}
+      <div class="mini tenue">
+        acierta <b class="num">${pct(m.tasa)}</b> · base <span class="num">${pct(m.base)}</span> ·
+        ventaja <span class="num">${firmado(m.ventaja)}</span>
+        ${pocos ? " · <b>muestra insuficiente</b>" : ""}
+      </div>
+      <div class="mini tenue">${esc(m.veredicto)}</div>
+    </div>`;
+  }
+  h += `</div>`;
+
+  h += `<div class="tarjeta"><div class="rot">La misma tabla, en números</div>
+    <div class="desliza"><table class="datos">
+    <thead><tr><th>Patrón</th><th>Casos</th><th>Acierta</th><th>Base</th>
+      <th>Ventaja</th><th>Margen</th></tr></thead><tbody>`;
+  for(const m of filas){
+    h += `<tr><td>${esc(POR_CLAVE[m.clave].nombre)}</td>
+      <td class="num">${m.casos}</td><td class="num">${pctFino(m.tasa)}</td>
+      <td class="num">${pctFino(m.base)}</td><td class="num">${firmado(m.ventaja)}</td>
+      <td class="num">${pct(m.bajo)}–${pct(m.alto)}</td></tr>`;
+  }
+  h += `</tbody></table></div>
+    <p class="mini tenue" style="margin-top:var(--s3)">«Margen» es el intervalo
+    de confianza del 95 %: entre esos dos números está el valor de verdad. Si el
+    margen abarca la base, el patrón no se distingue de no mirar nada.</p>
+    </div>`;
+  return h;
+}
+
+/* Una barra por patrón: UNA sola serie (un solo color) y la base como marca
+   de referencia, no como segunda serie. Con menos casos de los necesarios va
+   rayada, para que se vea que no cuenta. */
+function barra(m){
+  const ancho = Math.max(0, Math.min(100, m.tasa * 100));
+  const base = Math.max(0, Math.min(100, m.base * 100));
+  const pocos = m.casos < D.casosMinimos;
+  return `<div class="pista" role="img"
+    aria-label="Acierta ${pct(m.tasa)} sobre ${m.casos} casos; la base es ${pct(m.base)}">
+    <div class="relleno${pocos ? " flojo" : ""}" style="width:${ancho}%"></div>
+    <div class="base" style="left:calc(${base}% - 1px)"></div>
+  </div>`;
+}
+
+/* ============================================================== EL GRÁFICO */
+function vHistorial(){
+  const velas = D.grafico;
+  if(!velas.length) return `<div class="vacio"><span class="ic">📈</span>
+    No hay sesiones para dibujar.</div>`;
+
+  let h = `<div class="tarjeta">
+    <div class="rot">Últimas ${velas.length} sesiones</div>
+    ${graficoVelas(velas)}
+    <div class="leyenda">
+      <span style="color:var(--alza)"><i class="muestra"></i>hueca = cerró subiendo</span>
+      <span style="color:var(--baja)"><i class="muestra llena"></i>llena = cerró bajando</span>
+      <span class="tenue">▲▼ = patrón detectado</span>
+    </div>
+    <p class="mini tenue" style="margin:var(--s3) 0 0">La forma (hueca o llena)
+    es lo que dice si la sesión subió o bajó; el color solo acompaña. Así se
+    lee igual sin distinguir el rojo del verde.</p>
+  </div>`;
+
+  const recientes = D.apariciones.slice().reverse();
+  h += `<div class="tarjeta"><div class="rot">Apariciones recientes</div>`;
+  if(!recientes.length){
+    h += `<p class="mini tenue" style="margin:0">Ninguna.</p>`;
+  } else {
+    h += `<div class="desliza"><table class="datos">
+      <thead><tr><th>Fecha</th><th>Patrón</th><th>Dirección</th></tr></thead><tbody>`;
+    for(const a of recientes.slice(0, 60)){
+      const p = POR_CLAVE[a.clave];
+      h += `<tr><td class="num">${fecha(a.fecha)}</td><td>${esc(p.nombre)}</td>
+        <td>${chip(p.sentimiento, p.sentimientoEtiqueta)}</td></tr>`;
+    }
+    h += `</tbody></table></div>`;
+    if(recientes.length > 60){
+      h += `<p class="mini tenue" style="margin:var(--s3) 0 0">
+        Se muestran las 60 más recientes de ${recientes.length}.</p>`;
+    }
+  }
+  return h + `</div>`;
+}
+
+function graficoVelas(velas){
+  const W = 720, H = 260, izq = 8, der = 46, arr = 10, aba = 22;
+  const alto = Math.min(...velas.map(v => v.l));
+  const cima = Math.max(...velas.map(v => v.h));
+  const margen = (cima - alto) * 0.06 || 1;
+  const y0 = alto - margen, y1 = cima + margen;
+  const y = p => arr + (1 - (p - y0) / (y1 - y0)) * (H - arr - aba);
+  const paso = (W - izq - der) / velas.length;
+  const ancho = Math.max(1.4, paso * 0.62);
+
+  const marcadas = new Map();
+  for(const a of D.apariciones){
+    const i = a.indice - D.graficoDesde;
+    if(i >= 0 && i < velas.length) marcadas.set(i, a.clave);
+  }
+
+  let s = `<svg class="grafico" viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="Gráfico de velas de las últimas ${velas.length} sesiones">`;
+  // Rejilla discreta: cuatro líneas y sus precios.
+  for(let k = 0; k <= 4; k++){
+    const p = y0 + (y1 - y0) * k / 4, py = y(p);
+    s += `<line x1="${izq}" y1="${py}" x2="${W-der}" y2="${py}"
+      stroke="var(--linea)" stroke-width="1"/>`;
+    s += `<text x="${W-der+5}" y="${py+4}" font-size="11" fill="var(--tinta3)"
+      font-family="ui-monospace,monospace">${numero(p)}</text>`;
+  }
+  velas.forEach((v, i) => {
+    const x = izq + i * paso + paso/2;
+    const sube = v.c >= v.a;
+    const col = sube ? "var(--alza)" : "var(--baja)";
+    const arriba = y(Math.max(v.a, v.c)), abajo = y(Math.min(v.a, v.c));
+    s += `<line x1="${x}" y1="${y(v.h)}" x2="${x}" y2="${y(v.l)}" stroke="${col}" stroke-width="1"/>`;
+    s += `<rect x="${x - ancho/2}" y="${arriba}" width="${ancho}"
+      height="${Math.max(1, abajo - arriba)}" fill="${sube ? "var(--papel)" : col}"
+      stroke="${col}" stroke-width="1"><title>${esc(fecha(v.f))} · abre ${numero(v.a)} · cierra ${numero(v.c)}</title></rect>`;
+    if(marcadas.has(i)){
+      const p = POR_CLAVE[marcadas.get(i)];
+      const baja = p && p.sentimiento === "bajista";
+      s += `<text x="${x}" y="${baja ? y(v.h) - 4 : y(v.l) + 12}" font-size="10"
+        text-anchor="middle" fill="var(--tinta2)">${baja ? "▼" : "▲"}<title>${esc(p ? p.nombre : "")}</title></text>`;
+    }
+  });
+  // Fechas: solo los extremos, para que no choquen.
+  s += `<text x="${izq}" y="${H-6}" font-size="11" fill="var(--tinta3)">${fecha(velas[0].f)}</text>`;
+  s += `<text x="${W-der}" y="${H-6}" font-size="11" fill="var(--tinta3)"
+    text-anchor="end">${fecha(velas[velas.length-1].f)}</text>`;
+  return s + `</svg>`;
+}
+
+/* ================================================================ el motor */
+function poner(f){ filtro = f; pintar(); }
+function ponerHorizonte(s){ horizonte = s; pintar(); }
+function ir(v){ vista = v; pintar(); window.scrollTo(0,0); }
+
+function pintar(){
+  document.getElementById("titulo").textContent = D.titulo || "Velas";
+  const r = D.resumen;
+  document.getElementById("subtitulo").textContent =
+    r.sesiones ? `${r.sesiones.toLocaleString("es-CO")} sesiones · ${fecha(r.desde)} → ${fecha(r.hasta)}`
+               : "sin datos";
+  document.getElementById("nav").innerHTML = VISTAS.map(([id,ic,t]) =>
+    `<button ${id===vista?'aria-current="page"':""} onclick="ir('${id}')">
+      <span class="ic" aria-hidden="true">${ic}</span>${t}</button>`).join("");
+  const cual = {resumen:vResumen, patrones:vPatrones,
+                medicion:vMedicion, historial:vHistorial}[vista] || vResumen;
+  document.getElementById("app").innerHTML = cual();
+}
+
+/* Tema: se guarda si se puede, y si el navegador lo prohíbe (ventana privada,
+   datos bloqueados) la aplicación sigue funcionando en el tema del sistema. */
+function temaGuardado(){
+  try{ return localStorage.getItem("velas-tema"); }catch(e){ return null; }
+}
+function ponerTema(t){
+  if(t) document.documentElement.setAttribute("data-theme", t);
+  else document.documentElement.removeAttribute("data-theme");
+  try{ t ? localStorage.setItem("velas-tema", t) : localStorage.removeItem("velas-tema"); }
+  catch(e){}
+}
+document.getElementById("btema").addEventListener("click", () => {
+  const actual = document.documentElement.getAttribute("data-theme");
+  const oscuroSistema = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const ahoraOscuro = actual ? actual === "dark" : oscuroSistema;
+  ponerTema(ahoraOscuro ? "light" : "dark");
+});
+ponerTema(temaGuardado());
+
+if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+
+pintar();
+</script>
+</body>
+</html>

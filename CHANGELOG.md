@@ -1,5 +1,52 @@
 # Registro de cambios
 
+## Sesión 31-ago-2026 (cierre) — Análisis de velas japonesas (`mercados/`)
+
+Módulo independiente que detecta los 28 patrones del libro de Luis M. González
+sobre un histórico en CSV y **mide si cumplen lo que el libro promete**. No
+predice precios ni genera señales de compra o venta: nada en el libro ni en la
+evidencia pública lo sostiene, y construirlo habría sido inventar.
+
+### Lo que trae
+- **28 detectores** (12 individuales, 16 combinados), cada uno con la
+  definición textual del libro y su caso de prueba construido a mano.
+- **Catálogo en JSON** con el texto del libro y la página de cada patrón,
+  validado contra los detectores por `python -m mercados revisar`.
+- **Lector de CSV** tolerante: cabecera ES/EN, separador `,`/`;`/tab, decimales
+  con coma o punto, orden ascendente o descendente. Columna faltante = mensaje
+  con nombre propio.
+- **Medición** con tasa base, intervalo de Wilson y veredicto en una línea.
+- **Aplicación web** instalable, sin internet, con cuatro pantallas.
+
+### Los tres cuidados que la hacen creíble
+- **Tasa base.** Cuántas veces el precio fue en esa dirección en TODAS las
+  sesiones. Sin esa comparación, en un mercado alcista todo patrón alcista
+  «funciona».
+- **Muestra mínima de 30 casos**, dicha explícitamente en cada veredicto.
+- **Corrección por comparaciones múltiples (Bonferroni).** Se hacen 112
+  preguntas (28 patrones × 4 horizontes): al 95 % de siempre, ~6 salen
+  «significativas» por azar. Comprobado con datos aleatorios: sin corregir
+  aparecía un patrón con +19 puntos sobre su base en 37 casos; con la
+  corrección, ninguno.
+
+### Accesibilidad de las gráficas
+El validador de la guía de visualización da **ΔE 4,1 (deutan)** entre el verde
+y el rojo: por debajo del mínimo de 8. El color no lleva significado — la vela
+que sube va **hueca** y la que baja **llena** (la forma original japonesa), y
+toda etiqueta de dirección lleva ▲/▼ junto a la palabra. Las barras de medición
+usan una sola serie con la base como marca de referencia; lo que no llega a 30
+casos sale rayado.
+
+### Honestidad de fuente
+Las etiquetas de fiabilidad del libro se muestran **atribuidas al autor** y sin
+respaldo declarado. La «Cubierta de la Nube Oscura» queda marcada con
+`"revisar"`: el libro no exige el cierre bajo la mitad del cuerpo que sí pide
+la literatura clásica, y se implementó lo que dice el libro.
+
+Pruebas: **112** (`tests/test_mercados`), 586 con las del ICFES y noruego.
+Comprobado además en Chromium a 390 px: cuatro pantallas, 28 fichas, 120 velas,
+sin errores de JavaScript ni desbordes.
+
 ## Sesión 31-ago-2026 (noche 6) — Todos los botones 🔊 estaban mudos
 
 La causa de fondo de todo el enredo de la voz.

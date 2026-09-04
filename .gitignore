@@ -106,3 +106,7 @@ icfes-app.html
 # Aplicación del curso de noruego: se genera con `python -m noruego exportar`
 # a partir del léxico. Es un archivo derivado de ~1 MB, no se versiona.
 static/noruego/
+
+# Aplicación de análisis de velas: se genera con `python -m mercados exportar`
+# a partir del CSV que exporta el usuario. Es un archivo derivado, no se versiona.
+static/mercados/
