@@ -90,6 +90,40 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 04-09-2026 (tarde) — FAMISANAR 2 de septiembre: 104 de 105 al primer intento
+
+Segundo lote de FAMISANAR con el mismo procedimiento del de la mañana: el
+listado de objeciones (105 renglones, 6 facturas, **$9.158.433**) cruzado
+contra el export de servicios del DGH (197 renglones de esas mismas 6
+facturas).
+
+**Resultado: 104 objeciones con el servicio identificado en confianza ALTA y
+1 sin cruce.** Salió mucho más limpio que el del 1 de septiembre porque esta
+vez FAMISANAR escribió los códigos **del hospital** (FMQ0112, FMQ0178-3…) y no
+los de su catálogo IUM. Las 104 quedaron con un código que el DGH reconoce;
+`CTNCENCOS` vacía en las 105 y `CROTIPOBJ` en 0 (las 6 facturas son
+administrativas: ninguna trae códigos CL).
+
+**La que quedó sin cruce:** la SO0101 de HUS0000544976 por **$1.500.000**
+(epicrisis que soporta la estancia). El texto de FAMISANAR viene cortado —
+«…se realiza objeción por falta o inconsistencia en el» — y no nombra ningún
+servicio, así que el bot no lo inventa. De los renglones de estancia de esa
+factura, el único que cuadra con el valor es **`120B01` SALA ESPECIAL
+(INCUBADORA III NIVEL)**: 3 unidades × $500.000 = $1.500.000 exactos (la
+factura trae 4 unidades por $2.000.000). Se le dejó al auditor para que
+confirme, como se hizo con la SO0101 del lote anterior.
+
+**Un arreglo que destapó este lote.** El export del DGH traía la columna del
+código escrita **`SERVICOS DGH`** (sin la «I»). El lector no la reconocía y la
+habría dejado pasar en silencio: el archivo habría salido con `SLNSERPRO`
+vacío en todo, aunque el cruce sí encontrara el renglón. Se agregó el alias, y
+además ahora el lector **falla con mensaje claro** si el export no trae
+ninguna columna de código, en vez de seguir de largo; si falta la de servicio
+pero está el CUPS o el código de medicamento, los usa y avisa.
+
+**Archivos entregados:** `OBJECIONES_FAMISANAR_02092026.xlsx` (el que se sube)
+y `CRUCE_FAMISANAR_02-09-2026.xlsx` (el respaldo, 1 renglón en REVISAR).
+
 ### 04-09-2026 — Las objeciones de FAMISANAR: el código que FAMISANAR escribe no es el que DGH entiende
 
 **Lo que se pidió.** Armar el archivo de objeciones de FAMISANAR (1 de
@@ -9234,6 +9268,13 @@ siguen escondidas para el gestor, como estaban.
 
 ## 3) PENDIENTE
 
+### FAMISANAR — objeciones del 2 de septiembre (04-09)
+- **Completar la SO0101 de HUS0000544976** ($1.500.000). Candidato con el valor
+  exacto: `120B01` SALA ESPECIAL (INCUBADORA III NIVEL), 3 × $500.000. Falta
+  que el auditor lo confirme antes de subir.
+- **Piloto de una factura** también en este lote. La más pequeña es
+  HUS0000548590 (5 objeciones) y la más grande HUS0000549340 (40).
+
 ### FAMISANAR — objeciones del 1 de septiembre (04-09)
 - **Revisar los 100 renglones de la hoja REVISAR** de
   `CRUCE_FAMISANAR_01-09-2026.xlsx`: 86 de confianza BAJA (se ubicaron por
@@ -10051,9 +10092,9 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 ## 4) PARA MAÑANA
 
 ### FAMISANAR — lo primero
-1. Revisar la hoja **REVISAR** del cruce y hacer el **piloto de una factura** en
-   DGH con `OBJECIONES_FAMISANAR_01-09-2026.xlsx`. Si el piloto entra bien,
-   cargar el resto.
+1. Revisar la hoja **REVISAR** de los dos cruces (1 y 2 de septiembre) y hacer
+   el **piloto de una factura** en DGH. Si el piloto entra bien, cargar el
+   resto de los dos lotes.
 
 ### Curso de noruego — lo primero
 1. **Bajar los cambios y armar la aplicación:** `git pull` y doble clic en

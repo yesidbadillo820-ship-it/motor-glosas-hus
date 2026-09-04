@@ -300,7 +300,17 @@ def homologar_cod_servicio(cod: str, mapa: dict[str, str] | None = None) -> tupl
 # — queda lo que se sabía por el texto y el renglón se reporta para revisión.
 
 COLUMNAS_DGH_SERVICIOS = {
-    "codigo": {"SERVICIOS DGH", "SERVICIOS_DGH", "SLNSERPRO SERVICIO", "SLNSERPRO_SERVICIO"},
+    # "SERVICOS DGH" (sin la I) es como sale el encabezado en algunos exports:
+    # sin ese alias la columna del código se perdía y el archivo salía con
+    # SLNSERPRO vacío aunque el cruce sí hubiera encontrado el renglón.
+    "codigo": {
+        "SERVICIOS DGH",
+        "SERVICIOS_DGH",
+        "SERVICOS DGH",
+        "SERVICOS_DGH",
+        "SLNSERPRO SERVICIO",
+        "SLNSERPRO_SERVICIO",
+    },
     "desc_institucional": {"DESCRIPCION INSTITUCIONAL", "DESCRIPCION_INSTITUCIONAL"},
     "cups": {"SLNSERPRO CUPS", "SLNSERPRO_CUPS"},
     "desc_cups": {"DESCRIPCION CUPS", "DESCRIPCION_CUPS"},
@@ -429,7 +439,11 @@ class LineaDgh:
     def __init__(
         self, codigo, descripcion, desc_cups, nombre_med, cups, cod_med, centro, cant, valor
     ):
-        self.codigo = codigo
+        # Si el export no trae la columna de servicio, el CUPS o el código del
+        # medicamento identifican la misma línea en DGH (igual que en el bot
+        # del ADRES). Antes el renglón salía sin código aunque el cruce
+        # acertara.
+        self.codigo = codigo or cups or cod_med
         self.descripcion = descripcion or desc_cups or nombre_med
         self.descripciones = {norm_desc(d) for d in (descripcion, desc_cups, nombre_med) if d}
         self.codigos: set[str] = set()
@@ -461,6 +475,17 @@ def leer_servicios_dgh(ruta: Path) -> dict[str, list[LineaDgh]]:
             raise ValueError(
                 f"{ruta.name} no parece el export de servicios del DGH: no encontré "
                 "las columnas FACTURA y Vr_SERVICIO."
+            )
+        if not {"codigo", "cups", "cod_medicamento"} & set(idx):
+            raise ValueError(
+                f"{ruta.name} no trae ninguna columna de código de servicio "
+                "(SERVICIOS DGH / SLNSERPRO_CUPS / CODIGO_MEDICAMENTO): sin eso el "
+                f"cruce dejaría SLNSERPRO vacío. Encabezados leídos: {[h for h in headers if h]}"
+            )
+        if "codigo" not in idx:
+            logger.warning(
+                f"  ⚠ {ruta.name} no trae la columna SERVICIOS DGH; se usará el CUPS o "
+                "el código de medicamento como código del servicio."
             )
 
         def dato(fila, clave):
