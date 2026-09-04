@@ -133,12 +133,17 @@ python -m mercados exportar historico.csv --titulo "ECOPETROL"
 ```
 
 Genera `static/mercados/` con cuatro pantallas —Resumen, Patrones, Medición e
-Histórico—, instalable y funcional sin internet. Para abrirla desde el celular,
-con el servidor del motor levantado:
+Histórico—, instalable y funcional sin internet.
 
-```
-<la dirección con la que entra al Motor de Glosas>/static/mercados/index.html
-```
+**El propio comando escribe el enlace del celular, completo y listo para
+copiar**, al terminar. No hay que armarlo a mano ni adivinar la dirección: sale
+la misma con la que se entra al Motor de Glosas (la variable `APP_BASE_URL`, o
+el `.env` del repositorio, o el dominio de producción). Aquí no se pone de
+ejemplo a propósito — en el curso de noruego, dos veces se copió en el
+navegador el texto de relleno en vez de la dirección de verdad.
+
+Si usa `--salida` para dejarla en otra carpeta, el servidor del motor no la
+publica y el comando lo dice, en lugar de dar un enlace que no abriría.
 
 Todo lo que la pantalla muestra **se calcula en Python** y se inyecta como
 datos; la aplicación solo dibuja. Si el detector estuviera además escrito en

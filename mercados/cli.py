@@ -17,6 +17,7 @@ from pathlib import Path
 from . import catalogo
 from .datos import ArchivoIlegible, decimales, formato, leer_csv, resumen
 from .dibujo import en_texto, medidas
+from .enlace import enlace_celular
 
 from .medicion import CASOS_MINIMOS, HORIZONTES, medir_todo
 from .patrones import PATRONES, POR_CLAVE, buscar
@@ -203,8 +204,15 @@ def cmd_exportar(args, salida: Salida) -> int:
     peso = sum(f.stat().st_size for f in destino.iterdir() if f.is_file()) / 1024
     salida(f"\nAplicación generada en: {destino}/  ({peso:.0f} KB)")
     salida(f"Doble clic en {indice} para abrirla en este computador.")
-    salida("\nPara el celular, con el servidor del motor levantado:")
-    salida("  <la dirección con la que entra al Motor de Glosas>/static/mercados/index.html")
+    enlace = enlace_celular(destino)
+    if enlace:
+        salida("\nPara el celular, con el servidor del motor levantado, copie:")
+        salida(f"  {enlace}")
+    else:
+        salida(
+            f"\nLa dejó en {destino}, que el servidor del motor no publica: desde el\n"
+            "celular no se abre. Para que se pueda, genérela sin --salida."
+        )
     salida(f"\n{ADVERTENCIA}")
     return 0
 
