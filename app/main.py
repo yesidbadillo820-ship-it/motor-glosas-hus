@@ -1654,6 +1654,7 @@ from app.api.routers.anomalias import router as anomalias_router
 from app.api.routers.sistema import router as sistema_router
 
 from app.api.routers.autopilot import router as autopilot_router
+from app.api.routers.radicacion import router as radicacion_router
 from app.api.routers.auditor_forense import router as auditor_forense_router
 from app.api.routers.push import router as push_router
 
@@ -1722,6 +1723,7 @@ app.include_router(auditoria_forense_router)
 app.include_router(anomalias_router)
 app.include_router(sistema_router)
 app.include_router(autopilot_router)
+app.include_router(radicacion_router)
 # control_center_router: stub removido
 app.include_router(notificaciones_router)
 app.include_router(eventos_live_router)

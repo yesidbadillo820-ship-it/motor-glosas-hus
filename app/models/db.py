@@ -1543,3 +1543,75 @@ class AutoPilotBitacoraRecord(Base):
     # dictamen sobre el que se decidió — Claude (Anthropic) o el fallback
     # de Groq, tal como quedó en historial.modelo_ia al generarlo.
     modelo_utilizado = Column(String(100))
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  V3 · PILAR 1 — LIBRO DE RADICACIÓN EN LOS PORTALES DE LAS EPS
+#  (arquitectura aprobada: docs/ARQUITECTURA_V3_PILAR1_RPA.md)
+# ══════════════════════════════════════════════════════════════════════════
+
+# Los estados del libro. El orden cuenta la historia de una radicación.
+RAD_PENDIENTE = "PENDIENTE"
+RAD_RECLAMADA = "RECLAMADA"
+# Se pulsó «radicar» y NO se alcanzó a leer el comprobante: no se sabe si
+# quedó. Desde aquí está PROHIBIDO reintentar solo (ver radicacion_eps.py).
+RAD_EN_PORTAL_SIN_CONFIRMAR = "EN_PORTAL_SIN_CONFIRMAR"
+RAD_RADICADA = "RADICADA"
+RAD_VERIFICAR_MANUAL = "VERIFICAR_MANUAL"
+RAD_FALLIDA = "FALLIDA"
+RAD_HUMANO_REQUERIDO = "HUMANO_REQUERIDO"
+
+# Estados en los que la fila sigue "viva": mientras exista una así para una
+# glosa, no se puede encolar otra. Es lo que impide radicar dos veces.
+RAD_ESTADOS_VIVOS = (
+    RAD_PENDIENTE,
+    RAD_RECLAMADA,
+    RAD_EN_PORTAL_SIN_CONFIRMAR,
+    RAD_RADICADA,
+    RAD_VERIFICAR_MANUAL,
+    RAD_HUMANO_REQUERIDO,
+)
+
+
+class RadicacionEpsRecord(Base):
+    """Una fila por glosa que se va a radicar en el portal de su EPS.
+
+    Se INSERTA y se le cambia el estado; la evidencia (radicado, comprobante,
+    hash) NO se edita una vez escrita — misma doctrina que la bitácora del
+    Auto-Pilot: lo que pasó, pasó, y queda escrito.
+
+    `TrabajoBotRecord` es por CORRIDA del bot; esta tabla es por GLOSA. Sin
+    ella no se puede responder «¿esta factura quedó radicada?» sin ponerse a
+    interpretar texto libre.
+    """
+
+    __tablename__ = "radicaciones_eps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    glosa_id = Column(Integer, index=True, nullable=False)
+    # «eps|factura|codigo|etapa». ÚNICO: la base impide físicamente dos
+    # radicaciones vivas de la misma glosa aunque falle la lógica de arriba.
+    clave_idempotencia = Column(String(200), unique=True, nullable=False)
+    trabajo_bot_id = Column(Integer, index=True)
+
+    eps = Column(String(200), index=True)
+    portal = Column(String(60))  # COOSALUD, SIMED, MUTUAL_SER…
+
+    estado = Column(String(40), default=RAD_PENDIENTE, index=True)
+    intentos = Column(Integer, default=0)
+    ultimo_error = Column(Text)
+
+    # ── La evidencia. Se escribe una vez. ──
+    radicado_numero = Column(String(120))
+    comprobante_ruta = Column(String(500))
+    comprobante_sha256 = Column(String(64))
+
+    radicado_en = Column(DateTime(timezone=True))
+    verificado_en = Column(DateTime(timezone=True))
+    verificado_por = Column(String(200))
+    # "radicador-rpa" para el bot; el correo de la persona cuando confirma.
+    actor = Column(String(120), index=True)
+
+    __table_args__ = (Index("ix_radicaciones_eps_estado_eps", "estado", "eps"),)

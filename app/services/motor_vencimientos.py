@@ -52,6 +52,11 @@ from app.core.logging_utils import logger
 
 # Estados en los que la glosa ya no compite contra el reloj.
 ESTADOS_CERRADOS = {
+    # V3 Pilar 1 (03-09-2026): radicada en el portal de la EPS. El reloj
+    # INTERNO del hospital se detiene aquí — la glosa sale de las barras
+    # rojas y ámbar y pasa a «En espera de EPS», donde corre un reloj
+    # PASIVO que mide al pagador, no a nosotros.
+    "RADICADA_EN_EPS",
     "LEVANTADA",
     "ACEPTADA",
     "CONCILIADA",

@@ -90,6 +90,50 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 04-09-2026 — Arranca la V3: el motor empieza a radicar solo (Pilar 1)
+
+**Qué se busca.** Que las respuestas que un auditor ya aprobó se suban solas
+al portal de la EPS, y que el comprobante quede guardado. Hoy queda listo el
+**circuito de atrás** (la parte que decide y lleva la cuenta); el robot que
+abre el navegador entra como prueba de concepto con COOSALUD.
+
+**Lo primero que se hizo fue mirar lo que ya había.** Media automatización
+estaba construida desde antes: los bots de portal ya usan el navegador
+escondido, ya existe una cola de trabajos para el PC del hospital y su agente.
+Se reutilizó todo. Lo único nuevo es un **libro de radicación**: una fila por
+glosa, con su estado y su comprobante.
+
+**Las tres reglas que gobiernan el circuito:**
+
+1. **La cola dice QUÉ radicar, nunca CÓMO entrar.** Las claves de los portales
+   siguen en el PC del auditor. El motor no las ve ni las guarda.
+2. **Ante la duda, no se actúa.** Si el robot pulsa «Terminar respuesta» y no
+   alcanza a ver el cartel de confirmación, esa factura **no se reintenta
+   sola**: queda para que una persona mire el portal. Radicar dos veces la
+   misma respuesta le hace daño real al hospital ante la EPS.
+3. **Los doce escudos de la V2 siguen intactos.** Nada se radica sin
+   aprobación humana: si la propuso el piloto automático, se exige su
+   liberación en la bitácora. Se suma un escudo nuevo: **no radicar un
+   dictamen viejo** si después se cargaron tarifas o contratos.
+
+**Qué portales entran** (decisión del auditor): COOSALUD, SIMED y Mutual Ser
+se automatizan. FOMAG, DGH y NUEVA EPS tienen captcha o clave dinámica, así
+que sus filas **nacen marcadas para hacerse a mano** — no se promete
+autonomía donde no la hay.
+
+**El reloj cambia.** Cuando una glosa queda radicada en el portal, sale del
+semáforo de urgencia (ya no aparece en rojo ni ámbar): la pelota pasa a ser
+del pagador.
+
+**El piloto es obligatorio y ahora lo vigila el robot.** Por defecto radica
+UNA sola factura y se detiene. Para ir por más hay que revisar esa primera en
+el portal y decirlo expresamente. Ya no depende de que alguien se acuerde.
+
+Con 29 pruebas nuevas. Arquitectura completa en
+`docs/ARQUITECTURA_V3_PILAR1_RPA.md`.
+
+**PENDIENTE del Pilar 1:** SIMED y Mutual Ser, la pantalla de la bandeja «En
+espera de EPS», y la pasada que resuelve las radicaciones dudosas.
 ### 03-09-2026 (cierre) — Regla de runbook: los permisos van en la instrucción
 
 Al cerrar la V2 le indiqué «doble clic» sobre
