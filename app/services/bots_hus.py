@@ -92,6 +92,43 @@ CATALOGO_BOTS: tuple[BotHUS, ...] = (
         ),
     ),
     _b(
+        id="simed-radicar",
+        nombre="Radicar respuestas en SIMED (autónomo)",
+        sistema="SIMED",
+        que_hace=(
+            "Toma del libro de radicación las glosas del Dispensario que un humano "
+            "ya aprobó y cierra su respuesta en el portal, guardando el comprobante."
+        ),
+        donde_corre="pc_hus",
+        disparo="cola",
+        archivo="tools/radicar_glosas_simed.py",
+        comando_pc="py tools/radicar_glosas_simed.py",
+        parametros_ayuda="--limite N --piloto-ok (sin eso, radica UNA sola).",
+        riesgo=(
+            "PILOTO OBLIGATORIO: radica 1 factura y se detiene. Revísela en el "
+            "portal antes de pedir el masivo con --piloto-ok."
+        ),
+    ),
+    _b(
+        id="mutualser-radicar",
+        nombre="Radicar respuestas en Mutual Ser (autónomo)",
+        sistema="MUTUAL SER",
+        que_hace=(
+            "Cierra en el portal de Mutual Ser las respuestas ya aprobadas, "
+            "reusando una sesión sembrada a mano (el portal pide reCAPTCHA)."
+        ),
+        donde_corre="pc_hus",
+        disparo="cola",
+        archivo="tools/radicar_glosas_mutual_ser.py",
+        comando_pc="py tools/radicar_glosas_mutual_ser.py",
+        parametros_ayuda="--limite N --piloto-ok · --storage-state <sesión>",
+        riesgo=(
+            "MUTUAL SER PIDE reCAPTCHA: hay que sembrar la sesión UNA vez con "
+            "responder_glosas_mutual_ser.py --con-cabeza. Sin sesión válida, las "
+            "glosas se marcan HUMANO_REQUERIDO. PILOTO OBLIGATORIO de 1 factura."
+        ),
+    ),
+    _b(
         id="coosalud-verificar",
         nombre="Verificar radicación COOSALUD",
         sistema="COOSALUD",

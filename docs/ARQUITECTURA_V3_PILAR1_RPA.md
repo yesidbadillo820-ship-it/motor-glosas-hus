@@ -212,6 +212,27 @@ tarifas o contratos después de `dictamen_generado_en`, la fila va a
 el estado `RADICADA_EN_EPS` con sus transiciones, y el primer script headless
 **exclusivo para COOSALUD** como prueba de concepto, con el piloto de 1 factura.
 
-**Fuera, para entregas siguientes:** SIMED y Mutual Ser, la pantalla de la
-bandeja «En espera de EPS», y la pasada de verificación que resuelve las
-`EN_PORTAL_SIN_CONFIRMAR`.
+**Entregado en la segunda fase (04-09-2026):** la bandeja «En espera de EPS»
+con sus botones de resolución, y los radicadores de SIMED y Mutual Ser sobre
+un módulo común (`tools/radicador_comun.py`).
+
+---
+
+## 11) Dos correcciones que salieron al construir
+
+**1. Mutual Ser SÍ pide reCAPTCHA.** La matriz lo clasificó como «usuario y
+contraseña», pero el bot de respuestas que ya existía entra con
+`login_interactivo(...timeout_captcha_s=240)`: una persona resuelve el captcha
+y la sesión queda guardada. Un radicador headless **no puede** pasar eso en
+frío. Se implementó de la forma honesta:
+
+- con **sesión sembrada válida** → radica solo, escondido;
+- **sin ella** → marca `HUMANO_REQUERIDO` con el motivo y dice cómo sembrarla.
+
+No se promete autonomía donde no la hay, ni siquiera cuando la matriz lo dijo.
+
+**2. «Radicar» aquí significa CERRAR, no redactar.** Los tres bots reutilizan
+el paso final del portal —`terminar_respuesta` en COOSALUD, `enviar_finalizar`
+en SIMED, `solo_finalizar` en Mutual Ser—, que **cierra una respuesta ya
+cargada**. Escribir la respuesta en el portal sigue siendo trabajo de los bots
+`responder_glosas_*`. El libro de radicación cubre el cierre y su evidencia.

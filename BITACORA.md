@@ -90,6 +90,40 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 04-09-2026 (tarde) — Pilar 1 completo: la bandeja y los tres portales
+
+**La bandeja «En espera de EPS».** Botón nuevo 📮 en la barra. Muestra el libro
+de radicación en dos partes, y el orden es a propósito:
+
+- **Arriba, lo que necesita a una persona.** Las que se enviaron y no se pudo
+  confirmar si entraron, y las de portales que piden captcha o clave dinámica.
+  Cada una con dos botones: «✔ Sí quedó» y «✖ No quedó», que se contestan
+  DESPUÉS de mirar el portal. Esa es la única forma de sacar una radicación
+  de la duda — el robot nunca lo decide solo.
+- **Abajo, el resto del libro**, con el número de radicado y la huella del
+  comprobante. En pantalla la huella va abreviada; el dato completo queda al
+  pasar el mouse, que es el que sirve ante la Supersalud.
+
+**Los tres portales.** Ya hay robot para COOSALUD, SIMED (Dispensario) y
+Mutual Ser. Los tres comparten un mismo molde: la conversación con el motor
+vive en un solo archivo, así que un arreglo sirve para los tres. Y los tres
+traen el piloto obligatorio de 1 factura.
+
+**Una corrección importante sobre Mutual Ser.** La matriz lo daba por
+automatizable con usuario y clave, pero al revisar el robot que ya existía se
+vio que **ese portal pide reCAPTCHA**. Un robot no lo resuelve. Así que se
+construyó de la forma honesta: reutiliza una sesión que una persona siembra a
+mano una vez (con `--con-cabeza`), y si esa sesión venció **no adivina**:
+marca la glosa como «la hace una persona» y explica cómo sembrarla de nuevo.
+
+**Qué significa exactamente «radicar» aquí.** Los tres robots **cierran** en el
+portal una respuesta que ya estaba cargada; escribir la respuesta sigue siendo
+trabajo de los bots de respuesta de siempre. Conviene tenerlo claro para no
+esperar que el radicador redacte nada.
+
+Con 24 pruebas nuevas, más la validación de la bandeja en un navegador real.
+
+
 ### 04-09-2026 (cierre) — Las velas contra 16 años de EUR/USD: ninguna le ganó al azar
 
 **Lo que estaba pendiente desde el 31-08.** El programa de velas japonesas se

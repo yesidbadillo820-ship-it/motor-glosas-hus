@@ -299,6 +299,9 @@ def reclamar_una(
         "portal": fila.portal,
         "factura": glosa.factura,
         "codigo_glosa": glosa.codigo_glosa,
+        # El código de respuesta que el portal pide al cerrar (RE9901, RE9502…).
+        # Sin él, el bot tendría que adivinarlo y el portal registraría otro.
+        "codigo_respuesta": getattr(glosa, "codigo_respuesta", "") or "",
         "valor_objetado": glosa.valor_objetado,
         "dictamen": glosa.dictamen,
     }
