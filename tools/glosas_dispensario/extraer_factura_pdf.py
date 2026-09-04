@@ -18,7 +18,12 @@ usa en la redacción los datos que de verdad salieron del PDF.
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from _dinero import a_entero  # noqa: E402  (el UNICO lector de pesos de tools/)
 
 MIN_TEXTO_UTIL = 30  # caracteres alfanuméricos para considerar "leído"
 
@@ -116,14 +121,8 @@ def _buscar_paciente(texto: str) -> str | None:
 
 
 def _buscar_total(texto: str) -> int | None:
-    candidatos = []
-    for rx in RE_TOTAL:
-        for m in rx.finditer(texto.upper()):
-            crudo = m.group(1).replace(".", "").replace(",", ".")
-            try:
-                candidatos.append(int(float(crudo)))
-            except ValueError:
-                continue
+    candidatos = [a_entero(m.group(1)) for rx in RE_TOTAL for m in rx.finditer(texto.upper())]
+    candidatos = [c for c in candidatos if c]
     return max(candidatos) if candidatos else None  # el total es el mayor de los totales
 
 
