@@ -1500,11 +1500,16 @@ def asignar_area(
     centro_costos: str | None = None,
     medico: str | None = None,
 ) -> GlosaAdresRecord:
-    """Un SUPER ADMIN decide qué área trabaja esta glosa.
+    """El área decide qué área trabaja esta glosa (auditor o superior).
 
     Hoy aplica a la causal 4506: la misma causal la ven los gestores por
     FACTURACION y las médicas por PERTINENCIA, y quién la toma depende del
     procedimiento y de lo que se glosó.
+
+    Es REVERSIBLE: se puede volver a llamar sobre una glosa ya asignada para
+    corregir el área (un error humano no queda en piedra). No borra el trabajo
+    de nadie — solo cambia la clasificación y el testigo, y recalcula la
+    sugerencia del bot para la nueva área.
     """
     glosa = db.get(GlosaAdresRecord, glosa_id)
     if glosa is None:

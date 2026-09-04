@@ -20811,10 +20811,24 @@ function gaPintar(d){
          }).join('')+
          '</div></div>';
   }
-  if(r.por_asignar){
+  // Causal 4506 (doble área). Se avisa cuántas hay y, si el usuario puede
+  // repartir, botones para dejarlas todas en un área de una vez. Todo es
+  // reversible glosa por glosa en la columna «Clasificación» (04-09-2026).
+  var gaDobleArea = (d.glosas||[]).filter(function(g){ return (g.areas_posibles||[]).length; });
+  if(gaDobleArea.length){
+    var gaSinRepartir = gaDobleArea.filter(function(g){ return g.requiere_asignacion; }).length;
     h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.10);font-size:.8rem">'+
-         '<b>'+r.por_asignar+' glosa(s) por repartir.</b> Esta causal la trabajan dos áreas: los gestores por FACTURACION y las médicas por PERTINENCIA. '+
-         'Solo un super admin puede asignarla.</div>';
+         '<b>'+gaDobleArea.length+' glosa(s) de doble área'+(gaSinRepartir ? ' — '+gaSinRepartir+' sin repartir' : '')+'.</b> '+
+         'La causal 4506 la trabajan dos áreas: los gestores por <b>FACTURACIÓN</b> y las médicas por <b>PERTINENCIA</b>. '+
+         'Ojo: el material de osteosíntesis y el de alto costo los revisa el médico auditor. '+
+         (gaPuedeRepartirArea()
+            ? 'Reparta cada una en la columna «Clasificación» — y cámbiela después si quedó en el área equivocada.'
+              +'<div style="margin-top:.5rem;display:flex;gap:.4rem;flex-wrap:wrap">'+
+                '<button class="btn btn-ghost" style="font-size:.75rem" onclick="gaTodasArea(\'FACTURACION\')" title="Poner en FACTURACIÓN todas las glosas de doble área de esta factura">Todas a FACTURACIÓN</button>'+
+                '<button class="btn btn-ghost" style="font-size:.75rem" onclick="gaTodasArea(\'PERTINENCIA\')" title="Poner en PERTINENCIA todas las glosas de doble área de esta factura">Todas a PERTINENCIA</button>'+
+              '</div>'
+            : 'La reparte el área (auditor o superior).')+
+         '</div>';
   }
 
   if((d.por_clasificacion||[]).length){
@@ -20915,19 +20929,44 @@ function gaPintar(d){
 
 // La causal 4506 la trabajan dos areas: los gestores por FACTURACION y las
 // medicas por PERTINENCIA. Quien la toma depende del procedimiento y de lo
-// glosado, asi que la reparte un super admin. El bot solo sugiere, con motivo.
+// glosado. El bot solo sugiere, con motivo; la reparte el area (auditor o
+// superior, abierto el 31-08-2026 — el mismo permiso del backend).
+//
+// 04-09-2026 (Yesid: «si por error coloco PERTINENCIA y eran FACTURACION ya no
+// puedo volver a reasignar»). Antes, en cuanto una glosa quedaba asignada esta
+// celda mostraba solo texto plano y no habia forma de corregir el area. Ahora
+// el selector queda SIEMPRE en las causales de doble area: se puede reasignar
+// cuantas veces haga falta (el backend siempre lo permitio — es reversible).
+function gaPuedeRepartirArea(){
+  return ['AUDITOR','COORDINADOR','SUPER_ADMIN'].indexOf((window.USER_ROL||'').toUpperCase()) >= 0;
+}
 function gaCeldaArea(g){
-  if(!g.requiere_asignacion) return escHtml(g.clasificacion||'—');
+  // Causal de una sola area: la clasificacion la dedujo el bot, no se toca aca.
+  if(!(g.areas_posibles||[]).length) return escHtml(g.clasificacion||'—');
+
+  var puedo = gaPuedeRepartirArea();
+  var yaAsignada = !g.requiere_asignacion;
+  // Lo que hay que dejar marcado en el selector: si ya se repartio, el area que
+  // quedo; si no, la que sugiere el bot.
+  var actual = yaAsignada ? (g.clasificacion||'') : (g.area_sugerida||'');
   var opciones = (g.areas_posibles||[]).map(function(a){
-    return '<option value="'+escHtml(a)+'"'+(g.area_sugerida===a?' selected':'')+'>'+escHtml(a)+'</option>';
+    return '<option value="'+escHtml(a)+'"'+(actual===a?' selected':'')+'>'+escHtml(a)+'</option>';
   }).join('');
-  var puedo = (window.USER_ROL === 'SUPER_ADMIN');
-  var h = '<span style="font-size:.66rem;padding:.15rem .4rem;border-radius:999px;background:rgba(124,58,237,.15);color:#7c3aed;font-weight:700">POR ASIGNAR</span>';
-  if(puedo){
-    h += '<select onchange="gaAsignarArea('+g.id+',this.value)" style="margin-top:.25rem;width:100%;font-size:.72rem;padding:.2rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text)">'+
-         '<option value="">— escoja el área —</option>'+opciones+'</select>';
+
+  var h = '';
+  if(yaAsignada){
+    h += '<span style="font-size:.72rem;font-weight:700;color:var(--text)">'+escHtml(g.clasificacion||'—')+'</span>';
+    if(g.area_asignada_por) h += '<div style="font-size:.62rem;color:var(--text3)">asignó: '+escHtml(g.area_asignada_por)+'</div>';
   }else{
-    h += '<div style="font-size:.68rem;color:var(--text3);margin-top:.2rem">sugerido: <b>'+escHtml(g.area_sugerida||'—')+'</b> · lo asigna un super admin</div>';
+    h += '<span style="font-size:.66rem;padding:.15rem .4rem;border-radius:999px;background:rgba(124,58,237,.15);color:#7c3aed;font-weight:700">POR ASIGNAR</span>';
+  }
+
+  if(puedo){
+    h += '<select onchange="gaAsignarArea('+g.id+',this.value)" title="Repartir o reasignar el área de esta glosa" style="margin-top:.25rem;width:100%;font-size:.72rem;padding:.2rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text)">'+
+         (yaAsignada ? '' : '<option value="">— escoja el área —</option>')+opciones+'</select>';
+    if(yaAsignada) h += '<div style="font-size:.6rem;color:var(--text3);margin-top:.1rem">↪ cámbiela si quedó en el área equivocada</div>';
+  }else if(!yaAsignada){
+    h += '<div style="font-size:.68rem;color:var(--text3);margin-top:.2rem">sugerido: <b>'+escHtml(g.area_sugerida||'—')+'</b> · lo reparte el área</div>';
   }
   if(g.motivo_area) h += '<div style="font-size:.66rem;color:var(--text3);margin-top:.2rem">'+escHtml(g.motivo_area)+'</div>';
   return h;
@@ -20964,6 +21003,31 @@ async function gaAsignarArea(id, area){
     toast('Área asignada', 'Esta glosa la trabaja '+area, 'success');
     gaBuscar();
   }catch(e){ toast('No se pudo asignar', e.message, 'error'); }
+}
+
+// «TODO SALGA COMO FACTURACIÓN» (Yesid, 04-09-2026). Deja en un área todas las
+// glosas de doble área (4506) de la factura que está en pantalla, de una vez.
+// Es reversible: cualquiera se puede cambiar después en «Clasificación».
+async function gaTodasArea(area){
+  if(!area) return;
+  var gs = ((GA_DATOS && GA_DATOS.glosas) || []).filter(function(g){
+    return (g.areas_posibles||[]).length && g.clasificacion !== area;
+  });
+  if(!gs.length){ toast('Nada que cambiar', 'Todas las de doble área ya están en '+area, 'info'); return; }
+  if(!confirm('¿Poner en '+area+' las '+gs.length+' glosa(s) de doble área de esta factura?\n\n'+
+              'Recuerde: el material de osteosíntesis y el de alto costo los revisa el médico auditor. '+
+              'Puede cambiar cualquiera después.')) return;
+  var ok=0, err=0;
+  for(var i=0;i<gs.length;i++){
+    try{
+      var r = await fetch('/glosas-adres/glosa/'+gs[i].id+'/area', {method:'POST',
+        headers: Object.assign({'Content-Type':'application/json'}, authH()),
+        body: JSON.stringify({area: area})});
+      if(r.ok) ok++; else err++;
+    }catch(e){ err++; }
+  }
+  toast(ok+' glosa(s) en '+area, err ? (err+' no se pudieron') : 'Listo', err ? 'warning' : 'success');
+  gaBuscar();
 }
 
 async function gaCentro(id, valor){

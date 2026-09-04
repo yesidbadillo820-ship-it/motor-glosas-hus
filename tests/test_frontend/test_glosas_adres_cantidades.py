@@ -231,6 +231,10 @@ def _pintar_tabla() -> dict:
         for n in (
             "gaCant",
             "gaCantGlosada",
+            # 04-09-2026: `gaCeldaArea` ahora reparte/reasigna con el mismo
+            # permiso del backend, que sale de `gaPuedeRepartirArea`. Sin
+            # traerla, `gaPintar` revienta apenas haya una glosa de doble área.
+            "gaPuedeRepartirArea",
             "gaCeldaArea",
             "gaCeldaCentro",
             "gaCeldaAceptado",
