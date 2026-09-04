@@ -10463,6 +10463,40 @@ lo confirmó** y quedó en firme:
 9 pruebas nuevas (las del comando y la que deja escrito que la 4302 es
 TARIFAS).
 
+### 03/04-09-2026 — Dispensario: directriz nueva (las CL médicas no las toca el bot) y lote 04-sep
+
+**Directriz de negocio nueva, pedida por el auditor y ya montada en el
+generador oficial (`tools/glosas_dispensario/gen_lote.py`, con su prueba):**
+las objeciones con causal **CL** de glosas **Médica o Mixta** ya NO se
+responden con el robot. Quedan aisladas en una hoja aparte del mismo Excel
+(**"PARA GESTION MEDICA"**, encabezado rojo) para que las trabaje el equipo
+médico a mano. La razón: cuando el equipo médico acepta una de esas glosas
+debe cruzar una nota crédito, y una respuesta genérica ya cargada por el bot
+impide ese cruce y daña la conciliación. Las objeciones excluidas conservan
+su número de la grilla del portal, así el robot responde las demás sin
+correrse de fila. La regla quedó también en
+`docs/CONTEXTO_DISPENSARIO_GLOSAS.md` (punto 9).
+
+**Lote GLOSAS_04_SEPTIEMBRE:** 94 objeciones de 64 facturas del Dispensario.
+Con la directriz aplicada: **88 respuestas para el robot ($17.060.666)** y
+**6 objeciones CL médicas/mixtas apartadas para el equipo médico
+($19.066.935)** — son 2 facturas: HUS0000545263 (osteotomía, tendón de
+Aquiles y anclaje PEEK) y HUS0000545286 (resección de colon, anastomosis y
+linfadenectomía). Cuadre al peso contra la hoja INICIAL (respondidas +
+apartadas = valor total). Vencimientos: 45 facturas el 16-09 y 19 el 18-09
+(las 45 son las mismas que el cruce de GI detectó como "glosas nuevas").
+
+**Otros cierres de estos días que faltaban por anotar:** el cruce de GI por
+factura que pidió el auditor quedó completo (227 facturas: 24 del
+GI-33-5369-2026, 128 del lote 31-ago, 20 del GI-33-5335-2026, 3 del
+GI-33-5251-2026, 1 respondida por otra vía y **6 que se saltaron entre
+lotes** — de esas 6 aún falta el export DGH para responderlas, vencían 4 y
+7-09); el cargue de notas de septiembre (acta 1121/1122) avanzó hasta dejar
+solo 3 notas rechazadas por CUV en la grilla (332871, 332846, 332847, a la
+espera de SISTEMAS) más la nota nueva 332519 con su triada armada; y el acta
+863 de FAMISANAR quedó armada desde el detalle 7883 de la EPS (586 facturas,
+$987 millones conciliados al peso, en xlsm y xlsx).
+
 ---
 
 ## 3) PENDIENTE

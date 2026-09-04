@@ -8,6 +8,12 @@ hoja "Respuestas Glosa" con columnas Factura | # Objeción | Cód. | Servicio |
 Valor Objetado | Valor Aceptado (0) | Cod Respuesta (RE9901) | Detalle Respuesta.
 La numeración 1..N por factura sigue el orden del export, que es el orden de la
 grilla del portal (verificado con el lote del 09-07-2026).
+
+Directriz 03-09-2026: las objeciones con causal CL de glosas Médica o Mixta NO
+se responden con el bot — van a la hoja "PARA GESTION MEDICA" y las trabaja el
+equipo médico a mano (si aceptan la glosa, la nota crédito debe poder cruzar;
+una respuesta genérica ya cargada lo impide). Esas objeciones conservan su
+número en la grilla, así el robot responde las demás sin correrse de fila.
 """
 
 import json
@@ -45,9 +51,20 @@ c = {
         ob="ListadoConceptos.Observaciones",
     ).items()
 }
+i_tt = H.index("TipoObjecionTramite") if "TipoObjecionTramite" in H else None
+
+
+def es_cl_para_medicos(tipo_tramite: str, code: str) -> bool:
+    """Directriz 03-09-2026: las glosas Médica o Mixta con causal CL no se
+    responden con el bot — quedan a gestión manual del equipo médico, para que
+    si ellos aceptan la glosa, la nota crédito pueda cruzar en el sistema (una
+    respuesta genérica ya cargada impide ese cruce)."""
+    t = norm(tipo_tramite).upper()
+    return (t.startswith("MEDIC") or t == "MIXTA") and norm(code).upper().startswith("CL")
+
 
 seq = defaultdict(int)
-out_rows, tally, dump = [], Counter(), []
+out_rows, tally, dump, excluidas = [], Counter(), [], []
 for r in det.iter_rows(min_row=2, values_only=True):
     if not r[c["fac"]] or not disp(norm(r[c["ent"]])):
         continue
@@ -57,9 +74,15 @@ for r in det.iter_rows(min_row=2, values_only=True):
     serv = norm(r[c["sd"]])
     valor = int(r[c["vl"]] or r[c["vh"]] or 0)
     obs = r[c["ob"]]
+    # La numeración es POSICIONAL (el orden de la grilla del portal): las
+    # excluidas también cuentan, para que el robot responda cada objeción
+    # restante con su número real y jamás toque la CL omitida.
+    seq[fac] += 1
+    if i_tt is not None and es_cl_para_medicos(r[i_tt], code):
+        excluidas.append([fac, seq[fac], code, f"{cups} - {serv}", valor, norm(obs)])
+        continue
     det_txt, t = redactar(fac, code, cups, serv, valor, obs)
     tally[t] += 1
-    seq[fac] += 1
     out_rows.append([fac, seq[fac], code, f"{cups} - {serv}", valor, 0, "RE9901", det_txt])
     dump.append(
         dict(
@@ -102,13 +125,46 @@ for i, w in enumerate([16, 10, 9, 44, 14, 14, 13, 130], 1):
 for rr in osh.iter_rows(min_row=2):
     rr[7].alignment = Alignment(wrap_text=True, vertical="top")
 osh.freeze_panes = "A2"
+
+# Las CL médicas/mixtas quedan aisladas en su propia hoja: es el paquete de
+# trabajo del equipo médico, y NO lo lee el robot (solo lee "Respuestas Glosa").
+if excluidas:
+    med = owb.create_sheet("PARA GESTION MEDICA")
+    med.append(
+        [
+            "Factura",
+            "# Objeción (grilla portal)",
+            "Cód.",
+            "Servicio",
+            "Valor Objetado",
+            "Observación de la EPS",
+        ]
+    )
+    for i, _ in enumerate(med[1], 1):
+        x = med.cell(row=1, column=i)
+        x.font = Font(bold=True, color="FFFFFF")
+        x.fill = PatternFill("solid", fgColor="9C0006")
+    for row in excluidas:
+        med.append(row)
+    for i, w in enumerate([16, 12, 9, 44, 14, 120], 1):
+        med.column_dimensions[get_column_letter(i)].width = w
+    for rr in med.iter_rows(min_row=2):
+        rr[5].alignment = Alignment(wrap_text=True, vertical="top")
+    med.freeze_panes = "A2"
 owb.save(out)
 if jsonout:
     json.dump(dump, open(jsonout, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
 print("OK ->", out)
+if excluidas:
+    print(
+        f"EXCLUIDAS PARA GESTION MEDICA (CL medica/mixta): {len(excluidas)} objeciones "
+        f"de {len({e[0] for e in excluidas})} facturas por {money(sum(e[4] for e in excluidas))} "
+        f"— ver hoja 'PARA GESTION MEDICA'; el bot NO las responde."
+    )
 print(
-    f"Ítems: {len(out_rows)} | Facturas: {len(seq)} | Valor obj: {money(sum(r[4] for r in out_rows))}"
+    f"Ítems: {len(out_rows)} | Facturas: {len({r[0] for r in out_rows})} "
+    f"| Valor obj: {money(sum(r[4] for r in out_rows))}"
 )
 print("Por tipo:", dict(tally))
 prob = []
@@ -123,4 +179,5 @@ for r in out_rows:
     ):
         prob.append((r[0], r[1]))
 print("Problemas de formato:", prob if prob else "NINGUNO")
-print("Largo detalle:", min(len(r[7]) for r in out_rows), "-", max(len(r[7]) for r in out_rows))
+if out_rows:
+    print("Largo detalle:", min(len(r[7]) for r in out_rows), "-", max(len(r[7]) for r in out_rows))
