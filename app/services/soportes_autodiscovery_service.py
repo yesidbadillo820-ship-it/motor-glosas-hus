@@ -30,6 +30,7 @@ ENV, mes, tamaño) lista para inyectar en el flujo de análisis.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -334,11 +335,125 @@ class SoportesIndexer:
         self._archivos_escaneados: int = 0
         self._archivos_indexados: int = 0
         self._construyendo: bool = False
+        # Escaneo diferencial (04-09-2026): huella de cada carpeta ya vista,
+        # para no volver a listarla si no ha cambiado.
+        self._firmas: dict[str, tuple[float, int]] = {}
+        self._carpetas_saltadas: int = 0
+        self._cargado_de_disco: bool = False
+        self._cargar_de_disco()
 
     def _esta_caliente(self) -> bool:
         if not self._indice:
             return False
         return (time.time() - self._construido_en) < self.ttl_segundos
+
+    # ── El índice sobrevive al reinicio (04-09-2026) ────────────────────
+    #
+    # ANTES: el índice vivía SOLO en memoria. Cada reinicio de uvicorn —y hay
+    # varios al día por el autodespliegue— lo borraba, y el motor volvía a
+    # recorrer 473.581 archivos por red: horas. Durante todo ese rato el
+    # buscador de soportes contestaba vacío.
+    #
+    # AHORA se guarda en disco y se recupera al arrancar. El motor abre con el
+    # índice de la última vez —utilizable desde el primer segundo— y encima
+    # la reconstrucción salta las carpetas que no han cambiado.
+
+    def _ruta_cache(self) -> Path:
+        return Path(__file__).resolve().parents[2] / "data" / "soportes_indice.json"
+
+    def _cargar_de_disco(self) -> None:
+        """Recupera el índice de la corrida anterior. Nunca revienta: si el
+        archivo no está o quedó a medias, se sigue como antes (desde cero)."""
+        ruta = self._ruta_cache()
+        try:
+            if not ruta.is_file():
+                return
+            with open(ruta, "r", encoding="utf-8") as f:
+                datos = json.load(f)
+            # Si cambió la raíz, el índice viejo no sirve para nada.
+            if str(datos.get("raiz") or "") != str(self.raiz):
+                logger.info("[SOPORTES] El índice guardado es de otra carpeta; se ignora.")
+                return
+            indice: dict[str, list[SoporteEntry]] = {}
+            for factura, filas in (datos.get("indice") or {}).items():
+                indice[factura] = [SoporteEntry(**fila) for fila in filas]
+            self._indice = indice
+            self._firmas = {k: (v[0], v[1]) for k, v in (datos.get("firmas") or {}).items()}
+            self._construido_en = float(datos.get("construido_en") or 0.0)
+            self._archivos_indexados = int(datos.get("archivos_indexados") or 0)
+            self._cargado_de_disco = True
+            logger.info(
+                f"[SOPORTES] Índice recuperado del disco: {len(self._indice)} facturas, "
+                f"{self._archivos_indexados} archivos. No hay que empezar de cero."
+            )
+        except Exception as e:  # noqa: BLE001 — un caché ilegible no tumba el motor
+            logger.warning(f"[SOPORTES] No se pudo recuperar el índice guardado: {e}")
+
+    def _guardar_en_disco(self) -> None:
+        """Deja el índice listo para el próximo arranque. Se escribe a un
+        temporal y se renombra: si se corta la luz a mitad, el archivo bueno
+        de la vez pasada sigue intacto."""
+        ruta = self._ruta_cache()
+        try:
+            ruta.parent.mkdir(parents=True, exist_ok=True)
+            datos = {
+                "raiz": str(self.raiz),
+                "construido_en": self._construido_en,
+                "archivos_indexados": self._archivos_indexados,
+                "firmas": {k: list(v) for k, v in self._firmas.items()},
+                "indice": {
+                    factura: [asdict(e) for e in filas] for factura, filas in self._indice.items()
+                },
+            }
+            tmp = ruta.with_suffix(".json.tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(datos, f, ensure_ascii=False)
+            tmp.replace(ruta)
+            logger.info(f"[SOPORTES] Índice guardado en {ruta.name}")
+        except Exception as e:  # noqa: BLE001 — no poder guardar no invalida el índice
+            logger.warning(f"[SOPORTES] No se pudo guardar el índice: {e}")
+
+    def _entradas_por_carpeta(self) -> dict[str, list[SoporteEntry]]:
+        """Lo ya sabido, ordenado por la carpeta donde vive cada archivo.
+
+        Es lo que permite reusar una carpeta intacta sin volver a leerla.
+        """
+        por_carpeta: dict[str, list[SoporteEntry]] = {}
+        for filas in self._indice.values():
+            for entry in filas:
+                try:
+                    padre = str(Path(entry.ruta).parent)
+                except Exception:  # noqa: BLE001
+                    continue
+                por_carpeta.setdefault(padre, []).append(entry)
+        return por_carpeta
+
+    @staticmethod
+    def _recorrer_carpetas(raiz: Path):
+        """Todas las carpetas colgando de la raíz, la raíz incluida.
+
+        Se usa `os.walk`, que va listando sin traerse el árbol entero a
+        memoria: en el servidor de radicación hay cientos de miles de
+        archivos y cargarlos de golpe no cabe.
+        """
+        yield raiz
+        for actual, subcarpetas, _archivos in os.walk(raiz, onerror=lambda e: None):
+            for sub in subcarpetas:
+                yield Path(actual) / sub
+
+    @staticmethod
+    def _firma_de(carpeta: Path) -> Optional[tuple[float, int]]:
+        """Huella barata de una carpeta: cuándo cambió y cuántas cosas tiene.
+
+        Con esas dos, si nada cambió, no hace falta volver a mirar archivo por
+        archivo —que es lo caro cuando la carpeta vive en el servidor de red.
+        """
+        try:
+            with os.scandir(carpeta) as it:
+                n = sum(1 for _ in it)
+            return (carpeta.stat().st_mtime, n)
+        except OSError:
+            return None
 
     def _construir_entry(
         self,
@@ -400,9 +515,17 @@ class SoportesIndexer:
         try:
             self._construyendo = True
             inicio = time.time()
-            self._indice = {}
+            # EL ÍNDICE VIEJO NO SE BORRA (04-09-2026). Antes se hacía
+            # `self._indice = {}` aquí, y durante las HORAS que dura el
+            # recorrido el buscador contestaba vacío a todo el mundo: el motor
+            # quedaba ciego justo mientras trabajaba. Ahora se construye uno
+            # nuevo aparte y se cambia de golpe al final; mientras tanto se
+            # sigue respondiendo con el de la última vez.
+            nuevo_indice: dict[str, list[SoporteEntry]] = {}
+            nuevas_firmas: dict[str, tuple[float, int]] = {}
             self._archivos_escaneados = 0
             self._archivos_indexados = 0
+            self._carpetas_saltadas = 0
             self._ultimo_error = None
 
             if not self.raiz.exists():
@@ -418,29 +541,66 @@ class SoportesIndexer:
             facturas_por_carpeta: dict[Path, set[tuple[str, str]]] = {}
             compartidos_por_carpeta: dict[Path, list[Path]] = {}
 
-            for archivo in self.raiz.rglob("*"):
-                if not archivo.is_file():
+            # ESCANEO DIFERENCIAL. Se recorren las carpetas una por una; si
+            # una carpeta tiene la misma huella que la última vez (misma fecha
+            # de cambio y misma cantidad de elementos), NO se vuelve a mirar
+            # archivo por archivo: se reusa lo que ya se sabía de ella. Eso es
+            # lo caro cuando la carpeta está al otro lado de la red.
+            cache_por_carpeta = self._entradas_por_carpeta()
+
+            for carpeta in self._recorrer_carpetas(self.raiz):
+                firma = self._firma_de(carpeta)
+                clave = str(carpeta)
+                if firma is not None:
+                    nuevas_firmas[clave] = firma
+
+                # Ojo con el `or []`: una carpeta intacta se salta AUNQUE no
+                # tenga archivos indexados. Las carpetas intermedias del árbol
+                # (año, mes, EPS…) son la mayoría y no indexan nada; si se
+                # releyeran todas, el escaneo diferencial no ahorraría casi
+                # nada. Lo que manda es la firma, no que hubiera contenido.
+                reutilizables = cache_por_carpeta.get(clave) or []
+                if firma is not None and self._firmas.get(clave) == firma:
+                    # Carpeta intacta: se reusa tal cual.
+                    # Se reusa TODO lo de esa carpeta —incluidos los
+                    # compartidos del lote (FURIPS, XML CUFE), que ya venían
+                    # asociados a su factura en la corrida anterior—, así que
+                    # no hace falta rehacer la pasada 2 para ella.
+                    self._carpetas_saltadas += 1
+                    for entry in reutilizables:
+                        nuevo_indice.setdefault(entry.factura_norm, []).append(entry)
+                        self._archivos_indexados += 1
                     continue
-                self._archivos_escaneados += 1
-                nombre = archivo.name
-                m = _RE_FACTURA.search(nombre)
-                if m:
-                    factura_raw = m.group(1).upper()
-                    factura_norm = normalizar_factura(factura_raw)
-                    if not factura_norm:
-                        continue
-                    entry = self._construir_entry(archivo, factura_raw, factura_norm)
-                    self._indice.setdefault(factura_norm, []).append(entry)
-                    self._archivos_indexados += 1
-                    facturas_por_carpeta.setdefault(archivo.parent, set()).add(
-                        (factura_raw, factura_norm)
-                    )
-                else:
-                    # Solo nos interesan compartidos clasificables (FURIPS,
-                    # XML CUFE, ResultadosMSPS). Files random como leeme.txt
-                    # se ignoran.
-                    if _clasificar_archivo(nombre) is not None:
-                        compartidos_por_carpeta.setdefault(archivo.parent, []).append(archivo)
+
+                # Carpeta nueva o cambiada: se mira de verdad.
+                try:
+                    with os.scandir(carpeta) as it:
+                        hijos = [Path(e.path) for e in it if e.is_file()]
+                except OSError as e:
+                    logger.debug(f"[SOPORTES] No se pudo leer {carpeta}: {e}")
+                    continue
+
+                for archivo in hijos:
+                    self._archivos_escaneados += 1
+                    nombre = archivo.name
+                    m = _RE_FACTURA.search(nombre)
+                    if m:
+                        factura_raw = m.group(1).upper()
+                        factura_norm = normalizar_factura(factura_raw)
+                        if not factura_norm:
+                            continue
+                        entry = self._construir_entry(archivo, factura_raw, factura_norm)
+                        nuevo_indice.setdefault(factura_norm, []).append(entry)
+                        self._archivos_indexados += 1
+                        facturas_por_carpeta.setdefault(carpeta, set()).add(
+                            (factura_raw, factura_norm)
+                        )
+                    else:
+                        # Solo nos interesan compartidos clasificables (FURIPS,
+                        # XML CUFE, ResultadosMSPS). Files random como
+                        # leeme.txt se ignoran.
+                        if _clasificar_archivo(nombre) is not None:
+                            compartidos_por_carpeta.setdefault(carpeta, []).append(archivo)
 
             # Pasa 2: asociar compartidos a las facturas de su carpeta
             for carpeta, archivos_compartidos in compartidos_por_carpeta.items():
@@ -450,15 +610,21 @@ class SoportesIndexer:
                 for archivo in archivos_compartidos:
                     for factura_raw, factura_norm in facturas_carpeta:
                         entry = self._construir_entry(archivo, factura_raw, factura_norm)
-                        self._indice.setdefault(factura_norm, []).append(entry)
+                        nuevo_indice.setdefault(factura_norm, []).append(entry)
                         self._archivos_indexados += 1
 
+            # El cambiazo: hasta esta línea se estuvo respondiendo con el
+            # índice anterior.
+            self._indice = nuevo_indice
+            self._firmas = nuevas_firmas
             self._construido_en = time.time()
             duracion = round(self._construido_en - inicio, 2)
             logger.info(
                 f"Soportes indexados: {self._archivos_indexados} archivos / "
-                f"{len(self._indice)} facturas únicas en {duracion}s"
+                f"{len(self._indice)} facturas únicas en {duracion}s "
+                f"({self._carpetas_saltadas} carpetas sin cambios, no se releyeron)"
             )
+            self._guardar_en_disco()
             return self.stats()
         finally:
             self._construyendo = False
