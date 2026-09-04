@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 03-09-2026
+**Última actualización:** 04-09-2026
 
 ---
 
@@ -89,6 +89,122 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 04-09-2026 (cierre) — Las velas contra 16 años de EUR/USD: ninguna le ganó al azar
+
+**Lo que estaba pendiente desde el 31-08.** El programa de velas japonesas se
+había comprobado solo con datos simulados. Hoy usted exportó el histórico real
+del EUR/USD y se corrió la medición de verdad.
+
+**Antes hubo una pregunta que valía la pena.** «El CSV son solo datos, no dice
+nada de velas, que es lo que realmente queremos analizar».
+
+Es la duda correcta, y la respuesta es que **una vela japonesa ES esos cuatro
+números** y nada más:
+
+| En el archivo | En el dibujo |
+|---|---|
+| Apertura y Cierre | el **cuerpo** de la vela |
+| cuál de los dos quedó arriba | **hueca** (subió) o **llena** (bajó) |
+| Máximo | la **mecha de arriba** |
+| Mínimo | la **mecha de abajo** |
+
+TradingView pinta exactamente eso: el gráfico no añade **ni un dato** que no
+esté en el archivo. Para no quedarse en la explicación, se agregó el comando
+**`python -m mercados vela`**, que dibuja en pantalla la sesión que usted pida,
+con cada precio señalado, sus medidas («la mecha inferior es 2,3 veces el
+cuerpo») y qué patrones encajan ahí. Así se ve el mismo dibujo saliendo del
+mismo archivo.
+
+**El resultado con su histórico** (4.336 sesiones diarias, del 1 de enero de
+2010 al 4 de septiembre de 2026):
+
+| | |
+|---|---|
+| Apariciones de patrones encontradas | **1.563** |
+| Patrones que llegan a 30 apariciones (el mínimo para concluir) | **4** de 28 |
+| Mediciones con muestra suficiente | **16** |
+| **Mediciones que le ganan a su tasa base** | **0** |
+
+Dicho en español claro: **en 16 años de EUR/USD, ningún patrón del libro
+demostró servir.** No es que salieran mal —ninguno quedó tampoco por debajo—:
+es que **ninguno se distingue de lo que el precio hace de todos modos**.
+
+**El que estuvo cerca, y por qué no cuenta.** El Elefante Verde acertó el 68 %
+a cinco sesiones, contra una base del 48 %: veinte puntos de ventaja, que a
+primera vista es muchísimo. Pero son 44 casos, y con esa cantidad el margen va
+del **42 % al 86 %** — y ese margen **abarca la base**, así que la ventaja
+verdadera puede ser cero. Sin la corrección por preguntar 112 cosas a la vez,
+el margen habría dado 53 %–80 %, no habría tocado la base, y el hallazgo habría
+pasado por bueno. **Para eso exactamente está la corrección**, y esta fue la
+primera vez que hizo su trabajo con datos reales.
+
+**Dos etiquetas del libro quedan contradichas por su propio histórico:** el
+**Elefante Verde** (el libro dice fiabilidad «muy alta») y el **Elefante Rojo**
+(«bastante alta»). El programa los marca solo, sin que nadie tenga que
+acordarse de revisarlo.
+
+**Qué significa esto, sin rodeos.** No significa que las velas japonesas «no
+sirvan». Significa que **en este mercado, en este marco de tiempo y por sí
+solas, no le ganan a lanzar una moneda**. El libro afirma que la probabilidad
+va «al menos por encima del 50 %» y no publica un solo número que lo sostenga;
+ahora hay un número, sacado de su propio histórico. Eso es justo lo que este
+programa se construyó para hacer: no repetir la promesa, sino comprobarla —
+y el resultado incómodo se entrega igual.
+
+**Si quiere seguir mirando:** el mismo comando funciona con cualquier CSV —una
+acción colombiana, un índice, una cripto— y con otros marcos de tiempo. Puede
+que en otro mercado sí haya señal; el programa lo dirá con la misma frialdad.
+
+**Cómo se corre:**
+
+```
+python -m mercados medir su_historico.csv --sesiones 5
+python -m mercados vela   su_historico.csv --fecha 2026-08-28
+python -m mercados exportar su_historico.csv --titulo "EUR/USD"
+```
+
+Guía completa: `docs/GUIA_ANALISIS_VELAS.md`.
+
+---
+
+### 04-09-2026 — El curso de noruego no sonaba: los doce botones estaban rotos
+
+**Lo que se vio.** «Ahora sí lo dice al principio, pero cuando le doy en "toca
+para oír" no sale nada».
+
+**La causa, que estuvo escondida más de lo debido.** Cada botón de bocina se
+armaba metiendo la palabra noruega dentro de la orden, y la palabra venía con
+sus propias comillas. Al juntarlas, **la orden quedaba partida por la mitad** y
+el navegador la descartaba sin avisar nada en pantalla. Los **doce** botones de
+bocina de la aplicación estaban muertos desde el primer día. Se corrigió la
+forma de armarla y se abrió el curso en un navegador de verdad para confirmar
+que ahora sí suenan.
+
+**De paso, otras dos cosas del sonido:**
+
+- **Las voces del navegador llegan con retraso.** La pantalla las consultaba
+  una sola vez, al abrir; si la voz noruega no había cargado todavía, decía «no
+  hay voz» para siempre — incluso en un celular que sí la tiene. Ahora la
+  pantalla se entera cuando llegan y se vuelve a dibujar sola.
+- **El audio automático estaba escrito pero desconectado.** La pantalla buscaba
+  una marca que nada ponía. Ya se pone: al pasar de tarjeta, la palabra se
+  pronuncia sola.
+
+**Corrijo una indicación mía sobre la voz de Windows.** Le dije que marcara
+«Voz» en las características opcionales. Esa ruta además ofrece **«Establecer
+como mi idioma de presentación de Windows»**, que le dejaría **todo el
+computador del hospital en noruego**. La ruta correcta es *Configuración › Hora
+e idioma › Voz › Administrar voces › Agregar voces*. En el PC del hospital el
+paquete no bajó de todos modos (el servidor de actualizaciones del dominio lo
+bloquea); **en el celular no hace falta instalar nada.**
+
+**Lección para mí, anotada porque costó tiempo suyo:** ante un «no suena», lo
+primero es abrir la consola del navegador. El error estaba a la vista desde el
+primer reporte, y se dieron varias vueltas antes de mirar donde había que
+mirar.
+
+---
 
 ### 04-09-2026 — Arranca la V3: el motor empieza a radicar solo (Pilar 1)
 
@@ -10079,17 +10195,22 @@ TARIFAS).
 
 ## 3) PENDIENTE
 
-### Análisis de velas (31-08, cierre)
-- **Probarlo con un histórico de verdad.** Todo se comprobó con datos
-  simulados. Falta exportar el CSV de un activo real —cuantos más años, mejor—
-  y correr `python -m mercados medir`. Es ahí donde se va a ver si algún patrón
-  del libro aguanta la prueba.
-- **Ojo con el número de casos.** Con dos o tres años de sesiones diarias, casi
-  ningún patrón llega a las 30 apariciones que hacen falta. Para que la
-  medición diga algo hay que traer histórico largo.
-- **La «Cubierta de la Nube Oscura» está marcada para revisión** (ver arriba).
-  Si algún día se decide usar la definición clásica, hay que añadir la
-  condición a mano y volver a medir.
+### Análisis de velas (actualizado 04-09)
+- **~~Probarlo con un histórico de verdad~~ — YA HECHO (04-09).** Se midió con
+  16 años de EUR/USD diario (4.336 sesiones): **ningún patrón le ganó a su tasa
+  base**. Ver la entrada del 04-09 (cierre).
+- **Lo confirmado sobre el número de casos:** con 16 años de sesiones diarias
+  solo **4 patrones de 28** llegaron a las 30 apariciones. Con dos o tres años
+  no llega ninguno. Si un día quiere medir un patrón raro (Bebé Abandonado,
+  Triple Formación), hará falta histórico de varias décadas o marco intradía.
+- **Probar en otro mercado.** El resultado es del EUR/USD diario, no de «las
+  velas japonesas» en general. Falta correr lo mismo sobre una acción
+  colombiana, un índice o una cripto, y sobre otro marco de tiempo (semanal,
+  4 horas). Es el mismo comando; solo cambia el CSV.
+- **La «Cubierta de la Nube Oscura» sigue marcada para revisión.** Si algún día
+  se decide usar la definición clásica —que exige que la segunda vela cierre
+  por debajo de la mitad de la primera—, hay que añadir la condición a mano y
+  volver a medir.
 
 
 ### Curso de noruego (31-08, noche)
@@ -10897,12 +11018,24 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 ## 4) PARA MAÑANA
 
 ### Análisis de velas — lo primero
-1. **Exportar un histórico real** desde el bróker o TradingView (CSV, cuantos
-   más años mejor) y correr:
-   `python -m mercados medir ese_archivo.csv --sesiones 5`
-2. **Leer la columna «ventaja», no la de «acierta».** Un 60 % no dice nada si
+1. **Armar la aplicación con su histórico** y abrirla en el celular. En el PC
+   de cartera, el CSV está en Descargas, no en la carpeta del repositorio:
+
+   ```powershell
+   cd C:\motor-glosas\repo
+   $csv = (Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "*EUR_USD*.csv" | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+   echo $csv
+   python -m mercados exportar "$csv" --titulo "EUR/USD"
+   ```
+
+   Después se abre desde el celular en
+   `https://iaglosassinac.help/static/mercados/index.html`.
+2. **Probar otro mercado.** Exportar el CSV de una acción colombiana, un índice
+   o una cripto y correr `python -m mercados medir ese_archivo.csv --sesiones 5`.
+   El EUR/USD ya dio su respuesta; falta ver si en otro lado hay algo.
+3. **Leer la columna «ventaja», no la de «acierta».** Un 60 % no dice nada si
    la base también es 60 %.
-3. **Desconfiar de todo lo que tenga menos de 30 casos**, por bonito que se
+4. **Desconfiar de todo lo que tenga menos de 30 casos**, por bonito que se
    vea el porcentaje. El programa lo avisa, pero conviene tenerlo en la cabeza.
 
 
