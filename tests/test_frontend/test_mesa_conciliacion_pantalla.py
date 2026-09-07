@@ -23,9 +23,16 @@ HTML = (RAIZ / "static" / "index.html").read_text(encoding="utf-8")
 
 
 def _funcion(nombre: str) -> str:
-    """El cuerpo de una función del index, para mirarla de cerca."""
+    """El cuerpo de una función del index, para mirarla de cerca.
+
+    Se corta en la función SIGUIENTE, no a tantos caracteres: con un tope
+    fijo, agregarle una línea a la función deja el resto fuera y las
+    pruebas de «esto no aparece» (`toLocaleString`) pasan sin haber mirado
+    el trozo donde podría estar.
+    """
     i = HTML.index(f"function {nombre}(")
-    return HTML[i : i + 2600]
+    fin = HTML.find("\nfunction ", i + 1)
+    return HTML[i:fin] if fin != -1 else HTML[i:]
 
 
 class TestLaMesaLlamaLoQueExiste:

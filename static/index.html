@@ -1090,6 +1090,43 @@ input::placeholder,textarea::placeholder{color:var(--text4);font-weight:400}
 .mesa-todo button{border:1px solid var(--border);background:var(--bg);border-radius:4px;font-size:.62rem;padding:.05rem .3rem;cursor:pointer;color:var(--text3)}
 .mesa-todo button:hover{border-color:var(--c-teal2);color:var(--text)}
 .mesa-nc{font-size:.68rem;color:var(--text3);white-space:nowrap}
+/* Limpieza de la tabla: filas alternas y menos peso visual en las líneas.
+   Con 146 renglones, la cuadrícula completa cansa y se pierde el renglón. */
+.mesa-tabla tbody tr:nth-child(even){background:color-mix(in srgb,var(--text3) 3%,transparent)}
+.mesa-tabla tbody tr:hover{background:color-mix(in srgb,var(--c-teal2) 6%,transparent)}
+.mesa-tabla td{border-bottom:1px solid color-mix(in srgb,var(--border) 55%,transparent)}
+.mesa-tabla .cod{font-variant-numeric:tabular-nums;white-space:nowrap}
+.mesa-tabla .num,.mesa-tabla input.num{font-variant-numeric:tabular-nums}
+/* El botón que despliega el motivo completo, sin sacar al auditor de la fila. */
+.mesa-abrir{border:0;background:none;cursor:pointer;color:var(--text3);font-size:.8rem;padding:.1rem .25rem;line-height:1}
+.mesa-abrir:hover{color:var(--c-teal2)}
+.mesa-detalle td{background:var(--bg);padding:.6rem .9rem;font-size:.78rem;line-height:1.45;white-space:pre-wrap}
+/* Insignia de soportes: tres estados, y «no sé» NO se pinta como «no hay». */
+.mesa-sop{font-size:.72rem;white-space:nowrap;cursor:default}
+.mesa-sop.si{color:var(--c-verde,#16a34a);font-weight:600}
+.mesa-sop.no{color:var(--text3)}
+.mesa-sop.duda{color:var(--c-amber,#d97706)}
+/* Panel lateral de gestión. */
+.mesa-drawer{position:fixed;inset:0;z-index:1200;display:flex;justify-content:flex-end}
+/* El `display:flex` de arriba le gana al atributo `hidden` (una clase pesa
+   más que la hoja del navegador), y el panel quedaba SIEMPRE presente con su
+   fondo invisible tapando la página entera: ningún clic funcionaba. */
+.mesa-drawer[hidden]{display:none}
+.mesa-drawer-fondo{position:absolute;inset:0;background:rgba(0,0,0,.35)}
+.mesa-drawer-caja{position:relative;width:min(560px,94vw);height:100%;background:var(--bg-card);
+  border-left:1px solid var(--border);display:flex;flex-direction:column;box-shadow:-8px 0 24px rgba(0,0,0,.18)}
+.mesa-drawer-caja header{display:flex;justify-content:space-between;align-items:center;gap:1rem;
+  padding:.9rem 1.1rem;border-bottom:1px solid var(--border)}
+.mesa-dr-cod{margin-left:.5rem;font-size:.76rem;color:var(--text3)}
+.mesa-drawer-cuerpo{flex:1;overflow-y:auto;padding:1.1rem;font-size:.82rem;line-height:1.5}
+.mesa-dr-seccion{margin-bottom:1.2rem}
+.mesa-dr-seccion h4{margin:0 0 .45rem;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
+.mesa-dr-caja{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:.6rem .75rem}
+.mesa-dr-dictamen{max-height:260px;overflow-y:auto}
+.mesa-dr-arch{display:flex;justify-content:space-between;gap:.6rem;padding:.28rem 0;border-bottom:1px solid var(--border)}
+.mesa-dr-arch:last-child{border-bottom:0}
+.mesa-dr-com{border-left:2px solid var(--c-teal2);padding:.35rem .6rem;margin-bottom:.5rem;background:var(--bg)}
+.mesa-dr-com small{color:var(--text3);display:block;font-size:.7rem}
 .concil-grid{display:grid;grid-template-columns:340px 1fr;gap:1.5rem;margin-top:1rem}
 .stat-row{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
 .stat-mini{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:.8rem 1.2rem;min-width:110px}
@@ -4414,10 +4451,11 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             <div class="mesa-tabla-wrap">
               <table class="mesa-tabla" id="mesa-tabla">
                 <thead><tr>
-                  <th>#</th><th>Factura</th><th>Código</th><th>Servicio</th>
+                  <th></th><th>#</th><th>Factura</th><th>Código</th><th>Servicio</th>
+                  <th title="Soportes de la factura en el archivo del hospital">📎</th>
                   <th class="num">Glosado</th><th>Tipo</th>
                   <th class="num">Acepta IPS</th><th class="num">Levanta EPS</th><th class="num">Ratifica</th>
-                  <th class="num">Pendiente</th><th>Texto de la conciliación</th><th>Nota crédito</th>
+                  <th class="num">Pendiente</th><th>Texto de la conciliación</th><th>Nota crédito</th><th></th>
                 </tr></thead>
                 <tbody id="mesa-filas"></tbody>
               </table>
@@ -4428,6 +4466,22 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
               <span id="mesa-estado" class="auto-estado" style="align-self:center"></span>
             </div>
           </div>
+        </div>
+
+        <!-- Panel lateral: lo que hace falta para refutar una glosa EN la
+             audiencia, sin salir de la mesa ni hacer esperar a la EPS. -->
+        <div id="mesa-drawer" class="mesa-drawer" hidden>
+          <div class="mesa-drawer-fondo" onclick="mesaCerrarPanel()"></div>
+          <aside class="mesa-drawer-caja" role="dialog" aria-label="Gestión del renglón">
+            <header>
+              <div>
+                <b id="mesa-dr-factura">—</b>
+                <span id="mesa-dr-cod" class="mesa-dr-cod"></span>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="mesaCerrarPanel()">Cerrar</button>
+            </header>
+            <div class="mesa-drawer-cuerpo" id="mesa-dr-cuerpo"></div>
+          </aside>
         </div>
 
         <!-- El acta que se trabaja en Excel en la audiencia: se cuadra sola,
@@ -24729,10 +24783,12 @@ function mesaPintar(){
       ? escHtml(l.cuenta_contable + ' · ' + l.concepto_nota)
       : (l.centro_costo ? '<span title="' + escHtml(l.centro_costo) + '">centro sin catálogo</span>' : '—');
     return '<tr' + falta + ' data-id="' + l.id + '" title="' + escHtml(l.aviso || '') + '">'
+      + '<td><button class="mesa-abrir" title="Ver el motivo completo" onclick="mesaDesplegar(' + l.id + ', this)">▸</button></td>'
       + '<td>' + escHtml(l.item) + '</td>'
-      + '<td>' + escHtml(l.factura) + '</td>'
-      + '<td>' + escHtml(l.cod_glosa) + '<br><small style="color:var(--text3)">' + escHtml(l.tipificacion) + '</small></td>'
+      + '<td class="cod">' + escHtml(l.factura) + '</td>'
+      + '<td class="cod">' + escHtml(l.cod_glosa) + '<br><small style="color:var(--text3)">' + escHtml(l.tipificacion) + '</small></td>'
       + '<td><span class="serv" title="' + escHtml(l.descripcion) + '">' + escHtml(l.descripcion) + '</span></td>'
+      + '<td>' + mesaInsigniaSoportes(l.factura) + '</td>'
       + '<td class="num">' + fmtCOP(l.glosa_inicial) + '</td>'
       + '<td><select onchange="mesaGuardar(' + l.id + ', {tipo_glosa: this.value})"' + ro + '>'
         + ['','ADMINISTRATIVA','MIXTA','MEDICO'].map(function(t){
@@ -24752,9 +24808,16 @@ function mesaPintar(){
       + '<td class="txt"><input type="text" value="' + escHtml(l.texto_conciliacion) + '"'
         + ' onchange="mesaGuardar(' + l.id + ', {texto_conciliacion: this.value})"' + ro + '></td>'
       + '<td class="mesa-nc">' + nc + '</td>'
-      + '</tr>';
+      + '<td><button class="btn btn-ghost btn-sm" style="padding:.15rem .45rem;font-size:.7rem"'
+        + ' onclick="mesaGestionar(' + l.id + ')">Gestionar</button></td>'
+      + '</tr>'
+      + '<tr class="mesa-detalle" id="mesa-det-' + l.id + '" hidden><td colspan="15">'
+        + escHtml(l.descripcion || '(sin motivo)')
+        + (l.aviso ? '\n\n⚠ ' + escHtml(l.aviso) : '')
+      + '</td></tr>';
   }).join('');
   document.getElementById('mesa-filas').innerHTML = filas;
+  mesaTraerSoportes();
 }
 
 function mesaCifras(){
@@ -24769,6 +24832,136 @@ function mesaCifras(){
   document.getElementById('mesa-cifras').innerHTML = c.map(function(x){
     return '<div class="c">' + escHtml(x[0]) + '<b>' + x[1] + '</b></div>';
   }).join('');
+}
+
+var MESA_SOPORTES = {};
+
+function mesaDesplegar(lineaId, boton){
+  var fila = document.getElementById('mesa-det-' + lineaId);
+  if(!fila) return;
+  fila.hidden = !fila.hidden;
+  boton.textContent = fila.hidden ? '▸' : '▾';
+}
+
+function mesaInsigniaSoportes(factura){
+  var s = MESA_SOPORTES[factura];
+  if(!s) return '<span class="mesa-sop duda" title="Todavía no se consultó">·</span>';
+  if(s.estado === 'CON_SOPORTES')
+    return '<span class="mesa-sop si" title="' + s.cuantos + ' archivo(s) en el archivo del hospital">📎 ' + s.cuantos + '</span>';
+  if(s.estado === 'SIN_SOPORTES')
+    return '<span class="mesa-sop no" title="No se encontraron soportes de esta factura">—</span>';
+  // INDEXANDO o SIN_INDICE: NO se dice «no tiene». Decirlo mientras el
+  // índice se arma manda a aceptar una glosa que sí estaba soportada.
+  return '<span class="mesa-sop duda" title="' + escHtml(s.detalle || 'Todavía no se sabe') + '">?</span>';
+}
+
+async function mesaTraerSoportes(){
+  if(!MESA) return;
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/soportes', {headers: authH()});
+    if(!r.ok) return;
+    MESA_SOPORTES = await r.json();
+    // Se repintan solo las insignias, no la tabla: el auditor puede estar
+    // escribiendo en un renglón mientras esto llega.
+    MESA.lineas.forEach(function(l){
+      var tr = document.querySelector('#mesa-filas tr[data-id="' + l.id + '"]');
+      if(tr && tr.cells[5]) tr.cells[5].innerHTML = mesaInsigniaSoportes(l.factura);
+    });
+  }catch(e){ /* las insignias son una ayuda, no un bloqueo */ }
+}
+
+function mesaCerrarPanel(){
+  var d = document.getElementById('mesa-drawer');
+  if(d) d.hidden = true;
+}
+
+async function mesaGestionar(lineaId){
+  if(!MESA) return;
+  var d = document.getElementById('mesa-drawer');
+  var cuerpo = document.getElementById('mesa-dr-cuerpo');
+  d.hidden = false;
+  cuerpo.innerHTML = '<p style="color:var(--text3)">Trayendo el detalle…</p>';
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/linea/' + lineaId, {headers: authH()});
+    if(!r.ok){
+      var e = await r.json().catch(function(){return {}});
+      cuerpo.innerHTML = '<p class="auto-error">' + escHtml(e.detail || ('HTTP ' + r.status)) + '</p>';
+      return;
+    }
+    mesaPintarPanel(await r.json());
+  }catch(e){ cuerpo.innerHTML = '<p class="auto-error">Error de conexión: ' + escHtml(e.message) + '</p>'; }
+}
+
+function mesaPintarPanel(d){
+  document.getElementById('mesa-dr-factura').textContent = d.factura || '—';
+  document.getElementById('mesa-dr-cod').textContent = d.cod_glosa || '';
+  var h = '';
+
+  h += '<div class="mesa-dr-seccion"><h4>Lo que objeta la EPS</h4>'
+     + '<div class="mesa-dr-caja">' + escHtml(d.descripcion || '(sin motivo)') + '</div></div>';
+
+  if(d.glosa){
+    h += '<div class="mesa-dr-seccion"><h4>Nuestro dictamen</h4><div class="mesa-dr-caja mesa-dr-dictamen">'
+       + (d.glosa.dictamen || '<i style="color:var(--text3)">Esta glosa todavía no tiene dictamen escrito.</i>')
+       + '</div><small style="color:var(--text3)">Estado: ' + escHtml(d.glosa.workflow_state || '—')
+       + ' · objetado ' + fmtCOP(d.glosa.valor_objetado)
+       + (d.glosa.valor_aceptado ? ' · aceptado ' + fmtCOP(d.glosa.valor_aceptado) : '') + '</small></div>';
+  } else if(d.nota){
+    h += '<div class="mesa-dr-seccion"><h4>Historial</h4><div class="mesa-dr-caja" style="color:var(--text3)">'
+       + escHtml(d.nota) + '</div></div>';
+  }
+
+  var s = d.soportes || {};
+  h += '<div class="mesa-dr-seccion"><h4>Soportes de la factura</h4><div class="mesa-dr-caja">';
+  if(s.estado === 'CON_SOPORTES'){
+    h += (s.archivos||[]).map(function(a){
+      return '<div class="mesa-dr-arch"><span>' + escHtml(a.nombre) + '</span>'
+           + '<small style="color:var(--text3)">' + escHtml(a.tipo || '') + '</small></div>';
+    }).join('');
+    if(s.cuantos > (s.archivos||[]).length) h += '<small>… y ' + (s.cuantos - s.archivos.length) + ' más</small>';
+  } else if(s.estado === 'SIN_SOPORTES'){
+    h += '<span style="color:var(--text3)">No se encontraron soportes de esta factura en el archivo.</span>';
+  } else {
+    h += '<span style="color:var(--c-amber,#d97706)">Todavía no se puede saber: '
+       + escHtml(s.detalle || 'el buscador de soportes no está listo') + '</span>';
+  }
+  h += '</div></div>';
+
+  h += '<div class="mesa-dr-seccion"><h4>Comentarios del equipo</h4>';
+  if(d.glosa_id){
+    h += '<div style="display:flex;gap:.4rem;margin-bottom:.6rem">'
+       + '<input type="text" id="mesa-dr-nuevo" placeholder="Anotá algo para el equipo…" style="flex:1">'
+       + '<button class="btn btn-primary btn-sm" onclick="mesaComentar(' + d.linea_id + ')">Anotar</button></div>';
+    h += (d.comentarios||[]).length
+      ? d.comentarios.map(function(c){
+          return '<div class="mesa-dr-com">' + escHtml(c.texto)
+               + '<small>' + escHtml(c.autor) + (c.creado_en ? ' · ' + c.creado_en.slice(0,16).replace('T',' ') : '') + '</small></div>';
+        }).join('')
+      : '<span style="color:var(--text3)">Todavía nadie anotó nada sobre esta glosa.</span>';
+  } else {
+    h += '<span style="color:var(--text3)">Este renglón no está enlazado a una glosa del motor, '
+       + 'así que no hay dónde guardar comentarios.</span>';
+  }
+  h += '</div>';
+
+  document.getElementById('mesa-dr-cuerpo').innerHTML = h;
+}
+
+async function mesaComentar(lineaId){
+  var campo = document.getElementById('mesa-dr-nuevo');
+  var texto = (campo && campo.value || '').trim();
+  if(!texto){ toast('Falta el texto','Escribí el comentario antes de anotarlo','warning'); return; }
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/linea/' + lineaId + '/comentario', {
+      method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({texto: texto})
+    });
+    if(!r.ok){
+      var e = await r.json().catch(function(){return {}});
+      toast('No se guardó', escHtml(e.detail || ('HTTP ' + r.status)), 'error'); return;
+    }
+    mesaGestionar(lineaId);
+  }catch(e){ toast('Error de conexión', escHtml(e.message), 'error'); }
 }
 
 async function mesaGuardar(lineaId, cambios){

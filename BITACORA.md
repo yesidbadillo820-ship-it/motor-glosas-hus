@@ -91,6 +91,51 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 07-09-2026 (noche, 2) — En la mesa se ve por qué se glosó y con qué refutarlo
+
+**El problema.** La tabla de la mesa mostraba el motivo de la glosa cortado a
+media línea. Un motivo de verdad tiene tres o cuatro renglones de texto —
+«supera el valor pactado en el anexo técnico 2 del contrato…»— y en pantalla
+se veía «supera el valor pact…». Para leerlo completo tocaba abrir el Excel
+de la EPS aparte, en plena audiencia, con la EPS esperando.
+
+**Cómo queda.**
+
+- **El motivo completo, sin romper la tabla.** Cada renglón tiene una flecha
+  al principio: se hace clic y se abre debajo el texto entero, con los saltos
+  de línea como los mandó la EPS. Y pasando el mouse por encima también se ve.
+  La tabla no se estira: sigue cabiendo en la pantalla.
+
+- **Una columna que dice si hay soportes.** Un clip con el número (📎 3)
+  cuando la factura tiene soportes en el archivo del hospital, una raya
+  cuando no tiene, y un signo de interrogación cuando el buscador **todavía
+  no ha terminado de revisar**. Esa tercera respuesta es a propósito: decir
+  «no tiene soportes» mientras el índice se está armando lleva a aceptar una
+  glosa que sí estaba soportada.
+
+- **Un botón «Gestionar» en cada renglón.** Abre un cajón lateral con cuatro
+  cosas, sin salir de la mesa: lo que objeta la EPS, el dictamen que el motor
+  ya escribió para esa glosa, la lista de soportes de la factura, y los
+  comentarios del equipo. Es lo que hace falta para refutar en el momento.
+
+- **La tabla, más limpia.** Renglones alternados, se resalta el que está bajo
+  el mouse, las cifras alineadas por la coma y los bordes más suaves.
+
+**Un detalle que importa.** No todas las glosas del archivo de la EPS están en
+el motor: hay facturas que ella glosa y que nunca entraron por el flujo
+normal. En esos renglones el cajón lo dice con todas sus letras («no hay
+dictamen ni comentarios que mostrar») en vez de mostrar un cajón vacío que
+parece un error.
+
+**Lo que NO se hizo, y hay que decirlo.** El cajón **deja ver** los soportes
+que ya existen, pero todavía **no permite subir archivos** desde la mesa. Se
+pidió «cargar/descargar»; quedó la mitad. Queda anotado en PENDIENTE.
+
+30 pruebas nuevas y una revisión en navegador de toda la pantalla.
+
+---
+
+
 ### 07-09-2026 (noche) — La conciliación se trabaja en la pantalla, no en un Excel suelto
 
 **El problema de fondo.** Una audiencia con la EPS dura horas. Hasta ahora el
@@ -11200,6 +11245,22 @@ valor leido del PDF o con el objetado.
 
 ## 3) PENDIENTE
 
+### Mesa de conciliación en pantalla (07-09)
+- **Subir soportes desde la mesa.** El cajón «Gestionar» ya deja **ver** los
+  soportes que hay en el archivo del hospital, pero todavía no deja **subir**
+  un archivo desde ahí. Se pidió cargar y descargar; quedó solo el ver.
+- **Probarla con un lote de verdad.** Falta correrla con una lista de facturas
+  y el consolidado de la MISMA remesa de la EPS. Los tres archivos de prueba
+  que hay son de remesas distintas, así que cruzan poco.
+- **«No se pudo cerrar».** No se pudo repetir el error en el motor de prueba.
+  Ahora el cierre aguanta que falle el aprendizaje y la pantalla muestra el
+  motivo exacto que devuelve el servidor: si vuelve a salir, ese texto dice
+  qué fue.
+- **Centros de costo que no están en el catálogo de contabilidad** (por
+  ejemplo `734005 - LABORATORIO - INMUNOLOGIA`): se muestra el centro pero no
+  se pone cuenta. Falta que contabilidad diga si hay regla para esos.
+
+
 ### COOSALUD — paquete del 07-09 (GI-33-5434-2026)
 - **DECISIÓN SUYA: el texto de COBERTURA.** Son 281 glosas CO4601 en la factura
   HUS545379 ($47.882.455). Apenas el área dicte el texto, se deja fijo en
@@ -12088,6 +12149,12 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
   son para que el área los mire, no se unieron por parecido.
 
 ## 4) PARA MAÑANA
+
+**Mesa de conciliación — probarla de verdad.** Abrir una mesa con una lista de
+facturas y el consolidado de la MISMA remesa de la EPS, y trabajarla de punta a
+punta hasta bajar el acta. Es lo único que dice si sirve en una audiencia. Si
+al cerrar sale «No se pudo cerrar», ahora la pantalla muestra el motivo exacto:
+copiarlo al chat.
 
 **COOSALUD 07-09 — lo primero.** Correr el portal con las 4 listas (vence el
 14/09) y, en paralelo, bajar de DGH la base de servicios del 26/06 al 02/08

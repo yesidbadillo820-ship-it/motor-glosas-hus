@@ -25,7 +25,7 @@ TRES DUEÑOS EN CADA RENGLÓN, y conviene no confundirlos:
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from app.core.logging_utils import logger
 from app.models.db import (
@@ -64,6 +64,36 @@ def _dinero(valor: Any) -> float:
 # ═══════════════════════════════════════════════════════════════════════
 #  Abrir la mesa
 # ═══════════════════════════════════════════════════════════════════════
+
+
+def glosa_del_motor(db: Any, factura_clave: str, cod_glosa: str) -> Optional[int]:
+    """El id de la glosa del motor que corresponde a este renglón, si la hay.
+
+    Los renglones de la mesa vienen del archivo de la EPS, no del historial:
+    hay facturas que la EPS glosa y que el motor nunca recibió. Cuando el
+    enlace existe, el auditor puede abrir en la audiencia el dictamen que ya
+    se escribió, los comentarios del equipo y los soportes cargados — que es
+    justo lo que hace falta para refutar en la mesa.
+
+    Se busca por factura Y código: una factura tiene varias glosas y traerse
+    la primera sería mostrar el historial de otra.
+    """
+    from app.models.db import GlosaRecord
+
+    if not factura_clave or not cod_glosa:
+        return None
+    try:
+        fila = (
+            db.query(GlosaRecord.id)
+            .filter(GlosaRecord.factura.like(f"%{factura_clave}%"))
+            .filter(GlosaRecord.codigo_glosa == cod_glosa)
+            .order_by(GlosaRecord.id.desc())
+            .first()
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[MESA] no se pudo enlazar la glosa del motor: {e}")
+        return None
+    return int(fila[0]) if fila else None
 
 
 def _contables_de(db: Any, factura_clave: str, cod_glosa: str) -> tuple[str, str, str]:
@@ -147,6 +177,7 @@ def abrir(
             MesaLineaRecord(
                 mesa_id=mesa.id,
                 orden=orden,
+                glosa_id=glosa_del_motor(db, clave, linea.cod_glosa),
                 item=linea.item,
                 radicado=linea.radicado[:60],
                 factura=linea.factura[:50],
@@ -375,3 +406,146 @@ def a_excel(db: Any, mesa: MesaConciliacionRecord, modelo: bytes) -> bytes:
     )
     resultado = armador.Resultado(acta=a_acta(db, mesa))
     return armador.escribir_en_modelo(resultado, modelo, encabezado, marcar_pendientes=False)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  El detalle de un renglón: lo que hace falta para refutar en la mesa
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def _soportes_de(factura: str) -> dict:
+    """Qué soportes tiene esa factura, según el indexador del hospital.
+
+    TRES RESPUESTAS, NO DOS. «Tiene soportes», «no tiene» y **«todavía no
+    sé»**: el indexador recorre el share del hospital y ese escaneo tarda
+    horas. Decir «no tiene soportes» mientras el índice se arma es peor que
+    no decir nada — en una mesa, esa frase manda a aceptar una glosa que sí
+    estaba soportada.
+    """
+    try:
+        from app.services import soportes_autodiscovery_service as sas
+
+        indexador = sas.get_indexer()
+        stats = indexador.stats()
+        archivos = indexador.lookup(factura, auto_rebuild=False) or []
+    except Exception as e:  # noqa: BLE001
+        return {"estado": "SIN_INDICE", "cuantos": 0, "archivos": [], "detalle": str(e)[:200]}
+
+    if not archivos and stats.get("construyendo"):
+        return {
+            "estado": "INDEXANDO",
+            "cuantos": 0,
+            "archivos": [],
+            "detalle": "El buscador de soportes todavía está recorriendo el archivo.",
+        }
+    return {
+        "estado": "CON_SOPORTES" if archivos else "SIN_SOPORTES",
+        "cuantos": len(archivos),
+        # `lookup` devuelve DICCIONARIOS (`asdict` de SoporteEntry), no
+        # objetos: hay que leerlos con `.get`, no con `getattr`, o el cajón
+        # muestra una lista de nombres en blanco.
+        "archivos": [
+            {
+                "nombre": a.get("nombre_archivo") or "",
+                "tipo": a.get("tipo") or "",
+                "tipo_codigo": a.get("tipo_codigo") or "",
+                "tamano_kb": a.get("tamano_kb") or 0,
+                "ruta": a.get("ruta") or "",
+            }
+            for a in archivos[:40]
+            if isinstance(a, dict)
+        ],
+    }
+
+
+def detalle_linea(db: Any, mesa_id: int, linea_id: int) -> dict:
+    """Todo lo que el auditor necesita ver de un renglón sin salir de la mesa.
+
+    En una audiencia, cuando la EPS sostiene una glosa, la pregunta es
+    siempre la misma: **¿qué tenemos para refutar esto?** La respuesta está
+    repartida en el motor —el dictamen que ya se escribió, los soportes que
+    hay en el archivo, lo que anotó un compañero— y hasta ahora había que ir
+    a buscarla a otra pantalla, con la EPS esperando.
+    """
+    from app.models.db import ComentarioGlosaRecord, GlosaRecord
+
+    linea = (
+        db.query(MesaLineaRecord)
+        .filter(MesaLineaRecord.id == linea_id)
+        .filter(MesaLineaRecord.mesa_id == mesa_id)
+        .first()
+    )
+    if linea is None:
+        return {"estado": "no_existe"}
+
+    salida: dict = {
+        "estado": "ok",
+        "linea_id": linea.id,
+        "factura": linea.factura or "",
+        "cod_glosa": linea.cod_glosa or "",
+        "descripcion": linea.descripcion or "",
+        "glosa_id": linea.glosa_id,
+        "soportes": _soportes_de(linea.factura or ""),
+        "glosa": None,
+        "comentarios": [],
+    }
+
+    if not linea.glosa_id:
+        salida["nota"] = (
+            "Esta glosa no está en el historial del motor: vino en el archivo de "
+            "la EPS y no se recibió por el flujo normal. No hay dictamen ni "
+            "comentarios que mostrar."
+        )
+        return salida
+
+    glosa = db.query(GlosaRecord).filter(GlosaRecord.id == linea.glosa_id).first()
+    if glosa is not None:
+        salida["glosa"] = {
+            "id": glosa.id,
+            "eps": glosa.eps or "",
+            "factura": glosa.factura or "",
+            "codigo_glosa": glosa.codigo_glosa or "",
+            "codigo_respuesta": getattr(glosa, "codigo_respuesta", "") or "",
+            "etapa": glosa.etapa or "",
+            "estado": glosa.estado or "",
+            "workflow_state": getattr(glosa, "workflow_state", "") or "",
+            "valor_objetado": glosa.valor_objetado or 0.0,
+            "valor_aceptado": glosa.valor_aceptado or 0.0,
+            # El dictamen es HTML que ya escribió el motor: es LO que se lee
+            # en la mesa para sostener la posición del hospital.
+            "dictamen": glosa.dictamen or "",
+            "dictamen_generado_en": (
+                glosa.dictamen_generado_en.isoformat() if glosa.dictamen_generado_en else None
+            ),
+            "observacion_eps": getattr(glosa, "observacion_eps", "") or "",
+        }
+
+    comentarios = (
+        db.query(ComentarioGlosaRecord)
+        .filter(ComentarioGlosaRecord.glosa_id == linea.glosa_id)
+        .order_by(ComentarioGlosaRecord.id.desc())
+        .limit(50)
+        .all()
+    )
+    salida["comentarios"] = [
+        {
+            "id": c.id,
+            "autor": c.autor_nombre or c.autor_email or "",
+            "texto": c.texto or "",
+            "resuelto": bool(c.resuelto),
+            "creado_en": c.creado_en.isoformat() if c.creado_en else None,
+        }
+        for c in comentarios
+    ]
+    return salida
+
+
+def soportes_de_la_mesa(db: Any, mesa_id: int) -> dict:
+    """Cuántos soportes tiene cada factura de la mesa, de una sola pasada.
+
+    Se consulta POR FACTURA y no por renglón: una factura con doce glosas
+    comparte sus soportes, y preguntarlo doce veces sería recorrer el índice
+    doce veces para la misma respuesta.
+    """
+    facturas = {x.factura for x in lineas_de(db, mesa_id) if x.factura}
+    return {f: _soportes_de(f) for f in sorted(facturas)}

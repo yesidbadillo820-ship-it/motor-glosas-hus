@@ -877,6 +877,23 @@ async def lifespan(app: FastAPI):
     # IM F1.3: tabla nueva `lotes_importacion` — la crea Base.metadata
     # .create_all automaticamente si no existe. No requiere ALTER TABLE.
 
+    # La mesa de conciliación enlaza cada renglón con su glosa del motor,
+    # para poder abrir el historial y los comentarios desde la audiencia.
+    # La tabla ya existía sin esta columna: create_all() no la agrega.
+    try:
+        if _tiene_tabla("mesa_conciliacion_lineas") and not _tiene_columna(
+            "mesa_conciliacion_lineas", "glosa_id"
+        ):
+            logger.warning("MIGRACIÓN: Agregando columna 'glosa_id' a mesa_conciliacion_lineas")
+            db.execute(text("ALTER TABLE mesa_conciliacion_lineas ADD COLUMN glosa_id INTEGER"))
+            db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN mesa_conciliacion_lineas glosa_id: {e}")
+
     # RustDesk: 2 columnas opcionales en usuarios para acceso remoto
     _USUARIOS_RUSTDESK = [
         ("rustdesk_id", "VARCHAR(40)"),

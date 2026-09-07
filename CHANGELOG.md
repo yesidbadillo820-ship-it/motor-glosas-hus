@@ -1,5 +1,45 @@
 # Registro de cambios
 
+## Sesión 07-sep-2026 (noche, 2) — La mesa muestra por qué se glosó y con qué refutar
+
+La tabla cortaba el motivo de la glosa a media línea y no decía si la factura
+tenía soportes. Con la EPS al frente, eso obligaba a abrir el Excel aparte.
+
+- **`glosa_del_motor()`** (`mesa_conciliacion.py`) — enlaza el renglón con la
+  glosa del historial por factura **y** código. Solo por factura traería la
+  primera de doce y se mostraría el dictamen de otra. Se guarda en
+  `MesaLineaRecord.glosa_id` al abrir la mesa (migración en `app/main.py`).
+- **`detalle_linea()`** — devuelve el dictamen del motor, los soportes y los
+  comentarios del equipo. Cuando la glosa no está en el motor (vino solo en el
+  archivo de la EPS) lo dice explícitamente en vez de responder vacío.
+- **`_soportes_de()`** — **tres** estados, no dos: `CON_SOPORTES`,
+  `SIN_SOPORTES` y `INDEXANDO`/`SIN_INDICE`. Decir «no tiene» mientras el
+  índice se construye induce a aceptar una glosa soportada.
+- **`soportes_de_la_mesa()`** — consulta por factura, no por renglón: doce
+  glosas de la misma factura comparten soportes y recorrer el índice doce
+  veces daría la misma respuesta.
+- **Pantalla** (`static/index.html`) — flecha que despliega el motivo completo
+  con `white-space:pre-wrap` (+ `title` para verlo al pasar el mouse), columna
+  de soportes con insignia, botón «Gestionar» que abre un cajón lateral con
+  cuatro secciones, y limpieza de la tabla (renglones alternados, hover,
+  `tabular-nums`).
+- **`.mesa-drawer[hidden]{display:none}`** — sin esta regla el `display:flex`
+  ganaba sobre `hidden` y el fondo invisible del cajón se comía todos los
+  clics de la página.
+
+Corregido en el camino:
+
+- `lookup()` del indexador devuelve **diccionarios**, no objetos: se leían con
+  `getattr` y el cajón mostraba «3 soportes» con tres nombres en blanco. Va
+  con prueba que falla contra el código anterior.
+- El ayudante `_funcion()` de `test_mesa_conciliacion_pantalla.py` cortaba el
+  cuerpo a 2.600 caracteres: agregarle una línea a la función dejaba el resto
+  fuera y las pruebas de «esto no aparece» (`toLocaleString`) pasaban sin
+  haber mirado. Ahora corta en la función siguiente.
+
+30 pruebas nuevas (11 de API, 18 de pantalla, 1 de regresión de soportes).
+
+
 ## Sesión 07-sep-2026 (noche) — La mesa de conciliación vive en el motor
 
 El acta se arma, se guarda y se trabaja en pantalla; el Excel sale al final.
