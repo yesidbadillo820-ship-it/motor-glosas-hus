@@ -34,13 +34,17 @@ def cargar_tarifario(ruta_servicios: Path | None, ruta_medicamentos: Path | None
 
     indice: dict[str, dict] = {}
 
-    def anotar(codigo, precio, descripcion, fuente):
+    def anotar(codigo, precio, descripcion, fuente, modalidad=""):
         cod = _norm_cod(codigo)
         if cod and precio and cod not in indice:
             indice[cod] = dict(
                 precio=precio,
                 descripcion=" ".join(str(descripcion or "").split())[:80],
                 fuente=fuente,
+                # "PROPIA" o "SOAT SMLV-20%": el anexo dice, código por código,
+                # bajo qué modalidad se pactó. Es lo que permite responder una
+                # glosa de tarifas sin tener que citar cifras.
+                modalidad=" ".join(str(modalidad or "").split()).upper()[:40],
             )
 
     if ruta_servicios and Path(ruta_servicios).is_file():
@@ -66,12 +70,16 @@ def cargar_tarifario(ruta_servicios: Path | None, ruta_medicamentos: Path | None
                             None,
                         )
                         i_pre = next(i for v, i in encabezado.items() if "PRECIO" in v)
+                        i_mod = next(
+                            (i for v, i in encabezado.items() if v.startswith("TARIFA")), None
+                        )
                     continue
                 precio = a_entero(fila[i_pre]) if i_pre < len(fila) else None
                 des = fila[i_des] if i_des is not None and i_des < len(fila) else ""
+                mod = fila[i_mod] if i_mod is not None and i_mod < len(fila) else ""
                 if i_ips is not None and i_ips < len(fila):
-                    anotar(fila[i_ips], precio, des, f"anexo 6.2 · {hoja.strip()}")
-                anotar(fila[i_cups], precio, des, f"anexo 6.2 · {hoja.strip()}")
+                    anotar(fila[i_ips], precio, des, f"anexo 6.2 · {hoja.strip()}", mod)
+                anotar(fila[i_cups], precio, des, f"anexo 6.2 · {hoja.strip()}", mod)
         wb.close()
 
     if ruta_medicamentos and Path(ruta_medicamentos).is_file():

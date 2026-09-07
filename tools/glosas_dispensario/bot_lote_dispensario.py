@@ -260,6 +260,53 @@ def _reparto(cotejo: dict) -> str:
     )
 
 
+def es_concepto_de_tarifas(codigo_glosa: str) -> bool:
+    """Las causales TA**** del manual único de glosas son las de tarifas."""
+    return str(codigo_glosa or "").strip().upper().startswith("TA")
+
+
+def parrafo_tarifario(cups: str, servicio: str, tarifa: dict | None) -> str | None:
+    """El argumento de una glosa de TARIFAS, SIN una sola cifra.
+
+    Decisión del auditor (07-09-2026): en las glosas de tarifas la respuesta
+    no lleva valores. Dar el valor facturado y el pactado le sirve al pagador
+    para hacer la resta y ratificar por la diferencia; el hospital gana el
+    punto por el título contractual —el código está pactado en el anexo que
+    ambas partes firmaron—, no por la aritmética.
+
+    Lo que sí se dice, porque consta en el anexo: bajo qué modalidad quedó
+    pactado el código. Si el anexo lo trae como tarifa propia de la ESE, la
+    referencia SOAT que el pagador aplica no es la pactada, y eso por sí solo
+    tumba la causal.
+    """
+    if not tarifa:
+        return None
+    etiqueta = " ".join(f"{cups} {servicio}".split()).strip() or "EL SERVICIO GLOSADO"
+    propia = "PROPIA" in (tarifa.get("modalidad") or "")
+    pactado = (
+        "SE ENCUENTRA PACTADO EN EL ANEXO TARIFARIO DEL CONTRATO "
+        "440-DIGSA-DMBUG-2025 CON TARIFA PROPIA DE LA ESE HOSPITAL UNIVERSITARIO DE "
+        "SANTANDER, Y NO POR REFERENCIA SOAT"
+        if propia
+        else "SE ENCUENTRA PACTADO EN EL ANEXO TARIFARIO DEL CONTRATO 440-DIGSA-DMBUG-2025"
+    )
+    cierre = (
+        "EL DESCUENTO SE SUSTENTA EN UNA REFERENCIA TARIFARIA DISTINTA DE LA PACTADA, "
+        "APLICADA DE MANERA UNILATERAL POR EL PAGADOR Y SIN ACUERDO QUE SUSTITUYA EL "
+        "ANEXO, POR LO QUE LA CAUSAL CARECE DE SUSTENTO CONTRACTUAL."
+        if propia
+        else "EL DESCUENTO NO SE APOYA EN LA TARIFA PACTADA ENTRE LAS PARTES, POR LO QUE "
+        "LA CAUSAL CARECE DE SUSTENTO CONTRACTUAL."
+    )
+    return (
+        f"VERIFICADO EL SERVICIO {etiqueta} CONTRA EL ANEXO TARIFARIO DEL ACUERDO DE "
+        f"VOLUNTADES SUSCRITO ENTRE LAS PARTES, EL CODIGO {pactado}. LA FACTURACION SE "
+        "EFECTUO CONFORME A ESE ANEXO Y AL ACTO ADMINISTRATIVO TARIFARIO INSTITUCIONAL "
+        "VIGENTE A LA FECHA DE LA PRESTACION, QUE EL CONTRATO RECONOCE ENTRE LAS PARTES. "
+        f"{cierre}"
+    )
+
+
 def parrafo_por_escenario(
     cotejo: dict,
     datos_pdf: dict | None,
@@ -542,6 +589,7 @@ def enriquecer_excel(
     por_linea: dict[tuple[str, int], str] | None = None,
     apertura_por_linea: dict[tuple[str, int], str] | None = None,
     sustituir_cuerpo: set[tuple[str, int]] | None = None,
+    sin_cifras: set[tuple[str, int]] | None = None,
 ) -> int:
     """Arma la respuesta final de cada línea. `apertura_por_linea` es el
     párrafo de evidencia con trazabilidad: entra JUSTO DESPUES del encabezado
@@ -553,6 +601,7 @@ def enriquecer_excel(
     from openpyxl import load_workbook
 
     MARCA = "POR LO EXPUESTO, SE SOLICITA EL LEVANTAMIENTO"  # arranque del cierre del motor
+    RE_IMPORTE_ENTRE_PARENTESIS = re.compile(r"\s*\(\s*\$[\d.,]+\s*\)")
     RE_ENCABEZADO = re.compile(r"OBJETADO\s+BAJO\s+EL\s+CONCEPTO\s+[A-Z0-9]+\s*:")
     por_factura = por_factura or {}
     por_linea = por_linea or {}
@@ -584,6 +633,16 @@ def enriquecer_excel(
             else:
                 detalle = apertura + " " + detalle
             cambio = True
+
+        if (fac, num) in (sin_cifras or set()):
+            # El encabezado del motor nombra el cargo con su valor —"(...$113.500)"—.
+            # En una glosa de tarifas eso también es dar una cifra, así que el
+            # cargo queda identificado por código y descripción, que es lo que
+            # la EPS necesita para saber de qué se habla.
+            limpio = RE_IMPORTE_ENTRE_PARENTESIS.sub("", detalle)
+            if limpio != detalle:
+                detalle = limpio
+                cambio = True
 
         frases = [
             f for f in (por_linea.get((fac, num)), por_factura.get(fac)) if f and f not in detalle
@@ -868,12 +927,28 @@ def main() -> int:
     aperturas: dict[tuple[str, int], str] = {}
     por_escenario = Counter()
     con_escenario: set[tuple[str, int]] = set()
+    sin_cifras: set[tuple[str, int]] = set()
     con_pdf = 0
     for d in lineas:
         clave = (d["factura"], d["num"])
         datos = extraidos.get(d["factura"])
         servicio_pdf = servicios_hallados.get(clave)
         cot = cotejos[clave]
+        if es_concepto_de_tarifas(d.get("code", "")):
+            # Directriz del auditor (07-09-2026): en las glosas de tarifas la
+            # respuesta va SIN cifras. Ver `parrafo_tarifario`.
+            parrafo = parrafo_tarifario(
+                d.get("cups", ""), d.get("serv", ""), tarifa_por_linea.get(clave)
+            )
+            # La cifra sale del texto aunque el código no esté en el anexo: si
+            # no hay con qué armar el argumento tarifario, queda el del motor,
+            # que defiende la tarifa institucional, pero sin el valor.
+            sin_cifras.add(clave)
+            if parrafo:
+                aperturas[clave] = parrafo
+                con_escenario.add(clave)
+                por_escenario["TARIFAS SIN CIFRAS"] += 1
+            continue
         parrafo = parrafo_por_escenario(
             cot, datos, servicio_pdf, d.get("cups", ""), d.get("serv", ""), d["factura"]
         )
@@ -899,9 +974,12 @@ def main() -> int:
         if parrafo:
             aperturas[clave] = parrafo
             con_pdf += 1 if datos else 0
-    if aperturas:
+    if aperturas or sin_cifras:
         n = enriquecer_excel(
-            excel_resp, apertura_por_linea=aperturas, sustituir_cuerpo=con_escenario
+            excel_resp,
+            apertura_por_linea=aperturas,
+            sustituir_cuerpo=con_escenario,
+            sin_cifras=sin_cifras,
         )
         print(
             f"[5/7] Respuestas redactadas: {n} líneas ({con_pdf} citan el PDF leído). "

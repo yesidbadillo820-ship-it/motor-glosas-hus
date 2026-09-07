@@ -406,3 +406,66 @@ def test_el_argumento_del_cotejo_reemplaza_el_cuerpo_generico(tmp_path):
     # la que no: se conserva el comportamiento de siempre (se suma, no sustituye)
     sin = filas[1][7]
     assert "EL VALOR FACTURADO ES LA TARIFA PACTADA" in sin and "EL ANEXO PACTA" in sin
+
+
+# ── Glosas de tarifas: la respuesta va SIN cifras (directriz 07-09-2026) ────
+def test_el_argumento_de_tarifas_no_lleva_ni_una_cifra():
+    """Dar el valor facturado y el pactado le sirve al pagador para hacer la
+    resta y ratificar por la diferencia. En tarifas se gana por el título
+    contractual, no por la aritmética."""
+    import re
+
+    from bot_lote_dispensario import es_concepto_de_tarifas, parrafo_tarifario
+
+    assert es_concepto_de_tarifas("TA0201") and es_concepto_de_tarifas("ta0801")
+    assert not es_concepto_de_tarifas("SO4201") and not es_concepto_de_tarifas("FA0301")
+
+    propia = dict(precio=180000, descripcion="CONSULTA", fuente="anexo 6.2", modalidad="PROPIA")
+    p = parrafo_tarifario("890275H", "CONSULTA DE PRIMERA VEZ", propia)
+    assert not re.search(r"\$[\d.]+", p)  # ni una cifra
+    assert "890275H CONSULTA DE PRIMERA VEZ" in p
+    assert "CON TARIFA PROPIA DE LA ESE" in p and "NO POR REFERENCIA SOAT" in p
+    assert "CARECE DE SUSTENTO CONTRACTUAL" in p
+
+    # si el anexo pactó el código por SOAT, no se le atribuye tarifa propia
+    soat = dict(precio=732248, descripcion="PUNCION", fuente="anexo 6.2", modalidad="SOAT SMLV-20%")
+    q = parrafo_tarifario("010101", "PUNCION CISTERNAL", soat)
+    assert "TARIFA PROPIA" not in q and not re.search(r"\$[\d.]+", q)
+
+    # sin tarifa en el anexo no se afirma que está pactado
+    assert parrafo_tarifario("999999", "LO QUE SEA", None) is None
+
+
+def test_en_tarifas_tambien_sale_el_valor_del_encabezado(tmp_path):
+    from bot_lote_dispensario import enriquecer_excel
+
+    ruta = tmp_path / "resp.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Respuestas Glosa"
+    ws.append(
+        [
+            "Factura",
+            "# Objeción",
+            "Cód.",
+            "Servicio",
+            "Valor Objetado",
+            "Valor Aceptado",
+            "Cod Respuesta",
+            "Detalle Respuesta",
+        ]
+    )
+    detalle = (
+        "ESE HUS NO ACEPTA LA GLOSA APLICADA A LA FACTURA HUS0000500001. FRENTE AL CARGO "
+        "POR CÓDIGO 890275H CONSULTA ($113.500), OBJETADO BAJO EL CONCEPTO TA0201: EL "
+        "ARGUMENTO. POR LO EXPUESTO, SE SOLICITA EL LEVANTAMIENTO TOTAL."
+    )
+    ws.append(["HUS0000500001", 1, "TA0201", "890275H - CONSULTA", 113500, 0, "RE9901", detalle])
+    ws.append(["HUS0000500002", 1, "SO4201", "890275H - CONSULTA", 113500, 0, "RE9901", detalle])
+    wb.save(ruta)
+
+    enriquecer_excel(ruta, sin_cifras={("HUS0000500001", 1)})
+    filas = list(load_workbook(ruta)["Respuestas Glosa"].iter_rows(min_row=2, values_only=True))
+    assert "$113.500" not in filas[0][7]  # la de tarifas queda sin el valor
+    assert "890275H CONSULTA, OBJETADO BAJO" in filas[0][7]  # y se lee bien
+    assert "$113.500" in filas[1][7]  # los demás conceptos, intactos
