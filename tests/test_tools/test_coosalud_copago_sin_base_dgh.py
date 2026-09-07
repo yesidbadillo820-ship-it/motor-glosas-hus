@@ -161,3 +161,50 @@ def test_el_texto_de_topes_queda_guardado_pero_no_se_aplica_solo(coo):
     assert coo.COD_RTA_TOPES == "RE9602"
     assert "EXCEDE TOPES AUTORIZADOS" in coo.OBS_TOPES_AUTORIZADOS
     assert coo.OBS_TOPES_AUTORIZADOS not in coo.OBS_POR_TIPO.values()
+
+
+# ─── Cruce por el principio de la descripción ────────────────────────────────
+
+
+def _cruces_con(descripciones: dict[str, str]) -> dict:
+    """cruces minimos con solo el indice de descripciones de una factura."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(_TOOLS))
+    try:
+        import consolidar_coosalud as coo
+    finally:
+        sys.path.remove(str(_TOOLS))
+    return {"desc_lista": {"538183": [(coo.norm_desc(d), c) for c, d in descripciones.items()]}}
+
+
+def test_oxigeno_cruza_con_oxigeno_medicinal(coo):
+    # COOSALUD glosa "OXIGENO" con el código 1O1044511000101; DGH lo tiene como
+    # V03AN01 "OXIGENO MEDICINAL". Ni el código ni la descripción coinciden, y
+    # DGH tumbaba el cargue entero con "la cuenta por cobrar no tiene asociado
+    # el servicio".
+    cruces = _cruces_con({"V03AN01": "OXIGENO MEDICINAL", "903603": "CALCIO AUTOMATIZADO"})
+
+    assert coo.cruzar_por_principio_desc(cruces, "538183", "OXIGENO") == "V03AN01"
+
+
+def test_si_hay_dos_candidatos_no_se_arriesga(coo):
+    # "OXIGENO" también es el principio de "OXIGENO MEDICINAL", pero no de
+    # "CANULA NASAL PARA OXIGENO". Si aun así quedan dos, se deja quieto: mejor
+    # perder una objeción que objetarle a DGH un servicio que no es.
+    cruces = _cruces_con({"V03AN01": "OXIGENO MEDICINAL", "V03AN02": "OXIGENO DOMICILIARIO"})
+
+    assert coo.cruzar_por_principio_desc(cruces, "538183", "OXIGENO") is None
+
+
+def test_una_descripcion_muy_corta_no_cruza(coo):
+    # Con "GEL" o "SOL" el parecido no dice nada.
+    cruces = _cruces_con({"X1": "GEL CONDUCTOR ULTRASONIDO"})
+
+    assert coo.cruzar_por_principio_desc(cruces, "538183", "GEL") is None
+
+
+def test_sin_indice_no_estalla(coo):
+    # Bases viejas (sin el índice nuevo) tienen que seguir corriendo.
+    assert coo.cruzar_por_principio_desc({}, "538183", "OXIGENO") is None
