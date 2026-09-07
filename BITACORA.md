@@ -139,6 +139,44 @@ salvado no se haya aflojado, y que nadie vuelva a poner el tope viejo.
 
 ---
 
+### 07-09-2026 (noche) — «Cuidados Inteligentes»: la app del expediente médico
+
+**Lo que se pidió.** Que el tablero del frente personal (proyecto 12) dejara de
+parecer una página y se comportara como un programa de verdad: que responda
+«¿qué tengo que hacer hoy?», que uno le suba cualquier documento y ella sola lo
+lea y lo archive donde va, y que avise cuando dos papeles se contradicen.
+
+**Lo que se entregó (página privada + archivo, nada de datos al repositorio).**
+- **Cinco pantallas** con barra de navegación abajo (como una app de celular):
+  Inicio, Servicios, Documentos, Agenda y Más.
+- **Inicio** abre con lo urgente numerado y el botón para llamar al prestador;
+  debajo, el resumen, los vencimientos de los próximos 30 días, las
+  contradicciones y «¿qué cambió?».
+- **Analizar documento**: acepta PDF y **fotos tomadas con el celular**. Lee,
+  dice qué encontró («He detectado»), señala de qué página salió cada dato,
+  busca si el servicio ya existe y **actualiza sin duplicar**, diciendo
+  exactamente qué cambió.
+- **Expediente por servicio** con su trayecto (orden → solicitud →
+  autorización → inicio → seguimiento → vencimiento → renovación) y cada hito
+  enlazado a su documento.
+- **Ocho contradicciones** encontradas entre los propios documentos, todas con
+  su cita y su página. Dos ejemplos: la fórmula ordena un medicamento por sonda
+  de gastrostomía cuando la historia registra sonda nasogástrica; y dos
+  medicamentos del plan no aparecen en la fórmula del mismo día.
+- **Agenda** en calendario, lista y línea de tiempo; **módulo de medicamentos**
+  con fechas de renovación; **ficha de la paciente**; y todo lo anterior
+  (directorio, borradores, filtros, buscador) conservado.
+- **Accesibilidad y seguridad**: modo claro, oscuro y alto contraste; letra
+  A− / A / A+; el documento y el teléfono salen tapados por defecto; y **PIN
+  opcional** que se guarda cifrado (nunca el número en claro) con bloqueo
+  automático por inactividad.
+
+**Cómo se probó.** 42 pruebas automáticas en el navegador (Chromium), en 320,
+375, 390, 414, 768, 1024 y 1280 píxeles: navegación, carga de dos PDF reales,
+cruce sin duplicados, calendario, buscador, temas, PIN y desbordes. Las 42 en
+verde. De paso, la prueba destapó un error grave: al elegir un tema, el
+programa dejaba de responder a casi todos los botones. Ya quedó corregido.
+
 ### 07-09-2026 (tarde) — La app «Cuidados de Emely» ahora lee los PDF sola
 
 **Lo que se pidió.** Convertir el tablero del frente personal (proyecto 12) en
