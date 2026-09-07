@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 04-09-2026
+**Última actualización:** 07-09-2026
 
 ---
 
@@ -30,6 +30,7 @@
 | 9 | **Informes de cartera y conciliaciones** | Consolidados de estado de cartera por entidad (formato FAMISANAR), análisis de actas (ej. PROTEGER EPS) e informes en Word para la mesa. | Usted sube el Excel de la entidad al chat; Claude entrega el informe verificado al centavo. |
 | 10 | **Caja de bots del PC del auditor** | Bots de doble clic entregados POR CHAT (no van al repo porque procesan datos reales): ORGANIZAR ARCHIVOS, BAJAR PESO EXCEL, PARTIR/UNIR archivos grandes, OCR a PDF (PC y celular), UNIR EXCELES, CORREOS DE PAGOS, AUTORIZACIONES RIPS, DE1601 (NUEVA EPS), HERRAMIENTAS DE IMÁGENES. | Se piden por chat, llegan en ZIP, se descomprimen y doble clic al `.bat`. Si uno falla, pegue la pantalla del error en el chat. |
 | 11 | **Módulos personales de estudio** | Dos programas aparte, que no tocan el motor: **ICFES** (`icfes/`, preparación para el Saber 11) y **noruego** (`noruego/`, curso de idioma para el celular). Cada uno con su aplicación web que funciona sin internet. | Doble clic en `tools\ICFES.cmd` o `tools\NORUEGO.cmd`. Guías: `docs/GUIA_SISTEMA_ICFES.md` y `docs/GUIA_CURSO_NORUEGO.md`. |
+| 12 | **Cuidados médicos de la familiar (personal)** | Seguimiento de las autorizaciones, citas, medicamentos e insumos de EPS Sura de una familiar del auditor (paciente en casa), con su tablero HTML y los borradores de quejas/memoriales. | Se trabaja POR CHAT: usted sube los PDF/pantallazos de Sura y Claude entrega el tablero actualizado. Nada de datos de la paciente se guarda en este repositorio. |
 
 **Regla de oro:** no importa en qué chat esté — todo lo trabajado se anota en
 esta bitácora al terminar, y por eso cualquier chat nuevo "se acuerda" de todo.
@@ -89,6 +90,31 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 07-09-2026 — Nace el frente personal «Cuidados médicos de la familiar» (EPS Sura)
+
+**Lo que se pidió.** Organizar en un tablero los documentos de EPS Sura de la
+familiar del auditor que está en cuidado en casa (autorizaciones, citas,
+medicamentos, insumos y el proceso que ya está en la Supersalud), y avisar qué
+está urgente, qué está pendiente y qué quejas conviene radicar.
+
+**Lo que se entregó (todo POR CHAT, nada al repositorio).**
+- El **tablero «Cuidados de Emely»** en HTML (se abre en el navegador del
+  celular o del PC): semáforo de urgente/pendiente/al día, la tabla completa
+  de las 24 gestiones con sus números de autorización y vigencias, el
+  directorio de teléfonos para agendar y **dos borradores listos para
+  radicar** (memorial de impulso a la Supersalud y queja a Sura) con botón
+  de copiar.
+- El análisis en el chat: 16 autorizaciones de Sura leídas una a una, más la
+  historia clínica, la epicrisis, el escrito de la Supersalud y 13
+  pantallazos. Los PDF de resultados de Sura que piden clave se abren con la
+  cédula de la paciente.
+- Regla que quedó fija: los datos de la paciente **no** se suben al
+  repositorio; este frente vive en el chat y en los archivos que se
+  entregan.
+
+**Para la próxima vez.** Subir los documentos nuevos de Sura al chat y pedir
+«actualizar el tablero de cuidados»; Claude entrega el HTML al día.
 
 ### 04-09-2026 (tarde) — FAMISANAR 2 de septiembre: 104 de 105 al primer intento
 
@@ -9268,6 +9294,19 @@ siguen escondidas para el gestor, como estaban.
 
 ## 3) PENDIENTE
 
+### Cuidados médicos de la familiar — EPS Sura (07-09)
+- **Radicar el memorial de impulso** al proceso de la Supersalud (el plazo de
+  respuesta ya se venció) y **la queja a Sura** por lo que sigue sin
+  autorizar (oxígeno de respaldo, renovación del aspirador, terapias física y
+  ocupacional, pañales, ambulancia). Los dos borradores están en el tablero
+  HTML entregado el 07-09.
+- **Agendar esta semana la visita del médico domiciliario** (autorizada el
+  01-09): ahí se renuevan la fórmula del mes (vence hacia el 14-09) y el
+  MIPRES de los pañales (la última entrega se acaba hacia el 16-09).
+- **Agendar** geriatría, nefrología, fisiatría y los laboratorios a domicilio
+  (con ayuno de 8–10 horas, menos la creatinina), y **confirmar el inicio**
+  de las terapias de deglución y respiratoria ya autorizadas.
+
 ### FAMISANAR — objeciones del 2 de septiembre (04-09)
 - **Completar la SO0101 de HUS0000544976** ($1.500.000). Candidato con el valor
   exacto: `120B01` SALA ESPECIAL (INCUBADORA III NIVEL), 3 × $500.000. Falta
@@ -10090,6 +10129,14 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
   son para que el área los mire, no se unieron por parecido.
 
 ## 4) PARA MAÑANA
+
+### Cuidados médicos de la familiar — lo primero
+1. Radicar el **Borrador A** (impulso a la Supersalud) por el correo oficial
+   que la misma Supersalud indicó, y el **Borrador B** (queja) en la oficina
+   de Sura pidiendo radicado escrito. Ambos están en el tablero HTML del
+   07-09 con botón de copiar.
+2. Llamar a la IPS del programa domiciliario para **agendar la visita del
+   médico** antes de que se venza la fórmula del mes.
 
 ### FAMISANAR — lo primero
 1. Revisar la hoja **REVISAR** de los dos cruces (1 y 2 de septiembre) y hacer
