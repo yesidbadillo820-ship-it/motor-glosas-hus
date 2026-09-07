@@ -17,11 +17,11 @@ del cargue, con la MISMA lógica de las respuestas del portal:
 REGLA DE FACTURA COMPLETA (definida por el área):
   - Factura EXTEMPORÁNEA (RE9502): TODOS sus ítems — incluidos los CL — llevan
     la misma respuesta de extemporaneidad y la factura va completa al archivo.
-  - Factura A TIEMPO (RE9901) con ítems de CALIDAD (CL) o COBERTURA (CO): esos
-    ítems los responde auditoría médica, así que la factura se QUITA COMPLETA
-    del archivo (no solo el concepto CL) — se sube después, cuando las doctoras
-    respondan su parte. La lista de facturas excluidas queda en un TXT junto al
-    archivo final.
+  - Factura A TIEMPO (RE9901) con ítems de CALIDAD (CL): esos ítems los responde
+    auditoría médica, así que la factura se QUITA COMPLETA del archivo (no solo
+    el concepto CL) — se sube después, cuando las doctoras respondan su parte.
+    La lista de facturas excluidas queda en un TXT junto al archivo final.
+    COBERTURA (CO) NO entra aquí: la responde cartera y ya tiene su texto.
 
 La fecha de radicación de cada factura se lee de las cabeceras del portal
 (carpeta FACTURAS del "CARGUE MASIVO COOSALUD"); la fecha de la glosa sale de
@@ -60,7 +60,7 @@ try:
         COD_RTA_EXTEMPORANEA,
         COD_RTA_NORMAL,
         DIAS_HABILES_EPS,
-        OBS_EXTEMPORANEA,
+        obs_extemporanea,
         OBS_POR_TIPO,
         TIPO_POR_PREFIJO,
         a_fecha,
@@ -183,13 +183,23 @@ def procesar(
         if dia_cache[clave] > DIAS_HABILES_EPS:
             # Extemporánea: TODOS los ítems (incluidos CL) van con RE9502.
             calculadas.append(
-                (fkey, base + [fecha_cargue, COD_RTA_EXTEMPORANEA, 0, OBS_EXTEMPORANEA])
+                (
+                    fkey,
+                    base
+                    + [
+                        fecha_cargue,
+                        COD_RTA_EXTEMPORANEA,
+                        0,
+                        obs_extemporanea(dia_cache[clave], rad),
+                    ],
+                )
             )
         else:
             obs = OBS_POR_TIPO.get(tipo, "")
             if not obs:
-                # CALIDAD/COBERTURA a tiempo: responde auditoría médica ->
-                # la factura ENTERA se queda por fuera de este cargue.
+                # Tipo a tiempo sin texto del área (hoy solo CALIDAD): lo
+                # responde auditoría médica, así que la factura ENTERA se
+                # queda por fuera de este cargue.
                 blanco[tipo or codigo[:2].upper()] = blanco.get(tipo or "?", 0) + 1
                 facturas_incompletas.add(fkey)
                 calculadas.append((fkey, base + [fecha_cargue, "", 0, ""]))

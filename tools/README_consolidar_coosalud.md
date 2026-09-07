@@ -85,10 +85,16 @@ Requiere Python 3 con `openpyxl` (`py -m pip install openpyxl`).
      (art. 57, Ley 1438 de 2011).
    - **COD / COD RESPUESTA GLOSA**: `RE9502` (extemporánea) o `RE9901`
      (a tiempo) · **OBSERVACION RTA GLOSA**: el texto del área según el tipo
-     (TARIFAS, AUTORIZACION, FACTURACION, SOPORTES). Las glosas de CALIDAD a
-     tiempo quedan con la observación vacía (respuesta de auditoría médica).
+     (TARIFAS, AUTORIZACION, FACTURACION, SOPORTES, COBERTURA). Solo las glosas
+     de **CALIDAD** a tiempo quedan con la observación vacía: esas las responde
+     auditoría médica. **COBERTURA la responde cartera** y ya tiene su texto.
+   - El texto de **extemporaneidad** se arma por factura: lleva los **días
+     hábiles** que pasaron y la **fecha de radicación** reales, no un texto
+     genérico. Si faltara alguno de los dos datos, el hueco queda a la vista
+     (`xx`, `XXXX-XX-XX`) en vez de dar por buena una respuesta a medio llenar.
    - Los textos se editan al inicio de `consolidar_coosalud.py`
-     (constantes `OBS_POR_TIPO`, `OBS_EXTEMPORANEA`, `DESC_RTA_*`).
+     (constantes `OBS_POR_TIPO`, `PLANTILLA_OBS_EXTEMPORANEA`, `DESC_RTA_*`).
+     Última actualización del área: **07-09-2026**.
 
    - El `OBJECIONES.xlsx` queda con **una sola hoja** (como la guía), ya limpio
      para el cargue. Lo que DGH rechazaría se deja **FUERA** y se guarda en un
