@@ -24606,7 +24606,8 @@ function armarPintarParte(d){
     html += '<br><b style="color:var(--c-amber,#d97706)">' + d.total_avisos
       + ' casilla(s) que decide una persona:</b>';
     (d.avisos||[]).slice(0,6).forEach(function(a){
-      html += '<br>· ' + escHtml(a.factura) + ': ' + escHtml(a.motivo);
+      var cuantos = (a.renglones && a.renglones > 1) ? ' (' + a.renglones + ' renglones)' : '';
+      html += '<br>· ' + escHtml(a.factura) + cuantos + ': ' + escHtml(a.motivo);
     });
     if(d.total_avisos > 6) html += '<br>· … y ' + (d.total_avisos-6) + ' más, marcadas ◄ DEFINIR en el acta';
   } else {
