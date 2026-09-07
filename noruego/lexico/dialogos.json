@@ -1,0 +1,607 @@
+{
+ "tipo": "dialogos",
+ "variante": "bokmål",
+ "version": 1,
+ "nota": "Conversaciones de situaciones reales. Los índices en «huecos» son las líneas que el usuario tiene que completar.",
+ "palabras": [
+  {
+   "id": "d-presentacion",
+   "titulo": "Presentarse",
+   "nivel": "cero",
+   "tema": "saludos",
+   "situacion": "Conoces a alguien por primera vez en un curso de noruego.",
+   "lineas": [
+    {
+     "quien": "Kari",
+     "no": "Hei! Jeg heter Kari. Hva heter du?",
+     "es": "¡Hola! Me llamo Kari. ¿Cómo te llamas?",
+     "pron": "jei! yei HE-ter KA-ri. va HE-ter du"
+    },
+    {
+     "quien": "Tú",
+     "no": "Hei! Jeg heter Yesid.",
+     "es": "¡Hola! Me llamo Yesid.",
+     "pron": "jei! yei HE-ter ye-SID"
+    },
+    {
+     "quien": "Kari",
+     "no": "Hyggelig å møte deg! Hvor kommer du fra?",
+     "es": "¡Mucho gusto! ¿De dónde eres?",
+     "pron": "HYG-ge-li o MØ-te dei! vur KOM-mer du fra"
+    },
+    {
+     "quien": "Tú",
+     "no": "Jeg kommer fra Colombia.",
+     "es": "Soy de Colombia.",
+     "pron": "yei KOM-mer fra ko-LOM-bia"
+    },
+    {
+     "quien": "Kari",
+     "no": "Så hyggelig! Snakker du norsk?",
+     "es": "¡Qué bien! ¿Hablas noruego?",
+     "pron": "so HYG-ge-li! SNAK-ker du noshk"
+    },
+    {
+     "quien": "Tú",
+     "no": "Jeg snakker litt norsk.",
+     "es": "Hablo un poco de noruego.",
+     "pron": "yei SNAK-ker lit noshk"
+    }
+   ],
+   "huecos": [
+    1,
+    3,
+    5
+   ]
+  },
+  {
+   "id": "d-cafe",
+   "titulo": "En la cafetería",
+   "nivel": "A1",
+   "tema": "comida",
+   "situacion": "Pides algo de tomar en una cafetería de Oslo.",
+   "lineas": [
+    {
+     "quien": "Betjening",
+     "no": "Hei! Hva vil du ha?",
+     "es": "¡Hola! ¿Qué va a querer?",
+     "pron": "jei! va vil du ha"
+    },
+    {
+     "quien": "Tú",
+     "no": "Jeg vil ha en kaffe, takk.",
+     "es": "Quiero un café, por favor.",
+     "pron": "yei vil ha en KAF-fe tak"
+    },
+    {
+     "quien": "Betjening",
+     "no": "Noe å spise?",
+     "es": "¿Algo de comer?",
+     "pron": "NU-e o SPI-se"
+    },
+    {
+     "quien": "Tú",
+     "no": "Ja, et rundstykke, takk.",
+     "es": "Sí, un panecillo, por favor.",
+     "pron": "ya, et RUN-styk-ke tak"
+    },
+    {
+     "quien": "Betjening",
+     "no": "Det blir åttifem kroner.",
+     "es": "Son ochenta y cinco coronas.",
+     "pron": "de blir OT-ti-fem KRU-ner"
+    },
+    {
+     "quien": "Tú",
+     "no": "Kan jeg betale med kort?",
+     "es": "¿Puedo pagar con tarjeta?",
+     "pron": "kan yei be-TA-le me kurt"
+    },
+    {
+     "quien": "Betjening",
+     "no": "Ja, vær så god.",
+     "es": "Sí, adelante.",
+     "pron": "ya, væ sho gu"
+    }
+   ],
+   "huecos": [
+    1,
+    3,
+    5
+   ]
+  },
+  {
+   "id": "d-supermercado",
+   "titulo": "En el supermercado",
+   "nivel": "A1",
+   "tema": "compras",
+   "situacion": "Buscas algo en el supermercado y preguntas.",
+   "lineas": [
+    {
+     "quien": "Tú",
+     "no": "Unnskyld, hvor er melka?",
+     "es": "Disculpe, ¿dónde está la leche?",
+     "pron": "UN-shyl, vur ær MEL-ka"
+    },
+    {
+     "quien": "Ansatt",
+     "no": "Den står der borte, til høyre.",
+     "es": "Está allá, a la derecha.",
+     "pron": "den stor dær BOR-te, til HØY-re"
+    },
+    {
+     "quien": "Tú",
+     "no": "Takk! Har dere brød uten gluten?",
+     "es": "¡Gracias! ¿Tienen pan sin gluten?",
+     "pron": "tak! har DE-re brø U-ten GLU-ten"
+    },
+    {
+     "quien": "Ansatt",
+     "no": "Ja, det har vi. Kom, jeg viser deg.",
+     "es": "Sí, sí tenemos. Venga, le muestro.",
+     "pron": "ya, de har vi. kom, yei VI-ser dei"
+    },
+    {
+     "quien": "Tú",
+     "no": "Tusen takk!",
+     "es": "¡Muchas gracias!",
+     "pron": "TU-sen tak"
+    }
+   ],
+   "huecos": [
+    0,
+    2,
+    4
+   ]
+  },
+  {
+   "id": "d-medico",
+   "titulo": "En el médico",
+   "nivel": "A2",
+   "tema": "salud",
+   "situacion": "Vas al centro de salud porque te sientes mal.",
+   "lineas": [
+    {
+     "quien": "Lege",
+     "no": "God dag. Hva kan jeg hjelpe deg med?",
+     "es": "Buen día. ¿En qué le puedo ayudar?",
+     "pron": "gu dag. va kan yei YEL-pe dei me"
+    },
+    {
+     "quien": "Tú",
+     "no": "Jeg har vondt i hodet.",
+     "es": "Me duele la cabeza.",
+     "pron": "yei har vunt i JU-de"
+    },
+    {
+     "quien": "Lege",
+     "no": "Hvor lenge har du hatt det?",
+     "es": "¿Hace cuánto lo tiene?",
+     "pron": "vur LENG-e har du hat de"
+    },
+    {
+     "quien": "Tú",
+     "no": "I tre dager.",
+     "es": "Hace tres días.",
+     "pron": "i tre DA-ger"
+    },
+    {
+     "quien": "Lege",
+     "no": "Har du feber?",
+     "es": "¿Tiene fiebre?",
+     "pron": "har du FE-ber"
+    },
+    {
+     "quien": "Tú",
+     "no": "Nei, men jeg er veldig trøtt.",
+     "es": "No, pero estoy muy cansado.",
+     "pron": "nei, men yei ær VEL-di trøt"
+    },
+    {
+     "quien": "Lege",
+     "no": "Da skriver jeg ut en resept.",
+     "es": "Entonces le hago una receta.",
+     "pron": "da SKRI-ver yei ut en re-SEPT"
+    }
+   ],
+   "huecos": [
+    1,
+    3,
+    5
+   ]
+  },
+  {
+   "id": "d-transporte",
+   "titulo": "Comprando un pasaje",
+   "nivel": "A2",
+   "tema": "viaje",
+   "situacion": "Compras un tiquete de tren en la estación.",
+   "lineas": [
+    {
+     "quien": "Tú",
+     "no": "Hei! En billett til Bergen, takk.",
+     "es": "¡Hola! Un tiquete a Bergen, por favor.",
+     "pron": "jei! en bi-LET til BÆR-gen tak"
+    },
+    {
+     "quien": "Selger",
+     "no": "Når vil du reise?",
+     "es": "¿Cuándo quiere viajar?",
+     "pron": "nor vil du REI-se"
+    },
+    {
+     "quien": "Tú",
+     "no": "I morgen tidlig.",
+     "es": "Mañana temprano.",
+     "pron": "i MÅ-ren TI-li"
+    },
+    {
+     "quien": "Selger",
+     "no": "Toget går klokka sju. Det koster fem hundre kroner.",
+     "es": "El tren sale a las siete. Cuesta quinientas coronas.",
+     "pron": "TU-ge gor KLOK-ka shu. de KOS-ter fem HUN-dre KRU-ner"
+    },
+    {
+     "quien": "Tú",
+     "no": "Hvor lenge tar turen?",
+     "es": "¿Cuánto dura el viaje?",
+     "pron": "vur LENG-e tar TU-ren"
+    },
+    {
+     "quien": "Selger",
+     "no": "Omtrent sju timer.",
+     "es": "Unas siete horas.",
+     "pron": "om-TRENT shu TI-mer"
+    }
+   ],
+   "huecos": [
+    0,
+    2,
+    4
+   ]
+  },
+  {
+   "id": "d-arriendo",
+   "titulo": "Preguntando por un apartamento",
+   "nivel": "B1",
+   "tema": "casa",
+   "situacion": "Llamas por un apartamento que viste anunciado.",
+   "lineas": [
+    {
+     "quien": "Tú",
+     "no": "Hei, jeg ringer om leiligheten.",
+     "es": "Hola, llamo por el apartamento.",
+     "pron": "jei, yei RING-er om LEI-li-je-ten"
+    },
+    {
+     "quien": "Utleier",
+     "no": "Ja, den er fortsatt ledig.",
+     "es": "Sí, todavía está disponible.",
+     "pron": "ya, den ær FOSHT-sat LE-di"
+    },
+    {
+     "quien": "Tú",
+     "no": "Hvor mye er husleia?",
+     "es": "¿Cuánto es el arriendo?",
+     "pron": "vur MY-e ær JUS-lei-a"
+    },
+    {
+     "quien": "Utleier",
+     "no": "Tolv tusen i måneden, strøm inkludert.",
+     "es": "Doce mil al mes, luz incluida.",
+     "pron": "tol TU-sen i MÅ-ne-den, strøm in-klu-DERT"
+    },
+    {
+     "quien": "Tú",
+     "no": "Kan jeg komme og se på den?",
+     "es": "¿Puedo ir a verlo?",
+     "pron": "kan yei KOM-me o se po den"
+    },
+    {
+     "quien": "Utleier",
+     "no": "Ja, passer det på lørdag?",
+     "es": "Sí, ¿le sirve el sábado?",
+     "pron": "ya, PAS-ser de po LØR-dag"
+    },
+    {
+     "quien": "Tú",
+     "no": "Det passer fint. Tusen takk!",
+     "es": "Me sirve perfecto. ¡Muchas gracias!",
+     "pron": "de PAS-ser fint. TU-sen tak"
+    }
+   ],
+   "huecos": [
+    0,
+    2,
+    4,
+    6
+   ]
+  },
+  {
+   "id": "d-trabajo",
+   "titulo": "Entrevista de trabajo",
+   "nivel": "B1",
+   "tema": "trabajo",
+   "situacion": "Te entrevistan para un puesto.",
+   "lineas": [
+    {
+     "quien": "Sjef",
+     "no": "Kan du fortelle litt om deg selv?",
+     "es": "¿Puede contarme un poco sobre usted?",
+     "pron": "kan du fo-TEL-le lit om dei sel"
+    },
+    {
+     "quien": "Tú",
+     "no": "Jeg er sykepleier og har fem års erfaring.",
+     "es": "Soy enfermero y tengo cinco años de experiencia.",
+     "pron": "yei ær SY-ke-plei-er o har fem osh er-FA-ring"
+    },
+    {
+     "quien": "Sjef",
+     "no": "Hvorfor søker du denne jobben?",
+     "es": "¿Por qué solicita este trabajo?",
+     "pron": "VUR-for SØ-ker du DEN-ne YOB-ben"
+    },
+    {
+     "quien": "Tú",
+     "no": "Fordi jeg vil jobbe med pasienter igjen.",
+     "es": "Porque quiero volver a trabajar con pacientes.",
+     "pron": "FOR-di yei vil YOB-be me pa-si-EN-ter i-YEN"
+    },
+    {
+     "quien": "Sjef",
+     "no": "Hvordan er norsken din?",
+     "es": "¿Cómo está su noruego?",
+     "pron": "VUR-dan ær NOSH-ken din"
+    },
+    {
+     "quien": "Tú",
+     "no": "Jeg forstår mye, men jeg øver fortsatt på å snakke.",
+     "es": "Entiendo mucho, pero todavía practico el hablar.",
+     "pron": "yei fu-SHTOR MY-e, men yei Ø-ver FOSHT-sat po o SNAK-ke"
+    },
+    {
+     "quien": "Sjef",
+     "no": "Det er helt greit. Når kan du begynne?",
+     "es": "Está perfectamente bien. ¿Cuándo puede empezar?",
+     "pron": "de ær helt greit. nor kan du be-YYN-ne"
+    }
+   ],
+   "huecos": [
+    1,
+    3,
+    5
+   ]
+  },
+  {
+   "id": "d-telefono",
+   "titulo": "Llamada al NAV",
+   "nivel": "B1",
+   "tema": "sociedad",
+   "situacion": "Llamas a una oficina pública para preguntar por un trámite.",
+   "lineas": [
+    {
+     "quien": "NAV",
+     "no": "NAV, hva kan jeg hjelpe deg med?",
+     "es": "NAV, ¿en qué le puedo ayudar?",
+     "pron": "nav, va kan yei YEL-pe dei me"
+    },
+    {
+     "quien": "Tú",
+     "no": "Hei, jeg har sendt inn en søknad, men jeg har ikke fått svar.",
+     "es": "Hola, envié una solicitud pero no he recibido respuesta.",
+     "pron": "jei, yei har sent in en SØK-nad, men yei har IK-ke fot svar"
+    },
+    {
+     "quien": "NAV",
+     "no": "Kan du oppgi fødselsnummeret ditt?",
+     "es": "¿Me puede dar su número de identidad?",
+     "pron": "kan du OP-yi FØD-sels-num-me-re dit"
+    },
+    {
+     "quien": "Tú",
+     "no": "Ja, ett øyeblikk.",
+     "es": "Sí, un momento.",
+     "pron": "ya, et ØY-e-blik"
+    },
+    {
+     "quien": "NAV",
+     "no": "Takk. Søknaden er under behandling.",
+     "es": "Gracias. La solicitud está en trámite.",
+     "pron": "tak. SØK-na-den ær UN-ner be-HAND-ling"
+    },
+    {
+     "quien": "Tú",
+     "no": "Hvor lang tid tar det vanligvis?",
+     "es": "¿Cuánto suele demorar?",
+     "pron": "vur lang tid tar de VAN-li-vis"
+    }
+   ],
+   "huecos": [
+    1,
+    3,
+    5
+   ]
+  },
+  {
+   "id": "d-vecino",
+   "titulo": "Charla con el vecino",
+   "nivel": "A2",
+   "tema": "personas",
+   "situacion": "Te encuentras a tu vecino en la escalera.",
+   "lineas": [
+    {
+     "quien": "Nabo",
+     "no": "Hei! Hvordan går det?",
+     "es": "¡Hola! ¿Cómo vas?",
+     "pron": "jei! VUR-dan gor de"
+    },
+    {
+     "quien": "Tú",
+     "no": "Det går bra, takk. Og med deg?",
+     "es": "Bien, gracias. ¿Y tú?",
+     "pron": "de gor bra tak. o me dei"
+    },
+    {
+     "quien": "Nabo",
+     "no": "Bare bra. Kaldt i dag, ikke sant?",
+     "es": "Muy bien. Frío hoy, ¿no?",
+     "pron": "BA-re bra. kalt i dag, IK-ke sant"
+    },
+    {
+     "quien": "Tú",
+     "no": "Ja, veldig kaldt! Jeg er ikke vant til det.",
+     "es": "¡Sí, muy frío! No estoy acostumbrado.",
+     "pron": "ya, VEL-di kalt! yei ær IK-ke vant til de"
+    },
+    {
+     "quien": "Nabo",
+     "no": "Du venner deg til det. Ha en fin dag!",
+     "es": "Te vas a acostumbrar. ¡Que tengas buen día!",
+     "pron": "du VEN-ner dei til de. ha en fin dag"
+    }
+   ],
+   "huecos": [
+    1,
+    3
+   ]
+  },
+  {
+   "id": "d-restaurante",
+   "titulo": "En el restaurante",
+   "nivel": "A2",
+   "tema": "comida",
+   "situacion": "Cenas en un restaurante.",
+   "lineas": [
+    {
+     "quien": "Kelner",
+     "no": "God kveld. Har dere bestilt bord?",
+     "es": "Buenas noches. ¿Tienen reserva?",
+     "pron": "gu kvel. har DE-re be-STILT bur"
+    },
+    {
+     "quien": "Tú",
+     "no": "Ja, på navnet Yesid, klokka sju.",
+     "es": "Sí, a nombre de Yesid, a las siete.",
+     "pron": "ya, po NAV-ne ye-SID, KLOK-ka shu"
+    },
+    {
+     "quien": "Kelner",
+     "no": "Perfekt. Vil dere se på menyen?",
+     "es": "Perfecto. ¿Quieren ver el menú?",
+     "pron": "per-FEKT. vil DE-re se po me-NY-en"
+    },
+    {
+     "quien": "Tú",
+     "no": "Ja takk. Hva anbefaler du?",
+     "es": "Sí, gracias. ¿Qué recomienda?",
+     "pron": "ya tak. va AN-be-fa-ler du"
+    },
+    {
+     "quien": "Kelner",
+     "no": "Fisken i dag er veldig god.",
+     "es": "El pescado de hoy está muy bueno.",
+     "pron": "FIS-ken i dag ær VEL-di gu"
+    },
+    {
+     "quien": "Tú",
+     "no": "Da tar jeg fisken, takk.",
+     "es": "Entonces pido el pescado, gracias.",
+     "pron": "da tar yei FIS-ken tak"
+    }
+   ],
+   "huecos": [
+    1,
+    3,
+    5
+   ]
+  },
+  {
+   "id": "d-aeropuerto",
+   "titulo": "En el aeropuerto",
+   "nivel": "A2",
+   "tema": "viaje",
+   "situacion": "Haces el check-in en el aeropuerto.",
+   "lineas": [
+    {
+     "quien": "Ansatt",
+     "no": "God morgen. Kan jeg få se passet ditt?",
+     "es": "Buenos días. ¿Me permite su pasaporte?",
+     "pron": "gu MÅ-ren. kan yei fo se PAS-se dit"
+    },
+    {
+     "quien": "Tú",
+     "no": "Ja, vær så god.",
+     "es": "Sí, aquí tiene.",
+     "pron": "ya, væ sho gu"
+    },
+    {
+     "quien": "Ansatt",
+     "no": "Har du bagasje som skal sjekkes inn?",
+     "es": "¿Lleva equipaje para documentar?",
+     "pron": "har du ba-GA-she som skal SHEK-kes in"
+    },
+    {
+     "quien": "Tú",
+     "no": "Ja, én koffert.",
+     "es": "Sí, una maleta.",
+     "pron": "ya, en KOF-fert"
+    },
+    {
+     "quien": "Ansatt",
+     "no": "Gate tolv. Ha en god tur!",
+     "es": "Puerta doce. ¡Buen viaje!",
+     "pron": "gate tol. ha en gu tur"
+    }
+   ],
+   "huecos": [
+    1,
+    3
+   ]
+  },
+  {
+   "id": "d-escuela",
+   "titulo": "Hablando con el profesor",
+   "nivel": "A2",
+   "tema": "estudio",
+   "situacion": "Le preguntas algo a tu profesor de noruego.",
+   "lineas": [
+    {
+     "quien": "Tú",
+     "no": "Unnskyld, kan du forklare det igjen?",
+     "es": "Disculpe, ¿puede explicarlo otra vez?",
+     "pron": "UN-shyl, kan du fo-KLA-re de i-YEN"
+    },
+    {
+     "quien": "Lærer",
+     "no": "Selvfølgelig. Hva forstod du ikke?",
+     "es": "Por supuesto. ¿Qué no entendió?",
+     "pron": "SEL-føl-ge-li. va fo-SHTU du IK-ke"
+    },
+    {
+     "quien": "Tú",
+     "no": "Jeg forstår ikke forskjellen mellom «i» og «på».",
+     "es": "No entiendo la diferencia entre «i» y «på».",
+     "pron": "yei fu-SHTOR IK-ke fo-SHEL-len MEL-lom i o po"
+    },
+    {
+     "quien": "Lærer",
+     "no": "God idé å spørre. «I» er inni noe, «på» er oppå noe.",
+     "es": "Buena pregunta. «I» es dentro de algo, «på» es encima de algo.",
+     "pron": "gu i-DE o SPØ-re. i ær IN-ni NU-e, po ær OP-po NU-e"
+    },
+    {
+     "quien": "Tú",
+     "no": "Nå forstår jeg. Tusen takk!",
+     "es": "Ahora entiendo. ¡Muchas gracias!",
+     "pron": "no fu-SHTOR yei. TU-sen tak"
+    }
+   ],
+   "huecos": [
+    0,
+    2,
+    4
+   ]
+  }
+ ]
+}

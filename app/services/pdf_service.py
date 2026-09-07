@@ -17,6 +17,43 @@ logger = logging.getLogger("motor_glosas")
 # de soportes (historias clínicas, RIPS, facturas) traen >>300 chars.
 UMBRAL_TEXTO_MINIMO = 300
 
+# Etiqueta con la que queda marcada una glosa cuyo OCR se cortó a mitad de
+# camino (timeout o desconexión). La ve el gestor en la nota del workflow.
+ETIQUETA_ERROR_OCR = "ERROR_OCR"
+
+
+class ErrorOCR(RuntimeError):
+    """Cortacircuito del OCR (03-09-2026).
+
+    Se lanza cuando el OCR de Gemini se corta por red (timeout, conexión
+    reiniciada, WinError). NO es un error cualquiera: el caller que está
+    analizando una glosa debe DETENERLA de inmediato — sin texto de los
+    soportes no hay dictamen honesto — y dejarla en manos humanas
+    (PENDIENTE_APROBACION_HUMANA) marcada con ETIQUETA_ERROR_OCR.
+    """
+
+    etiqueta = ETIQUETA_ERROR_OCR
+
+
+def _es_corte_de_red(exc: BaseException) -> bool:
+    """¿La excepción es un timeout o una desconexión (WinError incluido)?
+
+    Solo estos cortes disparan el cortacircuito. Un error de la API con
+    respuesta (cuota, clave mala, PDF rechazado) sigue el camino de siempre:
+    se loguea y se continúa con el texto nativo.
+    """
+    if isinstance(exc, (httpx.TimeoutException, httpx.TransportError)):
+        return True
+    # En Windows los cortes llegan como OSError "[WinError 10054] ..." o
+    # ConnectionResetError; TimeoutError cubre asyncio.timeout.
+    if isinstance(exc, (ConnectionError, TimeoutError, OSError)):
+        return True
+    msg = str(exc).lower()
+    return any(
+        marca in msg
+        for marca in ("winerror", "timed out", "timeout", "connection reset", "disconnect")
+    )
+
 
 class PdfService:
     """
@@ -138,6 +175,13 @@ class PdfService:
                 if texto_ocr and len(texto_ocr.strip()) > len(texto_real):
                     return texto_ocr, "gemini-pdf"
             except Exception as e:
+                # Cortacircuito (03-09-2026): un corte de red NO se traga.
+                # Antes esto seguía de largo y el dictamen salía argumentado
+                # sobre soportes que nadie leyó. Ahora la glosa se detiene.
+                if _es_corte_de_red(e):
+                    raise ErrorOCR(
+                        f"OCR de Gemini cortado por red ({type(e).__name__}: {str(e)[:200]})"
+                    ) from e
                 logger.error(f"OCR gemini falló: {e}")
 
         if not anthropic_api_key and not gemini_api_key:

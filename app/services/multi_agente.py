@@ -278,6 +278,96 @@ def agente_tarifario(
 # ─── Agente Conciliador ─────────────────────────────────────────────────────
 
 
+def agente_auditor_eps(dictamen: str, codigo_glosa: str, eps: str) -> dict:
+    """Lee el dictamen como lo leería el auditor de la EPS: buscando por dónde
+    tumbarlo.
+
+    26-08-2026, de las propuestas al motor. Los defectos graves de esta semana
+    los encontraron tres auditorías DESPUÉS de que los dictámenes salieran.
+    Cada ronda costó un día de correcciones sobre documentos ya entregados.
+
+    Las revisiones que ya existían son de CUMPLIMIENTO: que la apertura sea la
+    correcta, que la extensión alcance, que no haya placeholders. Ninguna
+    preguntaba lo único que importa del otro lado de la mesa: «¿por dónde
+    tumbaría yo esta respuesta?».
+
+    Este agente hace esa pregunta, y la hace sobre los seis flancos por los que
+    de verdad se cayeron los dictámenes de agosto — no sobre una lista teórica.
+    Devuelve la lista de flancos a revisar; quien la usa decide si la inyecta
+    al prompt o la muestra como aviso al gestor.
+    """
+    prefijo = (codigo_glosa or "")[:2].upper()
+    d = (dictamen or "").upper()
+    flancos: list[dict] = []
+
+    def _flanco(nombre: str, como_lo_tumbo: str, disparado: bool) -> None:
+        if disparado:
+            flancos.append({"flanco": nombre, "como_lo_tumbaria": como_lo_tumbo})
+
+    # 1. La cita que no dice lo que se le atribuye. Fue el defecto más repetido:
+    #    GL-127 le atribuyó al Art. 57 una regla de carga de la prueba que no
+    #    tiene; GL-124, al Art. 2 de la Ley 100 una regla tarifaria.
+    _flanco(
+        "una norma citada para algo que no dice",
+        "Abro el artículo. Si no dice lo que ustedes le atribuyen, la respuesta "
+        "entera pierde credibilidad y ratifico.",
+        bool(re.search(r"ART[ÍI]?CULO|ART\.\s*\d", d)),
+    )
+
+    # 2. Afirmar el contenido de un soporte que nadie anexó.
+    _flanco(
+        "afirmar lo que no se probó",
+        "Pido el soporte. Si el dictamen dice que la historia clínica registra "
+        "algo y la historia no vino, esa afirmación no existe para mí.",
+        bool(re.search(r"HISTORIA CL[ÍI]NICA|EPICRISIS|SE EVIDENCIA|CONSTA EN|SE REGISTR", d)),
+    )
+
+    # 3. Contradecirse dentro del mismo documento. Basta con leer las dos
+    #    mitades: no hay que discutir el fondo.
+    _flanco(
+        "el documento se contradice solo",
+        "Leo las dos mitades. Si dice que no hay contrato pactado y luego invoca "
+        "una cláusula, o dice que un contrato está vigente y da una fecha ya "
+        "pasada, tumbo sin entrar en el fondo.",
+        bool(re.search(r"SIN CONTRATO|VIGENTE|CL[ÁA]USULA|PACTAD", d)),
+    )
+
+    # 4. Un código que no existe o que no es de ese sistema.
+    _flanco(
+        "un código que no cruza contra mi sistema",
+        "Cruzo el CUPS. Si no existe, o es un código institucional suyo "
+        "presentado como CUPS, ratifico la glosa completa.",
+        bool(re.search(r"\bCUPS\b", d)),
+    )
+
+    # 5. El plazo citado al revés — le regala la extemporaneidad a la entidad.
+    _flanco(
+        "el plazo, contado al revés",
+        "Si el dictamen dice que ustedes tienen menos días de los que la ley les "
+        "da, uso sus propias palabras para alegar que respondieron tarde.",
+        bool(re.search(r"D[ÍI]AS H[ÁA]BILES|PLAZO|T[ÉE]RMINO|EXTEMPOR", d)),
+    )
+
+    # 6. No responder la causal que se puso. En auditoría, callar es conceder.
+    _flanco(
+        "no contestó la causal que puse",
+        f"Yo glosé por {codigo_glosa or 'esta causal'}. Si la respuesta discute "
+        "otra cosa, la doy por no contestada y descuento.",
+        True,
+    )
+
+    return {
+        "eps": (eps or "").upper(),
+        "codigo": (codigo_glosa or "").upper(),
+        "familia": prefijo,
+        "flancos": flancos,
+        "instruccion": (
+            "Antes de radicar, lea el dictamen como si fuera el auditor de la "
+            "entidad y busque por cuál de estos flancos lo tumbaría."
+        ),
+    }
+
+
 def agente_conciliador(tono: str, etapa: str) -> dict:
     """Ajusta tono y estructura final del dictamen.
 

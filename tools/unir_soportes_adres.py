@@ -94,6 +94,7 @@ from organizar_soportes_por_factura import factura_del_nombre  # noqa: E402
 from unir_pdfs_carpetas import (  # noqa: E402
     _cargar_lector_escritor,
     clave_natural,
+    copiar_como,
     reemplazar_con_reintento,
     unir_pdfs,
 )
@@ -1156,6 +1157,401 @@ def _poner_caratula(
                 basura.unlink()
 
 
+def folios_de_facturas(
+    carpeta_facturas: Path,
+    salida: Path,
+    carpeta_detallados: Path | None = None,
+    prefijo: str = "",
+    facturas: set[str] | None = None,
+    aplicar: bool = False,
+) -> list[FolioSuelto]:
+    """El folio de la factura, suelto en `salida` y sin crear carpetas.
+
+    Toma el `<NIT>_<FACTURA>_FACTURA.pdf` de la carpeta del XML, le intercala el
+    detallado que esté en `carpeta_detallados`, y deja el folio armado en el
+    orden que pidió el área: 1 FACTURA · 2 DETALLADO · 3 REPRESENTACIÓN GRÁFICA
+    DIAN · 4 NOTAS CRÉDITO. Sin índice, como el folio de la factura de siempre.
+    """
+    PdfReader, PdfWriter = _cargar_lector_escritor()
+    indice = indice_facturas(carpeta_facturas)
+    detallados = _indice_detallados(carpeta_detallados) if carpeta_detallados else {}
+    numeros = sorted(facturas) if facturas is not None else sorted(indice)
+
+    hechos: list[FolioSuelto] = []
+    for numero in numeros:
+        pdf = indice.get(numero)
+        destino = salida / nombre_folio(prefijo, numero, SUFIJO_FACTURA)
+        folio = FolioSuelto(numero, pdf or Path(), destino)
+        hechos.append(folio)
+        if pdf is None:
+            folio.aviso = "no está el PDF de la factura en la carpeta del XML"
+            logger.warning("  %s: %s", numero, folio.aviso)
+            continue
+        if not aplicar:
+            continue
+        if destino.exists() and not es_folio_nuestro(destino, PdfReader):
+            folio.aviso = (
+                f"NO se armó: {destino.name} ya existe y no lo escribió este bot. "
+                "Revíselo; si es un folio viejo, bórrelo y vuelva a correr."
+            )
+            logger.warning("  %s: %s", numero, folio.aviso)
+            continue
+        salida.mkdir(parents=True, exist_ok=True)
+        try:
+            folio.paginas = _armar_folio_factura_suelto(
+                numero, pdf, detallados.get(numero), destino, folio, PdfReader, PdfWriter
+            )
+        except Exception as e:  # noqa: BLE001 - una factura mala no tumba el lote
+            folio.aviso = explicar_error(e)
+            logger.warning("  %s: %s", numero, folio.aviso)
+    return hechos
+
+
+def _indice_detallados(carpeta: Path) -> dict[str, Path]:
+    """Número de factura → su detallado, prefiriendo el que ya está en PDF."""
+    indice: dict[str, Path] = {}
+    for r in sorted(carpeta.rglob("*")):
+        if not r.is_file() or r.suffix.lower() not in {".pdf", ".xlsx", ".xlsm", ".xls"}:
+            continue
+        numero = factura_del_nombre(r.name)
+        if not numero:
+            continue
+        previo = indice.get(numero)
+        if previo is None or (previo.suffix.lower() != ".pdf" and r.suffix.lower() == ".pdf"):
+            indice[numero] = r
+    return indice
+
+
+def _armar_folio_factura_suelto(
+    numero: str,
+    pdf: Path,
+    detallado: Path | None,
+    destino: Path,
+    folio: FolioSuelto,
+    PdfReader,
+    PdfWriter,
+) -> int:
+    """Arma el folio de una factura reusando el mismo motor del folio normal."""
+    fac = Factura(factura=numero, carpeta=destino.parent)
+    fac.soportes_factura.append(Soporte(ruta=pdf, grupo=GRUPO_FACTURA))
+    fac.trae_la_factura = renglones_que_trae(pdf, PdfReader)
+
+    if detallado is not None:
+        if "DETALLADO" in fac.trae_la_factura:
+            folio.aviso = "la factura ya trae el detallado adentro; no se le agregó el de aparte"
+        elif detallado.suffix.lower() == ".pdf":
+            fac.soportes_factura.append(Soporte(ruta=detallado, grupo=GRUPO_DETALLADO))
+        else:
+            fac.detallados_sin_pdf.append(detallado)
+            for _, _, estado in convertir_detallados([fac], aplicar=True):
+                if estado != "PASADO A PDF":
+                    folio.aviso = f"el detallado no se pudo pasar a PDF: {estado}"
+
+    entradas, pedazos = piezas_del_folio_factura(fac, PdfReader, PdfWriter)
+    try:
+        paginas, omitidos = unir_pdfs(entradas, destino, PdfReader, PdfWriter, METADATOS_FOLIO)
+    finally:
+        for basura in pedazos:
+            with contextlib.suppress(OSError):
+                basura.unlink()
+    if omitidos:
+        folio.aviso = (folio.aviso + " | " if folio.aviso else "") + "; ".join(omitidos)
+    return paginas
+
+
+# ─── Dejar en cada carpeta solo los dos folios ───────────────────────────────
+
+# Los soportes NO se borran: se mueven aquí. Son los documentos clínicos del
+# paciente y son la única fuente para rehacer un folio. El auditor los revisa
+# y los borra él, cuando esté seguro.
+CARPETA_APARTADOS = "_APARTADOS_REVISAR_Y_BORRAR"
+
+
+@dataclass
+class Limpieza:
+    """Qué se le hizo a una carpeta de factura."""
+
+    factura: str
+    carpeta: Path
+    apartados: int = 0
+    aviso: str = ""
+
+
+def es_folio_armado(nombre: str, factura: str) -> tuple[bool, str]:
+    """¿Este archivo es uno de los dos folios de esta factura? Y cuál."""
+    tallo = Path(nombre).stem
+    if Path(nombre).suffix.lower() != ".pdf" or factura_del_nombre(nombre) != factura:
+        return False, ""
+    for sufijo in (SUFIJO_EPICRIS, SUFIJO_FACTURA):
+        if _norm(tallo).endswith(_norm(sufijo.strip("_"))):
+            return True, sufijo
+    return False, ""
+
+
+def dejar_solo_los_folios(carpeta: Path, aplicar: bool = False) -> list[Limpieza]:
+    """En cada carpeta de factura deja solo «..._EPICRIS.pdf» y «..._FACTURA.pdf».
+
+    Lo demás se APARTA a «_APARTADOS_REVISAR_Y_BORRAR», no se borra: son los
+    soportes clínicos y son la única fuente para rehacer un folio. Y si a una
+    carpeta le falta alguno de los dos folios, no se le toca nada — apartarle
+    los soportes la dejaría sin nada que radicar.
+    """
+    apartados_raiz = carpeta / CARPETA_APARTADOS
+    hechas: list[Limpieza] = []
+    for sub in sorted(p for p in carpeta.iterdir() if p.is_dir()):
+        if sub.name == CARPETA_APARTADOS:
+            continue
+        numero = factura_del_nombre(sub.name)
+        limpieza = Limpieza(numero, sub)
+        hechas.append(limpieza)
+        if not numero:
+            limpieza.aviso = "el nombre de la carpeta no dice de qué factura es"
+            logger.warning("  %s: %s", sub.name, limpieza.aviso)
+            continue
+
+        archivos = [p for p in sorted(sub.rglob("*")) if p.is_file()]
+        folios = {s for p in archivos for hay, s in [es_folio_armado(p.name, numero)] if hay}
+        faltan = [s.strip("_") for s in (SUFIJO_EPICRIS, SUFIJO_FACTURA) if s not in folios]
+        if faltan:
+            limpieza.aviso = f"NO se tocó: falta el folio de la {' y de la '.join(faltan)}"
+            logger.warning("  %s: %s", numero, limpieza.aviso)
+            continue
+
+        sobran = [p for p in archivos if not es_folio_armado(p.name, numero)[0]]
+        limpieza.apartados = len(sobran)
+        if not aplicar or not sobran:
+            continue
+        destino = apartados_raiz / sub.name
+        destino.mkdir(parents=True, exist_ok=True)
+        for suelto in sobran:
+            try:
+                libre, _ = nombre_libre(destino, suelto.name)
+                shutil.move(str(suelto), str(libre))
+            except OSError as e:
+                limpieza.apartados -= 1
+                limpieza.aviso = explicar_error(e)
+                logger.warning("  %s: %s", numero, limpieza.aviso)
+    return hechas
+
+
+@dataclass
+class Salida:
+    """Qué folios se sacaron de una carpeta de factura."""
+
+    factura: str
+    carpeta: Path
+    sacados: int = 0
+    aviso: str = ""
+
+
+def sacar_los_folios(carpeta: Path, aplicar: bool = False) -> list[Salida]:
+    """Saca los dos folios de cada subcarpeta y los deja sueltos en `carpeta`.
+
+    Así queda todo igual: los de las facturas que tenían carpeta de soportes
+    junto a los que ya estaban sueltos. La carpeta vacía se va; si adentro
+    sobró algo, se queda y se avisa — nada desaparece sin que el auditor lo sepa.
+    """
+    hechas: list[Salida] = []
+    for sub in sorted(p for p in carpeta.iterdir() if p.is_dir()):
+        if sub.name == CARPETA_APARTADOS:
+            continue
+        numero = factura_del_nombre(sub.name)
+        salida = Salida(numero, sub)
+        hechas.append(salida)
+        folios = [
+            p for p in sorted(sub.iterdir()) if p.is_file() and es_folio_armado(p.name, numero)[0]
+        ]
+        if not folios:
+            salida.aviso = "no tiene ningún folio armado adentro"
+            logger.warning("  %s: %s", numero or sub.name, salida.aviso)
+            continue
+        for folio in folios:
+            destino = carpeta / folio.name
+            if destino.exists():
+                salida.aviso = f"ya hay uno suelto con el nombre «{folio.name}»; no se pisó"
+                logger.warning("  %s: %s", numero, salida.aviso)
+                continue
+            salida.sacados += 1
+            if not aplicar:
+                continue
+            try:
+                shutil.move(str(folio), str(destino))
+            except OSError as e:
+                salida.sacados -= 1
+                salida.aviso = explicar_error(e)
+                logger.warning("  %s: %s", numero, salida.aviso)
+        if not aplicar:
+            continue
+        quedan = [p for p in sub.rglob("*") if p.is_file()]
+        if quedan:
+            # Se suma al aviso que ya hubiera: el de la colisión importa más y
+            # no puede perderse por este.
+            cola = f"la carpeta quedó con {len(quedan)} archivo(s) adentro; no se borró"
+            salida.aviso = f"{salida.aviso} | {cola}" if salida.aviso else cola
+            continue
+        with contextlib.suppress(OSError):
+            shutil.rmtree(sub)
+    return hechas
+
+
+@dataclass
+class Traido:
+    """El XML que se trajo (o no) para una factura."""
+
+    factura: str
+    traidos: int = 0
+    aviso: str = ""
+
+
+def facturas_con_folio(carpeta: Path) -> list[str]:
+    """Las facturas que ya tienen algún folio suelto en la carpeta de radicación."""
+    numeros: set[str] = set()
+    for pdf in carpeta.glob("*.pdf"):
+        numero = factura_del_nombre(pdf.name)
+        if numero and es_folio_armado(pdf.name, numero)[0]:
+            numeros.add(numero)
+    return sorted(numeros)
+
+
+def traer_los_xml(
+    carpeta: Path,
+    carpeta_facturas: Path,
+    prefijo: str = "",
+    facturas: set[str] | None = None,
+    aplicar: bool = False,
+) -> list[Traido]:
+    """Copia el XML de cada factura junto a sus folios, suelto y sin carpetas.
+
+    Se COPIA, no se mueve: la carpeta del XML es la fuente del paquete y no
+    puede quedar vacía. Y no se pisa un XML que ya estuviera en el destino.
+    """
+    indice: dict[str, Path] = {}
+    for x in sorted(carpeta_facturas.rglob("*.xml")):
+        numero = factura_del_nombre(x.name)
+        if numero:
+            indice.setdefault(numero, x)
+
+    numeros = [f for f in facturas_con_folio(carpeta) if facturas is None or f in facturas]
+    hechos: list[Traido] = []
+    for numero in numeros:
+        traido = Traido(numero)
+        hechos.append(traido)
+        origen = indice.get(numero)
+        if origen is None:
+            traido.aviso = "no está el XML en la carpeta del paquete"
+            logger.warning("  %s: %s", numero, traido.aviso)
+            continue
+        destino = carpeta / (
+            nombre_folio(prefijo, numero, SUFIJO_FACTURA).replace(".pdf", ".xml")
+            if prefijo
+            else origen.name
+        )
+        if destino.exists():
+            traido.aviso = f"ya estaba «{destino.name}» en la carpeta; no se pisó"
+            logger.warning("  %s: %s", numero, traido.aviso)
+            continue
+        traido.traidos = 1
+        if not aplicar:
+            continue
+        try:
+            copiar_como(origen, destino)
+        except OSError as e:
+            traido.traidos = 0
+            traido.aviso = explicar_error(e)
+            logger.warning("  %s: %s", numero, traido.aviso)
+    return hechos
+
+
+def leer_lista_facturas(ruta: Path) -> set[str]:
+    """Las facturas de un .txt, una por línea, como las pega el área del Excel.
+
+    Aguanta ceros de relleno, espacios y líneas en blanco. Las que empiezan por
+    «#» son comentarios.
+    """
+    facturas: set[str] = set()
+    for linea in ruta.read_text(encoding="utf-8-sig").splitlines():
+        limpia = linea.strip()
+        if not limpia or limpia.startswith("#"):
+            continue
+        factura = factura_del_nombre(limpia)
+        if factura:
+            facturas.add(factura)
+    return facturas
+
+
+# ─── El folio de las facturas que solo tienen la respuesta ───────────────────
+
+
+@dataclass
+class FolioSuelto:
+    """Una respuesta a glosa convertida en folio clínico, sin carpeta propia."""
+
+    factura: str
+    origen: Path
+    destino: Path | None = None
+    paginas: int = 0
+    aviso: str = ""
+
+
+def folios_de_respuestas(
+    carpeta_rta: Path,
+    salida: Path,
+    prefijo: str = "",
+    facturas: set[str] | None = None,
+    aplicar: bool = False,
+    caratula: bool = True,
+) -> list[FolioSuelto]:
+    """Un folio clínico por respuesta suelta: el índice y la respuesta, nada más.
+
+    Es para las facturas que no tienen carpeta de soportes. El folio queda
+    directo en `salida` como «<NIT>_<FACTURA>_EPICRIS.pdf», SIN crear carpetas.
+    Sin `aplicar` solo dice qué haría y no toca el disco.
+    """
+    PdfReader, PdfWriter = _cargar_lector_escritor()
+    hechos: list[FolioSuelto] = []
+    for pdf in sorted(carpeta_rta.glob("*.pdf"), key=lambda p: clave_orden(p.name)):
+        factura = factura_del_nombre(pdf.name)
+        if not factura:
+            hechos.append(FolioSuelto("", pdf, aviso="el nombre no dice de qué factura es"))
+            continue
+        if facturas is not None and factura not in facturas:
+            continue
+        destino = salida / nombre_folio(prefijo, factura, SUFIJO_EPICRIS)
+        folio = FolioSuelto(factura, pdf, destino)
+        hechos.append(folio)
+        if not aplicar:
+            continue
+        if destino.exists() and not es_folio_nuestro(destino, PdfReader):
+            folio.aviso = (
+                f"NO se armó: {destino.name} ya existe y no lo escribió este bot. "
+                "Revíselo; si es un folio viejo, bórrelo y vuelva a correr."
+            )
+            logger.warning("  %s: %s", factura, folio.aviso)
+            continue
+        salida.mkdir(parents=True, exist_ok=True)
+        try:
+            folio.paginas = _armar_folio_suelto(pdf, destino, caratula, PdfReader, PdfWriter)
+        except Exception as e:  # noqa: BLE001 - una respuesta mala no tumba el lote
+            folio.aviso = explicar_error(e)
+            logger.warning("  %s: %s", factura, folio.aviso)
+    return hechos
+
+
+def _armar_folio_suelto(rta: Path, destino: Path, caratula: bool, PdfReader, PdfWriter) -> int:
+    """Índice + respuesta. Devuelve cuántas páginas quedaron."""
+    portada = destino.with_suffix(".caratula.tmp.pdf")
+    try:
+        entradas = [(f"1.{GRUPOS[0].titulo}", 2)]  # la 1 es la carátula misma
+        if caratula and escribir_caratula(entradas, portada):
+            paginas, _ = unir_pdfs([portada, rta], destino, PdfReader, PdfWriter, METADATOS_FOLIO)
+            return paginas
+        paginas, _ = unir_pdfs([rta], destino, PdfReader, PdfWriter, METADATOS_FOLIO)
+        return paginas
+    finally:
+        with contextlib.suppress(OSError):
+            portada.unlink()
+
+
 def armar_folios(
     carpeta: Path,
     facturas: set[str] | None = None,
@@ -1628,8 +2024,8 @@ def construir_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--carpeta",
         type=Path,
-        required=True,
-        help="Carpeta del gestor (CAROLINA, CLAUDIA, OSCAR…).",
+        help="Carpeta del gestor (CAROLINA, CLAUDIA, OSCAR…). No hace falta con "
+        "--solo-facturas, que trabaja con --carpeta-facturas.",
     )
     p.add_argument(
         "--facturas",
@@ -1661,6 +2057,51 @@ def construir_parser() -> argparse.ArgumentParser:
         default="",
         help="NIT con que se nombran los folios (680010079201), por si los archivos "
         "de una carpeta no lo traen. Sin esto se usa el que traigan los archivos.",
+    )
+    p.add_argument(
+        "--solo-respuestas",
+        action="store_true",
+        help="Para las facturas SIN carpeta de soportes: toma cada respuesta de "
+        "«--carpeta», le pone el índice y la deja en «--salida» como "
+        "«<NIT>_<FACTURA>_EPICRIS.pdf», suelta, sin crear carpetas.",
+    )
+    p.add_argument(
+        "--traer-xml",
+        action="store_true",
+        help="Copia a «--carpeta» el XML de cada factura que ya tiene folio ahí. "
+        "El XML se toma de «--carpeta-facturas» y se COPIA, no se mueve.",
+    )
+    p.add_argument(
+        "--sacar-folios",
+        action="store_true",
+        help="Saca los dos folios de cada subcarpeta de «--carpeta» y los deja "
+        "SUELTOS ahí mismo. La carpeta que queda vacía se borra; si adentro "
+        "sobró algo, se conserva y se avisa.",
+    )
+    p.add_argument(
+        "--dejar-solo-folios",
+        action="store_true",
+        help="En cada carpeta de «--carpeta» deja solo «..._EPICRIS.pdf» y "
+        "«..._FACTURA.pdf». Lo demás NO se borra: se aparta a una carpeta "
+        "«_APARTADOS_REVISAR_Y_BORRAR» para que usted la revise.",
+    )
+    p.add_argument(
+        "--solo-facturas",
+        action="store_true",
+        help="Como --solo-respuestas pero para el folio de la FACTURA: toma el PDF "
+        "de «--carpeta-facturas», le intercala el detallado de «--detallados» y deja "
+        "«<NIT>_<FACTURA>_FACTURA.pdf» suelto en «--salida».",
+    )
+    p.add_argument(
+        "--detallados",
+        type=Path,
+        help="Carpeta con los detallados por factura (HUS403233.xlsx o su PDF).",
+    )
+    p.add_argument("--salida", type=Path, help="Carpeta donde dejar los folios sueltos.")
+    p.add_argument(
+        "--lista",
+        type=Path,
+        help="Archivo .txt con las facturas a trabajar, una por línea.",
     )
     p.add_argument(
         "--sin-caratula",
@@ -1820,6 +2261,129 @@ def _resumen_folios(
         )
 
 
+def _informe_sueltos(
+    hechos: list[FolioSuelto], aplicar: bool, pedidas: set[str] | None, que: str = "de respuesta"
+) -> int:
+    """Lo que el auditor lee en pantalla al terminar."""
+    armados = [f for f in hechos if f.paginas]
+    con_aviso = [f for f in hechos if f.aviso]
+    verbo = "Se armaron" if aplicar else "Se armarían"
+    logger.info("\n%s %d folio(s) %s.", verbo, len(armados) if aplicar else len(hechos), que)
+    if armados:
+        logger.info("Páginas escritas: %d", sum(f.paginas for f in armados))
+    for f in hechos[:3]:
+        logger.info("   %s → %s", f.factura or "(sin factura)", (f.destino or Path()).name)
+    if len(hechos) > 3:
+        logger.info("   … y %d más.", len(hechos) - 3)
+
+    if pedidas:
+        faltan = sorted(pedidas - {f.factura for f in hechos})
+        if faltan:
+            logger.info(
+                "\nOJO, %d factura(s) de la lista NO tienen respuesta en la carpeta:", len(faltan)
+            )
+            for factura in faltan[:10]:
+                logger.info("   %s", factura)
+            if len(faltan) > 10:
+                logger.info("   … y %d más.", len(faltan) - 10)
+
+    if con_aviso:
+        logger.info("\nCon novedad (%d):", len(con_aviso))
+        for f in con_aviso[:10]:
+            logger.info("   %s: %s", f.factura or f.origen.name, f.aviso)
+        if len(con_aviso) > 10:
+            logger.info("   … y %d más.", len(con_aviso) - 10)
+    if not aplicar:
+        logger.info("\nEsto fue una simulación. Agregue --aplicar para hacerlo de verdad.")
+    return 0
+
+
+def _leer_lista(args) -> set[str] | None | bool:
+    """Las facturas de --lista, o None si no se pidió. False si el archivo no está."""
+    if args.lista is None:
+        return None
+    if not args.lista.is_file():
+        logger.error("No existe la lista: %s", args.lista)
+        return False
+    lista = leer_lista_facturas(args.lista)
+    logger.info("Lista de trabajo: %d facturas", len(lista))
+    return lista
+
+
+def _informe_limpieza(hechas: list[Limpieza], aplicar: bool) -> int:
+    """Lo que el auditor lee al terminar la limpieza."""
+    tocadas = [h for h in hechas if h.apartados]
+    con_aviso = [h for h in hechas if h.aviso]
+    verbo = "Se apartaron" if aplicar else "Se apartarían"
+    logger.info(
+        "\n%s %d archivo(s) de %d carpeta(s), de %d revisadas.",
+        verbo,
+        sum(h.apartados for h in hechas),
+        len(tocadas),
+        len(hechas),
+    )
+    for h in tocadas[:5]:
+        logger.info("   %s: %d archivo(s)", h.factura or h.carpeta.name, h.apartados)
+    if len(tocadas) > 5:
+        logger.info("   … y %d carpeta(s) más.", len(tocadas) - 5)
+    if con_aviso:
+        logger.info("\nSin tocar (%d):", len(con_aviso))
+        for h in con_aviso[:10]:
+            logger.info("   %s: %s", h.factura or h.carpeta.name, h.aviso)
+        if len(con_aviso) > 10:
+            logger.info("   … y %d más.", len(con_aviso) - 10)
+    if aplicar:
+        logger.info(
+            "\nNada se borró: lo apartado quedó en «%s». Revíselo y bórrelo usted.",
+            CARPETA_APARTADOS,
+        )
+    else:
+        logger.info("\nEsto fue una simulación. Agregue --aplicar para hacerlo de verdad.")
+    return 0
+
+
+def _informe_salida(hechas: list[Salida], aplicar: bool) -> int:
+    """Lo que el auditor lee al terminar de sacar los folios."""
+    con_aviso = [h for h in hechas if h.aviso]
+    verbo = "Se sacaron" if aplicar else "Se sacarían"
+    logger.info(
+        "\n%s %d folio(s) de %d carpeta(s).", verbo, sum(h.sacados for h in hechas), len(hechas)
+    )
+    if aplicar:
+        vacias = sum(1 for h in hechas if not h.carpeta.exists())
+        logger.info("Carpetas que quedaron vacías y se borraron: %d", vacias)
+    if con_aviso:
+        logger.info("\nCon novedad (%d):", len(con_aviso))
+        for h in con_aviso[:10]:
+            logger.info("   %s: %s", h.factura or h.carpeta.name, h.aviso)
+        if len(con_aviso) > 10:
+            logger.info("   … y %d más.", len(con_aviso) - 10)
+    if not aplicar:
+        logger.info("\nEsto fue una simulación. Agregue --aplicar para hacerlo de verdad.")
+    return 0
+
+
+def _informe_xml(hechos: list[Traido], aplicar: bool) -> int:
+    """Lo que el auditor lee al terminar de traer los XML."""
+    con_aviso = [h for h in hechos if h.aviso]
+    verbo = "Se trajeron" if aplicar else "Se traerían"
+    logger.info(
+        "\n%s %d XML, de %d factura(s) con folio en la carpeta.",
+        verbo,
+        sum(h.traidos for h in hechos),
+        len(hechos),
+    )
+    if con_aviso:
+        logger.info("\nCon novedad (%d):", len(con_aviso))
+        for h in con_aviso[:10]:
+            logger.info("   %s: %s", h.factura, h.aviso)
+        if len(con_aviso) > 10:
+            logger.info("   … y %d más.", len(con_aviso) - 10)
+    if not aplicar:
+        logger.info("\nEsto fue una simulación. Agregue --aplicar para hacerlo de verdad.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = construir_parser().parse_args(argv)
     handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
@@ -1828,9 +2392,80 @@ def main(argv: list[str] | None = None) -> int:
         handlers.append(logging.FileHandler(args.log, encoding="utf-8"))
     logging.basicConfig(level=logging.INFO, format="%(message)s", handlers=handlers)
 
-    if not args.carpeta.is_dir():
-        logger.error("No existe la carpeta: %s", args.carpeta)
-        return 1
+    # --solo-facturas trabaja con --carpeta-facturas; las demás corridas sí
+    # necesitan la carpeta del gestor.
+    if not args.solo_facturas:
+        if args.carpeta is None:
+            logger.error("Falta --carpeta (la del gestor: CAROLINA, CLAUDIA, OSCAR…).")
+            return 1
+        if not args.carpeta.is_dir():
+            logger.error("No existe la carpeta: %s", args.carpeta)
+            return 1
+
+    if args.traer_xml:
+        if args.carpeta_facturas is None:
+            logger.error("Con --traer-xml hay que decir --carpeta-facturas (la del XML).")
+            return 1
+        if not args.carpeta_facturas.is_dir():
+            logger.error("No existe la carpeta del XML: %s", args.carpeta_facturas)
+            return 1
+        lista = _leer_lista(args)
+        if lista is False:
+            return 1
+        return _informe_xml(
+            traer_los_xml(args.carpeta, args.carpeta_facturas, args.prefijo, lista, args.aplicar),
+            args.aplicar,
+        )
+
+    if args.sacar_folios:
+        return _informe_salida(sacar_los_folios(args.carpeta, args.aplicar), args.aplicar)
+
+    if args.dejar_solo_folios:
+        return _informe_limpieza(dejar_solo_los_folios(args.carpeta, args.aplicar), args.aplicar)
+
+    if args.solo_facturas:
+        if args.salida is None or args.carpeta_facturas is None:
+            logger.error("Con --solo-facturas hay que decir --carpeta-facturas y --salida.")
+            return 1
+        if not args.carpeta_facturas.is_dir():
+            logger.error("No existe la carpeta del XML: %s", args.carpeta_facturas)
+            return 1
+        lista = _leer_lista(args)
+        if lista is False:
+            return 1
+        return _informe_sueltos(
+            folios_de_facturas(
+                args.carpeta_facturas,
+                args.salida,
+                args.detallados,
+                prefijo=args.prefijo,
+                facturas=lista,
+                aplicar=args.aplicar,
+            ),
+            args.aplicar,
+            lista,
+            que="de la factura",
+        )
+
+    if args.solo_respuestas:
+        if args.salida is None:
+            logger.error("Con --solo-respuestas hay que decir --salida.")
+            return 1
+        lista = _leer_lista(args)
+        if lista is False:
+            return 1
+        return _informe_sueltos(
+            folios_de_respuestas(
+                args.carpeta,
+                args.salida,
+                prefijo=args.prefijo,
+                facturas=lista,
+                aplicar=args.aplicar,
+                caratula=not args.sin_caratula,
+            ),
+            args.aplicar,
+            lista,
+        )
 
     facturas: set[str] | None = None
     if args.facturas:

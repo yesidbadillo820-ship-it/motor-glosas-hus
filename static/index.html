@@ -690,42 +690,97 @@ header::after{
 
 /* ─── SIDEBAR NAV (lateral, estilo Linear/Epic) ────────────── */
 .main-layout{flex:1;display:flex;overflow:hidden;min-height:0}
-.sidebar-nav{width:240px;flex-shrink:0;background:var(--bg-card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;transition:width .2s var(--ease)}
-.sidebar-nav.collapsed{width:64px}
-.sn-toggle{display:flex;align-items:center;justify-content:space-between;padding:.9rem 1rem;border-bottom:1px solid var(--border);color:var(--text3);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
-.sidebar-nav.collapsed .sn-toggle-label{display:none}
-.sn-toggle button{background:transparent;border:none;cursor:pointer;color:var(--text3);padding:4px;border-radius:4px;display:flex;align-items:center;justify-content:center}
-.sn-toggle button:hover{background:var(--bg-subtle);color:var(--text)}
-.sn-group{padding:.75rem 0;border-bottom:1px solid var(--border)}
-.sn-group:last-child{border-bottom:none}
-.sn-label{padding:.35rem 1.1rem;font-size:.66rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:.25rem}
-.sidebar-nav.collapsed .sn-label{display:none}
-.sn-item{
-  width:100%;display:flex;align-items:center;gap:.75rem;padding:.6rem 1.15rem;
-  background:transparent;border:none;cursor:pointer;font-family:var(--font);
-  font-size:.82rem;font-weight:500;color:var(--text2);text-align:left;
-  transition:background .2s var(--ease-out),color .2s var(--ease-out),transform .15s var(--ease-out);
-  position:relative;border-radius:0;
+/* ═══════════════════════════════════════════════════════════════════
+   MENÚ LATERAL — pulido visual (31-08-2026)
+
+   Solo estética: ni una ruta, ni un permiso, ni un onclick cambian.
+   Se conservan todas las clases y todos los nombres que el JS usa
+   (.sn-item, .sn-group, .sn-label, .sn-badge, .collapsed, .active…).
+
+   Qué se corrigió y por qué:
+   · El grupo se separaba con una LÍNEA a todo el ancho; eso corta el
+     menú en bloques y compite con el item activo. Se cambia por aire
+     y un rótulo mejor jerarquizado — pesa menos y ordena más.
+   · Los items iban pegados al borde. Ahora viven en una «pista» con
+     margen lateral, así el estado activo se lee como una pieza y no
+     como una banda que cruza la pantalla.
+   · El hover movía el item 3px a la derecha. En un menú de 30 entradas
+     eso es ruido: se reemplaza por un cambio de fondo, que es lo que
+     hace un producto serio.
+   ══════════════════════════════════════════════════════════════════ */
+.sidebar-nav{
+  width:248px;flex-shrink:0;background:var(--bg-card);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;
+  transition:width .2s var(--ease);
+  scrollbar-width:thin;scrollbar-color:var(--border2) transparent;
 }
-.sn-item:hover{background:var(--sinac-gray-50);color:var(--text);transform:translateX(3px);box-shadow:inset 0 0 0 1px rgba(11,61,145,.06)}
-.sn-item:hover svg{color:var(--sinac-blue-700)}
-/* 13-08-2026. La pestaña activa pasa de azul a NARANJA, como la pidió el
-   auditor. Se usa el token que ya existe (--c-amber / --c-amber-light), no
-   un color suelto: si mañana se ajusta la paleta, esto va con ella. */
+.sidebar-nav::-webkit-scrollbar{width:8px}
+.sidebar-nav::-webkit-scrollbar-track{background:transparent}
+.sidebar-nav::-webkit-scrollbar-thumb{background:transparent;border-radius:4px;border:2px solid transparent;background-clip:content-box}
+.sidebar-nav:hover::-webkit-scrollbar-thumb{background:var(--border2);background-clip:content-box}
+.sidebar-nav.collapsed{width:68px}
+
+.sn-toggle{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.85rem 1rem .8rem 1.15rem;
+  color:var(--text4);font-size:.63rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.9px;
+}
+.sidebar-nav.collapsed .sn-toggle{justify-content:center;padding-left:1rem;padding-right:1rem}
+.sidebar-nav.collapsed .sn-toggle-label{display:none}
+.sn-toggle button{
+  background:transparent;border:none;cursor:pointer;color:var(--text3);
+  padding:5px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  transition:background .15s var(--ease-out),color .15s var(--ease-out);
+}
+.sn-toggle button:hover{background:var(--bg-subtle);color:var(--text)}
+
+/* Los grupos se separan con AIRE, no con una línea a todo el ancho:
+   la línea partía el menú en bloques y competía con el item activo. */
+.sn-group{padding:.15rem .5rem .55rem}
+.sn-group + .sn-group{margin-top:.1rem}
+.sn-group:last-child{padding-bottom:.75rem}
+.sn-label{
+  padding:.55rem .65rem .3rem;
+  font-size:.62rem;font-weight:700;color:var(--text4);
+  text-transform:uppercase;letter-spacing:.9px;
+}
+.sidebar-nav.collapsed .sn-label{
+  /* Colapsado no cabe el rótulo, pero el grupo sí tiene que notarse:
+     queda una rayita corta y centrada en su lugar. */
+  padding:0;height:1px;overflow:hidden;color:transparent;
+  margin:.5rem auto .45rem;width:20px;background:var(--border2);
+}
+.sn-item{
+  width:100%;display:flex;align-items:center;gap:.7rem;
+  padding:.5rem .65rem;border-radius:7px;
+  background:transparent;border:none;cursor:pointer;font-family:var(--font);
+  font-size:.815rem;font-weight:500;color:var(--text2);text-align:left;
+  letter-spacing:.005em;line-height:1.35;
+  transition:background .15s var(--ease-out),color .15s var(--ease-out);
+  position:relative;
+}
+.sn-item + .sn-item{margin-top:1px}
+/* El hover ya no desplaza el item: en un menú de treinta entradas ese
+   salto de 3px es ruido. Cambia el fondo, que es lo que se espera. */
+.sn-item:hover{background:var(--bg-subtle);color:var(--text)}
+.sn-item:hover svg{color:var(--text2)}
+
+/* 13-08-2026. La pestaña activa es NARANJA, como la pidió el auditor.
+   31-08-2026: se conserva el color, se cambia la forma. Antes era una
+   banda a todo el ancho con una barra que latía; ahora es una pieza
+   con esquinas suaves y una marca fija a la izquierda — se distingue
+   igual de rápido y no compite con el contenido de la pantalla. */
 .sn-item.active{
   background:var(--c-amber-light);
   color:var(--c-amber);font-weight:600;
 }
 .sn-item.active::before{
-  content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  height:16px;width:3px;
   background:var(--c-amber);
   border-radius:0 3px 3px 0;
-  box-shadow:0 0 8px rgba(230,81,0,.35);
-  animation:snActivePulse 2.4s ease-in-out infinite;
-}
-@keyframes snActivePulse{
-  0%,100%{box-shadow:0 0 8px rgba(230,81,0,.30)}
-  50%{box-shadow:0 0 13px rgba(230,81,0,.55)}
 }
 /* Cascade slide-in al cargar el sidebar */
 .sn-group .sn-item{opacity:0;animation:snItemIn .35s var(--ease-out) forwards}
@@ -742,26 +797,55 @@ header::after{
 }
 @media (prefers-reduced-motion: reduce){
   .sn-group .sn-item{opacity:1;animation:none}
-  .sn-item.active::before{animation:none}
 }
-body.dark .sn-item.active{background:rgba(230,81,0,.18);color:#fdba74}
-body.dark .sn-item:hover{background:rgba(255,255,255,.05)}
-.sn-item svg{flex-shrink:0;color:var(--text3)}
+body.dark .sn-item.active{background:rgba(230,81,0,.16);color:#fdba74}
+body.dark .sn-item:hover{background:rgba(255,255,255,.045)}
+
+/* Iconos: mismo tamaño para todos y alineados en una columna, para que
+   las etiquetas arranquen a la misma altura en todo el menú. */
+.sn-item svg{flex-shrink:0;width:17px;height:17px;color:var(--text4);transition:color .15s var(--ease-out)}
 .sn-item.active svg{color:var(--c-amber)}
 body.dark .sn-item.active svg{color:#fdba74}
 .sn-item-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sidebar-nav.collapsed .sn-item-label{display:none}
-.sidebar-nav.collapsed .sn-item{justify-content:center;padding:.6rem;position:relative}
-.sidebar-nav.collapsed .sn-item[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);background:var(--navy);color:#fff;padding:4px 10px;border-radius:6px;font-size:.72rem;white-space:nowrap;z-index:100;box-shadow:var(--sh-md)}
-.sn-badge{background:var(--c-red);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto;flex-shrink:0;box-shadow:0 0 0 0 rgba(239,68,68,.65);animation:snBadgePulse 2s ease-out infinite}
-@keyframes snBadgePulse{
-  0%{box-shadow:0 0 0 0 rgba(239,68,68,.55)}
-  70%{box-shadow:0 0 0 6px rgba(239,68,68,0)}
-  100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}
+.sidebar-nav.collapsed .sn-item{justify-content:center;padding:.55rem;position:relative}
+.sidebar-nav.collapsed .sn-item.active::before{display:none}
+.sidebar-nav.collapsed .sn-item[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%);background:var(--navy);color:#fff;padding:5px 10px;border-radius:6px;font-size:.72rem;font-weight:500;white-space:nowrap;z-index:100;box-shadow:var(--sh-md)}
+
+/* Badges: eran un círculo rojo que latía sin parar. Un número que
+   parpadea todo el día se deja de ver, y son tres a la vez. Ahora es
+   una pastilla discreta que se lee de un vistazo; el rojo se reserva
+   para «Alertas» y «Vencimientos», que es donde corre un plazo. */
+.sn-badge{
+  background:var(--bg-subtle);color:var(--text2);
+  font-size:10.5px;font-weight:700;font-variant-numeric:tabular-nums;
+  min-width:19px;height:18px;border-radius:9px;padding:0 6px;
+  display:inline-flex;align-items:center;justify-content:center;
+  margin-left:auto;flex-shrink:0;line-height:1;
+  border:1px solid var(--border2);
 }
+.sn-item.active .sn-badge{background:#fff;border-color:rgba(230,81,0,.35);color:var(--c-amber)}
+body.dark .sn-badge{background:rgba(255,255,255,.07);border-color:transparent;color:var(--text2)}
+body.dark .sn-item.active .sn-badge{background:rgba(255,255,255,.12);color:#fdba74}
+
+/* El rojo se reserva para donde CORRE UN PLAZO: vencimientos y alertas.
+   Una glosa que no se contesta a tiempo se da por aceptada (Art. 57 Ley
+   1438), así que ese número sí tiene que saltar. Si todos los badges van
+   en rojo, ninguno destaca — que es lo que pasaba.
+   Se selecciona por el id que ya existe en el HTML: no se toca el markup
+   ni el JavaScript que los muestra y los llena. */
+#venc-badge-side, #alert-badge-side, #sn-sug-badge{
+  background:var(--c-red);border-color:transparent;color:#fff;
+}
+.sn-item.active #venc-badge-side,
+.sn-item.active #alert-badge-side{background:var(--c-red);color:#fff;border-color:transparent}
+body.dark #venc-badge-side, body.dark #alert-badge-side, body.dark #sn-sug-badge{
+  background:var(--c-red);color:#fff;
+}
+
 @media (prefers-reduced-motion: reduce){.sn-badge{animation:none}}
 .sidebar-nav.collapsed .sn-badge{position:absolute;top:4px;right:4px;margin-left:0;min-width:14px;height:14px;font-size:9px}
-.sn-brand-footer{margin-top:auto;padding:1rem .75rem;border-top:1px solid var(--border);background:var(--bg-subtle)}
+.sn-brand-footer{margin-top:auto;padding:.85rem .75rem;border-top:1px solid var(--border);background:var(--bg-subtle)}
 .sidebar-nav.collapsed .sn-brand-footer{padding:.6rem .3rem}
 .sidebar-nav.collapsed .sn-brand-footer img{max-height:24px}
 .sidebar-nav.collapsed .sn-brand-footer div{display:none}
@@ -849,6 +933,11 @@ body.dark tbody tr:hover{background-color:rgba(125,211,252,.08)}
 .sb-label::before{content:'';width:3px;height:12px;background:var(--c-teal2);border-radius:2px;flex-shrink:0}
 .field{margin-bottom:.85rem}
 .field label{display:block;font-size:.7rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.35rem}
+/* 26-08-2026 — modo compacto. Las filas están hechas para leerse cómodas,
+   no para revisar doscientas seguidas. */
+body.denso table td, body.denso table th{padding-top:.28rem;padding-bottom:.28rem;font-size:.82rem}
+body.denso table{line-height:1.3}
+body.denso .card{padding:.7rem .9rem}
 input,select,textarea{
   width:100%;background:var(--bg-card);border:1.5px solid var(--border);border-radius:var(--r);
   padding:.6rem .8rem;font-size:.85rem;font-family:var(--font);color:var(--text);outline:none;
@@ -1044,6 +1133,7 @@ input::placeholder,textarea::placeholder{color:var(--text4);font-weight:400}
 .pill-time.ok{background:var(--c-green-light);color:var(--c-green)}
 .pill-gray{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
 .pill-teal{background:var(--c-teal-light);color:var(--c-teal)}
+.pill-etapa{background:#fef3c7;color:#92400e;border:1px solid #f59e0b;font-weight:700}
 
 .res-score{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem 1.25rem}
 .score-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}
@@ -1792,6 +1882,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   table{page-break-inside:avoid}
   h1,h2,h3,h4{page-break-after:avoid}
   .dont-break{page-break-inside:avoid}
+  /* 26-08-2026: los avisos de «no radicar» son lo único del sistema que SÍ
+     debe imprimirse — y en rojo. Si alguien imprime un dictamen que los lleva,
+     tiene que verlo antes de radicarlo. La regla de arriba oculta [onclick] y
+     .btn; esta se asegura de que el aviso no se vaya con ellos. */
+  .aviso-no-radicar{
+    display:block!important;border:2px solid #dc2626!important;
+    background:#fef2f2!important;color:#7f1d1d!important;font-weight:700!important;
+    page-break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
   /* Encabezado institucional impreso */
   body::before{
     content:"ESE HOSPITAL UNIVERSITARIO DE SANTANDER · NIT 900.006.037-4";
@@ -2089,6 +2188,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
 </style>
 <!-- SINAC Design System 2.0 — Plan de Transformación, Ola 3 -->
 <link rel="stylesheet" href="/static/sinac-ds.css">
+<link rel="stylesheet" href="/static/healthtech.css">
 <!-- SINAC Analizar PRO — gauge, dictamen héroe, loading premium, chips con identidad -->
 <link rel="stylesheet" href="/static/sinac-analizar-pro.css">
 </head>
@@ -2161,12 +2261,12 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     </div>
     <div class="hdr-right">
       <div class="hdr-kpis" id="hdr-kpis" style="display:flex;align-items:center;gap:.8rem;padding:.25rem .7rem;margin-right:.4rem;background:rgba(255,255,255,.08);border-radius:20px;font-size:.7rem;color:rgba(255,255,255,.85);font-weight:600;letter-spacing:.2px;">
-        <span id="hdr-kpi-glosas" title="Glosas analizadas hoy" style="display:inline-flex;align-items:center;gap:.3rem">
+        <span id="hdr-kpi-glosas" title="Glosas registradas este mes — el contador arranca de cero cada día 1" style="display:inline-flex;align-items:center;gap:.3rem">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.85"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           <span data-num="—">—</span>
         </span>
         <span style="opacity:.3">·</span>
-        <span id="hdr-kpi-recuperado" title="Valor recuperado este mes" style="display:inline-flex;align-items:center;gap:.3rem">
+        <span id="hdr-kpi-recuperado" title="Valor recuperado este mes — también arranca de cero cada día 1" style="display:inline-flex;align-items:center;gap:.3rem">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.85"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           <span data-num="—">—</span>
         </span>
@@ -2260,6 +2360,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M9 11H15M9 15H13M17 21H7A2 2 0 0 1 5 19V5A2 2 0 0 1 7 3H14L19 8V19A2 2 0 0 1 17 21Z"/></svg>
           <span class="sn-item-label">Analizar glosa</span>
         </button>
+        <button class="sn-item" data-tip="Mi día" onclick="sidebarTab(this,'mi-dia')" id="sn-mi-dia">
+          <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+          <span class="sn-item-label">Mi día</span>
+        </button>
         <button class="sn-item" data-tip="Mi desempeño" onclick="sidebarTab(this,'mi-desempeno')">
           <svg class="i i-md" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           <span class="sn-item-label">Mi desempeño</span>
@@ -2276,6 +2380,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
         <button class="sn-item" data-solo-coordinacion="1" data-tip="Expediente" onclick="sidebarTab(this,'expediente')" id="sn-expediente">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           <span class="sn-item-label">Expediente</span>
+        </button>
+        <button class="sn-item" data-solo-coordinacion="1" data-tip="Plata recuperada" onclick="sidebarTab(this,'plata')" id="sn-plata">
+          <svg class="i i-md" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span class="sn-item-label">Plata recuperada</span>
         </button>
         <button class="sn-item" data-tip="Vencimientos" onclick="sidebarTab(this,'vencimientos')" id="sn-vencimientos">
           <svg class="i i-md" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
@@ -2341,6 +2449,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
         <button class="sn-item" data-tip="Glosas ADRES: escribí una factura y trae todo" onclick="sidebarTab(this,'glosas-adres')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 14l2 2 4-4"/></svg>
           <span class="sn-item-label">Glosas ADRES</span>
+        </button>
+        <button id="sn-pre-auditoria" class="sn-item" data-tip="Pre-Auditoría: lo que el HIS consulta antes de timbrar" onclick="sidebarTab(this,'pre-auditoria')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 22S20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+          <span class="sn-item-label">Pre-Auditoría</span>
         </button>
         <button class="sn-item" data-tip="Resumen mensual ejecutivo" onclick="sidebarTab(this,'resumen-mes')">
           <svg class="i i-md" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -2649,6 +2761,8 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
                      Refrescar (Ctrl+R nativo) y Voz por contaminación visual; solo dejé las
                      acciones que el gestor usa día a día. -->
                 <button style="padding:.55rem 1.1rem;background:linear-gradient(90deg,#047857,#10b981);color:#fff;border:0;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;box-shadow:0 2px 8px rgba(4,120,87,.35);" onclick="prepararElDia()" title="Aplica texto fijo + marca RESPONDIDAS las RATIFICADAS/EXTEMPORÁNEAS en 1 click">⚡ Preparar el día</button>
+                <button style="padding:.55rem 1.1rem;background:#fff7ed;color:#9a3412;border:1px solid #f59e0b;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;" onclick="verBorradoresAutoPilot()" title="Bandeja de Salida del Auto-Pilot: lo que la máquina dejó en PENDIENTE_APROBACION_HUMANA. Nada sale sin su clic.">📤 Borradores Auto-Pilot</button>
+                <button style="padding:.55rem 1.1rem;background:#eff6ff;color:#1e40af;border:1px solid #60a5fa;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;" onclick="verBandejaEsperaEPS()" title="Libro de radicación: lo que ya se subió al portal de la EPS con su comprobante, y lo que quedó atorado esperando que usted mire el portal.">📮 En espera de EPS</button>
                 <button class="btn-secondary" onclick="window.location.href='/importar-recepcion'" title="Subir Excel masivo — la IA auto-procesa cada glosa">📥 Importar Excel masivo</button>
                 <button class="btn-secondary" onclick="sidebarTab(document.querySelector('.sn-item[onclick*=\'mis-glosas\']'),'mis-glosas')" title="Ver glosas asignadas pendientes">📋 Mis glosas</button>
                 <button class="btn-secondary" onclick="nuevaGlosa()" title="Glosa nueva (Ctrl+N)">🆕 Nueva glosa</button>
@@ -3002,6 +3116,21 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           </button>
         </div>
 
+        <!-- 26-08-2026: buscador y densidad.
+             En un lote de 1.573 facturas, encontrar una pasando páginas es
+             inviable, y las filas están hechas para leerse cómodas, no para
+             revisar doscientas seguidas. El gestor pasa el día acá. -->
+        <div style="display:flex;gap:.6rem;margin-bottom:.85rem;flex-wrap:wrap;align-items:center">
+          <input type="search" id="mis-buscar" placeholder="Buscar factura, EPS, código…"
+                 oninput="filtrarMisGlosas()" aria-label="Buscar en mis glosas"
+                 style="flex:1 1 240px;min-width:200px;padding:.45rem .7rem;font-size:.85rem"/>
+          <span id="mis-buscar-cuenta" style="font-size:.75rem;color:var(--text3);white-space:nowrap"></span>
+          <button type="button" onclick="alternarDensidad()" id="btn-densidad"
+                  style="padding:.45rem .8rem;font-size:.78rem;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;white-space:nowrap">
+            Filas compactas
+          </button>
+        </div>
+
         <!-- Presets de filtros guardados -->
         <div id="mis-presets" style="display:flex;gap:.4rem;margin-bottom:.85rem;flex-wrap:wrap;align-items:center"></div>
 
@@ -3119,6 +3248,8 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           </div>
           <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
             <select id="ga-paquete" onchange="gaCambiarPaquete()" style="padding:.42rem .6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.8rem"></select>
+            <button class="btn btn-ghost" onclick="gaExportarExcel(this)" style="font-size:.8rem" title="Baja el paquete completo: la Hoja1 de siempre (las 26 columnas de la macro) y encima el informe por causal, por área, por gestor y factura por factura">⬇ Exportar Excel</button>
+            <button class="btn btn-ghost" onclick="gaEvidenciasZip()" style="font-size:.8rem" title="Un PDF de evidencia por factura, todo en un ZIP">📦 PDF de todas (ZIP)</button>
             <button class="btn btn-ghost" onclick="gaAbrirCargue()" style="font-size:.8rem">Cargar paquete</button>
           </div>
         </div>
@@ -3162,12 +3293,44 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
         <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem">Excel de la macro (opcional — trae el reparto y lo ya decidido)</label>
         <input type="file" id="ga-file-macro" accept=".xlsx,.xlsm" style="width:100%;margin-bottom:.8rem;font-size:.8rem">
         <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem">Bitácora del ajustador de detallados (opcional — CSV)</label>
-        <input type="file" id="ga-file-bitacora" accept=".csv" style="width:100%;margin-bottom:1rem;font-size:.8rem">
+        <input type="file" id="ga-file-bitacora" accept=".csv" style="width:100%;margin-bottom:.8rem;font-size:.8rem">
+        <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:.25rem">Reparto del área (opcional — quién audita cada factura)</label>
+        <div style="font-size:.72rem;color:var(--text3);margin-bottom:.25rem">
+          Tabla de tres columnas: <code>FACTURA</code>, <code>PROFESIONAL</code> (la médica) y
+          <code>TECNICO</code> (el gestor). Sin esto la columna Gestor sale «(sin gestor asignado)».
+        </div>
+        <input type="file" id="ga-file-reparto" accept=".xlsx,.xlsm,.csv" style="width:100%;margin-bottom:1rem;font-size:.8rem">
         <div id="ga-cargue-estado" style="font-size:.8rem;color:var(--text3);margin-bottom:.8rem"></div>
         <div style="display:flex;gap:.5rem;justify-content:flex-end">
           <button class="btn btn-ghost" onclick="document.getElementById('ga-modal-cargue').style.display='none'">Cancelar</button>
           <button class="btn btn-primary" id="ga-btn-cargar" onclick="gaCargar()">Cargar</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Pre-Auditoría Concurrente (V3, Pilar 2): lo que el HIS consulta ANTES de timbrar -->
+    <div class="panel" id="p-pre-auditoria">
+      <div class="dash-area">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700;color:var(--text)">Pre-Auditoría Concurrente</div>
+            <div style="font-size:.78rem;color:var(--text3)">Lo que el sistema del hospital nos consulta <b>antes</b> de timbrar cada factura. Cada peso corregido acá es un peso que no entra a cartera.</div>
+          </div>
+          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+            <select id="preaud-estado" onchange="preAudCargar()" style="padding:.42rem .6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.8rem">
+              <option value="">Todos los dictámenes</option>
+              <option value="BLOQUEO">Solo bloqueos</option>
+              <option value="ADVERTENCIA">Solo advertencias</option>
+              <option value="APROBADO">Solo aprobados</option>
+            </select>
+            <input id="preaud-factura" placeholder="Buscar factura" onkeydown="if(event.key==='Enter')preAudCargar()"
+                   style="padding:.42rem .6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.8rem;width:150px">
+            <button class="btn btn-ghost" onclick="preAudCargar()" style="font-size:.8rem">⟳ Actualizar</button>
+          </div>
+        </div>
+
+        <div id="preaud-tarjetas" class="preaud-grid"></div>
+        <div id="preaud-tabla"></div>
       </div>
     </div>
 
@@ -3304,6 +3467,95 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           Datos en tiempo real · Endpoint: <code>/dashboard-ejecutivo/vivo</code> ·
           Solo COORDINADOR / SUPER_ADMIN
         </div>
+      </div>
+    </div>
+
+    <!-- 26-08-2026 · «Mi dia».
+         Treinta y dos pantallas para un gestor que en el dia a dia hace tres
+         cosas: responder lo que llego, revisar lo que el motor marco y
+         radicar lo que esta listo. Las otras siguen ahi para quien las
+         necesite, pero dejan de ser el punto de partida. -->
+    <div class="panel" id="p-mi-dia">
+      <div class="dash-area" style="overflow-y:auto;padding:1rem 1.25rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700;color:var(--text)">☀️ Mi día</div>
+            <div style="font-size:.78rem;color:var(--text3)" id="midia-sub">Lo que le toca hoy, ordenado por lo que más urge</div>
+          </div>
+          <button class="btn btn-ghost" onclick="cargarMiDia()" style="font-size:.8rem">Actualizar</button>
+        </div>
+
+        <div id="midia-cols" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem">
+          <div class="chart-card">
+            <div class="chart-hdr">📝 Responder lo que llegó <span id="midia-n-responder" style="float:right;font-weight:700"></span></div>
+            <div id="midia-responder" style="padding:.5rem"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">🔎 Revisar lo que el motor marcó <span id="midia-n-revisar" style="float:right;font-weight:700"></span></div>
+            <div id="midia-revisar" style="padding:.5rem"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-hdr">📤 Radicar lo que está listo <span id="midia-n-radicar" style="float:right;font-weight:700"></span></div>
+            <div id="midia-radicar" style="padding:.5rem"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:1rem;font-size:.72rem;color:var(--text3);text-align:center">
+          Primero lo que vence antes; a igualdad de días, lo de más plata.
+          Lo que no tiene plazo conocido va al final — no se le inventa uno.
+        </div>
+      </div>
+    </div>
+
+    <!-- 26-08-2026 · Tablero de plata recuperada.
+         Habia 32 pantallas y una sola grafica. El motor sabia cuanto se
+         gloso, cuanto se respondio y cuanto se levanto, pero eso no se veia
+         junto en ninguna parte. Este es el numero que pide la gerencia. -->
+    <div class="panel" id="p-plata">
+      <div class="dash-area" style="overflow-y:auto;padding:1rem 1.25rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700;color:var(--text)">💰 Plata glosada y en qué terminó</div>
+            <div style="font-size:.78rem;color:var(--text3)">Mes a mes y EPS por EPS · glosado, respondido a tiempo, levantado, ratificado y perdido por vencimiento</div>
+          </div>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <select id="plata-meses" onchange="cargarPlata()" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text);font-size:.8rem;font-family:var(--font)">
+              <option value="3">Últimos 3 meses</option>
+              <option value="6" selected>Últimos 6 meses</option>
+              <option value="12">Últimos 12 meses</option>
+              <option value="24">Últimos 24 meses</option>
+            </select>
+            <button class="btn btn-ghost" onclick="cargarPlata()" style="font-size:.8rem">Actualizar</button>
+          </div>
+        </div>
+
+        <div class="kpi-grid" id="plata-kpis">
+          <div class="kpi"><div class="kpi-lbl">Glosado</div><div class="kpi-num" id="plata-glosado">—</div><div class="kpi-sub">lo que las EPS objetaron</div></div>
+          <div class="kpi"><div class="kpi-lbl">Levantado</div><div class="kpi-num" id="plata-levantado">—</div><div class="kpi-sub">plata que se recuperó</div></div>
+          <div class="kpi"><div class="kpi-lbl">Ratificado</div><div class="kpi-num" id="plata-ratificado">—</div><div class="kpi-sub">la EPS mantuvo la glosa</div></div>
+          <div class="kpi"><div class="kpi-lbl">Perdido por vencimiento</div><div class="kpi-num" id="plata-perdido">—</div><div class="kpi-sub">no se contestó a tiempo</div></div>
+          <div class="kpi"><div class="kpi-lbl">Sin decidir</div><div class="kpi-num" id="plata-sindec">—</div><div class="kpi-sub">la EPS no ha contestado</div></div>
+          <div class="kpi"><div class="kpi-lbl">Tasa de levantamiento</div><div class="kpi-num" id="plata-tasa">—</div><div class="kpi-sub">levantado sobre glosado</div></div>
+        </div>
+
+        <div id="plata-faltantes" style="display:none;margin-top:.9rem;padding:.7rem .9rem;border:1px solid var(--c-amber);border-radius:8px;background:rgba(245,158,11,.08);font-size:.8rem;color:var(--text2)"></div>
+
+        <div style="margin-top:1rem" class="chart-card">
+          <div class="chart-hdr">Mes a mes</div>
+          <canvas id="ch-plata-mes" style="max-height:220px"></canvas>
+        </div>
+
+        <div style="margin-top:1rem" class="chart-card">
+          <div class="chart-hdr">Detalle por mes</div>
+          <div style="overflow-x:auto"><table id="plata-tabla-mes" style="width:100%;border-collapse:collapse;font-size:.78rem"></table></div>
+        </div>
+
+        <div style="margin-top:1rem" class="chart-card">
+          <div class="chart-hdr">Detalle por EPS</div>
+          <div style="overflow-x:auto"><table id="plata-tabla-eps" style="width:100%;border-collapse:collapse;font-size:.78rem"></table></div>
+        </div>
+
+        <div style="margin-top:1rem;font-size:.7rem;color:var(--text3);text-align:center" id="plata-nota">—</div>
       </div>
     </div>
 
@@ -5716,23 +5968,26 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
 
   /* 3. SIDEBAR PREMIUM: search input + favoritos + recientes */
   .sn-search{
-    margin:.5rem .75rem .65rem; position:sticky; top:0; z-index:5;
-    background:var(--bg-card);
+    margin:0 .75rem .5rem; position:sticky; top:0; z-index:5;
+    background:var(--bg-card); padding-bottom:.35rem;
   }
+  .sidebar-nav.collapsed .sn-search{display:none}
   .sn-search input{
-    width:100%; padding:.45rem .6rem .45rem 2rem;
-    font-size:.78rem;
-    background:var(--bg-subtle); border:1px solid var(--border);
+    width:100%; padding:.48rem .65rem .48rem 2.05rem;
+    font-size:.78rem; font-family:var(--font);
+    background:var(--bg-subtle); border:1px solid var(--border2);
     border-radius:8px; color:var(--text);
-    transition:all .15s ease;
+    transition:border-color .15s ease, box-shadow .15s ease, background .15s ease;
   }
+  /* 31-08-2026: el foco se pinta con el azul del sistema, no con el teal —
+     era el único punto del menú donde aparecía ese color. */
   .sn-search input:focus{
-    outline:none; border-color:var(--c-teal2);
+    outline:none; border-color:var(--sinac-blue-700);
     background:var(--bg-card);
-    box-shadow:0 0 0 3px rgba(2,132,199,.1);
+    box-shadow:0 0 0 3px rgba(21,101,192,.12);
   }
   .sn-search::before{
-    content:""; position:absolute; left:.55rem; top:50%;
+    content:""; position:absolute; left:.62rem; top:calc(50% - .17rem);
     transform:translateY(-50%); width:12px; height:12px;
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>");
     background-size:contain; background-repeat:no-repeat; opacity:.6;
@@ -6891,8 +7146,72 @@ function _toastSonido(type){
 // Se avisa UNA vez por pantalla y no más de una cada 15 segundos: con la red
 // caída fallan seis cosas a la vez y seis avisos seguidos no los lee nadie.
 var _avisosDeCarga = {};
+
+// ─── «NO TIENE PERMISO» NO ES «REVISE LA CONEXIÓN» (31-08-2026) ──────────
+//
+// Los gestores no podían trabajar el ADRES y nadie sabía por qué. La causa
+// no era el permiso en sí: era que la pantalla NO LO DECÍA. Cuando el
+// servidor contesta 403, el aviso que veía el gestor era el genérico de
+// abajo — «no se pudo cargar, revise la conexión»— así que reintentaba,
+// culpaba al internet, y el problema nunca llegaba con nombre propio hasta
+// quien podía arreglarlo.
+//
+// De las 317 llamadas que hace esta pantalla al motor, solo 21 miraban el
+// 403. Arreglarlas una por una es imposible de sostener: en cuanto alguien
+// escriba la 318 vuelve el problema. Se envuelve `fetch` UNA vez, y con eso
+// queda cubierta toda llamada presente y futura.
+//
+// El servidor ya manda el motivo exacto («Se requiere rol COORDINADOR o
+// superior»): lo único que faltaba era mostrárselo a quien está sentado
+// enfrente, junto con el rol que tiene.
+var _ultimo403 = 0;
+(function envolverFetchPara403(){
+  if (!window.fetch || window.__fetch403) return;
+  window.__fetch403 = true;
+  var original = window.fetch.bind(window);
+  window.fetch = function(entrada, opciones){
+    return original(entrada, opciones).then(function(res){
+      try{
+        if (res && res.status === 403) {
+          _ultimo403 = Date.now();
+          var ruta = '';
+          try { ruta = (typeof entrada === 'string' ? entrada : (entrada && entrada.url) || ''); } catch(_){}
+          // Se lee sobre una COPIA: el original tiene que llegar intacto a
+          // quien hizo la llamada.
+          res.clone().json().then(function(cuerpo){
+            _avisar403(ruta, (cuerpo && cuerpo.detail) ? String(cuerpo.detail) : '');
+          }).catch(function(){ _avisar403(ruta, ''); });
+        }
+      }catch(_){}
+      return res;
+    });
+  };
+})();
+
+function _avisar403(ruta, motivo){
+  try{
+    if (_avisosDeCarga['__403'] && (Date.now() - _avisosDeCarga['__403']) < 8000) return;
+    _avisosDeCarga['__403'] = Date.now();
+    var rol = (window.USER_ROL || localStorage.getItem('hus_rol') || '').toUpperCase() || 'sin rol';
+    var donde = '';
+    try { donde = String(ruta).split('?')[0].replace(location.origin, ''); } catch(_){}
+    var base = motivo || 'Esta acción está restringida a otro rol.';
+    if (!/[.!?]$/.test(base)) base += '.';   // el servidor no manda punto final
+    var texto = base
+              + ' Su usuario tiene rol ' + rol + '.'
+              + (donde ? ' (' + donde + ')' : '')
+              + ' No es un problema de conexión: pida el permiso a quien administra los usuarios.';
+    if (typeof toast === 'function') toast('No tiene permiso para esto', texto, 'error', {duracion: 12000});
+    console.error('[403]', donde, motivo, 'rol=' + rol);
+  }catch(_){}
+}
+
 function avisarNoCargo(queCosa, e){
   try{
+    // Si el motivo real fue un 403, ya se avisó arriba con el detalle exacto.
+    // Repetirlo como «revise la conexión» sería justo la mentira que este
+    // cambio vino a quitar.
+    if (Date.now() - _ultimo403 < 3000) return;
     var ahora = Date.now();
     if(_avisosDeCarga[queCosa] && (ahora - _avisosDeCarga[queCosa]) < 15000) return;
     _avisosDeCarga[queCosa] = ahora;
@@ -7113,7 +7432,9 @@ function iniciarNarracion(traceId){
       ia_completada: function(){ return '✅ Dictamen redactado, afinando detalles…'; },
       persistido: function(){ return '💾 Guardado en el historial…'; },
       finalizado: function(){ return '🎉 ¡Listo!'; },
-      error: function(d){ return '⚠️ ' + (d.mensaje || 'Hubo un problema'); }
+      error: function(d){ return '⚠️ ' + (d.mensaje || 'Hubo un problema'); },
+      reconectando: function(){ return '📡 Se cortó la narración en vivo; reconectando… (el dictamen sigue generándose y se recogerá solo)'; },
+      sin_narracion: function(){ return '📡 La narración en vivo no volvió. El dictamen sigue generándose y aparecerá aquí al terminar.'; }
     };
     function agregar(tipo, datos){
       var fn = COPY[tipo]; if(!fn || !steps) return;
@@ -7135,7 +7456,13 @@ function iniciarNarracion(traceId){
     // empiece a redactarse el dictamen, asi que el panel se cerraba con el
     // trabajo a medias y parecia que se habia caido. 6 minutos.
     setTimeout(cerrar, 360000);
-    (async function(){
+    // 02-09-2026 — un corte del túnel NO puede apagar la narración en silencio.
+    // El bucle tiene nombre para poder reintentarlo una vez con el mismo
+    // trace_id: la cola del servidor sigue viva y entrega lo que falte. El
+    // dictamen llega igual por la consulta corta; esto es para que la pantalla
+    // no se quede muda. `terminado` marca que llegó un evento final legítimo.
+    var reintentado = false, terminado = false;
+    async function leer(){
       try {
         var resp = await fetch('/eventos/analizar/'+encodeURIComponent(traceId), {headers: authH(), signal: ctrl.signal});
         if(!resp.ok || !resp.body){ cerrar(); return; }
@@ -7157,12 +7484,21 @@ function iniciarNarracion(traceId){
             if(!ev) return;
             var datos={}; try{ datos=JSON.parse(data||'{}'); }catch(e){}
             agregar(ev, datos);
-            if(ev==='finalizado' || ev==='error' || ev==='timeout') cerrar();
+            if(ev==='finalizado' || ev==='error' || ev==='timeout'){ terminado = true; cerrar(); }
           });
         }
-      } catch(e){ /* abort/red: cierre silencioso */ }
+      } catch(e){ /* abort o red: se decide abajo si se reintenta */ }
+      if(cerrado || terminado){ cerrar(); return; }
+      if(!reintentado){
+        reintentado = true;
+        agregar('reconectando', {});
+        setTimeout(function(){ if(!cerrado) leer(); }, 1500);
+        return;
+      }
+      agregar('sin_narracion', {});
       cerrar();
-    })();
+    }
+    leer();
     return { cerrar: cerrar };
   } catch(e){ return { cerrar: function(){} }; }
 }
@@ -7323,7 +7659,9 @@ async function initApp(){
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.add('show');
   document.getElementById('hdr-user').textContent=USER_NAME;
-  if(localStorage.getItem('dark')==='1') document.body.classList.add('dark');
+  // Health-Tech (03-09-2026): el modo oscuro grafito es el predeterminado.
+  // La eleccion guardada del gestor sigue mandando ('0' = prefiere claro).
+  if(localStorage.getItem('dark')!=='0') document.body.classList.add('dark');
   // FABs flotantes (Mis tareas + Reportar fallo) — los mostramos AQUÍ
   // como salvavidas adicional al evento hus:auth, porque initApp se
   // ejecuta tanto en login fresh como en restore de sesión persistida.
@@ -7722,7 +8060,13 @@ async function refrescarKpisHeader(){
       if(span) span.textContent = valor;
       else el.textContent = valor;  // fallback si la estructura cambia
     }
-    _setKpi($('hdr-kpi-glosas'), fmtNum(a.glosas_mes || 0) + ' glosas');
+    // 01-09-2026 — DECÍA «148 glosas» Y EL title DECÍA «analizadas hoy»,
+    // pero el dato es del MES (glosa_repository.analytics filtra por
+    // extract('month', creado_en) == mes actual). El 1 de septiembre el
+    // encabezado amaneció en «0 glosas · $0» y el auditor creyó que se
+    // habían borrado las 148 de agosto. No se perdió nada: cambió el mes.
+    // La métrica está bien; lo que engañaba era el rótulo.
+    _setKpi($('hdr-kpi-glosas'), fmtNum(a.glosas_mes || 0) + ' glosas este mes');
     var rec = a.valor_recuperado_mes || 0;
     _setKpi($('hdr-kpi-recuperado'), (rec > 0 ? cop(rec) : '$0'));
     // Pendientes: glosas con fecha_vencimiento próxima
@@ -7739,6 +8083,59 @@ async function refrescarKpisHeader(){
       }
     }catch(_){}
   }catch(e){/* silencioso, no bloquear UX */}
+}
+
+// ─── Bandeja de Salida / Borradores del Auto-Pilot (V2, Pilar 2) ─────────
+// La máquina NUNCA marca RESPONDIDA: lo que pasa sus reglas queda en
+// PENDIENTE_APROBACION_HUMANA y se muestra acá. Cada liberación es un clic
+// humano afirmativo, y queda a nombre de quien lo dio en la bitácora.
+async function verBorradoresAutoPilot(){
+  try{
+    var r = await fetch('/autopilot/borradores?limite=200', {headers: authH()});
+    if(!r.ok){ toast('Error', 'No se pudo consultar los borradores (HTTP '+r.status+')', 'error'); return; }
+    var d = await r.json();
+    var viejo = document.getElementById('ap-borradores-overlay');
+    if(viejo) viejo.remove();
+    var ov = document.createElement('div');
+    ov.id = 'ap-borradores-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1.5rem';
+    var filas = (d.borradores || []).map(function(g){
+      // Hotfix 03-09-2026: una glosa detenida por el cortacircuito OCR llega
+      // a esta bandeja con la nota "ERROR_OCR: ..." — se marca en rojo para
+      // que el gestor sepa que NO tiene dictamen y debe re-analizarla.
+      var esErrorOcr = ((g.nota_workflow||'').indexOf('ERROR_OCR') === 0);
+      var badgeOcr = esErrorOcr ? ' <span title="'+String(g.nota_workflow||'').replace(/"/g,'&quot;')+'" style="background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;border-radius:6px;padding:.1rem .4rem;font-size:.68rem;font-weight:800">⛔ ERROR_OCR</span>' : '';
+      return '<tr>'+
+        '<td style="padding:.45rem .6rem">'+(g.factura||'—')+badgeOcr+'</td>'+
+        '<td style="padding:.45rem .6rem">'+(g.eps||'—')+'</td>'+
+        '<td style="padding:.45rem .6rem">'+(g.codigo_glosa||'—')+'</td>'+
+        '<td style="padding:.45rem .6rem;text-align:right">'+fmtCOP(g.valor_objetado||0)+'</td>'+
+        '<td style="padding:.45rem .6rem"><button onclick="liberarBorradorAutoPilot('+g.glosa_id+')" style="background:#047857;color:#fff;border:0;border-radius:6px;padding:.35rem .8rem;font-weight:700;cursor:pointer">✓ Liberar</button></td>'+
+      '</tr>';
+    }).join('');
+    ov.innerHTML = '<div style="background:#fff;border-radius:12px;max-width:820px;width:100%;max-height:80vh;overflow:auto;padding:1.2rem 1.4rem;box-shadow:0 20px 50px rgba(0,0,0,.3)">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">'+
+        '<h3 style="margin:0;font-size:1rem;color:#9a3412">📤 Bandeja de Salida — Borradores del Auto-Pilot ('+(d.total||0)+')</h3>'+
+        '<button onclick="document.getElementById(\'ap-borradores-overlay\').remove()" style="border:0;background:none;font-size:1.2rem;cursor:pointer">✕</button>'+
+      '</div>'+
+      '<p style="font-size:.78rem;color:#64748b;margin:.2rem 0 .8rem">La máquina las dejó en <b>PENDIENTE_APROBACION_HUMANA</b>. Nada sale de aquí sin su clic; cada liberación queda a su nombre en la bitácora.</p>'+
+      ((d.total||0) === 0
+        ? '<p style="font-size:.85rem;color:#334155">No hay borradores en espera.</p>'
+        : '<table style="width:100%;border-collapse:collapse;font-size:.82rem"><thead><tr style="text-align:left;color:#64748b"><th style="padding:.45rem .6rem">Factura</th><th style="padding:.45rem .6rem">Entidad</th><th style="padding:.45rem .6rem">Glosa</th><th style="padding:.45rem .6rem;text-align:right">Valor</th><th></th></tr></thead><tbody>'+filas+'</tbody></table>')+
+    '</div>';
+    document.body.appendChild(ov);
+  }catch(e){ toast('Error', 'No se pudo abrir la bandeja de borradores', 'error'); }
+}
+
+async function liberarBorradorAutoPilot(glosaId){
+  if(!confirm('✓ Liberar borrador\n\nEsta glosa saldrá de la bandeja del Auto-Pilot y quedará RESPONDIDA a su nombre (queda registrado en la bitácora).\n\n¿Confirma la liberación?')) return;
+  try{
+    var r = await fetch('/autopilot/liberar/'+glosaId, {method:'POST', headers: authH()});
+    var d = await r.json();
+    if(!r.ok){ toast('No se liberó', d.detail || ('HTTP '+r.status), 'error'); return; }
+    toast('✓ Liberada', 'La glosa #'+glosaId+' salió de borradores y quedó a su nombre', 'success');
+    verBorradoresAutoPilot();
+  }catch(e){ toast('Error', 'No se pudo liberar el borrador', 'error'); }
 }
 
 // ─── Preparar el día (Ronda 37) — master action del coordinador ─────────
@@ -8286,7 +8683,10 @@ function tab(btn,id){
   if(id==='dashboard') loadDash();
   if(id==='glosas-adres') loadGlosasAdres();
   if(id==='resumen-mes') loadResumenMes();
+  if(id==='pre-auditoria') preAudCargar();
   if(id==='mando'){ loadMando(); loadOperacion(); }
+  if(id==='mi-dia') cargarMiDia();
+  if(id==='plata') cargarPlata();
   if(id==='admin-sugerencias') cargarPanelSugerencias();
   if(id==='historial') loadHist(1);
   if(id==='alertas') loadAlertas();
@@ -8331,7 +8731,7 @@ async function cargarPapelera(){
   try{
     var r = await fetch('/papelera/', {headers: authH()});
     if(!r.ok){
-      if(r.status === 403){ body.innerHTML = '<tr><td colspan="8" style="color:#b45309;padding:2rem;text-align:center">Solo COORDINADOR/SUPER_ADMIN puede ver la papelera</td></tr>'; }
+      if(r.status === 403){ body.innerHTML = '<tr><td colspan="8" style="color:#b45309;padding:2rem;text-align:center">Su usuario no tiene permiso para ver la papelera (se requiere rol AUDITOR o superior)</td></tr>'; }
       else { body.innerHTML = '<tr><td colspan="8" style="color:#b91c1c;padding:2rem;text-align:center">Error ' + r.status + '</td></tr>'; }
       return;
     }
@@ -8353,8 +8753,10 @@ async function cargarPapelera(){
         '<td>'+fecha+'</td>' +
         '<td class="cell-center">'+badge+'</td>' +
         '<td class="cell-center">' +
-          '<button class="btn-sm" onclick="restaurarGlosa('+p.id+')">Restaurar</button> ' +
-          '<button class="btn-sm ghost" style="color:#b91c1c" onclick="purgarGlosa('+p.id+')">Purgar</button>' +
+          (esDeCoordinacion()
+            ? '<button class="btn-sm" onclick="restaurarGlosa('+p.id+')">Restaurar</button> ' +
+              '<button class="btn-sm ghost" style="color:#b91c1c" onclick="purgarGlosa('+p.id+')">Purgar</button>'
+            : '<span style="font-size:.72rem;color:var(--text3)" title="Restaurar o purgar es de coordinación">solo lectura</span>') +
         '</td></tr>';
     }).join('');
   }catch(e){ body.innerHTML = '<tr><td colspan="8" style="color:#b91c1c;padding:2rem;text-align:center">'+escHtml(e.message)+'</td></tr>'; }
@@ -10649,28 +11051,58 @@ if(!window._concepto_parciales) window._concepto_parciales = {};
 // Auto-auditoría suave antes de marcar como RESPONDIDA. Si hay hallazgos
 // se muestra un modal con sugerencias; el gestor decide. Si todo OK, pasa
 // directo a marcar como RESPONDIDA con un mensaje celebratorio.
+//
+// Hotfix 03-09-2026 (prevención de error humano): el botón de estado final
+// se APAGA solo — nada de «de todos modos» — cuando el Quality Gate trae
+// hallazgos graves, el puntaje está en zona roja, o la confianza de la IA
+// no supera el umbral. El camino entonces es corregir (re-analizar) primero.
+var UMBRAL_CONFIANZA_RESPONDIDA = 0.85;
+
+function _bloqueosEstadoFinal(aud, ap){
+  var motivos = [];
+  ((aud && aud.hallazgos) || []).forEach(function(h){
+    if(h.severidad === 'alta') motivos.push('Hallazgo grave del control de calidad: ' + (h.titulo || 'anomalía'));
+  });
+  if(aud && typeof aud.puntaje === 'number' && aud.puntaje < 60){
+    motivos.push('Calidad del dictamen ' + aud.puntaje + '/100 (zona roja)');
+  }
+  if(ap && typeof ap.confianza === 'number' && ap.confianza < UMBRAL_CONFIANZA_RESPONDIDA){
+    motivos.push('La confianza de la IA (' + Math.round(ap.confianza*100) + '%) no supera el umbral del '
+      + Math.round(UMBRAL_CONFIANZA_RESPONDIDA*100) + '%');
+  }
+  return motivos;
+}
+
 async function _auditarYConfirmar(glosaId, factura){
   try{
+    var ap = null;
+    try{
+      var ra = await fetch('/autopilot/glosa/'+glosaId, {headers: authH()});
+      if(ra.ok) ap = await ra.json();
+    }catch(e){ /* sin evaluación del autopilot no se bloquea por confianza */ }
     var r = await fetch('/glosas/'+glosaId+'/auditoria', {headers: authH()});
     if(!r.ok) return true; // si la auditoría falla, no bloqueamos
     var aud = await r.json();
-    if(aud.ok){
+    var bloqueos = _bloqueosEstadoFinal(aud, ap);
+    if(aud.ok && bloqueos.length === 0){
       // Dictamen impecable — confirmación celebratoria simple
       return confirm('✨ Dictamen verificado — todo OK.\n\n' +
         (aud.celebracion || '') + '\n\n' +
         '¿Marcar la factura ' + (factura || '#'+glosaId) + ' como RESPONDIDA?');
     }
-    // Hay hallazgos — modal informativo con opción de continuar o corregir
-    return _mostrarModalAuditoria(glosaId, factura, aud);
+    // Hay hallazgos o bloqueos — modal informativo; con bloqueos, el botón
+    // de continuar sale deshabilitado (gris) con sus motivos.
+    return _mostrarModalAuditoria(glosaId, factura, aud, bloqueos);
   }catch(e){
     return confirm('¿Marcar la factura ' + (factura || '#'+glosaId) + ' como RESPONDIDA?');
   }
 }
 
-function _mostrarModalAuditoria(glosaId, factura, aud){
+function _mostrarModalAuditoria(glosaId, factura, aud, bloqueos){
   return new Promise(function(resolve){
     var prev = document.getElementById('auditoria-modal');
     if(prev) prev.remove();
+    var bloqueado = !!(bloqueos && bloqueos.length);
     var puntaje = aud.puntaje || 0;
     var color = puntaje >= 80 ? '#10b981' : puntaje >= 60 ? '#f59e0b' : '#dc2626';
     var titulo = puntaje >= 80
@@ -10704,9 +11136,22 @@ function _mostrarModalAuditoria(glosaId, factura, aud){
         +   '</div>'
         + '</div>';
     });
+    // Hotfix 03-09-2026: con bloqueos, la caja gris explica el porqué y el
+    // botón de estado final queda deshabilitado — no hay «de todos modos».
+    if(bloqueado){
+      html += '<div style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:10px;padding:12px 14px;margin-bottom:4px;color:#374151;font-size:.8rem">'
+        + '<b>🔒 Bloqueado por seguridad:</b>'
+        + '<ul style="margin:.4rem 0 0 1.1rem;padding:0">'
+        + bloqueos.map(function(m){ return '<li>' + m + '</li>'; }).join('')
+        + '</ul>'
+        + '<div style="margin-top:.5rem;font-size:.74rem;color:#6b7280">Corrija el dictamen (re-analizar o editar) y vuelva a intentar: el botón se habilita solo cuando el control de calidad y la confianza lo permiten.</div>'
+        + '</div>';
+    }
     html += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap">'
       +   '<button id="aud-corregir" class="btn btn-ghost" style="padding:10px 16px">Lo corrijo primero</button>'
-      +   '<button id="aud-continuar" class="btn" style="padding:10px 18px;background:'+color+';color:#fff;border:0;border-radius:8px;font-weight:700">Marcar RESPONDIDA de todos modos</button>'
+      +   (bloqueado
+            ? '<button id="aud-continuar" disabled title="' + bloqueos.join(' · ').replace(/"/g,'&quot;') + '" style="padding:10px 18px;background:#9ca3af;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:not-allowed;opacity:.9">🔒 Marcar RESPONDIDA (bloqueado)</button>'
+            : '<button id="aud-continuar" class="btn" style="padding:10px 18px;background:'+color+';color:#fff;border:0;border-radius:8px;font-weight:700">Marcar RESPONDIDA de todos modos</button>')
       + '</div>'
       + '</div>';
     var bg = document.createElement('div');
@@ -10715,7 +11160,10 @@ function _mostrarModalAuditoria(glosaId, factura, aud){
     bg.innerHTML = html;
     document.body.appendChild(bg);
     document.getElementById('aud-corregir').onclick = function(){ bg.remove(); resolve(false); };
-    document.getElementById('aud-continuar').onclick = function(){ bg.remove(); resolve(true); };
+    var btnCont = document.getElementById('aud-continuar');
+    if(btnCont && !btnCont.disabled){
+      btnCont.onclick = function(){ bg.remove(); resolve(true); };
+    }
   });
 }
 
@@ -11462,18 +11910,47 @@ async function poblarLandingKPIs(){
   // escondía con `dias_restantes > 0`). Se cuentan aparte porque no es lo
   // mismo "vence pronto" que "ya se venció": decirle al gestor que algo
   // vence pronto cuando el plazo ya pasó es tranquilizarlo al revés.
-  var nVencen = 0, nVencidas = 0;
-  if(alertas && Array.isArray(alertas.alertas)){
+  //
+  // 31-08-2026 — NINGÚN ESTADO QUE MIENTA. El caso que más cuesta.
+  //
+  // La consulta de alertas se pide con `.catch(()=>null)`, así que si falla
+  // llega `null`. Y este bloque igual escribía **0** en la tarjeta y pintaba
+  // el pill verde de «sin glosas próximas a vencer».
+  //
+  // Eso no es cierto: no es que no haya ninguna, es que NO SE PUDO
+  // PREGUNTAR. Y aquí la diferencia cuesta plata — una glosa que no se
+  // contesta a tiempo se da por aceptada (Art. 57 Ley 1438 de 2011). El
+  // auditor abre el motor, ve un cero tranquilizador y se dedica a otra cosa.
+  //
+  // Cuando no se sabe, se dice que no se sabe.
+  var _hayAlertas = !!(alertas && Array.isArray(alertas.alertas));
+  var nVencen = 0, nVencidas = 0, nCriticas = 0;
+  if(_hayAlertas){
     nVencen = alertas.alertas.length;
     nVencidas = alertas.alertas.filter(function(a){ return (a.dias_restantes||0) <= 0; }).length;
+    // 03-09-2026 (V2, Pilar 4) — ROJO ANTES DE QUE SE VENZA. Hasta ahora solo
+    // se avisaba de lo YA vencido, que es cuando ya no hay nada que hacer. A
+    // 3 días hábiles o menos todavía se alcanza a responder: eso va en rojo.
+    // El plazo llega calculado EN CALIENTE por la API (radicación vs hoy,
+    // hábiles sin festivos); antes venía congelado desde el día del análisis.
+    nCriticas = alertas.alertas.filter(function(a){
+      var d = a.dias_restantes; return d != null && d > 0 && d <= 3;
+    }).length;
   }
-  if($('land-alertas')) $('land-alertas').textContent = nVencen;
+  if($('land-alertas')) $('land-alertas').textContent = _hayAlertas ? nVencen : '—';
   var deltaA = $('land-alertas-delta');
   if(deltaA){
-    deltaA.textContent = nVencidas > 0
-      ? (nVencidas + ' ya vencida' + (nVencidas===1?'':'s'))
-      : 'en 5 días';
-    deltaA.className = 'stat-card-delta ' + (nVencidas > 0 ? 'down' : 'neutral');
+    if(!_hayAlertas){
+      deltaA.textContent = 'no se pudo consultar';
+      deltaA.className = 'stat-card-delta down';
+    } else {
+      deltaA.textContent = nVencidas > 0
+        ? (nVencidas + ' ya vencida' + (nVencidas===1?'':'s'))
+        : nCriticas > 0
+          ? ('⚠ ' + nCriticas + ' crítica' + (nCriticas===1?'':'s') + ' — vence' + (nCriticas===1?'':'n') + ' en ≤3 días')
+          : 'en 5 días';
+      deltaA.className = 'stat-card-delta ' + ((nVencidas > 0 || nCriticas > 0) ? 'down' : 'neutral');
+    }
   }
 
   // ─── Saludo: pills de contexto ───
@@ -11486,15 +11963,26 @@ async function poblarLandingKPIs(){
     } else if(nVencen > 0){
       pillV.innerHTML = '⏰ <b>' + nVencen + '</b> glosa' + (nVencen===1?'':'s') + ' vence' + (nVencen===1?'':'n') + ' pronto';
       pillV.className = 'pill warn';
-    } else {
+    } else if(_hayAlertas){
       pillV.innerHTML = '✓ sin glosas próximas a vencer';
       pillV.className = 'pill good';
+    } else {
+      // El verde de «todo en orden» es justo lo que no se puede decir cuando
+      // no se pudo preguntar.
+      pillV.innerHTML = '⚠ no se pudo revisar si hay glosas próximas a vencer';
+      pillV.className = 'pill warn';
     }
   }
   var pillC = $('land-saludo-pill-contratos');
   if(pillC){
-    pillC.innerHTML = '📄 <b>' + nContratos + '</b> contrato' + (nContratos===1?'':'s') + ' cargado' + (nContratos===1?'':'s');
-    pillC.className = 'pill' + (nContratos > 0 ? ' good' : '');
+    // Mismo caso: sin respuesta, «0 contratos cargados» es falso.
+    if(!contratos){
+      pillC.innerHTML = '⚠ no se pudo consultar cuántos contratos hay cargados';
+      pillC.className = 'pill warn';
+    } else {
+      pillC.innerHTML = '📄 <b>' + nContratos + '</b> contrato' + (nContratos===1?'':'s') + ' cargado' + (nContratos===1?'':'s');
+      pillC.className = 'pill' + (nContratos > 0 ? ' good' : '');
+    }
   }
 
   // ─── Top entidades + Top causales ───
@@ -14132,6 +14620,55 @@ async function borrarPreset(presetId, ev){
   }catch(e){ toast('Error de red', String(e), 'error'); }
 }
 
+// ─── Buscar dentro de la tabla, sin ir al servidor ──────────────────────
+// 26-08-2026. En un lote de 1.573 facturas, encontrar una pasando páginas es
+// inviable. Filtra sobre lo que ya está pintado: es instantáneo y no gasta una
+// llamada al motor.
+function filtrarMisGlosas(){
+  try{
+    var q = (document.getElementById('mis-buscar') || {}).value || '';
+    q = q.trim().toLowerCase();
+    var body = document.getElementById('mis-body');
+    if(!body) return;
+    var filas = body.querySelectorAll('tr');
+    var visibles = 0;
+    for(var i=0; i<filas.length; i++){
+      var texto = (filas[i].textContent || '').toLowerCase();
+      var pasa = !q || texto.indexOf(q) !== -1;
+      filas[i].style.display = pasa ? '' : 'none';
+      if(pasa) visibles++;
+    }
+    var cuenta = document.getElementById('mis-buscar-cuenta');
+    if(cuenta){
+      cuenta.textContent = q
+        ? (visibles + ' de ' + filas.length)
+        : '';
+    }
+  }catch(_){}
+}
+
+// ─── Filas compactas ────────────────────────────────────────────────────
+// Quien revisa lotes grandes lo deja puesto siempre, así que se recuerda.
+function alternarDensidad(){
+  try{
+    var compacto = document.body.classList.toggle('denso');
+    try{ localStorage.setItem('sinac_denso', compacto ? '1' : '0'); }catch(_){}
+    var btn = document.getElementById('btn-densidad');
+    if(btn) btn.textContent = compacto ? 'Filas cómodas' : 'Filas compactas';
+  }catch(_){}
+}
+(function recordarDensidad(){
+  try{
+    if(localStorage.getItem('sinac_denso') === '1'){
+      document.body.classList.add('denso');
+      document.addEventListener('DOMContentLoaded', function(){
+        var b = document.getElementById('btn-densidad');
+        if(b) b.textContent = 'Filas cómodas';
+      });
+    }
+  }catch(_){}
+})();
+
 async function loadMisGlosas(){
   var todas = document.getElementById('mis-todas') && document.getElementById('mis-todas').checked;
   var vista = window._mis_vista || '';
@@ -16066,6 +16603,33 @@ function ocultarPreviewAuditoria(){
   if(landing) landing.style.display = '';
 }
 
+// 02-09-2026 — Espera el resultado de /analizar/async con peticiones cortas.
+// Devuelve un objeto con la forma de la Response de antes (ok, status, json())
+// para que el resto de analizar() no cambie ni una línea.
+async function esperarResultadoAnalisis(traceId){
+  var cada=2500, tope=20*60*1000, inicio=Date.now(), sinRegistro=0;
+  while(Date.now()-inicio<tope){
+    var res=null;
+    try{ res=await fetch('/analizar/resultado/'+encodeURIComponent(traceId),{headers:authH()}); }
+    catch(e){ res=null; }  // un corte de red en una consulta corta no es fatal: se reintenta
+    if(res){
+      if(res.status===401){ return {ok:false,status:401,json:async function(){return{detail:'Sesión vencida'};}}; }
+      if(res.status===404){
+        // El registro puede tardar un instante en aparecer; pasados varios
+        // intentos seguidos sin registro, el análisis no existe.
+        if(++sinRegistro>=8){ return {ok:false,status:404,json:async function(){return{detail:'El análisis no quedó registrado. Vuelva a intentarlo.'};}}; }
+      } else if(res.ok){
+        sinRegistro=0;
+        var e=await res.json().catch(function(){return{estado:'en_curso'};});
+        if(e.estado==='listo'){ var d=e.resultado||{}; return {ok:true,status:200,json:async function(){return d;}}; }
+        if(e.estado==='error'){ var det=e.detail||'Error procesando análisis'; var st=e.status||500; return {ok:false,status:st,json:async function(){return{detail:det};}}; }
+      }
+    }
+    await new Promise(function(ok){ setTimeout(ok,cada); });
+  }
+  return {ok:false,status:504,json:async function(){return{detail:'El análisis sigue en curso. Revíselo en Historial en un momento: el dictamen se guarda al terminar.'};}};
+}
+
 async function analizar(modoOverride){
   var eps=document.getElementById('eps-sel').value;
   var glosa=document.getElementById('f-glosa').value.trim();
@@ -16169,7 +16733,22 @@ async function analizar(modoOverride){
   }
 
   try{
-    var r=await fetch('/analizar',{method:'POST',headers:authH(),body:fd});
+    // 02-09-2026 — PRUEBA 2 (CL4506): el túnel corta toda respuesta a los 100 s
+    // y una glosa pesada tarda más. El motor terminaba y guardaba, pero la
+    // respuesta nunca llegaba: «Error de conexión». Ahora el POST devuelve el
+    // trace_id enseguida y el resultado se recoge con peticiones cortas, que el
+    // túnel no alcanza a cortar. La narración en vivo sigue por su canal.
+    var r0=await fetch('/analizar/async',{method:'POST',headers:authH(),body:fd});
+    if(r0.status===401){logout();return;}
+    if(!r0.ok){
+      var er0=await r0.json().catch(function(){return{detail:'Error desconocido'}});
+      toast('Error en el análisis',er0.detail||'Verifique los datos','error');
+      if(typeof paMarcarFallaPipeline === 'function') paMarcarFallaPipeline();
+      if(_narr) try{ _narr.cerrar(); }catch(e){}
+      hideLoading();_rehab();return;
+    }
+    var acuse=await r0.json().catch(function(){return{}});
+    var r=await esperarResultadoAnalisis(acuse.trace_id||_traceId);
     if(r.status===401){logout();return;}
     if(!r.ok){
       var er=await r.json().catch(function(){return{detail:'Error desconocido'}});
@@ -17082,8 +17661,20 @@ function renderMedallasDictamen(d, scoreColor){
   if(!v){
     grade='—'; gradeCls='nd'; gradeTag='SIN DATOS'; gradeDet='Sin verificación de citas disponible';
   } else if(issues.length === 0){
+    // 26-08-2026: el sello decía «N citas contra corpus · 0 hallazgos» sin
+    // decir nunca qué tan de fiar es ese corpus. Esa semana se descubrió que
+    // 21 de las 26 normas guardadas tenían algún artículo con el nombre o el
+    // texto inventado: el sello llevaba meses certificando contra una lista
+    // que nadie había contrastado. Ahora lleva su propia hoja de vida, y si
+    // alguien agrega una norma sin verificar, el sello lo dice.
     grade='A'; gradeCls='a'; gradeTag='CITAS VERIFICADAS';
     gradeDet=(v.total_citas || 0)+' citas contra corpus · 0 hallazgos';
+    if(v.corpus && v.corpus.leyenda){
+      gradeDet += ' · ' + v.corpus.leyenda;
+      if(v.corpus.normas_sin_verificar > 0){
+        grade='B'; gradeCls='b'; gradeTag='CORPUS INCOMPLETO';
+      }
+    }
   } else if(altas === 0){
     grade='B'; gradeCls='b'; gradeTag='HALLAZGOS LEVES';
     gradeDet=issues.length+' hallazgo(s) leve(s) (sin severidad ALTA) en '+(v.total_citas || issues.length)+' citas';
@@ -17131,6 +17722,16 @@ function renderResult(d){
   // Guardar verificacion_citas para que paMarcarCitasEnDictamen marque en rojo las falsas
   window._paVerificacionCitas = d.verificacion_citas || null;
 
+  // 31-08-2026 — LO QUE LA MÁQUINA CORRIGIÓ, A LA VISTA.
+  // El motor ya arreglaba solo lo que la IA escribe mal —quitaba códigos
+  // citados como CUPS que no existen, le ponía la fecha a una norma derogada,
+  // corregía el artículo— y todo eso pasaba EN SILENCIO: el dictamen salía
+  // limpio y nadie sabía que se le habían quitado tres cosas.
+  // Mostrarlo no cuesta trabajo nuevo (ya está hecho por dentro) y sirve para
+  // dos cosas: el gestor le cree al motor porque ve que revisa, y aprende qué
+  // mirar cuando revise a mano.
+  window._paCorrecciones = (d.correcciones && d.correcciones.length) ? d.correcciones : null;
+
   // Quality Gate OK = trae verificación de citas y ninguna con severidad ALTA.
   // La clase .qg-ok hace visible el sello "VALIDADO POR QUALITY GATE" (CSS);
   // el JS puede togglearla después si la verificación cambia.
@@ -17145,12 +17746,27 @@ function renderResult(d){
   var qgOk = !!(_vc && _seRevisó && !_qgIssues.some(function(i){ return i.severidad === 'ALTA'; }));
 
   var fechaLarga = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+
+  // La factura para el pie de página impreso. Misma cascada que el recuadro
+  // del servicio: lo que mande el motor y, si no, lo que el auditor escribió
+  // en el formulario. «N/A» es falta de dato, no un número.
+  var _facturaImpresa = '';
+  [d && d.factura, d && d.numero_factura,
+   (document.getElementById('f-factura') || {}).value].forEach(function(v){
+    v = String(v == null ? '' : v).trim();
+    if(!_facturaImpresa && v && v.toUpperCase() !== 'N/A') _facturaImpresa = v;
+  });
   var consecDoc = d.glosa_id ? ('GL-'+d.glosa_id) : (d.codigo_glosa || '—');
 
   var html='<div class="res-header">'
     +'<div class="res-title">'+d.resumen+'</div>'
     +'<div class="res-pills">'
     +'<span class="pill pill-code">'+d.codigo_glosa+'</span>'
+    +((d.etapa_procesal && d.etapa_procesal!=='INICIAL')
+        ? '<span class="pill pill-etapa">⚠️ ETAPA: '
+          +(d.etapa_procesal==='CONCILIACION'?'CONCILIACIÓN':'RATIFICACIÓN')
+          +' DETECTADA</span>'
+        : '')
     +'<span class="pill '+(isOk?'pill-time ok':'pill-time')+'">'+d.mensaje_tiempo+'</span>'
     +(d.valor_objetado!=='$ 0.00'?'<span class="pill pill-gray">'+d.valor_objetado+'</span>':'')
     +'<span class="pill pill-teal">'+d.modelo_ia+'</span>'
@@ -17163,6 +17779,24 @@ function renderResult(d){
     +(_vc && _vc.verificado === false
        ? '<div style="background:#fffbeb;border:2px solid #d97706;border-radius:8px;padding:.7rem .9rem;margin-bottom:.6rem;font-size:.82rem;color:#7c2d12"><b>⚠ Las citas de este dictamen NO se revisaron.</b> '
          + escHtml(_vc.motivo_no_verificado || 'El verificador no pudo correr.')
+         + '</div>'
+       : '')
+    // Lo que las redes arreglaron solas, ANTES del dictamen: el gestor tiene
+    // que verlo antes de leer el texto, no después de haberlo radicado.
+    // No sale impreso — es una nota interna, no parte del escrito a la EPS.
+    +(window._paCorrecciones
+       ? '<div class="res-correcciones no-print">'
+         + '<div class="res-correcciones-hdr">'
+         + '<span class="sds-estado es-probado">Revisado</span>'
+         + '<b>' + window._paCorrecciones.length + ' '
+         + (window._paCorrecciones.length === 1 ? 'corrección' : 'correcciones')
+         + ' antes de entregarle el dictamen</b></div>'
+         + '<ul class="res-correcciones-lista">'
+         + window._paCorrecciones.map(function(c){ return '<li>'+escHtml(c)+'</li>'; }).join('')
+         + '</ul>'
+         + '<div class="res-correcciones-pie">Esto lo arregló el motor solo. Se lo '
+         + 'mostramos para que sepa qué revisar cuando lea a mano — no hace falta '
+         + 'que haga nada.</div>'
          + '</div>'
        : '')
     +'<div class="res-dictamen card-doc'+(qgOk?' qg-ok':'')+'">'
@@ -17181,6 +17815,16 @@ function renderResult(d){
     +'</div>'
     +'</div>'
     +'<div id="res-dictamen-body" class="res-dictamen-body">'+d.dictamen+'</div>'
+    // 31-08-2026 — EL PAPEL ES LO QUE LLEGA A LA EPS.
+    // Un dictamen de seis hojas que se separa en la mesa de radicación queda
+    // sin forma de saber qué hoja es de qué factura: el número solo aparecía
+    // una vez, en el membrete de la primera. Este pie se repite en TODAS las
+    // hojas impresas (position:fixed en @media print) y no se ve en pantalla.
+    +'<div class="doc-pie-corrido">'
+    +  'ESE HUS · Respuesta a glosa'
+    +  (_facturaImpresa ? ' · Factura <b>'+escHtml(_facturaImpresa)+'</b>' : '')
+    +  ' · ' + fechaLarga
+    +'</div>'
     +'<div class="doc-footer">'
     +'<div class="doc-firma">'
     +'<div class="doc-firma-linea"></div>'
@@ -17938,14 +18582,19 @@ function _renderKanbanFromData(){
       var diasColor = (typeof dias === 'number' && dias < 0) ? '#dc2626' :
                       (typeof dias === 'number' && dias <= 5) ? '#d97706' :
                       'var(--text3)';
+      // Health-Tech (03-09-2026): el texto de días se vuelve barra que se
+      // consume. Con el módulo sin cargar, queda el texto de siempre.
+      var vencHtml = (window.HT && HT.barraVencimiento && typeof dias === 'number')
+        ? HT.barraVencimiento(dias)
+        : '<span style="color:'+diasColor+';font-weight:600">'+(typeof dias === 'number' ? dias+'d' : '—')+'</span>';
       return '<div class="kanban-card" draggable="true" data-id="'+g.id+'" data-estado="'+estado+'" '+
         'style="background:var(--bg-card);border:1px solid var(--border);border-radius:7px;padding:.55rem .7rem;cursor:grab;transition:box-shadow .15s,transform .12s">'+
         '<div style="display:flex;justify-content:space-between;align-items:center;font-size:.7rem;color:var(--text3);margin-bottom:.2rem">'+
           '<b style="color:var(--text2)">'+escHtml(g.factura||'#'+g.id)+'</b>'+
-          '<span style="color:'+diasColor+';font-weight:600">'+(typeof dias === 'number' ? dias+'d' : '—')+'</span>'+
         '</div>'+
         '<div style="font-size:.78rem;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(g.eps||g.entidad||'—')+'</div>'+
         '<div style="font-size:.7rem;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(g.codigo_glosa||'—')+' · '+cop(g.valor_objetado||0)+'</div>'+
+        '<div style="margin-top:.3rem">'+vencHtml+'</div>'+
       '</div>';
     }).join('');
     if(lista.length > 50){
@@ -19789,24 +20438,100 @@ async function gaAutocompletar(texto){
   }catch(e){ /* el autocompletado es de cortesía: si falla, se sigue escribiendo */ }
 }
 
+// Cuando la factura no está en el paquete escogido, no se dice «no existe»:
+// se mira en cuáles SÍ está y se ofrece llevar al auditor allá (31-08-2026).
+async function gaAvisarDondeEsta(numero, caja){
+  var donde = [];
+  try{
+    var r = await fetch('/glosas-adres/factura/'+encodeURIComponent(numero)+'/paquetes', {headers: authH()});
+    if(r.ok) donde = await r.json();
+  }catch(_){ /* si falla, queda el mensaje simple */ }
+  if(!donde.length){
+    caja.innerHTML = '<div class="chart-card" style="padding:1.2rem;color:var(--text3)">'+
+      'La factura <b>'+escHtml(numero)+'</b> no está en ningún paquete cargado.</div>';
+    return;
+  }
+  var botones = donde.map(function(p){
+    return '<button class="btn btn-primary" style="font-size:.8rem" onclick="gaIrAPaquete('+p.paquete_id+',\''+
+           String(p.factura||numero).replace(/'/g,"") + '\')">'+
+           'Ver en el paquete '+escHtml(p.paquete||p.paquete_id)+
+           ' · '+p.glosas+' glosa(s) · '+fmtCOP(p.valor_glosado)+'</button>';
+  }).join(' ');
+  caja.innerHTML = '<div class="chart-card" style="padding:1.2rem">'+
+    '<div style="font-size:.9rem;margin-bottom:.6rem">La factura <b>'+escHtml(numero)+
+    '</b> no está en el paquete que tiene escogido arriba, pero sí está en '+
+    (donde.length>1 ? 'estos paquetes' : 'este')+':</div>'+
+    '<div style="display:flex;gap:.5rem;flex-wrap:wrap">'+botones+'</div></div>';
+}
+
+// Cambia el paquete de arriba y trae la factura allá.
+async function gaIrAPaquete(paqueteId, factura){
+  var sel = document.getElementById('ga-paquete');
+  if(sel){ sel.value = String(paqueteId); }
+  GA_PAQUETE = paqueteId;
+  var input = document.getElementById('ga-factura');
+  if(input && factura) input.value = factura;
+  gaCargarLista();
+  gaBuscar();
+}
+
+// `HUS405315` y `HUS0000405315` son la misma factura.
+function gaMismaFactura(a, b){
+  var limpiar = function(x){ return String(x||'').replace(/[^0-9]/g,'').replace(/^0+/,''); };
+  var la = limpiar(a), lb = limpiar(b);
+  return !!la && la === lb;
+}
+
 async function gaBuscar(){
   var numero = (document.getElementById('ga-factura').value||'').trim();
   var caja = document.getElementById('ga-resultado');
   if(!numero){ caja.innerHTML=''; return; }
-  caja.innerHTML = '<div style="padding:1rem;color:var(--text3)">Buscando '+escHtml(numero)+'…</div>';
+  // 01-09-2026. Yesid: «cada vez que digito un dato vuelve y se regresa a la
+  // página de inicio y me toca bajar y mirar». Pasaba porque, al guardar una
+  // decisión, esta función vaciaba la caja para poner «Buscando…»: la página
+  // se encogía, el navegador subía el scroll al inicio, y el gestor quedaba
+  // arriba, frente a la lista de facturas, teniendo que bajar otra vez.
+  //
+  // Ahora se distingue: si es la MISMA factura que ya está en pantalla, no se
+  // vacía nada y la caja se queda donde estaba. Si es OTRA factura, se busca
+  // y se lleva la vista hasta la caja, que vive debajo de la lista.
+  var misma = !!(GA_DATOS && gaMismaFactura(GA_DATOS.factura, numero));
+  var posicion = misma ? caja.getBoundingClientRect().top : null;
+  if(!misma){
+    caja.innerHTML = '<div style="padding:1rem;color:var(--text3)">Buscando '+escHtml(numero)+'…</div>';
+  }
   try{
     var url = '/glosas-adres/factura/'+encodeURIComponent(numero)+(GA_PAQUETE?'?paquete_id='+GA_PAQUETE:'');
     var r = await fetch(url, {headers: authH()});
     if(r.status === 404){
-      caja.innerHTML = '<div class="chart-card" style="padding:1.2rem;color:var(--text3)">'+
-        'La factura <b>'+escHtml(numero)+'</b> no está en ningún paquete cargado.</div>';
+      await gaAvisarDondeEsta(numero, caja);
       return;
     }
     if(!r.ok) throw new Error('HTTP '+r.status);
+    // 31-08-2026: cada factura se abre LIMPIA. El filtro es de la factura que
+    // se esta mirando; si se heredara de la anterior, en una factura de pocas
+    // glosas la barra del filtro no se dibuja y las filas escondidas no se
+    // podrian ni ver ni destapar. (Si es la misma factura, el filtro que el
+    // gestor puso se respeta: acaba de guardar una decisión, no cambió de hoja.)
+    if(!misma) GA_FILTRO = {texto:'', causal:'', clasificacion:'', estado:''};
     GA_DATOS = await r.json();
     gaPintar(GA_DATOS);
+    gaDejarLaVistaEnSuSitio(caja, misma, posicion);
   }catch(e){
     caja.innerHTML = '<div style="color:#991b1b;padding:1rem">Error: '+escHtml(e.message)+'</div>';
+  }
+}
+
+// Misma factura: la caja vuelve exactamente a la altura de pantalla en que
+// estaba antes de repintar. Otra factura: se baja hasta la caja.
+function gaDejarLaVistaEnSuSitio(caja, misma, posicion){
+  if(typeof window === 'undefined' || !caja || !caja.getBoundingClientRect) return;
+  if(misma && posicion !== null){
+    var corrimiento = caja.getBoundingClientRect().top - posicion;
+    if(corrimiento) window.scrollBy(0, corrimiento);
+  } else if(caja.scrollIntoView){
+    caja.style.scrollMarginTop = '12px';
+    caja.scrollIntoView({behavior:'smooth', block:'start'});
   }
 }
 
@@ -19870,7 +20595,13 @@ function gaAvisoRepetidas(d){
 
 function gaBarraFiltro(d){
   var glosas = d.glosas || [];
-  if(glosas.length < 5) return '';   // con 4 filas el filtro estorba
+  if(glosas.length < 5){
+    // Con 4 filas el filtro estorba y no se dibuja. Y si no se dibuja, no hay
+    // donde verlo ni donde quitarlo: se limpia, para que ninguna glosa quede
+    // escondida sin que nadie pueda destaparla.
+    GA_FILTRO = {texto:'', causal:'', clasificacion:'', estado:''};
+    return '';
+  }
 
   var causales = {}, clasifs = {};
   glosas.forEach(function(g){
@@ -19936,6 +20667,12 @@ function gaAplicarFiltro(){
     if(ok) visibles++;
   });
   var cuenta = document.getElementById('ga-filtro-cuenta');
+  if(!cuenta && visibles !== filas.length){
+    // No se dibujo la barra: nadie podria ver ni quitar este filtro. Antes de
+    // esconder una glosa a ciegas, se muestran todas.
+    filas.forEach(function(tr){ tr.style.display = ''; });
+    return;
+  }
   if(cuenta){
     cuenta.innerHTML = (visibles === filas.length)
       ? filas.length + ' glosas'
@@ -20094,10 +20831,35 @@ function gaPintar(d){
     h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #f59e0b;background:rgba(245,158,11,.10);font-size:.8rem">'+
          '<b>Sin detallado.</b> '+escHtml(d.aviso_detallado)+'</div>';
   }
-  if(r.por_asignar){
+  // La misma factura glosada en dos paquetes: acá solo se ve la de este.
+  if(d.aviso_otros_paquetes){
     h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.10);font-size:.8rem">'+
-         '<b>'+r.por_asignar+' glosa(s) por repartir.</b> Esta causal la trabajan dos áreas: los gestores por FACTURACION y las médicas por PERTINENCIA. '+
-         'Solo un super admin puede asignarla.</div>';
+         '<b>Esta factura está glosada en más de un paquete.</b> '+escHtml(d.aviso_otros_paquetes)+
+         '<div style="margin-top:.5rem;display:flex;gap:.4rem;flex-wrap:wrap">'+
+         (d.otros_paquetes||[]).map(function(p){
+           return '<button class="btn btn-ghost" style="font-size:.75rem" onclick="gaIrAPaquete('+p.paquete_id+',\''+
+                  String(d.factura||'').replace(/'/g,"") + '\')">Ver en el paquete '+escHtml(p.paquete||p.paquete_id)+'</button>';
+         }).join('')+
+         '</div></div>';
+  }
+  // Causal 4506 (doble área). Se avisa cuántas hay y, si el usuario puede
+  // repartir, botones para dejarlas todas en un área de una vez. Todo es
+  // reversible glosa por glosa en la columna «Clasificación» (04-09-2026).
+  var gaDobleArea = (d.glosas||[]).filter(function(g){ return (g.areas_posibles||[]).length; });
+  if(gaDobleArea.length){
+    var gaSinRepartir = gaDobleArea.filter(function(g){ return g.requiere_asignacion; }).length;
+    h += '<div style="margin:1rem 0;padding:.7rem .9rem;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.10);font-size:.8rem">'+
+         '<b>'+gaDobleArea.length+' glosa(s) de doble área'+(gaSinRepartir ? ' — '+gaSinRepartir+' sin repartir' : '')+'.</b> '+
+         'La causal 4506 la trabajan dos áreas: los gestores por <b>FACTURACIÓN</b> y las médicas por <b>PERTINENCIA</b>. '+
+         'Ojo: el material de osteosíntesis y el de alto costo los revisa el médico auditor. '+
+         (gaPuedeRepartirArea()
+            ? 'Reparta cada una en la columna «Clasificación» — y cámbiela después si quedó en el área equivocada.'
+              +'<div style="margin-top:.5rem;display:flex;gap:.4rem;flex-wrap:wrap">'+
+                '<button class="btn btn-ghost" style="font-size:.75rem" onclick="gaTodasArea(\'FACTURACION\')" title="Poner en FACTURACIÓN todas las glosas de doble área de esta factura">Todas a FACTURACIÓN</button>'+
+                '<button class="btn btn-ghost" style="font-size:.75rem" onclick="gaTodasArea(\'PERTINENCIA\')" title="Poner en PERTINENCIA todas las glosas de doble área de esta factura">Todas a PERTINENCIA</button>'+
+              '</div>'
+            : 'La reparte el área (auditor o superior).')+
+         '</div>';
   }
 
   if((d.por_clasificacion||[]).length){
@@ -20198,19 +20960,44 @@ function gaPintar(d){
 
 // La causal 4506 la trabajan dos areas: los gestores por FACTURACION y las
 // medicas por PERTINENCIA. Quien la toma depende del procedimiento y de lo
-// glosado, asi que la reparte un super admin. El bot solo sugiere, con motivo.
+// glosado. El bot solo sugiere, con motivo; la reparte el area (auditor o
+// superior, abierto el 31-08-2026 — el mismo permiso del backend).
+//
+// 04-09-2026 (Yesid: «si por error coloco PERTINENCIA y eran FACTURACION ya no
+// puedo volver a reasignar»). Antes, en cuanto una glosa quedaba asignada esta
+// celda mostraba solo texto plano y no habia forma de corregir el area. Ahora
+// el selector queda SIEMPRE en las causales de doble area: se puede reasignar
+// cuantas veces haga falta (el backend siempre lo permitio — es reversible).
+function gaPuedeRepartirArea(){
+  return ['AUDITOR','COORDINADOR','SUPER_ADMIN'].indexOf((window.USER_ROL||'').toUpperCase()) >= 0;
+}
 function gaCeldaArea(g){
-  if(!g.requiere_asignacion) return escHtml(g.clasificacion||'—');
+  // Causal de una sola area: la clasificacion la dedujo el bot, no se toca aca.
+  if(!(g.areas_posibles||[]).length) return escHtml(g.clasificacion||'—');
+
+  var puedo = gaPuedeRepartirArea();
+  var yaAsignada = !g.requiere_asignacion;
+  // Lo que hay que dejar marcado en el selector: si ya se repartio, el area que
+  // quedo; si no, la que sugiere el bot.
+  var actual = yaAsignada ? (g.clasificacion||'') : (g.area_sugerida||'');
   var opciones = (g.areas_posibles||[]).map(function(a){
-    return '<option value="'+escHtml(a)+'"'+(g.area_sugerida===a?' selected':'')+'>'+escHtml(a)+'</option>';
+    return '<option value="'+escHtml(a)+'"'+(actual===a?' selected':'')+'>'+escHtml(a)+'</option>';
   }).join('');
-  var puedo = (window.USER_ROL === 'SUPER_ADMIN');
-  var h = '<span style="font-size:.66rem;padding:.15rem .4rem;border-radius:999px;background:rgba(124,58,237,.15);color:#7c3aed;font-weight:700">POR ASIGNAR</span>';
-  if(puedo){
-    h += '<select onchange="gaAsignarArea('+g.id+',this.value)" style="margin-top:.25rem;width:100%;font-size:.72rem;padding:.2rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text)">'+
-         '<option value="">— escoja el área —</option>'+opciones+'</select>';
+
+  var h = '';
+  if(yaAsignada){
+    h += '<span style="font-size:.72rem;font-weight:700;color:var(--text)">'+escHtml(g.clasificacion||'—')+'</span>';
+    if(g.area_asignada_por) h += '<div style="font-size:.62rem;color:var(--text3)">asignó: '+escHtml(g.area_asignada_por)+'</div>';
   }else{
-    h += '<div style="font-size:.68rem;color:var(--text3);margin-top:.2rem">sugerido: <b>'+escHtml(g.area_sugerida||'—')+'</b> · lo asigna un super admin</div>';
+    h += '<span style="font-size:.66rem;padding:.15rem .4rem;border-radius:999px;background:rgba(124,58,237,.15);color:#7c3aed;font-weight:700">POR ASIGNAR</span>';
+  }
+
+  if(puedo){
+    h += '<select onchange="gaAsignarArea('+g.id+',this.value)" title="Repartir o reasignar el área de esta glosa" style="margin-top:.25rem;width:100%;font-size:.72rem;padding:.2rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text)">'+
+         (yaAsignada ? '' : '<option value="">— escoja el área —</option>')+opciones+'</select>';
+    if(yaAsignada) h += '<div style="font-size:.6rem;color:var(--text3);margin-top:.1rem">↪ cámbiela si quedó en el área equivocada</div>';
+  }else if(!yaAsignada){
+    h += '<div style="font-size:.68rem;color:var(--text3);margin-top:.2rem">sugerido: <b>'+escHtml(g.area_sugerida||'—')+'</b> · lo reparte el área</div>';
   }
   if(g.motivo_area) h += '<div style="font-size:.66rem;color:var(--text3);margin-top:.2rem">'+escHtml(g.motivo_area)+'</div>';
   return h;
@@ -20247,6 +21034,31 @@ async function gaAsignarArea(id, area){
     toast('Área asignada', 'Esta glosa la trabaja '+area, 'success');
     gaBuscar();
   }catch(e){ toast('No se pudo asignar', e.message, 'error'); }
+}
+
+// «TODO SALGA COMO FACTURACIÓN» (Yesid, 04-09-2026). Deja en un área todas las
+// glosas de doble área (4506) de la factura que está en pantalla, de una vez.
+// Es reversible: cualquiera se puede cambiar después en «Clasificación».
+async function gaTodasArea(area){
+  if(!area) return;
+  var gs = ((GA_DATOS && GA_DATOS.glosas) || []).filter(function(g){
+    return (g.areas_posibles||[]).length && g.clasificacion !== area;
+  });
+  if(!gs.length){ toast('Nada que cambiar', 'Todas las de doble área ya están en '+area, 'info'); return; }
+  if(!confirm('¿Poner en '+area+' las '+gs.length+' glosa(s) de doble área de esta factura?\n\n'+
+              'Recuerde: el material de osteosíntesis y el de alto costo los revisa el médico auditor. '+
+              'Puede cambiar cualquiera después.')) return;
+  var ok=0, err=0;
+  for(var i=0;i<gs.length;i++){
+    try{
+      var r = await fetch('/glosas-adres/glosa/'+gs[i].id+'/area', {method:'POST',
+        headers: Object.assign({'Content-Type':'application/json'}, authH()),
+        body: JSON.stringify({area: area})});
+      if(r.ok) ok++; else err++;
+    }catch(e){ err++; }
+  }
+  toast(ok+' glosa(s) en '+area, err ? (err+' no se pudieron') : 'Listo', err ? 'warning' : 'success');
+  gaBuscar();
 }
 
 async function gaCentro(id, valor){
@@ -20434,8 +21246,67 @@ async function gaCambiarEstado(estado){
   }catch(e){ toast('No se pudo cambiar el estado', e.message, 'error'); }
 }
 
+// El paquete completo como informe en Excel: lo mismo que ya sale en
+// Pre-auditoría, pedido por el área el 31-08-2026. Se baja como archivo, así
+// que no sirve un enlace suelto: la petición lleva el token.
+async function gaExportarExcel(btn){
+  if(btn) btn.disabled = true;
+  try{
+    toast('Armando el informe', 'Puede tardar unos segundos con paquetes grandes', 'info');
+    var url = '/glosas-adres/informe.xlsx' + (GA_PAQUETE ? '?paquete_id='+GA_PAQUETE : '');
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok){
+      var d = await r.json().catch(function(){ return {}; });
+      throw new Error(d.detail || ('HTTP '+r.status));
+    }
+    var blob = await r.blob();
+    var nombre = 'RTA_GLOSA_ADRES.xlsx';
+    var cd = r.headers.get('Content-Disposition') || '';
+    var m = cd.match(/filename="?([^";]+)"?/);
+    if(m) nombre = m[1];
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = nombre;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    toast('Informe listo', 'Se descargó '+escHtml(nombre), 'success');
+  }catch(e){ toast('No se pudo generar el informe', e.message, 'error'); }
+  finally{ if(btn) btn.disabled = false; }
+}
+
 // El PDF de evidencia de la factura, con el mismo formato del reporte que
 // venía armando la macro.
+// 02-09-2026. Yesid: «que salga una opción de descargar el PDF también de
+// forma masiva y me quede en un zip con todas las facturas, un pdf por
+// factura». Con 81 facturas, bajarlos de a uno es un día de trabajo.
+async function gaEvidenciasZip(){
+  if(!GA_PAQUETE){ toast('Escogé un paquete', 'Arriba, en la lista de paquetes', 'error'); return; }
+  toast('Armando los PDF', 'Puede tardar un momento: es uno por factura', 'info');
+  try{
+    var r = await fetch('/glosas-adres/paquete/'+encodeURIComponent(GA_PAQUETE)+'/evidencias.zip',
+                        {headers: authH()});
+    if(!r.ok){
+      var e = await r.json().catch(function(){ return {}; });
+      throw new Error(e.detail || ('HTTP '+r.status));
+    }
+    var cuantas = r.headers.get('X-Facturas') || '';
+    var novedades = parseInt(r.headers.get('X-Novedades') || '0', 10);
+    var blob = await r.blob();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'RTA_ADRES_EVIDENCIAS.zip';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    if(novedades){
+      toast('ZIP descargado con novedades',
+            cuantas+' factura(s); '+novedades+' no se pudieron armar. Mirá NOVEDADES.txt dentro del ZIP.',
+            'error');
+    }else{
+      toast('ZIP descargado', cuantas+' PDF, uno por factura', 'success');
+    }
+  }catch(e){ toast('No se pudo armar el ZIP', e.message, 'error'); }
+}
+
 async function gaEvidenciaPDF(){
   if(!GA_DATOS) return;
   try{
@@ -20499,6 +21370,7 @@ async function gaCargar(){
   var macro = document.getElementById('ga-file-macro').files[0];
   var listaFacturas = document.getElementById('ga-file-facturas').files[0];
   var bitacora = document.getElementById('ga-file-bitacora').files[0];
+  var reparto = document.getElementById('ga-file-reparto').files[0];
   var estado = document.getElementById('ga-cargue-estado');
   var boton = document.getElementById('ga-btn-cargar');
   if(!reporte){ estado.textContent = 'Falta el reporte de glosas del ADRES.'; return; }
@@ -20521,6 +21393,25 @@ async function gaCargar(){
       var r2 = await fetch('/glosas-adres/importar-bitacora', {method:'POST', headers: authH(), body: fd2});
       var d2 = await r2.json();
       if(r2.ok) estado.textContent += ' ' + d2.items + ' renglones del detallado.';
+    }
+    if(reparto){
+      // 02-09-2026: quién audita cada factura. Si falla, el paquete YA quedó
+      // cargado: se avisa qué pasó y no se pierde el cargue.
+      estado.textContent += ' Cargando el reparto…';
+      var fd3 = new FormData();
+      fd3.append('paquete_id', d.paquete_id);
+      fd3.append('archivo', reparto);
+      var r3 = await fetch('/glosas-adres/importar-reparto', {method:'POST', headers: authH(), body: fd3});
+      var d3 = await r3.json();
+      if(r3.ok){
+        estado.textContent += ' Reparto: '+d3.facturas_actualizadas+' factura(s) para '+
+          (d3.gestores||[]).join(', ')+'.';
+        if((d3.sin_asignar||[]).length){
+          estado.textContent += ' OJO: '+d3.sin_asignar.length+' factura(s) del paquete quedaron sin asignar.';
+        }
+      }else{
+        estado.textContent += ' El reparto NO se cargó: '+(d3.detail || ('HTTP '+r3.status));
+      }
     }
     GA_PAQUETE = d.paquete_id;
     await loadGlosasAdres();
@@ -21261,6 +22152,206 @@ function mkChart(id,type,labels,datasets,opts){
   charts[id]=new Chart(c,{type:type,data:{labels:labels,datasets:datasets},options:Object.assign({responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:'#374151',font:{size:12}}}}},opts||{})});
 }
 
+// ─── «MI DÍA» (26-08-2026) ────────────────────────────────────────────────
+// Tres columnas y nada más: responder lo que llegó, revisar lo que el motor
+// marcó y radicar lo que está listo. El reparto y el orden los hace el
+// servidor (/mi-dia/tablero); aquí solo se pinta.
+function _midiaPlazo(g){
+  if(g.dias_que_faltan === null || g.dias_que_faltan === undefined){
+    return '<span style="color:var(--text3)">sin plazo conocido</span>';
+  }
+  if(g.vencida){
+    return '<span style="color:var(--c-red);font-weight:700">vencida hace '
+      + Math.abs(g.dias_que_faltan) + ' d</span>';
+  }
+  var color = g.dias_que_faltan <= 3 ? 'var(--c-amber)' : 'var(--text2)';
+  var texto = 'faltan ' + g.dias_que_faltan + ' d';
+  if(g.plazo_sin_fecha) texto += ' (sin fecha, del contador)';
+  return '<span style="color:' + color + ';font-weight:600">' + texto + '</span>';
+}
+
+function _midiaPintarColumna(idCaja, idContador, col, vacio){
+  var caja = document.getElementById(idCaja);
+  var cont = document.getElementById(idContador);
+  if(!caja) return;
+  if(cont){
+    cont.textContent = (col && col.cantidad) ? col.cantidad : '';
+    cont.style.color = (col && col.vencidas > 0) ? 'var(--c-red)' : 'var(--text3)';
+  }
+  if(!col || !col.glosas || !col.glosas.length){
+    caja.innerHTML = '<div style="padding:1rem;color:var(--text3);font-size:.8rem;text-align:center">'
+      + escHtml(vacio) + '</div>';
+    return;
+  }
+  var html = '<div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem">'
+    + col.cantidad + ' glosa(s) · ' + fmtCOP(col.valor)
+    + (col.vencidas > 0
+        ? ' · <span style="color:var(--c-red);font-weight:700">' + col.vencidas + ' vencida(s)</span>'
+        : '')
+    + '</div>';
+  col.glosas.forEach(function(g){
+    html += '<div style="padding:.5rem .6rem;border:1px solid var(--border);border-radius:8px;margin-bottom:.45rem;cursor:pointer;background:var(--bg-card)"'
+      + ' onclick="verGlosa(' + Number(g.id) + ')" title="Abrir la glosa">'
+      + '<div style="display:flex;justify-content:space-between;gap:.5rem;align-items:baseline">'
+      +   '<strong style="font-size:.82rem">' + escHtml(g.factura || '(sin factura)') + '</strong>'
+      +   '<span style="font-size:.82rem;font-weight:700">' + fmtCOP(g.valor_objetado) + '</span>'
+      + '</div>'
+      + '<div style="font-size:.72rem;color:var(--text3);margin-top:.15rem">'
+      +   escHtml(g.eps || '') + (g.codigo_glosa ? ' · ' + escHtml(g.codigo_glosa) : '')
+      + '</div>'
+      + '<div style="font-size:.72rem;margin-top:.25rem;display:flex;justify-content:space-between;gap:.5rem">'
+      +   '<span style="color:var(--text2)">' + escHtml(g.motivo || '') + '</span>'
+      +   _midiaPlazo(g)
+      + '</div>'
+      + '</div>';
+  });
+  if(col.hay_mas > 0){
+    html += '<div style="font-size:.72rem;color:var(--text3);text-align:center;padding:.3rem">'
+      + 'y ' + col.hay_mas + ' más — están en «Mis glosas»</div>';
+  }
+  caja.innerHTML = html;
+}
+
+async function cargarMiDia(){
+  ['midia-responder','midia-revisar','midia-radicar'].forEach(function(id){
+    var e = document.getElementById(id);
+    if(e) e.innerHTML = '<div style="padding:1rem;color:var(--text3);font-size:.8rem;text-align:center">Cargando…</div>';
+  });
+  try{
+    var r = await fetch('/mi-dia/tablero', {headers: authH()});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    _midiaPintarColumna('midia-responder','midia-n-responder', d.responder,
+                        'Nada por responder. Todo lo que llegó ya tiene respuesta escrita.');
+    _midiaPintarColumna('midia-revisar','midia-n-revisar', d.revisar,
+                        'El motor no marcó nada pendiente de revisar.');
+    _midiaPintarColumna('midia-radicar','midia-n-radicar', d.radicar,
+                        'Nada aprobado esperando el portal.');
+    var sub = document.getElementById('midia-sub');
+    if(sub){
+      sub.textContent = d.total_abiertas
+        ? (d.total_abiertas + ' glosa(s) abiertas · ' + fmtCOP(d.valor_en_riesgo) + ' en riesgo'
+           + (d.vencidas ? ' · ' + d.vencidas + ' vencida(s)' : ''))
+        : 'Sin glosas abiertas asignadas.';
+    }
+  }catch(e){
+    ['midia-responder','midia-revisar','midia-radicar'].forEach(function(id){
+      var el = document.getElementById(id);
+      if(el) el.innerHTML = '<div style="padding:1rem;color:var(--c-red);font-size:.8rem;text-align:center">No se pudo cargar.</div>';
+    });
+    avisarNoCargo('«Mi día»', e);
+  }
+}
+
+// ─── TABLERO DE PLATA RECUPERADA (26-08-2026) ─────────────────────────────
+// Lo que pide la gerencia en una sola pantalla. Todo sale de /dashboard-
+// ejecutivo/plata-recuperada, que a su vez saca cada peso de una columna de
+// la base. Lo que no tiene dato NO se rellena: se avisa arriba, en amarillo.
+function _plataFila(celdas, esCabecera){
+  var tag = esCabecera ? 'th' : 'td';
+  var estilo = esCabecera
+    ? 'text-align:left;padding:.45rem .5rem;border-bottom:2px solid var(--border2);color:var(--text3);font-weight:700;white-space:nowrap'
+    : 'padding:.4rem .5rem;border-bottom:1px solid var(--border);white-space:nowrap';
+  return '<tr>' + celdas.map(function(c, i){
+    var alin = (i === 0) ? '' : 'text-align:right;';
+    return '<' + tag + ' style="' + alin + estilo + '">' + c + '</' + tag + '>';
+  }).join('') + '</tr>';
+}
+
+function _plataPintarTabla(idTabla, filas, etiquetaPrimera, campoPrimera){
+  var t = document.getElementById(idTabla);
+  if(!t) return;
+  if(!filas || !filas.length){
+    t.innerHTML = '<tr><td style="padding:1rem;color:var(--text3);text-align:center">'
+      + 'No hay glosas en el periodo escogido.</td></tr>';
+    return;
+  }
+  var html = _plataFila([etiquetaPrimera, 'Glosas', 'Glosado', 'A tiempo', 'Tarde',
+                         'Levantado', 'Ratificado', 'Perdido', 'Sin decidir', '% levant.'], true);
+  filas.forEach(function(f){
+    html += _plataFila([
+      f[campoPrimera] || '—',
+      f.glosas,
+      fmtCOP(f.glosado),
+      fmtCOP(f.respondido_a_tiempo),
+      fmtCOP(f.respondido_tarde),
+      '<span style="color:var(--c-green);font-weight:700">' + fmtCOP(f.levantado) + '</span>',
+      fmtCOP(f.ratificado),
+      (f.perdido_por_vencimiento > 0
+        ? '<span style="color:var(--c-red);font-weight:700">' + fmtCOP(f.perdido_por_vencimiento) + '</span>'
+        : fmtCOP(0)),
+      fmtCOP(f.sin_decision),
+      (f.tasa_levantado_pct || 0).toFixed(1) + '%'
+    ], false);
+  });
+  t.innerHTML = html;
+}
+
+function _plataAvisarFaltantes(sd){
+  var caja = document.getElementById('plata-faltantes');
+  if(!caja) return;
+  var faltas = [];
+  if(sd && sd.levantadas_sin_valor > 0){
+    faltas.push(sd.levantadas_sin_valor + ' glosa(s) que la EPS levantó sin que nadie anotara '
+      + 'cuánta plata era — esa plata NO está sumada en «Levantado»');
+  }
+  if(sd && sd.sin_fecha_vencimiento > 0){
+    faltas.push(sd.sin_fecha_vencimiento + ' glosa(s) sin fecha de vencimiento — de esas no se '
+      + 'puede decir si se respondieron a tiempo');
+  }
+  if(sd && sd.sin_fecha_radicacion > 0){
+    faltas.push(sd.sin_fecha_radicacion + ' glosa(s) sin fecha de radicación registrada');
+  }
+  if(!faltas.length){ caja.style.display = 'none'; return; }
+  caja.style.display = 'block';
+  caja.innerHTML = '<strong>⚠ Lo que este tablero no puede afirmar:</strong><ul style="margin:.4rem 0 0 1.1rem">'
+    + faltas.map(function(f){ return '<li>' + f + '</li>'; }).join('') + '</ul>';
+}
+
+async function cargarPlata(){
+  var sel = document.getElementById('plata-meses');
+  var meses = sel ? sel.value : 6;
+  var kpis = ['plata-glosado','plata-levantado','plata-ratificado','plata-perdido',
+              'plata-sindec','plata-tasa'];
+  kpis.forEach(function(id){ var e = document.getElementById(id); if(e) e.textContent = '…'; });
+  try{
+    var r = await fetch('/dashboard-ejecutivo/plata-recuperada?meses=' + encodeURIComponent(meses),
+                        {headers: authH()});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    var t = d.total || {};
+    document.getElementById('plata-glosado').textContent = fmtCOP(t.glosado);
+    document.getElementById('plata-levantado').textContent = fmtCOP(t.levantado);
+    document.getElementById('plata-ratificado').textContent = fmtCOP(t.ratificado);
+    document.getElementById('plata-perdido').textContent = fmtCOP(t.perdido_por_vencimiento);
+    document.getElementById('plata-sindec').textContent = fmtCOP(t.sin_decision);
+    document.getElementById('plata-tasa').textContent = (t.tasa_levantado_pct || 0).toFixed(1) + '%';
+    _plataAvisarFaltantes(t.sin_dato);
+    _plataPintarTabla('plata-tabla-mes', d.meses, 'Mes', 'etiqueta');
+    _plataPintarTabla('plata-tabla-eps', d.eps, 'EPS', 'eps');
+    var nota = document.getElementById('plata-nota');
+    if(nota) nota.textContent = d.nota || '';
+    var meses_ = d.meses || [];
+    if(meses_.length && typeof mkChart === 'function'){
+      mkChart('ch-plata-mes','bar', meses_.map(function(m){ return m.etiqueta; }), [
+        {label:'Glosado', data: meses_.map(function(m){ return m.glosado; }),
+         backgroundColor:'rgba(107,114,128,.55)'},
+        {label:'Levantado', data: meses_.map(function(m){ return m.levantado; }),
+         backgroundColor:'rgba(22,163,74,.75)'},
+        {label:'Ratificado', data: meses_.map(function(m){ return m.ratificado; }),
+         backgroundColor:'rgba(234,88,12,.75)'},
+        {label:'Perdido por vencimiento', data: meses_.map(function(m){ return m.perdido_por_vencimiento; }),
+         backgroundColor:'rgba(198,40,40,.85)'}
+      ]);
+    }
+  }catch(e){
+    kpis.forEach(function(id){ var el = document.getElementById(id); if(el) el.textContent = '—'; });
+    _plataPintarTabla('plata-tabla-mes', [], 'Mes', 'etiqueta');
+    _plataPintarTabla('plata-tabla-eps', [], 'EPS', 'eps');
+    avisarNoCargo('el tablero de plata recuperada', e);
+  }
+}
+
 // ─── HISTORIAL ────────────────────────────────────────────────────────────
 function debounceHist(){
   clearTimeout(histDebounce);
@@ -21498,10 +22589,16 @@ async function loadAlertas(){
     list.innerHTML=data.map(function(a){
       var cls=a.dias_restantes<=2?'urgente':a.dias_restantes<=5?'media':'normal';
       var dc=a.dias_restantes<=2?'dias-red':a.dias_restantes<=5?'dias-amber':'dias-green';
+      // Health-Tech (03-09-2026): la fecha estática se vuelve barra que se
+      // consume (rojo ≤3 hábiles, ámbar 4-7, verde tenue >7). Si el módulo
+      // no cargó, se conserva el texto de siempre.
+      var venc = (window.HT && HT.barraVencimiento)
+        ? '<div style="min-width:150px;max-width:210px">'+HT.barraVencimiento(a.dias_restantes)+'</div>'
+        : '<div class="alerta-dias '+dc+'">'+a.dias_restantes+' días</div>';
       return '<div class="alerta-card '+cls+'">'
         +'<div class="alerta-info"><div class="alerta-eps">'+a.eps+'</div>'
         +'<div class="alerta-det">Cód: '+a.codigo_glosa+' — '+cop(a.valor_objetado)+' — Estado: '+a.estado+'</div></div>'
-        +'<div class="alerta-dias '+dc+'">'+a.dias_restantes+' días</div>'
+        +venc
         +'</div>';
     }).join('');
   } catch(e){list.innerHTML='<div style="color:var(--c-red);padding:1rem">Error cargando alertas</div>';}
@@ -22409,9 +23506,10 @@ var ROL_COLORS={'SUPER_ADMIN':'rol-super_admin','COORDINADOR':'rol-coordinador',
 //   Gestión: Conciliación, Plantillas Gold, Papelera
 //   Herramientas: Consulta Normativa, Salud Total, Importar recepción,
 //                 Importación masiva
-// Los demás items (Mi desempeño, Mis glosas, Historial, Alertas,
-// Contratos, Usuarios, Dashboard, Auditoría, Multi-concepto,
+// Los demás items (Usuarios, Dashboard, Auditoría, Multi-concepto,
 // Detector en masa, Simulador) quedan ocultos.
+// 01-09-2026: Contratos e Importación masiva entran a la lista, a pedido
+// de Yesid — ver el comentario dentro de la lista.
 // SUPER_ADMIN y COORDINADOR ven todo.
 var AUDITOR_TABS_PERMITIDAS = {
   // Análisis
@@ -22430,6 +23528,32 @@ var AUDITOR_TABS_PERMITIDAS = {
   // El validador ADRES y el buscador de autorizaciones son trabajo diario
   // del auditor, y sus rutas ya exigen rol AUDITOR o superior.
   'validador-adres': true,
+  // 01-09-2026 — Yesid, con las capturas en la mano: «que los auditores
+  // puedan ver esos espacios». Contratos e Importación masiva faltaban en
+  // esta lista, así que el menú se los escondía a todos los gestores aunque
+  // el servidor ya les permitiera consultarlos.
+  'contratos': true,
+  'importacion-masiva': true,
+  // 02-09-2026 — Yesid, con sus capturas del menú completo: «yo no veo que se
+  // vean todos esos botones». Se abre el resto de lo que aparece en ellas.
+  // Su directiva original del 21-08 era «el AUDITOR ve TODO menos
+  // Inteligencia, Expediente, Usuarios, Mando ejecutivo e Importar
+  // recepción» — esas cinco (y Plata recuperada) siguen escondidas.
+  // El servidor ya deja consultar todas estas con rol AUDITOR (verificado
+  // guard por guard el 02-09).
+  'mi-dia': true,
+  'vencimientos': true,
+  'malla': true,  // el «Contratos» de ANÁLISIS: la malla contractual
+  'automatizacion': true,
+  'tarifas': true,
+  'soportes': true,
+  // 31-08-2026 — LAS GLOSAS DEL ADRES SON TRABAJO DIARIO DEL GESTOR.
+  // Faltaban en esta lista, así que el botón del menú se le escondía a todo
+  // el que tuviera rol AUDITOR — o sea, a los 28 gestores. Ninguno podía
+  // siquiera entrar a la pantalla, y desde afuera parecía «falta de permiso»
+  // cuando en realidad el permiso del servidor ya lo tenían: las rutas de
+  // responder, cambiar estado y contestar en lote piden AUDITOR o superior.
+  'glosas-adres': true,
 };
 function aplicarRestriccionesRol(){
   if(USER_ROL !== 'AUDITOR') return;
@@ -23086,8 +24210,18 @@ async function registrarDecisionEPS(id){
   var decision=prompt('Decisión de la EPS:\nLEVANTADA (ganamos)\nACEPTADA (perdimos)\nRATIFICADA (va a conciliación)\nPENDIENTE');
   if(!decision)return;
   var valor=parseFloat(prompt('Valor recuperado ($):')||'0')||0;
+  // 26-08-2026 — cerrar el ciclo. Cuando la EPS nos da la razón, el gestor
+  // sabe POR QUÉ; sin esa frase el motor lleva un año escribiendo sin saber
+  // qué le funciona. Una sola pregunta, y se puede dejar en blanco.
+  var porQue='';
+  if(decision.toUpperCase()==='LEVANTADA'){
+    porQue=prompt('¿Cuál argumento la levantó?\n(Opcional — queda guardado con la plantilla '
+      +'para que el motor lo use primero la próxima vez con esta EPS y esta causal.)')||'';
+  }
   try{
-    var r=await fetch('/glosas/'+id+'/decision-eps',{method:'PATCH',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify({decision_eps:decision.toUpperCase(),valor_recuperado:valor})});
+    var cuerpo={decision_eps:decision.toUpperCase(),valor_recuperado:valor};
+    if(porQue.trim())cuerpo.observacion_eps=porQue.trim();
+    var r=await fetch('/glosas/'+id+'/decision-eps',{method:'PATCH',headers:{...authH(),'Content-Type':'application/json'},body:JSON.stringify(cuerpo)});
     var d=await r.json().catch(function(){return{};});
     toast(r.ok?'Decisión registrada':'Error',d.message||d.detail||('El servidor respondió '+r.status),r.ok?'success':'error');
     if(r.ok)loadHist(1);
@@ -23634,7 +24768,9 @@ window.addEventListener('DOMContentLoaded',function(){
   // auditor recarga la página. Sin esto, los botones que no le corresponden
   // reaparecen en cada F5 y el orden del menú dura un solo rato.
   try{ aplicarPermisosDelMenu(); }catch(e){}
-  if(localStorage.getItem('dark')==='1') document.body.classList.add('dark');
+  // Health-Tech (03-09-2026): el modo oscuro grafito es el predeterminado.
+  // La eleccion guardada del gestor sigue mandando ('0' = prefiere claro).
+  if(localStorage.getItem('dark')!=='0') document.body.classList.add('dark');
   // Registrar service worker para PWA (solo si es servido por HTTPS o localhost)
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('/sw.js').catch(function(){});
@@ -26134,9 +27270,163 @@ function paAjustarMisGlosas(){
     return r;
   };
 })();
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PRE-AUDITORÍA CONCURRENTE (V3, Pilar 2) — el tablero de prevención
+//
+//  El HIS del hospital consulta el motor ANTES de timbrar cada factura.
+//  Acá se ve qué le contestamos: cuántas pasaron, cuántas se bloquearon y
+//  —lo que de verdad importa— cuánta plata se corrigió antes de que la
+//  factura saliera. Prefijo preAud* porque pa* ya está tomado en esta
+//  página por el ajuste de «Mis glosas».
+// ═══════════════════════════════════════════════════════════════════════
+var PREAUD = { eventos: [], resumen: null };
+
+function preAudPill(estado){
+  var mapa = {
+    APROBADO:    ['✓ Aprobado',    'var(--sinac-green-600,#059669)'],
+    ADVERTENCIA: ['⚠ Advertencia', 'var(--sinac-amber-600,#D97706)'],
+    BLOQUEO:     ['⛔ Bloqueo',     'var(--sinac-red-600,#DC2626)']
+  };
+  var m = mapa[estado] || ['— ' + (estado || 'sin dictamen'), 'var(--text3)'];
+  return '<span style="display:inline-block;padding:.15rem .5rem;border-radius:999px;' +
+    'font-size:.72rem;font-weight:700;white-space:nowrap;color:#fff;background:' + m[1] + '">' +
+    escHtml(m[0]) + '</span>';
+}
+
+function preAudTarjeta(titulo, valor, nota, color){
+  return '<div class="chart-card" style="padding:.9rem 1rem">' +
+    '<div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">' + escHtml(titulo) + '</div>' +
+    '<div style="font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums;margin-top:.15rem;color:' + (color || 'var(--text)') + '">' + valor + '</div>' +
+    '<div style="font-size:.72rem;color:var(--text3);margin-top:.15rem">' + escHtml(nota) + '</div>' +
+  '</div>';
+}
+
+function preAudPintarResumen(r){
+  var host = document.getElementById('preaud-tarjetas');
+  if(!host) return;
+  var pe = r.por_estado || {};
+  host.innerHTML =
+    preAudTarjeta('Dinero salvado', fmtCOP(r.dinero_salvado || 0),
+      (r.facturas_corregidas || 0) + ' factura(s) bloqueada(s) que se corrigieron y volvieron a pasar',
+      'var(--sinac-green-600,#059669)') +
+    preAudTarjeta('Riesgo sin resolver', fmtCOP(r.riesgo_sin_resolver || 0),
+      'Bloqueadas que todavía no han vuelto: no sabemos qué se hizo con ellas',
+      'var(--sinac-red-600,#DC2626)') +
+    preAudTarjeta('Evaluaciones', fmtNum(r.evaluaciones || 0),
+      (pe.APROBADO || 0) + ' aprobadas · ' + (pe.ADVERTENCIA || 0) + ' con reparo · ' + (pe.BLOQUEO || 0) + ' bloqueadas', null) +
+    preAudTarjeta('Facturas bloqueadas', fmtNum(r.facturas_bloqueadas || 0),
+      'Distintas, no evaluaciones: una factura puede consultarse varias veces', null);
+}
+
+function preAudFila(e){
+  var alertas = Number(e.total_alertas || 0);
+  var sinIA = String(e.cruce_clinico_estado || '').indexOf('OMITIDO') === 0;
+  return '<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="preAudVerDetalle(' + Number(e.id) + ')" title="Ver los reparos de esta evaluación">' +
+    '<td style="padding:.5rem .6rem;font-weight:600">' + escHtml(e.factura || '—') + '</td>' +
+    '<td style="padding:.5rem .6rem;color:var(--text3);font-size:.76rem;white-space:nowrap">' + escHtml(fmtFecha(e.creado_en)) + '</td>' +
+    '<td style="padding:.5rem .6rem">' + preAudPill(e.estado) + '</td>' +
+    '<td style="padding:.5rem .6rem;text-align:center">' + (alertas ? alertas : '—') + '</td>' +
+    '<td class="num" style="padding:.5rem .6rem;text-align:right">' + fmtCOP(e.valor_en_riesgo || 0) + '</td>' +
+    '<td class="num" style="padding:.5rem .6rem;text-align:right;color:var(--text3)">' + fmtCOP(e.valor_factura || 0) + '</td>' +
+    '<td style="padding:.5rem .6rem;font-size:.72rem;color:var(--text3);white-space:nowrap">' +
+      (sinIA ? 'sin cruce clínico' : escHtml(e.modelo_utilizado || '—')) + '</td>' +
+  '</tr>';
+}
+
+function preAudPintarTabla(lista){
+  var host = document.getElementById('preaud-tabla');
+  if(!host) return;
+  if(!lista.length){
+    host.innerHTML = '<div class="chart-card" style="padding:1.6rem;text-align:center;color:var(--text3)">' +
+      'Todavía no hay evaluaciones. Cuando el sistema del hospital empiece a consultar antes de timbrar, cada factura aparece acá.</div>';
+    return;
+  }
+  host.innerHTML = '<div class="chart-card" style="padding:.4rem;overflow-x:auto">' +
+    '<table style="width:100%;border-collapse:collapse;font-size:.82rem">' +
+    '<thead><tr style="text-align:left;color:var(--text3);font-size:.74rem">' +
+      '<th style="padding:.5rem .6rem">Factura</th>' +
+      '<th style="padding:.5rem .6rem">Fecha</th>' +
+      '<th style="padding:.5rem .6rem">Dictamen</th>' +
+      '<th style="padding:.5rem .6rem;text-align:center">Reparos</th>' +
+      '<th style="padding:.5rem .6rem;text-align:right">En riesgo</th>' +
+      '<th style="padding:.5rem .6rem;text-align:right">Valor factura</th>' +
+      '<th style="padding:.5rem .6rem">Cruce clínico</th>' +
+    '</tr></thead><tbody>' + lista.map(preAudFila).join('') + '</tbody></table></div>';
+}
+
+function preAudPedir(url){
+  return fetch(url, {headers: authH()}).then(function(r){
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  });
+}
+
+function preAudCargar(){
+  var host = document.getElementById('preaud-tabla');
+  if(host) host.innerHTML = '<div class="chart-card" style="padding:1.6rem;text-align:center;color:var(--text3)">Cargando…</div>';
+  var estado = (document.getElementById('preaud-estado') || {}).value || '';
+  var factura = ((document.getElementById('preaud-factura') || {}).value || '').trim();
+  var qs = '?limite=300';
+  if(estado) qs += '&estado=' + encodeURIComponent(estado);
+  if(factura) qs += '&factura=' + encodeURIComponent(factura);
+
+  preAudPedir('/pre-auditoria/resumen')
+    .then(function(r){ PREAUD.resumen = r; preAudPintarResumen(r); })
+    .catch(function(e){
+      var t = document.getElementById('preaud-tarjetas');
+      if(t) t.innerHTML = '<div class="chart-card" style="padding:1rem;color:var(--text3)">No se pudieron traer las cifras (' + escHtml(e.message || 'error') + ').</div>';
+    });
+
+  preAudPedir('/pre-auditoria/eventos' + qs)
+    .then(function(lista){ PREAUD.eventos = lista || []; preAudPintarTabla(PREAUD.eventos); })
+    .catch(function(e){
+      if(host) host.innerHTML = '<div class="chart-card" style="padding:1.4rem;color:var(--text3)">' +
+        'No se pudo leer el tablero de pre-auditoría (' + escHtml(e.message || 'error') + '). ' +
+        '<button class="btn btn-ghost" onclick="preAudCargar()" style="font-size:.78rem;margin-left:.4rem">Reintentar</button></div>';
+    });
+}
+
+function preAudVerDetalle(id){
+  preAudPedir('/pre-auditoria/eventos/' + id)
+    .then(function(e){
+      var alertas = e.alertas || [];
+      var cuerpo = alertas.length
+        ? alertas.map(function(a){
+            var color = a.severidad === 'BLOQUEO' ? 'var(--sinac-red-600,#DC2626)' : 'var(--sinac-amber-600,#D97706)';
+            return '<div style="border-left:3px solid ' + color + ';padding:.5rem .7rem;margin-bottom:.6rem;background:var(--bg-card);border-radius:6px">' +
+              '<div style="font-weight:700;font-size:.85rem">' + escHtml(a.titulo || '') +
+                ' <span style="font-weight:500;color:var(--text3);font-size:.75rem">' + escHtml(a.codigo_glosa || '') + '</span></div>' +
+              '<div style="font-size:.78rem;color:var(--text2);margin-top:.2rem">' + escHtml(a.detalle || '') + '</div>' +
+              '<div style="font-size:.72rem;color:var(--text3);margin-top:.25rem">' +
+                escHtml(a.origen === 'IA' ? 'Lo levantó la IA — lo decide el médico auditor' : 'Regla determinista') +
+                ' · en riesgo ' + fmtCOP(a.valor_en_riesgo || 0) + '</div>' +
+            '</div>';
+          }).join('')
+        : '<div style="color:var(--text3);font-size:.82rem">Sin reparos: esta factura pasó limpia.</div>';
+      preAudModal('Factura ' + escHtml(e.factura || '') + ' · ' + preAudPill(e.estado), cuerpo);
+    })
+    .catch(function(e){ toast('No se pudo abrir', e.message || 'Error', 'error'); });
+}
+
+function preAudModal(titulo, cuerpo){
+  var viejo = document.getElementById('preaud-modal');
+  if(viejo) viejo.remove();
+  var d = document.createElement('div');
+  d.id = 'preaud-modal';
+  d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;display:flex;align-items:center;justify-content:center';
+  d.innerHTML = '<div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:1.3rem;max-width:680px;width:92%;max-height:82vh;overflow:auto">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:.9rem">' +
+      '<div style="font-weight:700;font-size:1rem">' + titulo + '</div>' +
+      '<button class="btn btn-ghost" onclick="document.getElementById(\'preaud-modal\').remove()" style="font-size:.8rem">✕ Cerrar</button>' +
+    '</div>' + cuerpo + '</div>';
+  d.addEventListener('click', function(ev){ if(ev.target === d) d.remove(); });
+  document.body.appendChild(d);
+}
 </script>
 <!-- SINAC UX 2.0 — Modo Enfocado + Command Palette + atajos -->
 <script src="/static/sinac-ux.js"></script>
+<script src="/static/healthtech.js"></script>
 <!-- SINAC Asistente Predictivo — Ola 4: detecta código/valor/plantilla en vivo -->
 <script src="/static/sinac-asistente.js"></script>
 <!-- SINAC Analizar PRO — transforma gauge/chips/dictamen vía MutationObserver -->

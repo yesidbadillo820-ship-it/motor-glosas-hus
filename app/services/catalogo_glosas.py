@@ -7,6 +7,60 @@ de modo que la IA no tenga que adivinar qué significa cada código.
 
 from __future__ import annotations
 
+# ─── QUÉ SOPORTE PIDE CADA CAUSAL ────────────────────────────────────────
+# 26-08-2026. Nueve de cada diez dictámenes del lote del 25 afirmaban cosas de
+# la historia clínica sin que hubiera un solo soporte adjunto. El motor avisaba,
+# pero con un aviso genérico —«no se encontró el expediente»— que no decía qué
+# faltaba, y que por tanto era fácil de ignorar.
+#
+# Este mapa dice, por familia de causal, cuál es el soporte que de verdad
+# resuelve esa glosa. Las llaves son los tipos que produce el indexador de
+# soportes (los mismos de _MARCO_LEGAL_SOPORTE en glosa_service).
+#
+# Regla al leerlo: son los soportes que SIRVEN para esa causal, no una lista
+# burocrática. Si la glosa dice «la epicrisis no soporta la estancia», sin
+# epicrisis no hay respuesta que valga por bien redactada que esté.
+SOPORTE_QUE_PIDE_LA_CAUSAL: dict[str, tuple[str, ...]] = {
+    # SOPORTES — la glosa ES sobre el documento que falta.
+    "SO": ("historia_clinica", "epicrisis"),
+    "SO01": ("epicrisis", "hoja_atencion_urgencias"),
+    "SO21": ("historia_clinica", "epicrisis"),
+    "SO41": ("historia_clinica",),
+    # AUTORIZACIÓN — se prueba con la autorización o con la historia que la
+    # registra; en urgencias, con la hoja de atención.
+    "AU": ("historia_clinica", "hoja_atencion_urgencias"),
+    # PERTINENCIA — la decisión clínica vive en la historia.
+    "CL": ("historia_clinica", "epicrisis"),
+    "PE": ("historia_clinica", "epicrisis"),
+    # MEDICAMENTOS E INSUMOS — la hoja de administración es la prueba de que
+    # se aplicó.
+    "ME": ("hoja_administracion_medicamentos", "historia_clinica"),
+    "IN": ("hoja_administracion_medicamentos", "historia_clinica"),
+    # FACTURACIÓN Y TARIFA — se prueban con la factura y sus RIPS.
+    "FA": ("factura_electronica", "rips"),
+    "TA": ("factura_electronica",),
+    # DEVOLUCIÓN — la constancia de radicación es lo que discute.
+    "DE": ("factura_electronica", "cuv"),
+}
+
+
+def soportes_que_pide(codigo: str) -> tuple[str, ...]:
+    """Los soportes que resuelven esa causal. Del más específico al general.
+
+    Busca primero el código de cuatro caracteres (SO0101 → SO01) y luego el
+    prefijo de familia (SO). Un código que no esté en el mapa devuelve vacío:
+    no se inventa un requisito que la norma no pide.
+    """
+    c = str(codigo or "").strip().upper()
+    if not c:
+        return ()
+    for largo in (4, 2):
+        pedido = SOPORTE_QUE_PIDE_LA_CAUSAL.get(c[:largo])
+        if pedido:
+            return pedido
+    return ()
+
+
 # ─── CATÁLOGO DE GLOSAS POR FACTURACIÓN (FA) ─────────────────────────────
 CODIGOS_FA = {
     "FA": "FACTURACIÓN — Diferencias en cantidad al comparar servicios prestados con facturados; recaudo de copagos no descontados; o errores administrativos en facturación.",

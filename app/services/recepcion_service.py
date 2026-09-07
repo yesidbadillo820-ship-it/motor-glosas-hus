@@ -811,6 +811,26 @@ class ResumenImportacion:
         self.gestores_asignados: dict[str, str] = {}
         self.gestores_sin_usuario: list[str] = []
         self.advertencias: list[str] = []
+        # 31-08-2026 — PEDIR EL DATO QUE FALTA, DONDE FALTA.
+        # En el export real de la base del hospital, 59 de las 135 glosas
+        # salieron SIN CÓDIGO DE CAUSAL — el 44 %. Sin causal el motor no sabe
+        # contra qué está defendiendo, así que redacta a ciegas: contesta la
+        # forma cuando la glosa era de fondo, o alega soportes cuando le
+        # objetaron la tarifa.
+        #
+        # Eso NO lo arregla ningún cambio de código: el dato no viene en el
+        # archivo. Lo que sí se puede hacer es dejar de importarlo en silencio
+        # y decir CUÁNTAS son y CUÁLES, para que el reclamo a quien manda el
+        # archivo salga con evidencia y no con una impresión.
+        self.sin_causal: int = 0
+        self.sin_causal_detalle: list[dict] = []
+
+    def registrar_sin_causal(self, factura: str, entidad: str = "") -> None:
+        self.sin_causal += 1
+        if len(self.sin_causal_detalle) < 50:
+            self.sin_causal_detalle.append(
+                {"factura": factura or "(sin número)", "entidad": entidad or ""}
+            )
 
     def registrar_omitida(self, fila: int, motivo: str) -> None:
         self.filas_omitidas += 1
@@ -838,6 +858,8 @@ class ResumenImportacion:
             "gestores_asignados": self.gestores_asignados,
             "gestores_sin_usuario": self.gestores_sin_usuario,
             "advertencias": self.advertencias,
+            "sin_causal": self.sin_causal,
+            "sin_causal_detalle": self.sin_causal_detalle,
         }
 
 
@@ -1061,6 +1083,17 @@ class RecepcionService:
                 clave_fac = str(item.get("factura") or "").strip().upper()
                 cod = por_factura.get(clave_fac)
                 if not cod:
+                    # AQUÍ ES DONDE SE PIERDE LA CAUSAL, y hasta hoy se seguía
+                    # de largo sin decir nada. En el export real del hospital
+                    # esto pasó en 59 de 135 glosas — el 44 %.
+                    # Sin causal el motor redacta a ciegas: contesta la forma
+                    # cuando la glosa era de fondo, o alega soportes cuando lo
+                    # que objetaron fue la tarifa. No se puede arreglar desde
+                    # el código —el dato no viene en el archivo— pero sí se
+                    # puede dejar de importarlo en silencio.
+                    resumen.registrar_sin_causal(
+                        str(item.get("factura") or ""), str(item.get("entidad") or "")
+                    )
                     continue
                 item["causal"] = cod
                 # LA MÉDICA NO SE PIERDE AL REHACER EL PLAN (25-08-2026).

@@ -122,6 +122,16 @@ FORMATOS_OBJECIONES: dict[str, str] = {
     "CROTIPOBJ": "0",
 }
 
+# Qué código va en la columna SLNSERPRO del archivo.
+#   "dgh"   — el código interno de DGH (873122, FMQ0041). Es lo que se viene
+#             cargando para COOSALUD y sigue siendo lo de siempre.
+#   "adres" — el código del ADRES tal como viene en la factura (21705, 39145).
+#             La pantalla de Recepción de Objeción lo muestra en su columna
+#             «Codigo», al lado de «Codigo Cups»; el auditor busca por ese, y
+#             con el CUPS el renglón no le sirve.
+CODIGO_DGH = "dgh"
+CODIGO_ADRES = "adres"
+
 CROCLAOBJ_CONST = 0
 GENUSUARIO4_CONST = "999"
 MAX_FACTURAS_POR_LOTE = 300  # tope de DGH (el mismo del cruce de la Suite)
@@ -208,6 +218,11 @@ class Resolucion:
     candidato_desc: str = ""
     tope_servicio: float = 0.0
     saldo: float = 0.0
+    # El centro de costo de la línea de DGH con la que se emparejó. La pantalla
+    # de Recepción de Objeción lo muestra en su propia columna, así que el
+    # archivo tiene que traerlo: antes salía siempre vacío aunque el cruce sí
+    # hubiera acertado el servicio.
+    centro_costo: str = ""
 
 
 @dataclass
@@ -691,6 +706,7 @@ def resolver_slnserpro(
             candidato_desc=linea.rotulo(),
             tope_servicio=round(sum(x.valor for x in mismos), 2),
             saldo=linea.saldo,
+            centro_costo=linea.centro_costo,
         )
 
     # 1) el código del ADRES ya existe tal cual en DGH.
@@ -815,6 +831,22 @@ def crotipobj_factura(clasificaciones: set[str]) -> int:
     if clinicas:
         return 1
     return 0
+
+
+def _mezclar_tipos(por_codigo: int, previos: set[int]) -> int:
+    """Junta lo que dice el código escrito con lo que ya se sabía de la factura.
+
+    Los tres tipos son 0 administrativa, 1 clínica y 2 mixta. Si de un lado
+    sale clínica y del otro administrativa, la factura es mixta. Un lado nunca
+    puede borrar al otro: eso fue lo que hizo que una factura con soportes Y
+    pertinencia saliera al ADRES marcada como administrativa.
+    """
+    tipos = {int(por_codigo)} | {int(t) for t in previos}
+    if 2 in tipos:
+        return 2
+    if tipos == {0, 1}:
+        return 2
+    return max(tipos) if tipos else 0
 
 
 def construir_crdobserv(codigo: str, fila: FilaAdres, valor: int) -> str:
@@ -947,6 +979,19 @@ def conciliar_factura(filas: list[FilaAdres], glosado_reportado: float) -> Conci
 # ─── Código de servicio para los renglones que no cruzaron ───────────────────
 
 
+def _codigo_servicio(modo: str, fila: FilaAdres, resolucion: Resolucion) -> str | None:
+    """El código que se escribe en SLNSERPRO, según lo que pida el portal.
+
+    En modo «adres» manda el código de la factura (`COD ELEMENTO`), que es el
+    que la pantalla de DGH muestra en su columna «Codigo». Si esa glosa no trae
+    código, se cae al de DGH antes que dejar el renglón vacío: una fila sin
+    servicio DGH la rechaza.
+    """
+    if modo == CODIGO_ADRES and fila.cod_elemento:
+        return _texto(fila.cod_elemento) or None
+    return resolucion.slnserpro or None
+
+
 def servicio_principal(lineas: list[LineaDgh]) -> LineaDgh | None:
     """El servicio de más peso de la factura en DGH: el que más plata suma.
 
@@ -1041,6 +1086,7 @@ def construir_registros(
     incluir_glosa_total: bool = True,
     reclamaciones: dict[str, Reclamacion] | None = None,
     completar_servicios: bool = False,
+    codigo_servicio: str = CODIGO_DGH,
 ) -> Conversion:
     """Convierte las glosas del ADRES en filas del formato OBJECIONES.
 
@@ -1101,9 +1147,14 @@ def construir_registros(
                     f"por parecido con {resolucion.candidato} {resolucion.candidato_desc}".strip()
                 )
                 resolucion.slnserpro = resolucion.candidato
+                resolucion.centro_costo = next(
+                    (x.centro_costo for x in lineas if x.slnserpro == resolucion.candidato),
+                    resolucion.centro_costo,
+                )
             elif principal is not None:
                 asignado = f"servicio de más peso de la factura: {principal.slnserpro} {principal.rotulo()}"
                 resolucion.slnserpro = principal.slnserpro
+                resolucion.centro_costo = principal.centro_costo
             if asignado:
                 salida.asignados += 1
 
@@ -1123,9 +1174,9 @@ def construir_registros(
                 "CRNCLAOBJ": None,
                 "GENUSUARIO4": GENUSUARIO4_CONST,
                 "CRNCONOBJ": codigo or None,
-                "SLNSERPRO": resolucion.slnserpro or None,
+                "SLNSERPRO": _codigo_servicio(codigo_servicio, fila, resolucion),
                 "IDRIPS": None,
-                "CTNCENCOS": None,
+                "CTNCENCOS": resolucion.centro_costo or None,
                 "CROVALOBJ": valor,
                 "CRDOBSERV": construir_crdobserv(codigo, fila, valor),
                 "CROTIPOBJ": crotipobj_factura(clasificaciones[crncxc]),
@@ -1189,16 +1240,32 @@ def construir_registros(
     # NINGUNO lo es sale administrativa (0), y si hay de los dos, mixta (2).
     # Ojo: se calcula al final porque antes de _conciliar hay renglones que
     # todavía se pueden caer del archivo.
+    # 26-08-2026 — OJO: esta vuelta PISABA el CROTIPOBJ que ya venía bien
+    # calculado arriba con la clasificación del auditor. Cuando el código
+    # escrito no arranca en CL —porque la causal quedó como SO, TA o FA— este
+    # recálculo lo bajaba a 0, y una factura MIXTA (soportes + pertinencia)
+    # salía al ADRES marcada como administrativa. Ahora no se pisa: se junta
+    # lo que dice el código escrito CON lo que ya se había concluido de la
+    # clasificación, y manda la mezcla. Un `0` calculado aquí no puede borrar
+    # un `1` o un `2` que ya se había probado antes.
     cl_por_factura: dict[str, set[bool]] = defaultdict(set)
+    tipo_previo: dict[str, set[int]] = defaultdict(set)
     for registro in salida.registros:
+        factura = str(registro["CRNCXC"])
         es_cl = str(registro.get("CRNCONOBJ") or "").upper()[:2] == GRUPO_CLINICO
-        cl_por_factura[str(registro["CRNCXC"])].add(es_cl)
+        cl_por_factura[factura].add(es_cl)
+        previo = registro.get("CROTIPOBJ")
+        if previo is not None:
+            tipo_previo[factura].add(int(previo))
     tipo_por_factura = {
         f: (1 if flags == {True} else 0 if flags == {False} else 2)
         for f, flags in cl_por_factura.items()
     }
     for registro in salida.registros:
-        registro["CROTIPOBJ"] = tipo_por_factura[str(registro["CRNCXC"])]
+        factura = str(registro["CRNCXC"])
+        registro["CROTIPOBJ"] = _mezclar_tipos(
+            tipo_por_factura[factura], tipo_previo.get(factura, set())
+        )
 
     salida.metodos = dict(metodos)
     cuadrar_con_reporte(salida, reclamaciones)
@@ -1486,6 +1553,14 @@ def construir_parser() -> argparse.ArgumentParser:
         "cuadrado contra el Valor Glosado que reporta el ADRES.",
     )
     p.add_argument(
+        "--codigo-servicio",
+        choices=(CODIGO_DGH, CODIGO_ADRES),
+        default=CODIGO_DGH,
+        help="Qué código va en SLNSERPRO: «dgh» el interno de DGH (lo de "
+        "siempre, COOSALUD) o «adres» el de la factura (21705, 39145), que es "
+        "el que la pantalla de Recepción de Objeción muestra en «Codigo».",
+    )
+    p.add_argument(
         "--completar-servicios",
         action="store_true",
         help="Que ningún renglón quede sin código de servicio: el que no cruce se lleva "
@@ -1591,6 +1666,7 @@ def main(argv: list[str] | None = None) -> int:
         incluir_glosa_total=not args.excluir_glosa_total,
         reclamaciones=reclamaciones,
         completar_servicios=args.completar_servicios,
+        codigo_servicio=args.codigo_servicio,
     )
 
     grupos = lotes(conversion.registros, args.max_facturas)

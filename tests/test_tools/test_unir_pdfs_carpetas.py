@@ -316,6 +316,7 @@ def test_si_no_puede_escribir_el_destino_no_deja_el_tmp_tirado(tmp_path, monkeyp
         raise PermissionError(5, "Acceso denegado", str(src), 5, str(dst))
 
     monkeypatch.setattr(mod.os, "replace", replace_denegado)
+    monkeypatch.setattr(mod.time, "sleep", lambda _s: None)  # sin esperar los reintentos
     with pytest.raises(PermissionError):
         mod.unir_pdfs([origen], destino, *mod._cargar_lector_escritor()[:2])
 
@@ -370,3 +371,43 @@ def test_si_el_bloqueo_no_se_suelta_avisa_y_no_deja_basura(tmp_path, monkeypatch
         mod.unir_pdfs([origen], destino, *mod._cargar_lector_escritor()[:2])
 
     assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_cuando_el_reintento_sirve_queda_dicho(tmp_path, monkeypatch, caplog):
+    """Si el archivo estaba ocupado y cedió, hay que decirlo.
+
+    Sin esto no se puede saber si el reintento está sirviendo o si la ventana
+    se queda corta: el auditor solo ve las que fallan, nunca las que se
+    salvaron. Es el dato que hacía falta en el paquete 31068.
+    """
+    import logging
+
+    mod = _cargar_modulo()
+    origen = tmp_path / "1 FACTURA.pdf"
+    _hacer_pdf(origen, 2)
+    destino = tmp_path / "FOLIO.pdf"
+
+    real = mod.os.replace
+    fallos = {"n": 0}
+
+    def replace_ocupado(src, dst):
+        if fallos["n"] < 3:
+            fallos["n"] += 1
+            raise PermissionError(5, "Acceso denegado", str(src), 5, str(dst))
+        return real(src, dst)
+
+    monkeypatch.setattr(mod.os, "replace", replace_ocupado)
+    monkeypatch.setattr(mod.time, "sleep", lambda _s: None)
+    with caplog.at_level(logging.INFO):
+        mod.unir_pdfs([origen], destino, *mod._cargar_lector_escritor()[:2])
+
+    dicho = caplog.text
+    assert "FOLIO.pdf" in dicho, "no dice de qué archivo se trata"
+    assert "ocupado" in dicho.lower(), "no avisa que estuvo ocupado"
+    assert destino.exists()
+
+
+def test_la_espera_alcanza_para_un_share_lento():
+    """3,7 segundos no alcanzan sobre el share: una factura seguía cayendo."""
+    mod = _cargar_modulo()
+    assert sum(mod.ESPERAS_REEMPLAZO) >= 15, "la ventana de reintento es muy corta"

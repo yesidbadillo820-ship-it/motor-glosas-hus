@@ -1,0 +1,928 @@
+{
+ "tipo": "frases",
+ "variante": "bokmål",
+ "version": 1,
+ "nota": "Frases de uso real. La pronunciación es una aproximación para hispanohablantes: las MAYÚSCULAS marcan la sílaba fuerte.",
+ "palabras": [
+  {
+   "id": "f-001",
+   "no": "Hei!",
+   "es": "¡Hola!",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "jei",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-002",
+   "no": "Hallo!",
+   "es": "Hola (más formal por teléfono)",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "ja-LU",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-003",
+   "no": "God morgen!",
+   "es": "¡Buenos días!",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "gu MÅ-ren",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-004",
+   "no": "God dag!",
+   "es": "¡Buen día!",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "gu dag",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-005",
+   "no": "God kveld!",
+   "es": "¡Buenas tardes/noches!",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "gu kvel",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-006",
+   "no": "God natt!",
+   "es": "¡Buenas noches! (al ir a dormir)",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "gu nat",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-007",
+   "no": "Ha det bra!",
+   "es": "¡Chao! ¡Que estés bien!",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "ha de bra",
+   "gram": [],
+   "nota": "Literalmente: «tenlo bien»."
+  },
+  {
+   "id": "f-008",
+   "no": "Vi ses!",
+   "es": "¡Nos vemos!",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "vi ses",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-009",
+   "no": "Takk!",
+   "es": "¡Gracias!",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "tak",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-010",
+   "no": "Tusen takk!",
+   "es": "¡Muchas gracias!",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "TU-sen tak",
+   "gram": [],
+   "nota": "Literalmente: «mil gracias»."
+  },
+  {
+   "id": "f-011",
+   "no": "Vær så god.",
+   "es": "De nada. / Aquí tiene.",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "væ sho gu",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-012",
+   "no": "Unnskyld.",
+   "es": "Perdón. / Disculpe.",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "UN-shyl",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-013",
+   "no": "Beklager.",
+   "es": "Lo siento.",
+   "tema": "saludos",
+   "nivel": "A1",
+   "pron": "be-KLA-ger",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-014",
+   "no": "Ja.",
+   "es": "Sí.",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "ya",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-015",
+   "no": "Nei.",
+   "es": "No.",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "nei",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-016",
+   "no": "Kanskje.",
+   "es": "Quizás.",
+   "tema": "saludos",
+   "nivel": "A1",
+   "pron": "KANS-he",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-017",
+   "no": "Hyggelig å møte deg!",
+   "es": "¡Mucho gusto!",
+   "tema": "saludos",
+   "nivel": "A1",
+   "pron": "HYG-ge-li o MØ-te dei",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-018",
+   "no": "Hva heter du?",
+   "es": "¿Cómo te llamas?",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "va HE-ter du",
+   "gram": [
+    "v2",
+    "pregunta"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-019",
+   "no": "Jeg heter Ana.",
+   "es": "Me llamo Ana.",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "yei HE-ter A-na",
+   "gram": [
+    "hete"
+   ],
+   "nota": "Sin pronombre reflexivo: no se dice «jeg heter meg»."
+  },
+  {
+   "id": "f-020",
+   "no": "Hvordan går det?",
+   "es": "¿Cómo estás?",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "VUR-dan gor de",
+   "gram": [
+    "pregunta"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-021",
+   "no": "Det går bra, takk.",
+   "es": "Bien, gracias.",
+   "tema": "saludos",
+   "nivel": "cero",
+   "pron": "de gor bra tak",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-022",
+   "no": "Hvor kommer du fra?",
+   "es": "¿De dónde eres?",
+   "tema": "saludos",
+   "nivel": "A1",
+   "pron": "vur KOM-mer du fra",
+   "gram": [
+    "pregunta"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-023",
+   "no": "Jeg kommer fra Colombia.",
+   "es": "Soy de Colombia.",
+   "tema": "saludos",
+   "nivel": "A1",
+   "pron": "yei KOM-mer fra ko-LOM-bia",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-024",
+   "no": "Jeg bor i Oslo.",
+   "es": "Vivo en Oslo.",
+   "tema": "casa",
+   "nivel": "A1",
+   "pron": "yei bur i US-lu",
+   "gram": [
+    "preposiciones"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-025",
+   "no": "Hvor gammel er du?",
+   "es": "¿Cuántos años tienes?",
+   "tema": "personas",
+   "nivel": "A1",
+   "pron": "vur GAM-mel ær du",
+   "gram": [
+    "pregunta"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-026",
+   "no": "Jeg er tjuefem år.",
+   "es": "Tengo veinticinco años.",
+   "tema": "personas",
+   "nivel": "A1",
+   "pron": "yei ær SHU-e-fem or",
+   "gram": [],
+   "nota": "En noruego se USA «ser», no «tener»: «jeg ER 25 år»."
+  },
+  {
+   "id": "f-027",
+   "no": "Jeg er gift.",
+   "es": "Estoy casado/a.",
+   "tema": "familia",
+   "nivel": "A1",
+   "pron": "yei ær yift",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-028",
+   "no": "Jeg har to barn.",
+   "es": "Tengo dos hijos.",
+   "tema": "familia",
+   "nivel": "A1",
+   "pron": "yei har tu barn",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-029",
+   "no": "Snakker du engelsk?",
+   "es": "¿Hablas inglés?",
+   "tema": "estudio",
+   "nivel": "A1",
+   "pron": "SNAK-ker du ENG-elsk",
+   "gram": [
+    "pregunta",
+    "v2"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-030",
+   "no": "Jeg snakker litt norsk.",
+   "es": "Hablo un poco de noruego.",
+   "tema": "estudio",
+   "nivel": "A1",
+   "pron": "yei SNAK-ker lit noshk",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-031",
+   "no": "Jeg forstår ikke.",
+   "es": "No entiendo.",
+   "tema": "estudio",
+   "nivel": "cero",
+   "pron": "yei fu-SHTOR IK-ke",
+   "gram": [
+    "negacion"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-032",
+   "no": "Kan du gjenta?",
+   "es": "¿Puedes repetir?",
+   "tema": "estudio",
+   "nivel": "A1",
+   "pron": "kan du YEN-ta",
+   "gram": [
+    "modales"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-033",
+   "no": "Kan du snakke saktere?",
+   "es": "¿Puedes hablar más despacio?",
+   "tema": "estudio",
+   "nivel": "A1",
+   "pron": "kan du SNAK-ke SAK-te-re",
+   "gram": [
+    "modales",
+    "comparativo"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-034",
+   "no": "Hva betyr det?",
+   "es": "¿Qué significa eso?",
+   "tema": "estudio",
+   "nivel": "A1",
+   "pron": "va be-TYR de",
+   "gram": [
+    "pregunta"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-035",
+   "no": "Hvordan sier man det på norsk?",
+   "es": "¿Cómo se dice eso en noruego?",
+   "tema": "estudio",
+   "nivel": "A2",
+   "pron": "VUR-dan SI-er man de po noshk",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-036",
+   "no": "Jeg lærer norsk.",
+   "es": "Estoy aprendiendo noruego.",
+   "tema": "estudio",
+   "nivel": "A1",
+   "pron": "yei LÆ-rer noshk",
+   "gram": [],
+   "nota": "El noruego no tiene «estar + -ando»: el presente sirve para las dos cosas."
+  },
+  {
+   "id": "f-037",
+   "no": "Hvor er toalettet?",
+   "es": "¿Dónde está el baño?",
+   "tema": "ciudad",
+   "nivel": "A1",
+   "pron": "vur ær tu-a-LET-te",
+   "gram": [
+    "pregunta"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-038",
+   "no": "Hvor mye koster det?",
+   "es": "¿Cuánto cuesta?",
+   "tema": "compras",
+   "nivel": "A1",
+   "pron": "vur MY-e KOS-ter de",
+   "gram": [
+    "pregunta"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-039",
+   "no": "Kan du hjelpe meg?",
+   "es": "¿Me puedes ayudar?",
+   "tema": "sociedad",
+   "nivel": "A1",
+   "pron": "kan du YEL-pe mei",
+   "gram": [
+    "modales",
+    "objeto"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-040",
+   "no": "Jeg trenger hjelp.",
+   "es": "Necesito ayuda.",
+   "tema": "sociedad",
+   "nivel": "A1",
+   "pron": "yei TREN-ger yelp",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-041",
+   "no": "Hva er klokka?",
+   "es": "¿Qué hora es?",
+   "tema": "tiempo",
+   "nivel": "A1",
+   "pron": "va ær KLOK-ka",
+   "gram": [
+    "pregunta"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-042",
+   "no": "Klokka er tre.",
+   "es": "Son las tres.",
+   "tema": "tiempo",
+   "nivel": "A1",
+   "pron": "KLOK-ka ær tre",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-043",
+   "no": "Når går toget?",
+   "es": "¿Cuándo sale el tren?",
+   "tema": "viaje",
+   "nivel": "A2",
+   "pron": "nor gor TU-ge",
+   "gram": [
+    "pregunta"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-044",
+   "no": "Hvor er stasjonen?",
+   "es": "¿Dónde está la estación?",
+   "tema": "viaje",
+   "nivel": "A1",
+   "pron": "vur ær sta-SHU-nen",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-045",
+   "no": "Jeg er sulten.",
+   "es": "Tengo hambre.",
+   "tema": "comida",
+   "nivel": "A1",
+   "pron": "yei ær SUL-ten",
+   "gram": [],
+   "nota": "Se usa «ser», no «tener»: jeg ER sulten."
+  },
+  {
+   "id": "f-046",
+   "no": "Jeg er tørst.",
+   "es": "Tengo sed.",
+   "tema": "comida",
+   "nivel": "A1",
+   "pron": "yei ær tøsht",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-047",
+   "no": "Jeg vil ha en kaffe, takk.",
+   "es": "Quiero un café, por favor.",
+   "tema": "comida",
+   "nivel": "A1",
+   "pron": "yei vil ha en KAF-fe tak",
+   "gram": [
+    "modales"
+   ],
+   "nota": "«Vil ha» = querer (tener). «Takk» hace de «por favor» al pedir."
+  },
+  {
+   "id": "f-048",
+   "no": "Kan jeg få regningen?",
+   "es": "¿Me trae la cuenta?",
+   "tema": "comida",
+   "nivel": "A2",
+   "pron": "kan yei fo REI-ning-en",
+   "gram": [
+    "modales"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-049",
+   "no": "Jeg vil gjerne bestille et bord.",
+   "es": "Quisiera reservar una mesa.",
+   "tema": "comida",
+   "nivel": "A2",
+   "pron": "yei vil YÆ-ne be-STIL-le et bur",
+   "gram": [],
+   "nota": "«Gjerne» suaviza la petición, como «quisiera»."
+  },
+  {
+   "id": "f-050",
+   "no": "Har dere vegetarmat?",
+   "es": "¿Tienen comida vegetariana?",
+   "tema": "comida",
+   "nivel": "A2",
+   "pron": "har DE-re ve-ge-TAR-mat",
+   "gram": [
+    "pregunta"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-051",
+   "no": "Det smaker godt.",
+   "es": "Está rico.",
+   "tema": "comida",
+   "nivel": "A2",
+   "pron": "de SMA-ker got",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-052",
+   "no": "Hva koster denne?",
+   "es": "¿Cuánto cuesta esta?",
+   "tema": "compras",
+   "nivel": "A1",
+   "pron": "va KOS-ter DEN-ne",
+   "gram": [
+    "demostrativos"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-053",
+   "no": "Kan jeg betale med kort?",
+   "es": "¿Puedo pagar con tarjeta?",
+   "tema": "compras",
+   "nivel": "A1",
+   "pron": "kan yei be-TA-le me kurt",
+   "gram": [
+    "modales"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-054",
+   "no": "Jeg tar denne, takk.",
+   "es": "Me llevo esta, gracias.",
+   "tema": "compras",
+   "nivel": "A1",
+   "pron": "yei tar DEN-ne tak",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-055",
+   "no": "Har dere denne i en større størrelse?",
+   "es": "¿La tienen en una talla más grande?",
+   "tema": "compras",
+   "nivel": "B1",
+   "pron": "har DE-re DEN-ne i en STØ-re STØ-rel-se",
+   "gram": [
+    "comparativo"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-056",
+   "no": "Jeg er syk.",
+   "es": "Estoy enfermo.",
+   "tema": "salud",
+   "nivel": "A1",
+   "pron": "yei ær syk",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-057",
+   "no": "Jeg har vondt i hodet.",
+   "es": "Me duele la cabeza.",
+   "tema": "salud",
+   "nivel": "A2",
+   "pron": "yei har vunt i JU-de",
+   "gram": [],
+   "nota": "Estructura fija: «ha vondt i» + parte del cuerpo."
+  },
+  {
+   "id": "f-058",
+   "no": "Jeg har vondt i magen.",
+   "es": "Me duele el estómago.",
+   "tema": "salud",
+   "nivel": "A2",
+   "pron": "yei har vunt i MA-gen",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-059",
+   "no": "Jeg trenger en time hos legen.",
+   "es": "Necesito una cita con el médico.",
+   "tema": "salud",
+   "nivel": "A2",
+   "pron": "yei TREN-ger en TI-me jus LE-gen",
+   "gram": [
+    "preposiciones"
+   ],
+   "nota": "«Hos» = «donde» una persona (hos legen, hos tannlegen)."
+  },
+  {
+   "id": "f-060",
+   "no": "Det gjør vondt her.",
+   "es": "Me duele aquí.",
+   "tema": "salud",
+   "nivel": "A2",
+   "pron": "de yør vunt hær",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-061",
+   "no": "Jeg leier en leilighet.",
+   "es": "Arriendo un apartamento.",
+   "tema": "casa",
+   "nivel": "A2",
+   "pron": "yei LEI-er en LEI-li-jet",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-062",
+   "no": "Hvor mye er husleia?",
+   "es": "¿Cuánto es el arriendo?",
+   "tema": "casa",
+   "nivel": "B1",
+   "pron": "vur MY-e ær JUS-lei-a",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-063",
+   "no": "Hva jobber du med?",
+   "es": "¿En qué trabajas?",
+   "tema": "trabajo",
+   "nivel": "A1",
+   "pron": "va YOB-ber du me",
+   "gram": [
+    "pregunta"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-064",
+   "no": "Jeg jobber som sykepleier.",
+   "es": "Trabajo como enfermero.",
+   "tema": "trabajo",
+   "nivel": "A1",
+   "pron": "yei YOB-ber som SY-ke-plei-er",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-065",
+   "no": "Jeg søker jobb.",
+   "es": "Estoy buscando trabajo.",
+   "tema": "trabajo",
+   "nivel": "B1",
+   "pron": "yei SØ-ker yob",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-066",
+   "no": "Jeg har fem års erfaring.",
+   "es": "Tengo cinco años de experiencia.",
+   "tema": "trabajo",
+   "nivel": "B1",
+   "pron": "yei har fem osh er-FA-ring",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-067",
+   "no": "Når kan jeg begynne?",
+   "es": "¿Cuándo puedo empezar?",
+   "tema": "trabajo",
+   "nivel": "B1",
+   "pron": "nor kan yei be-YYN-ne",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-068",
+   "no": "Det er kaldt i dag.",
+   "es": "Hace frío hoy.",
+   "tema": "clima",
+   "nivel": "A1",
+   "pron": "de ær kalt i dag",
+   "gram": [],
+   "nota": "El clima siempre empieza con «det»: det er, det regner."
+  },
+  {
+   "id": "f-069",
+   "no": "Det regner.",
+   "es": "Está lloviendo.",
+   "tema": "clima",
+   "nivel": "A1",
+   "pron": "de REI-ner",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-070",
+   "no": "Det snør.",
+   "es": "Está nevando.",
+   "tema": "clima",
+   "nivel": "A1",
+   "pron": "de snør",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-071",
+   "no": "Sola skinner.",
+   "es": "Hace sol.",
+   "tema": "clima",
+   "nivel": "A2",
+   "pron": "SU-la SHIN-ner",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-072",
+   "no": "I dag er det mandag.",
+   "es": "Hoy es lunes.",
+   "tema": "tiempo",
+   "nivel": "A1",
+   "pron": "i dag ær de MAN-dag",
+   "gram": [
+    "v2"
+   ],
+   "nota": "Fíjate: «I dag ER DET», el verbo va segundo."
+  },
+  {
+   "id": "f-073",
+   "no": "I morgen skal jeg jobbe.",
+   "es": "Mañana voy a trabajar.",
+   "tema": "tiempo",
+   "nivel": "A1",
+   "pron": "i MÅ-ren skal yei YOB-be",
+   "gram": [
+    "v2",
+    "modales"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-074",
+   "no": "I går var jeg hjemme.",
+   "es": "Ayer estuve en casa.",
+   "tema": "tiempo",
+   "nivel": "A2",
+   "pron": "i gor var yei YEM-me",
+   "gram": [
+    "v2",
+    "pasado"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-075",
+   "no": "Jeg står opp klokka sju.",
+   "es": "Me levanto a las siete.",
+   "tema": "tiempo",
+   "nivel": "A2",
+   "pron": "yei stor op KLOK-ka shu",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-076",
+   "no": "Jeg liker å lese.",
+   "es": "Me gusta leer.",
+   "tema": "sentimientos",
+   "nivel": "A1",
+   "pron": "yei LI-ker o LE-se",
+   "gram": [
+    "infinitivo"
+   ],
+   "nota": "«Å» delante del infinitivo, como el «to» del inglés."
+  },
+  {
+   "id": "f-077",
+   "no": "Jeg liker ikke fisk.",
+   "es": "No me gusta el pescado.",
+   "tema": "sentimientos",
+   "nivel": "A1",
+   "pron": "yei LI-ker IK-ke fisk",
+   "gram": [
+    "negacion"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-078",
+   "no": "Jeg synes det er vanskelig.",
+   "es": "Me parece difícil.",
+   "tema": "sentimientos",
+   "nivel": "A2",
+   "pron": "yei SY-nes de ær VANS-ke-li",
+   "gram": [],
+   "nota": "«Synes» = opinión propia; «tror» = creer algo que no se sabe."
+  },
+  {
+   "id": "f-079",
+   "no": "Jeg tror det blir fint vær.",
+   "es": "Creo que va a hacer buen tiempo.",
+   "tema": "clima",
+   "nivel": "B1",
+   "pron": "yei trur de blir fint vær",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-080",
+   "no": "Jeg er enig.",
+   "es": "Estoy de acuerdo.",
+   "tema": "sentimientos",
+   "nivel": "A2",
+   "pron": "yei ær E-ni",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-081",
+   "no": "Jeg er ikke enig.",
+   "es": "No estoy de acuerdo.",
+   "tema": "sentimientos",
+   "nivel": "A2",
+   "pron": "yei ær IK-ke E-ni",
+   "gram": [
+    "negacion"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-082",
+   "no": "Etter min mening er det for dyrt.",
+   "es": "En mi opinión es demasiado caro.",
+   "tema": "sentimientos",
+   "nivel": "B2",
+   "pron": "ET-ter min ME-ning ær de for dyrt",
+   "gram": [
+    "v2"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-083",
+   "no": "Jeg må fylle ut et skjema.",
+   "es": "Tengo que llenar un formulario.",
+   "tema": "sociedad",
+   "nivel": "B1",
+   "pron": "yei mo FYL-le ut et SHE-ma",
+   "gram": [
+    "modales"
+   ],
+   "nota": ""
+  },
+  {
+   "id": "f-084",
+   "no": "Kan du forklare det igjen?",
+   "es": "¿Puedes explicarlo otra vez?",
+   "tema": "sociedad",
+   "nivel": "B1",
+   "pron": "kan du fo-KLA-re de i-YEN",
+   "gram": [],
+   "nota": ""
+  },
+  {
+   "id": "f-085",
+   "no": "Jeg har en avtale klokka ti.",
+   "es": "Tengo una cita a las diez.",
+   "tema": "sociedad",
+   "nivel": "A2",
+   "pron": "yei har en AV-ta-le KLOK-ka ti",
+   "gram": [],
+   "nota": ""
+  }
+ ]
+}

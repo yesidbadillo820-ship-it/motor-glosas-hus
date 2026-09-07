@@ -18,6 +18,7 @@ from datetime import date
 from app.services.glosa_service import (
     TEXTO_DMBUG_TARIFAS,
     _dmbug_cubierto_por_el_contrato,
+    _item_del_anexo_dmbug,
 )
 
 
@@ -69,3 +70,36 @@ class TestLaCompuertaPorFecha:
         todo el periodo. Bloquear por no saber la fecha le quitaria al
         hospital su mejor defensa."""
         assert _dmbug_cubierto_por_el_contrato(None)
+
+
+class TestElAnexoSeProbaConElItem:
+    """26-08-2026, decision del area.
+
+    La tercera auditoria senalo que el texto canonico afirmaba que el servicio
+    facturado «se encuentra» entre los 7.141 items del Anexo 1 — sin decir cual
+    y sin verificarlo caso por caso. Puede ser cierta en general y falsa en un
+    caso puntual, y nadie se entera hasta que la entidad lo revisa.
+
+    Yesid pidio cambiarlo y que «trae los servicios». Asi quedo: la afirmacion
+    en bloque sale del texto fijo, y el motor busca el codigo en el catalogo
+    del contrato que cargo el coordinador. Si lo encuentra, lo nombra con su
+    descripcion y su valor — eso es una prueba. Si no, no afirma nada.
+    """
+
+    def test_el_texto_ya_no_afirma_que_el_servicio_esta_en_el_anexo(self):
+        assert "ENTRE LOS CUALES SE ENCUENTRA" not in TEXTO_DMBUG_TARIFAS
+
+    def test_pero_conserva_el_dato_del_anexo_que_si_es_cierto(self):
+        assert "7.141 ÍTEMS TARIFADOS" in TEXTO_DMBUG_TARIFAS
+
+    def test_sin_codigo_no_se_afirma_nada(self):
+        assert _item_del_anexo_dmbug(None) == ""
+        assert _item_del_anexo_dmbug("") == ""
+
+    def test_un_codigo_que_no_esta_en_el_catalogo_no_inventa_el_item(self):
+        assert _item_del_anexo_dmbug("999999") == ""
+
+    def test_el_hueco_donde_se_inserta_sigue_existiendo(self):
+        """El motor inserta el ítem justo después de esta frase; si alguien la
+        cambia, la inserción deja de funcionar en silencio."""
+        assert "7.141 ÍTEMS TARIFADOS." in TEXTO_DMBUG_TARIFAS

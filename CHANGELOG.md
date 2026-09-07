@@ -1,5 +1,522 @@
 # Registro de cambios
 
+## Sesión 07-sep-2026 — Pre-Auditoría: tres defectos de producción
+
+Hallados auditando el código, no por una prueba fallida: los tres se
+manifiestan solo con volumen o con el paso del tiempo.
+
+- **HTTP 500 en facturas de más de 2.000 renglones.** `traducir()` corría
+  fuera del `try/except` del router, así que el tope de `items` del
+  `PayloadFactura` salía como `ValidationError` crudo — y el docstring del
+  endpoint promete que lo único que devuelve error es un cuerpo ilegible
+  (422). Además los modelos del RIPS no tenían tope, de modo que el cuerpo
+  entero se convertía en objetos Pydantic antes de que nada lo revisara: un
+  RIPS de cápita podía agotar la memoria del proceso, que es uno solo para
+  todo el hospital. Se sube `items` a 20.000, se agregan `MAX_POR_FAMILIA` y
+  `MAX_USUARIOS` en `preauditoria_rips.py` (cortan antes de construir), y se
+  envuelve `traducir()` con un 422 que explica la salida. Verificado: 2.001 y
+  5.000 ítems → 200; 20.001 → 422. No se trunca: descartar renglones en
+  silencio en una auditoría financiera es peor que rechazar.
+- **~265 MB por consulta en el tablero.** `db.query(PreAuditoriaEventoRecord)`
+  cargaba la entidad completa, incluido `payload_base` (531 KB en HUS559077),
+  para pintar una tabla que no lo muestra. Se pasa a `load_only` con las trece
+  columnas que la vista usa; `/eventos/{id}` sigue leyendo el payload entero,
+  que es una sola fila.
+- **`dinero_salvado` congelado a los 5.000 eventos.** El `limit(5000)` iba
+  sobre `order_by(id.asc())`, o sea que conservaba los más viejos: al mes de
+  uso la cifra dejaba de crecer, en silencio y a la baja. Se reemplaza por una
+  ventana de 90 días (`creado_en >= ahora - 90d`), sin tope de filas, y el
+  resumen devuelve `dias`. El orden ascendente se conserva: la lógica de
+  «bloqueada y después pasó» solo se lee hacia adelante en el tiempo.
+- **12 pruebas nuevas** en `tests/test_api/test_preauditoria_limites_y_metrica.py`,
+  cuatro de ellas candados contra el propio arreglo.
+
+## Sesión 04-sep-2026 (hotfix) — Falsos positivos de la Pre-Auditoría
+
+Primera prueba contra una factura real del share (`Rips_HUS559077.json`,
+531 KB, $141.720.044): respondió en **32 ms** pero con 63 alertas, dos
+fuentes de ruido propias.
+
+- **`regla_topes_tarifarios` calla sin EPS.** El RIPS de la Res. 2275 no trae
+  pagador; sin él `tarifa_pactada_de` caía al catálogo oficial del HUS y
+  comparaba contra el precio propio del hospital — 48 BLOQUEOS irresolubles,
+  mientras `omisiones` afirmaba que la tarifa no se había cruzado. Ahora la
+  guarda es `ctx.db is None or not payload.eps.strip()`, y el mensaje de
+  omisión dice la verdad. Con EPS la regla opera sin cambios.
+- **`regla_cruce_edad` ignora DISPOSITIVO y MEDICAMENTO.** En un artículo,
+  «neonatal / pediátrico / adulto» es talla o dosis, no paciente: el insumo
+  `FMQ0098` salía BLOQUEADO como servicio pediátrico en adulto. La regla
+  sigue firme en estancias, consultas y procedimientos.
+- **9 pruebas nuevas** (`tests/test_services/test_preauditoria_falsos_positivos.py`),
+  la mitad de ellas comprobando que el arreglo NO debilitó las reglas: UCI
+  pediátrica en adulto y procedimiento neonatal en adulto siguen bloqueando,
+  y con EPS los topes siguen disparando con el mismo valor en riesgo.
+
+## Sesión 04-sep-2026 — V3 Pilar 2: mapeo RIPS real + tablero
+
+Con el primer archivo real del HIS (`Rips_HUS558039.json`) se ajusta el
+endpoint al formato normativo y se construye la pantalla.
+
+- **`app/services/preauditoria_rips.py`** — modelos Pydantic del RIPS
+  (Res. 2275/2023) y traductor a `PayloadFactura`. Se traduce en vez de
+  reescribir las reglas: las nueve duras y sus 108 pruebas no se tocaron.
+  Lee las siete familias de servicios (`consultas`, `procedimientos`,
+  `urgencias`, `hospitalizacion`, `recienNacidos`, `medicamentos`,
+  `otrosServicios`) con `extra="ignore"` y arreglos en `null` tolerados.
+- **`POST /pre-auditoria/evaluar`** acepta el RIPS (se reconoce por
+  `usuarios`) o la forma interna; 422 explícito si no es ninguna.
+- **Tres huecos del RIPS, dichos en voz alta** en el campo `omisiones` de la
+  respuesta, no como alertas: sin EPS (no se cruza tarifa ni contrato), sin
+  notas clínicas (nuevo estado `OMITIDO_SIN_NOTAS`, la IA no corre y no
+  aborta) y sin total de factura. `eps` deja de ser obligatoria en
+  `PayloadFactura`.
+- **Con varios usuarios en una factura no se cruzan sexo ni edad**: el RIPS
+  no dice de quién es cada servicio cuando se leen juntos. La plata sí se
+  suma toda.
+- **`GET /pre-auditoria/resumen`** y `preauditoria_concurrente.resumen()` —
+  dinero salvado = facturas BLOQUEADAS que después volvieron a pasar; las que
+  nunca volvieron van aparte en `riesgo_sin_resolver`. Una sola consulta.
+- **Pantalla Pre-Auditoría** en `static/index.html` (panel `p-pre-auditoria`,
+  entrada de menú, prefijo `preAud*` porque `pa*` ya estaba tomado):
+  tarjetas, tabla con filtros por dictamen y factura, y modal de reparos.
+  Verificada en Chromium a 1280/900/480/360 px.
+- **70 pruebas nuevas**: 21 del traductor sobre el archivo real, 20 del
+  endpoint y el tablero, 29 de la pantalla.
+
+## Sesión 04-sep-2026 (hotfix) — Rescate de filas RECLAMADAS
+
+Tapa una fuga del Pilar 1: `reclamar_una` marcaba la fila `RECLAMADA` y, si el
+bot moría en el paso siguiente (playwright ausente, navegador que no arranca,
+portal que no abre), la fila quedaba invisible para todos — los demás equipos
+solo ven `PENDIENTE` y las personas miran las atoradas.
+
+- **`radicacion_eps.rescatar_reclamada()`** — devuelve la fila a `PENDIENTE`,
+  escribe el diagnóstico en `ultimo_error` y limpia el sello del equipo. Solo
+  actúa sobre `RECLAMADA`: cualquier otro estado responde `no_rescatable`, y en
+  particular `EN_PORTAL_SIN_CONFIRMAR` no se trae de vuelta jamás.
+- **Cortacircuito** — a `MAX_INTENTOS_RESCATE` (3) muta a `HUMANO_REQUERIDO` en
+  vez de seguir rebotando. El contador NO se incrementa en el rescate:
+  `reclamar_una` ya lo sumó al entregar la fila, y volver a sumarlo haría
+  saltar el corte a las dos vueltas en vez de a las tres.
+- **`POST /radicacion/{id}/rescatar`** — puerta del agente (token de máquina).
+- **`radicador_comun`** — `ColaMotor.rescatar()` (se traga los fallos de red:
+  se llama cuando el bot ya se está muriendo) y perímetro de rescate en
+  `correr()` alrededor del import de playwright, del arranque del navegador y
+  de `abrir_sesion`. `SesionNoDisponible` sigue yendo a `humano_requerido`, no
+  a la cola: un portal con captcha no es un equipo enfermo.
+- **27 pruebas nuevas** (`tests/test_api/test_rescate_fila_reclamada.py`),
+  incluida la caída del worker con la fila en la mano y el ciclo completo de
+  tres intentos hasta el cortacircuito.
+- Máquina de estados actualizada en `docs/ARQUITECTURA_V3_PILAR1_RPA.md`.
+
+## Sesión 04-sep-2026 — V3 Pilar 2: Pre-Auditoría Concurrente (backend)
+
+El HIS del hospital consulta el motor **antes de timbrar** una factura y recibe
+un dictamen en menos de 10 segundos. Solo backend y pruebas; la pantalla queda
+para después.
+
+- **`POST /pre-auditoria/evaluar`** — sincrónico, dos puertas: el HIS con
+  `X-Agente-Token` (comparado con `compare_digest`) y el auditor con su sesión.
+  Contrato rígido de salida: `status`, `alertas`, `valor_en_riesgo`,
+  `recomendacion_accion`, más trazabilidad.
+- **Cadena de validación (Chain of Responsibility)** en
+  `app/services/preauditoria_reglas_duras.py`: aritmética, topes tarifarios,
+  cruce de género y de edad, vías quirúrgicas excluyentes, coherencia de fechas
+  y estancia, doble facturación, contrato vigente y UCI sin criterio escrito.
+  Todas deterministas; ninguna inventa (sin tarifa cargada, la regla calla).
+- **Cruce clínico con Groq** (`preauditoria_cruce_clinico.py`) al final de la
+  cadena, con reloj propio: tope de 6 s y corte por `asyncio.wait_for`. Sus
+  hallazgos son siempre ADVERTENCIA — la IA nunca bloquea una factura. Modelo
+  dedicado (`preauditoria_modelo`, por defecto `llama-3.3-70b-versatile`): el
+  `groq_model` general es un razonador y no cabe en el presupuesto de tiempo.
+- **Presupuesto de latencia** en `preauditoria_concurrente.py`: techo duro de
+  10 s (reglas + IA + escritura), con degradación elegante si la IA falla.
+- **Tabla `pre_auditoria_eventos`** — un evento por evaluación, con el payload
+  tal como llegó, el dictamen, la plata en riesgo y los tiempos por tramo.
+- **Códigos de glosa oficiales** del Manual Único (`catalogo_glosas.py`)
+  proyectados por tipo de servicio; una prueba impide que se cuele un código
+  inventado.
+- `tarifa_lookup_service.tarifa_pactada_de()` y
+  `reglas_casos_fno.sexo_exigido_por_el_procedimiento()`: dos accesos públicos
+  a lógica que ya existía, para no duplicarla.
+- **108 pruebas nuevas** (64 de reglas, 44 de la ruta), con los casos que pidió
+  el auditor: múltiples cirugías por vías excluyentes y estancia en UCI
+  injustificada.
+- Arquitectura: `docs/ARQUITECTURA_V3_PILAR2_PREAUDITORIA.md`.
+
+## Sesión 04-sep-2026 — «El CSV son solo datos, no dice nada de velas»
+
+Duda razonable del usuario, y merecía una respuesta demostrable en vez de una
+explicación: **una vela japonesa ES esos cuatro números**. El cuerpo va de la
+apertura al cierre, hueca o llena según cuál quedó arriba, y las mechas hasta
+el máximo y el mínimo. TradingView pinta exactamente eso; el gráfico no añade
+ni un dato que no esté en el archivo.
+
+- **`mercados/dibujo.py` + `python -m mercados vela`**: dibuja una sesión en la
+  consola con cada precio señalado donde le corresponde, las cuentas del libro
+  ya hechas («mecha inferior 2,3 veces el cuerpo») y qué patrones encajan ahí.
+- Se guarda el **índice** de la sesión, no la vela: dos sesiones con los mismos
+  cuatro precios son iguales entre sí, y buscarlas por valor habría devuelto la
+  primera en vez de la pedida.
+- **11 pruebas nuevas** (130 en `tests/test_mercados`, 599 en total).
+
+## Sesión 31-ago-2026 (cierre) — Análisis de velas japonesas (`mercados/`)
+
+Módulo independiente que detecta los 28 patrones del libro de Luis M. González
+sobre un histórico en CSV y **mide si cumplen lo que el libro promete**. No
+predice precios ni genera señales de compra o venta: nada en el libro ni en la
+evidencia pública lo sostiene, y construirlo habría sido inventar.
+
+### Lo que trae
+- **28 detectores** (12 individuales, 16 combinados), cada uno con la
+  definición textual del libro y su caso de prueba construido a mano.
+- **Catálogo en JSON** con el texto del libro y la página de cada patrón,
+  validado contra los detectores por `python -m mercados revisar`.
+- **Lector de CSV** tolerante: cabecera ES/EN, separador `,`/`;`/tab, decimales
+  con coma o punto, orden ascendente o descendente. Columna faltante = mensaje
+  con nombre propio.
+- **Medición** con tasa base, intervalo de Wilson y veredicto en una línea.
+- **Aplicación web** instalable, sin internet, con cuatro pantallas.
+
+### Los tres cuidados que la hacen creíble
+- **Tasa base.** Cuántas veces el precio fue en esa dirección en TODAS las
+  sesiones. Sin esa comparación, en un mercado alcista todo patrón alcista
+  «funciona».
+- **Muestra mínima de 30 casos**, dicha explícitamente en cada veredicto.
+- **Corrección por comparaciones múltiples (Bonferroni).** Se hacen 112
+  preguntas (28 patrones × 4 horizontes): al 95 % de siempre, ~6 salen
+  «significativas» por azar. Comprobado con datos aleatorios: sin corregir
+  aparecía un patrón con +19 puntos sobre su base en 37 casos; con la
+  corrección, ninguno.
+
+### Accesibilidad de las gráficas
+El validador de la guía de visualización da **ΔE 4,1 (deutan)** entre el verde
+y el rojo: por debajo del mínimo de 8. El color no lleva significado — la vela
+que sube va **hueca** y la que baja **llena** (la forma original japonesa), y
+toda etiqueta de dirección lleva ▲/▼ junto a la palabra. Las barras de medición
+usan una sola serie con la base como marca de referencia; lo que no llega a 30
+casos sale rayado.
+
+### Honestidad de fuente
+Las etiquetas de fiabilidad del libro se muestran **atribuidas al autor** y sin
+respaldo declarado. La «Cubierta de la Nube Oscura» queda marcada con
+`"revisar"`: el libro no exige el cierre bajo la mitad del cuerpo que sí pide
+la literatura clásica, y se implementó lo que dice el libro.
+
+Pruebas: **112** (`tests/test_mercados`), 586 con las del ICFES y noruego.
+Comprobado además en Chromium a 390 px: cuatro pantallas, 28 fichas, 120 velas,
+sin errores de JavaScript ni desbordes.
+
+## Sesión 31-ago-2026 (noche 6) — Todos los botones 🔊 estaban mudos
+
+La causa de fondo de todo el enredo de la voz.
+
+- **El navegador cortaba el manejador a la mitad.** Los botones se armaban con
+  `onclick="decir(${JSON.stringify(texto)})"`. `JSON.stringify` devuelve el
+  texto entre comillas **dobles**, y el atributo HTML también va entre comillas
+  dobles: el navegador leía `onclick="decir("gå")"`, lo cortaba en la primera
+  comilla, y el atributo quedaba en `decir(` — con su «Unexpected end of input»
+  en la consola. **Los 12 botones de audio de la aplicación no hacían nada**:
+  «Toca para oír», «🐢 Más despacio», «🔊 Oír» y «🐢 Despacio» del veredicto, y
+  los 🔊 del diccionario, la gramática y las conversaciones.
+- **Por qué costó tanto verlo.** Lo único que sí hablaba era lo que no pasa por
+  un atributo: el audio al acertar (se llama desde JavaScript) y, desde el
+  arreglo anterior, el automático al aparecer (va por un atributo de datos).
+- **Una sola puerta: `alPulsarDecir()`.** Escapa el JavaScript para HTML (`esc`
+  convierte la comilla en `&quot;`) y todos los botones que hablan salen de
+  ahí. De paso, el 🔊 de los errores recientes dejó de borrar los apóstrofos
+  del texto, que era lo que hacía para esquivar el problema.
+- **3 pruebas nuevas** (208): que ningún `onclick` lleve un `JSON.stringify` sin
+  escapar, que todos los botones salgan del ayudante y que el ayudante escape.
+
+Comprobado en Chromium con voz simulada: hablan los cinco sitios probados
+—automático, «Toca para oír», «Más despacio», «Oír» del veredicto y el 🔊 del
+diccionario— y el `onclick` ya llega entero (`decir("øl")`), sin errores.
+
+## Sesión 31-ago-2026 (noche 5) — «Escucha y elige» no sonaba al aparecer
+
+Fallo real reportado desde el uso: en los ejercicios de escucha la palabra
+**no se oía al aparecer el ejercicio**, solo al pulsar «Comprobar».
+
+- **Era código muerto.** `tras()` buscaba un elemento con `data-autoaudio` para
+  decirlo al pintar la pantalla… y **ningún ejercicio ponía ese atributo**. Lo
+  único que hablaba solo era `comprobar()`, que dice la palabra al acertar.
+  Resultado: «escucha y elige» funcionaba como «lee y elige».
+- **`audioGrande()` ahora sí lo marca**, y con ello quedan cubiertos los tres
+  ejercicios de oído que lo usan: `escuchar_opcion`, `escuchar_escribir` y
+  `pronunciar` (este último dice «escúchalo y repítelo», así que también debe
+  sonar solo).
+- **Dos condiciones para no molestar:**
+  - `data-audio-clave` (sesión + número de ejercicio) impide que la palabra se
+    repita **en cada toque de opción** — tocar una opción vuelve a pintar la
+    pantalla entera.
+  - No suena con la respuesta ya revelada: ahí ya habla `comprobar()`, y sonaría
+    dos veces encima.
+- **4 pruebas nuevas** (205) y comprobación en Chromium con una voz noruega
+  simulada: al aparecer el ejercicio dice `['øl']`, tras tocar dos opciones
+  sigue en `['øl']`, y al pasar al siguiente ejercicio de oído vuelve a hablar.
+
+## Sesión 31-ago-2026 (noche 4) — Windows no deja instalar la voz en el PC del hospital
+
+El usuario llegó al sitio correcto (Hora e idioma → Voz → Agregar voces) y
+Windows respondió **«No se pudo instalar el paquete de voz»**. Los dos paquetes
+listados —el noruego y el español— aparecían con **0 MB**: ese equipo no está
+descargando contenido de idioma en absoluto.
+
+- **La causa no es la aplicación ni el usuario.** Es un equipo de dominio
+  (`esehus.loc`): las actualizaciones pasan por el servidor de Sistemas, que
+  normalmente bloquea las *características a petición* (paquetes de voz e
+  idioma). Se habilita con la directiva «Especificar la configuración para la
+  instalación y la reparación de componentes opcionales», permitiendo bajar de
+  Windows Update en vez de WSUS. Eso lo hace Sistemas, no el usuario.
+- **El aviso de la app lo dice ahora.** En Windows, después de los pasos,
+  advierte del error exacto y ofrece la salida que sí funciona: el celular,
+  donde Android e iPhone traen la voz noruega.
+- **1 prueba nueva** (201): que el tramo de Windows nombre el error literal y
+  ofrezca el celular.
+
+La aplicación sigue siendo usable sin voz: los ejercicios de escuchar muestran
+la palabra escrita y la pronunciación aproximada sigue debajo de cada palabra.
+
+## Sesión 31-ago-2026 (noche 3) — La casilla de la voz en Windows no se llama así
+
+Corrección de una instrucción equivocada que se entregó al usuario.
+
+- **El nombre estaba mal.** La app decía «marcando **Voz** entre las funciones
+  opcionales». En esa pantalla de Windows la casilla se llama **«Texto a voz»**
+  — «Voz» a secas no existe ahí, y «Reconocimiento de voz» es otra cosa
+  (dictado).
+- **Y ese camino es peligroso.** En la misma pantalla de *Idioma y región →
+  Agregar idioma* está **«Establecer como mi idioma de presentación de
+  Windows»**: marcarla por error deja **todo el PC del hospital en noruego**.
+- **Se cambió al camino corto:** *Configuración → Hora e idioma → **Voz** →
+  Administrar voces → Agregar voces → «Noruego (Bokmål)»*. Instala solo la voz
+  y no toca el idioma del sistema.
+- La guía documenta los dos caminos y advierte del riesgo del primero.
+
+Comprobado en Chromium con user-agent de Windows: el aviso muestra el camino
+nuevo y ya no nombra el de «Idioma y región».
+
+## Sesión 31-ago-2026 (noche 2) — La voz noruega: aviso sin salida y voces tardías
+
+En la prueba real la app dijo «este dispositivo no tiene voz noruega» y ahí
+quedó: el usuario no tenía cómo saber que eso se instala.
+
+- **Fallo real: las voces llegan tarde y la pantalla no se redibujaba.** Chrome
+  entrega `speechSynthesis.getVoices()` de forma asíncrona; la primera llamada
+  casi siempre devuelve una lista vacía. Como el aviso se cocina al dibujar,
+  un aparato **que sí tiene** la voz veía «no hay voz» hasta cambiar de
+  pantalla. Ahora `onvoiceschanged` vuelve a dibujar cuando el resultado
+  cambia, y se abstiene si el usuario está escribiendo en un campo.
+- **`comoInstalarVoz()`: instrucciones según el aparato.** Los avisos nombraban
+  solo Android e iPhone. Se agregaron **Windows** (Configuración → Hora e
+  idioma → Agregar idioma → Norsk bokmål, marcando «Voz», y cerrar el navegador
+  por completo) y **macOS**, más un texto genérico. Los tres avisos de audio
+  apagado —inicio, ejercicio de escucha y perfil— dicen ahora cómo arreglarlo.
+- **4 pruebas nuevas** (200): que la búsqueda acepte las tres etiquetas del
+  noruego (`nb`, `no`, `nn`), que la pantalla se redibuje al llegar las voces
+  sin borrar lo escrito, que estén los cuatro sistemas y que ningún aviso quede
+  sin salida.
+
+## Sesión 31-ago-2026 (noche) — La guía hacía copiar una dirección que no era
+
+Segunda vuelta del mismo problema, en la prueba real.
+
+- **Se quitó toda dirección de ejemplo** de la guía y del bot. La guía traía
+  `http://192.168.1.15:8000/...` como muestra, con la advertencia de no
+  copiarla; se copió igual (la máquina real era `172.17.80.25`). Antes había
+  pasado lo mismo con `LA-IP-DE-ARRIBA` y con `ESE-NUMERO`. La conclusión: una
+  dirección impresa como ejemplo termina escrita en el navegador, así que no
+  puede haber ninguna — la instrucción ahora es «copie **la línea que muestra
+  su ventana**».
+- **El bot explica el `ERR_CONNECTION_TIMED_OUT`.** Ese error no es del enlace
+  sino de la red: firewall de Windows (con el `New-NetFirewallRule` listo para
+  pegar), celular en otra red, o wifi y cable separados en el hospital.
+- **Salida por el túnel.** Como `app/` monta `/static` desde el disco, el
+  servidor que ya se ve desde fuera del hospital sirve también la aplicación:
+  la dirección de siempre con `/static/noruego/index.html` al final. Sin
+  firewall, sin wifi y sin reiniciar nada.
+- **3 pruebas nuevas** (196): un `re` rechaza cualquier `http://n.n.n.n:puerto/`
+  en la guía y en el bot, y se exige que el bot traiga la regla de firewall.
+
+## Sesión 31-ago-2026 (tarde) — El bot de noruego no mostraba la dirección
+
+Arreglo de la primera prueba real en el PC de cartera.
+
+- **`tools/NORUEGO.cmd` imprimía la ayuda de `ipconfig` en vez de la IP.** La
+  línea era `ipconfig ^| findstr /C:"IPv4"`: el `^|` solo va escapado dentro de
+  un `for /f`; suelto, el `|` le llega a `ipconfig` como argumento. Como no
+  salía la dirección, el bot igual mostraba el texto de relleno
+  `http://LA-IP-DE-ARRIBA:8000/...` — y eso fue literalmente lo que se escribió
+  en Chrome (`DNS_PROBE_FINISHED_NXDOMAIN`).
+- **Nuevo `noruego/red.py` + `python -m noruego direccion`.** La IP se averigua
+  abriendo un socket UDP hacia `8.8.8.8` sin enviar ningún byte (en UDP,
+  `connect()` solo fija la ruta local): funciona sin internet, no genera tráfico
+  y no depende del idioma de Windows ni de cuántos adaptadores tenga el equipo.
+  El comando imprime el **enlace completo**, listo para copiar; sin red no
+  imprime nada y devuelve 1.
+- **El bot y `exportar` ya no muestran texto de relleno** cuando pueden mostrar
+  el enlace real. El relleno que queda (`ESE-NUMERO`) solo aparece si de verdad
+  no hubo IP, y va acompañado de cómo conseguirla.
+- **Se explica dónde está «Agregar a la pantalla de inicio»:** Android (Chrome)
+  en los tres puntos, iPhone (Safari) en el botón de compartir. En el computador
+  no aplica — se abre `static\noruego\index.html` con doble clic. Se buscó esa
+  opción en el Chrome de escritorio, donde no existe con ese nombre.
+- **26 pruebas nuevas** (193 en `tests/test_noruego`): `test_red.py` comprueba
+  que no salga tráfico, que sin red no reviente y que nunca se ofrezca una IP de
+  loopback; `test_bots_windows.py` rechaza el `^|` fuera de un `for /f`, el
+  texto de relleno viejo, los finales de línea LF y los subcomandos inexistentes.
+
+## Sesión 31-ago-2026 — Curso de noruego (`noruego/`)
+
+Aplicación web para aprender noruego bokmål desde cero, para hispanohablantes,
+instalable en el celular (PWA) y funcional sin internet. Módulo independiente:
+no importa nada de `app/` ni de `tools/` y solo usa la librería estándar.
+
+### Contenido
+- **423 elementos de léxico** en JSON: 133 sustantivos con género y las cuatro
+  formas, 69 verbos con sus cuatro tiempos y su grupo, 40 adjetivos con las tres
+  formas, 85 frases de uso real, 42 números, 13 guías de pronunciación, 29
+  reglas de gramática (con ejemplo, error típico y comparación con el español) y
+  12 conversaciones de situaciones reales.
+- **18 módulos y 73 lecciones**, de nivel cero a B2, con la estructura definida
+  hasta C2.
+
+### Motor
+- Los ejercicios **se generan a partir de los datos**, no se escriben a mano:
+  de «bil es masculino y su definido es bilen» salen solos el ejercicio de
+  género, el de forma, el de traducción, el de escucha y el de parejas. 875
+  ejercicios por variante, 3 variantes por lección (2.625 en total).
+- 15 tipos de ejercicio: opción, completar, ordenar, traducir en las dos
+  direcciones, escuchar y elegir, escuchar y escribir, parejas, conjugar,
+  género, forma nominal, encontrar el error, diálogo, lectura y pronunciación.
+
+### Aplicación
+- Mobile first: barra inferior, botones de 52 px, zona segura del iPhone,
+  vibración, atajos de teclado.
+- Repetición espaciada que decide sola qué repasar, con detección de palabras
+  difíciles.
+- XP, niveles de jugador, racha, objetivo diario, corazones, estrellas, 10
+  logros y desbloqueo progresivo.
+- Audio con la voz del propio dispositivo (`nb-NO`). **Si no hay voz noruega,
+  muestra el texto y lo dice**, en vez de leer con acento español.
+- Diccionario buscable, gramática explicada, conversaciones, estadísticas con
+  calendario de constancia, copia de seguridad y panel para agregar contenido
+  sin tocar código.
+- PWA: manifest, service worker con caché e iconos generados.
+
+### Correcciones encontradas durante el desarrollo
+- `fuentes=("frases")` era una cadena, no una tupla: al recorrerla daba letras
+  sueltas y dejaba lecciones sin material.
+- El tipo de ejercicio rotaba con los ejercicios ya generados, así que un tipo
+  imposible de construir con ese material **bloqueaba el ciclo entero**: 27
+  lecciones quedaban casi vacías. Ahora rota con los intentos.
+- Sin voz noruega instalada, los ejercicios de escucha eran imposibles de
+  responder. Ahora muestran el texto como respaldo.
+
+### Pruebas
+167 pruebas en `tests/test_noruego/`; `ruff` limpio. Recorrido completo
+verificado en Chromium emulando un celular: alta de usuario, tres lecciones
+completas, XP, logros, diccionario, gramática, conversaciones, perfil, panel de
+contenido y **persistencia tras recargar**, sin errores de JavaScript y sin
+desbordamiento horizontal.
+
+## Sesión 26-ago-2026 (cierre 7) — un solo vocabulario de color
+
+Idea #12, decidida por el área. **Corrige lo que la propuesta afirmaba:** que
+`sinac-ds.css` «se carga y nadie usa» y que no había defecto visible. Al medir,
+las dos afirmaciones resultaron falsas.
+
+- **16 reglas de color de ese archivo aplican hoy**, todas sobre `#p-analizar`:
+  `.res-dictamen-body`, `.pa-cite.verified`, `.pa-cite.unverified`,
+  `.sidebar input/select/textarea`, `.sidebar .btn-primary`, `.res-actions button`.
+- Las paletas eran **colores distintos**, no alias: `--sds-success` `#16a34a`
+  contra `--c-green` `#2E7D32` (distancia RGB 51); `--sds-amber` `#d97706`
+  contra `--c-amber` `#E65100` (41); `--sds-rose` `#e11d48` contra `--c-red`
+  `#C62828` (43).
+
+**Arreglo: 13 líneas, no 2.072.** Los trece tokens de color de `--sds-*` pasan
+a `var(--sinac-*, #hex)`. El nombre que se escribe sigue siendo `--sds-*` —como
+pide CLAUDE.md— y el valor que devuelve es el corporativo. Ningún uso se tocó.
+
+**El fallback es obligatorio:** de las 6 páginas que cargan el archivo, 4 no
+definen `--sinac-*` (preauditoria, importar-masiva, presentacion-ia,
+terapia-fisica). Un alias sin fallback las dejaría con `var()` vacío → elemento
+transparente. El fallback es el hex corporativo, no el viejo, para unificarlas
+también.
+
+**Pruebas:** `test_un_solo_vocabulario_de_color.py`, 8 casos — ningún token de
+color se declara solo, ninguno queda sin fallback, ningún fallback conserva el
+hex viejo, y un guardia de ≥10 tokens para que no pase por vacía. 262 en
+`tests/test_frontend`.
+
+
+
+## Sesión 26-ago-2026 (cierre 6) — la ruta de «Mi día» pisaba una que ya existía
+
+Defecto que entró con el PR #506 y lo cazó el CI.
+
+`GET /mi-dia` ya existía en `health.py` (resumen personal del gestor: tareas,
+saludo, alertas). El router del tablero nuevo registró la misma ruta y, como se
+incluye antes que el de health, FastAPI se quedó con la nueva y la vieja quedó
+muerta en silencio — el modo de falla de «Salud Total».
+
+- El tablero se muda a `GET /mi-dia/tablero`; la pantalla llama la nueva.
+- `tests/test_api/test_ninguna_ruta_pisa_a_otra.py`: recorre `app.routes` y
+  falla si dos comparten (método, camino), nombrándolas. Más un guardia que
+  exige >100 rutas para que la prueba no pase por estar vacía.
+
+Ninguna pantalla del portal consumía la ruta vieja, así que no se rompió nada
+de cara al auditor. `tests/test_api/`: 2.783 en verde.
+
+
+
+## Sesión 26-ago-2026 (cierre 5) — las once ideas para el motor
+
+Se implementaron once de las doce ideas propuestas. La #12 (unificar los dos
+vocabularios de color) queda sin hacer: son 2.072 cambios sobre algo que
+funciona y sin defecto visible; está escrita en la bitácora para constancia y
+solo se hace si el área lo pide.
+
+**Antes de radicar**
+
+- **No radicar sin el soporte de la causal.** `catalogo_glosas.py` gana el mapa
+  `SOPORTE_QUE_PIDE_LA_CAUSAL` y `soportes_que_pide(codigo)`; el dictamen avisa
+  cuando falta.
+- **`agente_auditor_eps()`** en `multi_agente.py`: seis flancos sacados de
+  fallas reales de agosto. Se dispara **cuando `citation_verifier` no encuentra
+  nada** — el caso que quemó esta semana. Lee `verif_citas` (la revisión que sí
+  llevó evidencia) en vez de volver a revisar; volver a revisar ahí sería sin
+  evidencia y un folio inventado pasaría de largo. Tres pruebas fijan ese
+  cableado.
+- **El sello dice contra qué se verificó** — `_estado_del_corpus()`.
+- **`_cups_desde_dgh()`**: cuando el texto no trae CUPS, se lee el que DGH ya
+  registró para esa factura en `ConceptoRecord`.
+
+**Aprendizaje**
+
+- Las plantillas gold se escogen por `valor_recuperado` y no por `usos`
+  (tres sitios de selección en `plantillas_gold.py`).
+- `_notas_de_la_promocion()` guarda con la plantilla lo que el gestor contestó
+  a «¿cuál argumento la levantó?». Si no contestó, no se inventa nada.
+
+**Pantallas nuevas**
+
+- `app/services/plata_recuperada.py` + `GET /dashboard-ejecutivo/plata-recuperada`
+  + panel `p-plata`. Una sola consulta para todo el periodo. Lo que no tiene
+  dato va a `sin_dato` y sale avisado en pantalla; no se rellena con supuestos.
+- `app/services/mi_dia.py` + `GET /mi-dia` + panel `p-mi-dia`. Tres columnas,
+  cada glosa en una sola. **`dias_restantes` vale 0 por defecto**, así que un 0
+  sin `fecha_vencimiento` es ambiguo entre «vencida» y «nadie la calculó»: se
+  devuelve `None` y esa glosa va al final, no al principio.
+
+**Pruebas:** 87 nuevas en cinco archivos. `tests/test_services` +
+`tests/test_api`: 6.601 en verde. `tests/test_frontend`: 264 en verde — la
+prueba de tokens fantasma atajó cuatro colores inexistentes en la pantalla
+nueva antes del commit.
+
+
+
 ## Sesión 26-ago-2026 (cierre 4) — el orden del folio de la factura, y sin índice
 
 Tres cosas que pidió el área al revisar el resultado:

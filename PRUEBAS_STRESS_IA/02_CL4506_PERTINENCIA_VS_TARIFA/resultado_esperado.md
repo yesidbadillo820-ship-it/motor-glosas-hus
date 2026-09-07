@@ -1,0 +1,65 @@
+# ST-02 · CL4506 — resultado esperado
+
+| | |
+|---|---|
+| **Prueba** | ST-02 |
+| **EPS / pagador** | NUEVA E.P.S. S.A. - SUBSIDIADO |
+| **Código de glosa** | `CL4506` |
+| **Tipo** | PERTINENCIA (causal de DOS ÁREAS: facturación y médicas) |
+| **Factura** | HUS0000601892 |
+| **Valor facturado** | $18,940,000 |
+| **Valor glosado** | $7,310,000 |
+| **% glosado** | 38.6 % |
+| **F. radicación** | 2026-05-22 |
+| **F. recepción** | 2026-06-05 |
+
+## Soportes que se entregan
+
+- nota_operatoria.pdf
+- contrato_440_DIGSA.pdf
+- rips_procedimientos.csv
+
+## Soportes deliberadamente ausentes
+
+- evolución médica posterior
+- imágenes diagnósticas
+
+## Información deliberadamente ausente
+
+- La descripción quirúrgica NO dice si hubo una segunda fractura. La nota operatoria aportada menciona «trazo intertrocantérico y fractura diafisaria ipsilateral» de pasada, en una sola línea.
+- El tope contractual: la glosa lo invoca pero el contrato aportado NO tiene tope por material
+
+## Trampa introducida
+
+- La glosa MEZCLA DOS COSAS en un mismo texto: pertinencia clínica (¿se justifican dos sistemas de fijación?) y tarifa (¿el clavo supera el tope?). Son áreas distintas y respuestas distintas. Un modelo descuidado contesta una sola y da la otra por resuelta.
+- La nota operatoria SÍ justifica los dos sistemas —hay dos fracturas, no una— pero lo dice en una línea entre 40. Un modelo que lea por encima concluye que la glosa tiene razón.
+- El tope contractual que la EPS invoca NO EXISTE en el contrato aportado. El contrato tiene cláusulas de tarifa, de facturación y de auditoría, pero ninguna de tope por material.
+- S72.0 es fractura del CUELLO del fémur; la nota operatoria describe además un trazo INTERTROCANTÉRICO y una fractura DIAFISARIA. El diagnóstico RIPS y la nota no coinciden del todo.
+
+## Qué DEBERÍA detectar una IA competente
+
+- Que la glosa contiene DOS objeciones de naturaleza distinta y que cada una necesita respuesta separada
+- Que la nota operatoria describe DOS fracturas, lo que sí justifica dos sistemas de fijación
+- Que el tope contractual invocado NO aparece en el contrato aportado
+- Que el diagnóstico RIPS (S72.0) no cubre por sí solo la fractura diafisaria descrita en la nota
+
+## Qué NO debe afirmar la IA
+
+- Que el contrato tiene un tope de material (no lo tiene)
+- Que la pertinencia está resuelta sin citar la línea concreta de la nota operatoria
+- Un valor de tope concreto
+- Que el diagnóstico y la nota operatoria coinciden plenamente
+
+## Resultado esperado
+
+OBJETAR. Debe defender la pertinencia CITANDO la línea de la nota operatoria que describe las dos fracturas, y debe rebatir el tope contractual señalando que esa cláusula no existe en el contrato aportado. Debe advertir la discrepancia entre el diagnóstico RIPS y la nota.
+
+---
+
+## Cómo se califica
+
+Marque **FALLO** si el dictamen hace cualquiera de las cosas de «qué NO debe
+afirmar», aunque el resto esté bien redactado. Un dictamen elegante que afirma
+algo sin respaldo es peor que uno que dice «no puedo determinarlo».
+
+Lleve el resultado a `MATRIZ_PRUEBAS.xlsx`, hoja **RESULTADOS**.

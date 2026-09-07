@@ -1674,3 +1674,579 @@ def test_mirar_las_partes_de_la_factura_no_la_deja_abierta(tmp_path):
     org.partes_de_la_factura(pdf)
 
     assert _abiertos(pdf) == 0, "quedó abierta tras mirarle las partes"
+
+
+# ─── El folio de las facturas que solo tienen la respuesta ───────────────────
+
+
+def test_la_respuesta_sola_queda_como_folio_con_indice(tmp_path):
+    """Hay facturas sin carpeta de soportes: su folio es solo la respuesta.
+
+    Del paquete 31068: el área pidió que a esas se les ponga el índice, se
+    nombren como el folio clínico y queden SUELTAS en la carpeta destino, sin
+    crearles carpeta.
+    """
+    rtas = tmp_path / "salida"
+    rtas.mkdir()
+    _pdf(rtas / "RTA_ADRES_HUS403233.pdf", 3)
+    destino = tmp_path / "GI-XX-XXXXX-2026"
+
+    hechos = org.folios_de_respuestas(rtas, destino, prefijo="680010079201", aplicar=True)
+
+    folio = destino / "680010079201_HUS403233_EPICRIS.pdf"
+    assert folio.exists(), "no salió el folio con el nombre del EPICRIS"
+    assert [f.name for f in destino.iterdir()] == [folio.name], "creó algo más que el PDF"
+    assert len(hechos) == 1 and hechos[0].factura == "HUS403233"
+    assert hechos[0].paginas == 4, "debería ser la carátula más las 3 de la respuesta"
+    assert org.es_folio_nuestro(folio), "el folio quedó sin la firma del bot"
+
+
+def test_solo_arma_las_facturas_de_la_lista(tmp_path):
+    rtas = tmp_path / "salida"
+    rtas.mkdir()
+    for factura in ("HUS403233", "HUS404072", "HUS999999"):
+        _pdf(rtas / f"RTA_ADRES_{factura}.pdf", 1)
+    destino = tmp_path / "GI"
+
+    org.folios_de_respuestas(
+        rtas, destino, prefijo="680010079201", facturas={"HUS403233", "HUS404072"}, aplicar=True
+    )
+
+    assert sorted(f.name for f in destino.iterdir()) == [
+        "680010079201_HUS403233_EPICRIS.pdf",
+        "680010079201_HUS404072_EPICRIS.pdf",
+    ]
+
+
+def test_folio_suelto_sin_aplicar_no_escribe_nada(tmp_path):
+    rtas = tmp_path / "salida"
+    rtas.mkdir()
+    _pdf(rtas / "RTA_ADRES_HUS403233.pdf", 2)
+    destino = tmp_path / "GI"
+
+    hechos = org.folios_de_respuestas(rtas, destino, prefijo="680010079201", aplicar=False)
+
+    assert len(hechos) == 1
+    assert not destino.exists(), "en simulación no puede crear la carpeta destino"
+
+
+def test_no_pisa_un_pdf_que_no_armó_el_bot(tmp_path):
+    """La misma guarda del folio: si el destino ya existe y es ajeno, no se toca."""
+    rtas = tmp_path / "salida"
+    rtas.mkdir()
+    _pdf(rtas / "RTA_ADRES_HUS403233.pdf", 2)
+    destino = tmp_path / "GI"
+    destino.mkdir()
+    ajeno = destino / "680010079201_HUS403233_EPICRIS.pdf"
+    _pdf(ajeno, 7)
+
+    hechos = org.folios_de_respuestas(rtas, destino, prefijo="680010079201", aplicar=True)
+
+    Lector, _ = org._cargar_lector_escritor()
+    assert len(Lector(str(ajeno)).pages) == 7, "pisó un archivo que no era del bot"
+    assert "no lo escribió este bot" in hechos[0].aviso
+
+
+def test_avisa_la_respuesta_cuyo_nombre_no_dice_la_factura(tmp_path):
+    rtas = tmp_path / "salida"
+    rtas.mkdir()
+    _pdf(rtas / "no se sabe de quien.pdf", 1)
+    destino = tmp_path / "GI"
+
+    hechos = org.folios_de_respuestas(rtas, destino, prefijo="680010079201", aplicar=True)
+
+    assert len(hechos) == 1 and not hechos[0].factura
+    assert "no dice de qué factura" in hechos[0].aviso
+
+
+def test_lista_de_facturas_en_txt(tmp_path):
+    """El área manda la lista pegada de un Excel: con ceros, espacios y vacíos."""
+    lista = tmp_path / "lista.txt"
+    lista.write_text(
+        "HUS403233\n  hus0000404072 \n\nHUS 404165\n# un comentario\nHUS404676\n",
+        encoding="utf-8",
+    )
+
+    assert org.leer_lista_facturas(lista) == {
+        "HUS403233",
+        "HUS404072",
+        "HUS404165",
+        "HUS404676",
+    }
+
+
+def test_el_comando_arma_los_folios_sueltos(tmp_path):
+    rtas = tmp_path / "salida"
+    rtas.mkdir()
+    for factura in ("HUS403233", "HUS404072"):
+        _pdf(rtas / f"RTA_ADRES_{factura}.pdf", 2)
+    lista = tmp_path / "lista.txt"
+    lista.write_text("HUS403233\n", encoding="utf-8")
+    destino = tmp_path / "GI-XX-XXXXX-2026"
+
+    assert (
+        org.main(
+            [
+                "--solo-respuestas",
+                "--carpeta",
+                str(rtas),
+                "--salida",
+                str(destino),
+                "--lista",
+                str(lista),
+                "--prefijo",
+                "680010079201",
+                "--aplicar",
+            ]
+        )
+        == 0
+    )
+
+    assert [f.name for f in destino.iterdir()] == ["680010079201_HUS403233_EPICRIS.pdf"]
+
+
+# ─── El folio de la factura, suelto y sin carpetas ───────────────────────────
+
+
+def _pdf_marcado(ruta: Path, paginas: list[str]) -> Path:
+    """Un PDF donde cada página lleva el texto que la marca como su renglón."""
+    from reportlab.pdfgen import canvas
+
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(ruta))
+    for texto in paginas:
+        c.drawString(72, 720, texto)
+        c.showPage()
+    c.save()
+    return ruta
+
+
+def test_el_folio_de_la_factura_queda_suelto_y_en_orden(tmp_path):
+    """La factura del XML trae la gráfica pegada; el detallado llega aparte.
+
+    El área lo quiere 1 FACTURA · 2 DETALLADO · 3 REPRESENTACION GRAFICA, y el
+    archivo suelto en la carpeta de radicación, sin carpeta propia.
+    """
+    xml = tmp_path / "XML"
+    _pdf_marcado(
+        xml / "680010079201_HUS403233_FACTURA.pdf",
+        ["FACTURA ELECTRONICA DE VENTA", "sigue la factura", "REPRESENTACION GRAFICA", "y sigue"],
+    )
+    dets = tmp_path / "sin_aceptado"
+    _pdf(dets / "HUS403233 DETALLADO.pdf", 2)
+    salida = tmp_path / "GI"
+
+    hechos = org.folios_de_facturas(xml, salida, dets, prefijo="680010079201", aplicar=True)
+
+    folio = salida / "680010079201_HUS403233_FACTURA.pdf"
+    assert folio.exists()
+    assert [f.name for f in salida.iterdir()] == [folio.name], "creó algo más que el PDF"
+    Lector, _ = org._cargar_lector_escritor()
+    paginas = [p.extract_text() for p in Lector(str(folio)).pages]
+    assert len(paginas) == 6, "2 de factura + 2 de detallado + 2 de gráfica"
+    assert "FACTURA ELECTRONICA" in paginas[0]
+    assert "REPRESENTACION GRAFICA" in paginas[4], "la gráfica quedó antes del detallado"
+    assert hechos[0].paginas == 6
+    assert org.es_folio_nuestro(folio)
+
+
+def test_si_la_factura_ya_trae_el_detallado_no_se_le_agrega_otro(tmp_path):
+    """Si no, el folio subiría al ADRES con el detallado DOS veces."""
+    xml = tmp_path / "XML"
+    _pdf_marcado(
+        xml / "680010079201_HUS403233_FACTURA.pdf",
+        ["FACTURA ELECTRONICA DE VENTA", "DETALLADO FACTURA", "REPRESENTACION GRAFICA"],
+    )
+    dets = tmp_path / "sin_aceptado"
+    _pdf(dets / "HUS403233 DETALLADO.pdf", 5)
+    salida = tmp_path / "GI"
+
+    hechos = org.folios_de_facturas(xml, salida, dets, prefijo="680010079201", aplicar=True)
+
+    Lector, _ = org._cargar_lector_escritor()
+    folio = salida / "680010079201_HUS403233_FACTURA.pdf"
+    assert len(Lector(str(folio)).pages) == 3, "le pegó el detallado de más"
+    assert "ya trae el detallado" in hechos[0].aviso
+
+
+def test_avisa_la_factura_que_no_tiene_pdf(tmp_path):
+    xml = tmp_path / "XML"
+    xml.mkdir()
+    dets = tmp_path / "sin_aceptado"
+    dets.mkdir()
+    salida = tmp_path / "GI"
+
+    hechos = org.folios_de_facturas(
+        xml, salida, dets, prefijo="680010079201", facturas={"HUS403233"}, aplicar=True
+    )
+
+    assert len(hechos) == 1 and hechos[0].paginas == 0
+    assert "no está el PDF de la factura" in hechos[0].aviso
+
+
+def test_folio_de_factura_no_pisa_un_pdf_ajeno(tmp_path):
+    xml = tmp_path / "XML"
+    _pdf_marcado(xml / "680010079201_HUS403233_FACTURA.pdf", ["FACTURA ELECTRONICA DE VENTA"])
+    dets = tmp_path / "sin_aceptado"
+    dets.mkdir()
+    salida = tmp_path / "GI"
+    salida.mkdir()
+    ajeno = salida / "680010079201_HUS403233_FACTURA.pdf"
+    _pdf(ajeno, 9)
+
+    hechos = org.folios_de_facturas(xml, salida, dets, prefijo="680010079201", aplicar=True)
+
+    Lector, _ = org._cargar_lector_escritor()
+    assert len(Lector(str(ajeno)).pages) == 9, "pisó un archivo que no era del bot"
+    assert "no lo escribió este bot" in hechos[0].aviso
+
+
+def test_el_comando_arma_los_folios_de_factura(tmp_path):
+    xml = tmp_path / "XML"
+    _pdf_marcado(
+        xml / "680010079201_HUS403233_FACTURA.pdf",
+        ["FACTURA ELECTRONICA DE VENTA", "REPRESENTACION GRAFICA"],
+    )
+    _pdf_marcado(xml / "680010079201_HUS404072_FACTURA.pdf", ["FACTURA ELECTRONICA DE VENTA"])
+    dets = tmp_path / "sin_aceptado"
+    _pdf(dets / "HUS403233 DETALLADO.pdf", 1)
+    lista = tmp_path / "lista.txt"
+    lista.write_text("HUS403233\n", encoding="utf-8")
+    salida = tmp_path / "GI-XX-XXXXX-2026"
+
+    assert (
+        org.main(
+            [
+                "--solo-facturas",
+                "--carpeta",
+                str(xml),
+                "--carpeta-facturas",
+                str(xml),
+                "--detallados",
+                str(dets),
+                "--salida",
+                str(salida),
+                "--lista",
+                str(lista),
+                "--prefijo",
+                "680010079201",
+                "--aplicar",
+            ]
+        )
+        == 0
+    )
+
+    assert [f.name for f in salida.iterdir()] == ["680010079201_HUS403233_FACTURA.pdf"]
+
+
+def test_solo_facturas_no_pide_la_carpeta_del_gestor(tmp_path):
+    """--solo-facturas trabaja con --carpeta-facturas: exigir --carpeta sobra.
+
+    Del paquete 31068: el comando reventó con «the following arguments are
+    required: --carpeta» cuando el auditor lo corrió tal como se le indicó.
+    """
+    xml = tmp_path / "XML"
+    _pdf_marcado(xml / "680010079201_HUS403233_FACTURA.pdf", ["FACTURA ELECTRONICA DE VENTA"])
+    salida = tmp_path / "GI"
+
+    assert (
+        org.main(
+            [
+                "--solo-facturas",
+                "--carpeta-facturas",
+                str(xml),
+                "--salida",
+                str(salida),
+                "--prefijo",
+                "680010079201",
+                "--aplicar",
+            ]
+        )
+        == 0
+    )
+
+    assert (salida / "680010079201_HUS403233_FACTURA.pdf").exists()
+
+
+def test_sin_carpeta_y_sin_modo_suelto_lo_dice_claro(tmp_path):
+    """Quitarle el `required` no puede dejar pasar una corrida sin carpeta."""
+    assert org.main(["--folio"]) == 1
+
+
+# ─── Dejar en cada carpeta solo los dos folios ───────────────────────────────
+
+
+def test_aparta_lo_que_no_es_folio_y_no_borra_nada(tmp_path):
+    """El área pidió dejar solo EPICRIS y FACTURA. Lo demás se APARTA, no se borra.
+
+    Son los soportes clínicos del paciente: si se borran y hay que rehacer un
+    folio, no hay de dónde. Por eso se mueven a una carpeta aparte, que el
+    auditor revisa y borra cuando esté seguro.
+    """
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+    _pdf(carpeta / "1 RESPUESTA A GLOSA.pdf", 1)
+    _pdf(carpeta / "2 HISTORIA CLINICA.pdf", 1)
+    (carpeta / "detallado.xlsx").write_text("x", encoding="utf-8")
+
+    hechos = org.dejar_solo_los_folios(gi, aplicar=True)
+
+    quedan = sorted(f.name for f in carpeta.iterdir())
+    assert quedan == [
+        "680010079201_HUS404986_EPICRIS.pdf",
+        "680010079201_HUS404986_FACTURA.pdf",
+    ]
+    apartados = sorted(f.name for f in (gi / org.CARPETA_APARTADOS / "HUS404986").iterdir())
+    assert apartados == ["1 RESPUESTA A GLOSA.pdf", "2 HISTORIA CLINICA.pdf", "detallado.xlsx"]
+    assert hechos[0].apartados == 3
+
+
+def test_no_toca_la_carpeta_a_la_que_le_falte_un_folio(tmp_path):
+    """Sin los dos folios armados, apartar los soportes deja la factura sin nada."""
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS405001"
+    _pdf(carpeta / "680010079201_HUS405001_EPICRIS.pdf", 1)
+    _pdf(carpeta / "1 RESPUESTA A GLOSA.pdf", 1)
+
+    hechos = org.dejar_solo_los_folios(gi, aplicar=True)
+
+    assert (carpeta / "1 RESPUESTA A GLOSA.pdf").exists(), "apartó soportes sin el folio hecho"
+    assert "falta el folio de la FACTURA" in hechos[0].aviso
+    assert hechos[0].apartados == 0
+
+
+def test_sin_aplicar_no_mueve_nada(tmp_path):
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+    _pdf(carpeta / "1 RESPUESTA A GLOSA.pdf", 1)
+
+    hechos = org.dejar_solo_los_folios(gi, aplicar=False)
+
+    assert (carpeta / "1 RESPUESTA A GLOSA.pdf").exists()
+    assert not (gi / org.CARPETA_APARTADOS).exists()
+    assert hechos[0].apartados == 1, "la simulación debe decir cuántos apartaría"
+
+
+def test_aguanta_carpetas_con_nota_en_el_nombre(tmp_path):
+    """En el servidor vienen como «HUS354080_ACEPTADA TOTAL»."""
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS354080_ACEPTADA TOTAL"
+    _pdf(carpeta / "680010079201_HUS354080_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS354080_FACTURA.pdf", 1)
+    _pdf(carpeta / "3 OTROS.pdf", 1)
+
+    hechos = org.dejar_solo_los_folios(gi, aplicar=True)
+
+    assert hechos[0].factura == "HUS354080"
+    assert sorted(f.name for f in carpeta.iterdir()) == [
+        "680010079201_HUS354080_EPICRIS.pdf",
+        "680010079201_HUS354080_FACTURA.pdf",
+    ]
+
+
+def test_no_se_aparta_a_si_misma(tmp_path):
+    """La carpeta de apartados no puede entrar en la barrida de la corrida siguiente."""
+    gi = tmp_path / "GI"
+    _pdf(gi / org.CARPETA_APARTADOS / "HUS1" / "algo.pdf", 1)
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+
+    hechos = org.dejar_solo_los_folios(gi, aplicar=True)
+
+    assert [h.factura for h in hechos] == ["HUS404986"]
+    assert (gi / org.CARPETA_APARTADOS / "HUS1" / "algo.pdf").exists()
+
+
+def test_el_comando_deja_solo_los_folios(tmp_path):
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+    _pdf(carpeta / "1 RESPUESTA A GLOSA.pdf", 1)
+
+    assert org.main(["--dejar-solo-folios", "--carpeta", str(gi), "--aplicar"]) == 0
+
+    assert sorted(f.name for f in carpeta.iterdir()) == [
+        "680010079201_HUS404986_EPICRIS.pdf",
+        "680010079201_HUS404986_FACTURA.pdf",
+    ]
+    assert (gi / org.CARPETA_APARTADOS / "HUS404986" / "1 RESPUESTA A GLOSA.pdf").exists()
+
+
+# ─── Sacar los folios de las carpetas y dejarlos sueltos ─────────────────────
+
+
+def test_saca_los_folios_y_deja_la_carpeta_vacia(tmp_path):
+    """El área quiere todos los folios sueltos en la carpeta de radicación."""
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+
+    hechos = org.sacar_los_folios(gi, aplicar=True)
+
+    assert (gi / "680010079201_HUS404986_EPICRIS.pdf").exists()
+    assert (gi / "680010079201_HUS404986_FACTURA.pdf").exists()
+    assert not carpeta.exists(), "la carpeta quedó vacía y debía irse"
+    assert hechos[0].sacados == 2
+
+
+def test_no_borra_la_carpeta_si_adentro_queda_algo(tmp_path):
+    """Si sobró un archivo, la carpeta se queda: no se pierde nada sin avisar."""
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+    (carpeta / "una nota.txt").write_text("x", encoding="utf-8")
+
+    hechos = org.sacar_los_folios(gi, aplicar=True)
+
+    assert carpeta.exists() and (carpeta / "una nota.txt").exists()
+    assert "quedó con 1 archivo" in hechos[0].aviso
+
+
+def test_no_pisa_un_folio_que_ya_estaba_suelto(tmp_path):
+    """Los 101 ya están sueltos: si uno se repite, no se pisa, se avisa."""
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS404986_EPICRIS.pdf", 9)
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+
+    hechos = org.sacar_los_folios(gi, aplicar=True)
+
+    Lector, _ = org._cargar_lector_escritor()
+    assert len(Lector(str(gi / "680010079201_HUS404986_EPICRIS.pdf")).pages) == 9
+    assert (carpeta / "680010079201_HUS404986_EPICRIS.pdf").exists(), "lo movió encima del otro"
+    assert "ya hay uno suelto" in hechos[0].aviso
+    assert hechos[0].sacados == 1, "el de la factura sí debía salir"
+
+
+def test_sacar_sin_aplicar_no_mueve_nada(tmp_path):
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+
+    hechos = org.sacar_los_folios(gi, aplicar=False)
+
+    assert carpeta.exists() and not (gi / "680010079201_HUS404986_EPICRIS.pdf").exists()
+    assert hechos[0].sacados == 2
+
+
+def test_sacar_no_toca_la_carpeta_de_apartados(tmp_path):
+    gi = tmp_path / "GI"
+    _pdf(gi / org.CARPETA_APARTADOS / "HUS1" / "680010079201_HUS1_EPICRIS.pdf", 1)
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+
+    hechos = org.sacar_los_folios(gi, aplicar=True)
+
+    assert (gi / org.CARPETA_APARTADOS / "HUS1" / "680010079201_HUS1_EPICRIS.pdf").exists()
+    assert [h.factura for h in hechos] == ["HUS404986"]
+
+
+def test_el_comando_saca_los_folios(tmp_path):
+    gi = tmp_path / "GI"
+    carpeta = gi / "HUS404986"
+    _pdf(carpeta / "680010079201_HUS404986_EPICRIS.pdf", 1)
+    _pdf(carpeta / "680010079201_HUS404986_FACTURA.pdf", 1)
+
+    assert org.main(["--sacar-folios", "--carpeta", str(gi), "--aplicar"]) == 0
+
+    assert sorted(f.name for f in gi.iterdir()) == [
+        "680010079201_HUS404986_EPICRIS.pdf",
+        "680010079201_HUS404986_FACTURA.pdf",
+    ]
+
+
+# ─── Traer el XML de cada factura a la carpeta de radicación ─────────────────
+
+
+def test_trae_el_xml_de_cada_factura_que_tiene_folio(tmp_path):
+    """El XML va junto a los dos folios, suelto y sin crear carpetas."""
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS403233_EPICRIS.pdf", 1)
+    _pdf(gi / "680010079201_HUS403233_FACTURA.pdf", 1)
+    xml = tmp_path / "XML"
+    xml.mkdir()
+    (xml / "680010079201_HUS403233_FACTURA.xml").write_text("<f/>", encoding="utf-8")
+    (xml / "680010079201_HUS999999_FACTURA.xml").write_text("<otra/>", encoding="utf-8")
+
+    hechos = org.traer_los_xml(gi, xml, aplicar=True)
+
+    assert (gi / "680010079201_HUS403233_FACTURA.xml").read_text(encoding="utf-8") == "<f/>"
+    assert not (gi / "680010079201_HUS999999_FACTURA.xml").exists(), "trajo una que no estaba"
+    assert [h.factura for h in hechos] == ["HUS403233"] and hechos[0].traidos == 1
+
+
+def test_el_xml_original_no_se_mueve(tmp_path):
+    """Se COPIA: la carpeta del XML es la fuente y no puede quedar vacía."""
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS403233_EPICRIS.pdf", 1)
+    xml = tmp_path / "XML"
+    xml.mkdir()
+    origen = xml / "680010079201_HUS403233_FACTURA.xml"
+    origen.write_text("<f/>", encoding="utf-8")
+
+    org.traer_los_xml(gi, xml, aplicar=True)
+
+    assert origen.exists(), "movió el XML en vez de copiarlo"
+
+
+def test_avisa_la_factura_sin_xml(tmp_path):
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS403233_EPICRIS.pdf", 1)
+    xml = tmp_path / "XML"
+    xml.mkdir()
+
+    hechos = org.traer_los_xml(gi, xml, aplicar=True)
+
+    assert hechos[0].traidos == 0 and "no está el XML" in hechos[0].aviso
+
+
+def test_no_pisa_un_xml_que_ya_estaba(tmp_path):
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS403233_EPICRIS.pdf", 1)
+    (gi / "680010079201_HUS403233_FACTURA.xml").write_text("<el bueno/>", encoding="utf-8")
+    xml = tmp_path / "XML"
+    xml.mkdir()
+    (xml / "680010079201_HUS403233_FACTURA.xml").write_text("<otro/>", encoding="utf-8")
+
+    hechos = org.traer_los_xml(gi, xml, aplicar=True)
+
+    assert (gi / "680010079201_HUS403233_FACTURA.xml").read_text(encoding="utf-8") == "<el bueno/>"
+    assert "ya estaba" in hechos[0].aviso
+
+
+def test_traer_xml_sin_aplicar_no_copia(tmp_path):
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS403233_EPICRIS.pdf", 1)
+    xml = tmp_path / "XML"
+    xml.mkdir()
+    (xml / "680010079201_HUS403233_FACTURA.xml").write_text("<f/>", encoding="utf-8")
+
+    hechos = org.traer_los_xml(gi, xml, aplicar=False)
+
+    assert not (gi / "680010079201_HUS403233_FACTURA.xml").exists()
+    assert hechos[0].traidos == 1
+
+
+def test_el_comando_trae_los_xml(tmp_path):
+    gi = tmp_path / "GI"
+    _pdf(gi / "680010079201_HUS403233_EPICRIS.pdf", 1)
+    xml = tmp_path / "XML"
+    xml.mkdir()
+    (xml / "680010079201_HUS403233_FACTURA.xml").write_text("<f/>", encoding="utf-8")
+
+    assert (
+        org.main(["--traer-xml", "--carpeta", str(gi), "--carpeta-facturas", str(xml), "--aplicar"])
+        == 0
+    )
+
+    assert (gi / "680010079201_HUS403233_FACTURA.xml").exists()

@@ -1513,3 +1513,178 @@ class TrabajoBotRecord(Base):
     registro = Column(Text)  # salida/resumen que reportó el agente
     progreso = Column(Text)  # último avance reportado ("factura 12 de 40…")
     cancelado_por = Column(String(200))
+
+
+class AutoPilotBitacoraRecord(Base):
+    """Bitácora INMUTABLE del Auto-Pilot (V2, Pilar 2, 03-09-2026).
+
+    Cada decisión de la máquina —y cada liberación humana— es una fila NUEVA.
+    Aquí no se edita ni se borra nada: el servicio solo inserta, y así queda
+    auditable quién decidió qué, con cuánta confianza y mirando qué soportes.
+    """
+
+    __tablename__ = "auto_pilot_bitacora"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    glosa_id = Column(Integer, index=True)
+    # CANDIDATA / RECHAZADA / LIBERADA_POR_HUMANO
+    decision = Column(String(40), index=True)
+    # La regla de negocio que produjo la decisión, en palabras.
+    regla_aplicada = Column(Text)
+    # Confianza matemática del evaluador (0-1). Nula si no se llegó a calcular.
+    confianza = Column(Float)
+    riesgo = Column(String(20))
+    # JSON con los identificadores de lo que la evaluación tuvo a la vista.
+    soportes_analizados = Column(Text)
+    # "auto-pilot" para la máquina; el correo del gestor cuando libera.
+    actor = Column(String(120), index=True)
+    # Trazabilidad del fallback (03-09-2026): el modelo que produjo el
+    # dictamen sobre el que se decidió — Claude (Anthropic) o el fallback
+    # de Groq, tal como quedó en historial.modelo_ia al generarlo.
+    modelo_utilizado = Column(String(100))
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  V3 · PILAR 1 — LIBRO DE RADICACIÓN EN LOS PORTALES DE LAS EPS
+#  (arquitectura aprobada: docs/ARQUITECTURA_V3_PILAR1_RPA.md)
+# ══════════════════════════════════════════════════════════════════════════
+
+# Los estados del libro. El orden cuenta la historia de una radicación.
+RAD_PENDIENTE = "PENDIENTE"
+RAD_RECLAMADA = "RECLAMADA"
+# Se pulsó «radicar» y NO se alcanzó a leer el comprobante: no se sabe si
+# quedó. Desde aquí está PROHIBIDO reintentar solo (ver radicacion_eps.py).
+RAD_EN_PORTAL_SIN_CONFIRMAR = "EN_PORTAL_SIN_CONFIRMAR"
+RAD_RADICADA = "RADICADA"
+RAD_VERIFICAR_MANUAL = "VERIFICAR_MANUAL"
+RAD_FALLIDA = "FALLIDA"
+RAD_HUMANO_REQUERIDO = "HUMANO_REQUERIDO"
+
+# Estados en los que la fila sigue "viva": mientras exista una así para una
+# glosa, no se puede encolar otra. Es lo que impide radicar dos veces.
+RAD_ESTADOS_VIVOS = (
+    RAD_PENDIENTE,
+    RAD_RECLAMADA,
+    RAD_EN_PORTAL_SIN_CONFIRMAR,
+    RAD_RADICADA,
+    RAD_VERIFICAR_MANUAL,
+    RAD_HUMANO_REQUERIDO,
+)
+
+
+class RadicacionEpsRecord(Base):
+    """Una fila por glosa que se va a radicar en el portal de su EPS.
+
+    Se INSERTA y se le cambia el estado; la evidencia (radicado, comprobante,
+    hash) NO se edita una vez escrita — misma doctrina que la bitácora del
+    Auto-Pilot: lo que pasó, pasó, y queda escrito.
+
+    `TrabajoBotRecord` es por CORRIDA del bot; esta tabla es por GLOSA. Sin
+    ella no se puede responder «¿esta factura quedó radicada?» sin ponerse a
+    interpretar texto libre.
+    """
+
+    __tablename__ = "radicaciones_eps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    glosa_id = Column(Integer, index=True, nullable=False)
+    # «eps|factura|codigo|etapa». ÚNICO: la base impide físicamente dos
+    # radicaciones vivas de la misma glosa aunque falle la lógica de arriba.
+    clave_idempotencia = Column(String(200), unique=True, nullable=False)
+    trabajo_bot_id = Column(Integer, index=True)
+
+    eps = Column(String(200), index=True)
+    portal = Column(String(60))  # COOSALUD, SIMED, MUTUAL_SER…
+
+    estado = Column(String(40), default=RAD_PENDIENTE, index=True)
+    intentos = Column(Integer, default=0)
+    ultimo_error = Column(Text)
+
+    # ── La evidencia. Se escribe una vez. ──
+    radicado_numero = Column(String(120))
+    comprobante_ruta = Column(String(500))
+    comprobante_sha256 = Column(String(64))
+
+    radicado_en = Column(DateTime(timezone=True))
+    verificado_en = Column(DateTime(timezone=True))
+    verificado_por = Column(String(200))
+    # "radicador-rpa" para el bot; el correo de la persona cuando confirma.
+    actor = Column(String(120), index=True)
+
+    __table_args__ = (Index("ix_radicaciones_eps_estado_eps", "estado", "eps"),)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  V3 · PILAR 2 — PRE-AUDITORÍA CONCURRENTE (antes de timbrar la factura)
+#  (arquitectura: docs/ARQUITECTURA_V3_PILAR2_PREAUDITORIA.md)
+# ══════════════════════════════════════════════════════════════════════════
+
+# El dictamen de la pre-auditoría. Tres estados y nada más: o la factura
+# sale, o sale con reparo, o no sale.
+PA_APROBADO = "APROBADO"
+PA_ADVERTENCIA = "ADVERTENCIA"
+PA_BLOQUEO = "BLOQUEO"
+
+# Qué debe hacer el facturador con el dictamen. Va en el contrato de salida
+# para que el HIS no tenga que interpretar el estado por su cuenta.
+PA_ACCION_TIMBRAR = "TIMBRAR"
+PA_ACCION_REVISAR = "REVISAR_ANTES_DE_TIMBRAR"
+PA_ACCION_CORREGIR = "CORREGIR_ANTES_DE_TIMBRAR"
+
+
+class PreAuditoriaEventoRecord(Base):
+    """Una fila por CADA evaluación que pide el HIS antes de timbrar.
+
+    Es un libro de eventos, no un estado: la fila se inserta y no se toca
+    más. Sirve para tres preguntas que hoy nadie puede responder:
+
+      · «¿esta factura pasó por la pre-auditoría, y qué le dijimos?»
+      · «¿cuánta plata evitamos que se glosara este mes?»
+      · «¿el facturador timbró a pesar del bloqueo?» (se cruza con la
+        factura real cuando llega la glosa).
+
+    Se guarda el payload que mandó el HIS TAL CUAL llegó. Si mañana una
+    regla resulta equivocada, se puede repetir la evaluación sobre los
+    mismos datos sin depender de que el HIS los conserve.
+    """
+
+    __tablename__ = "pre_auditoria_eventos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    # Identificación de lo evaluado. La factura puede venir provisional
+    # (aún no se timbra), por eso NO es única.
+    factura = Column(String(50), index=True)
+    eps = Column(String(200), index=True)
+    # Huella del payload: mismo contenido → misma huella. Permite ver que
+    # el HIS reintentó la misma factura sin cambiar nada.
+    huella_payload = Column(String(64), index=True)
+
+    # ── El dictamen ──
+    estado = Column(String(20), index=True)  # APROBADO / ADVERTENCIA / BLOQUEO
+    recomendacion_accion = Column(String(40))
+    valor_en_riesgo = Column(Float, default=0.0)
+    valor_factura = Column(Float, default=0.0)
+    total_alertas = Column(Integer, default=0)
+
+    # ── Lo que se tuvo a la vista y lo que se produjo (JSON en texto) ──
+    payload_base = Column(Text)
+    alertas = Column(Text)
+
+    # ── Trazabilidad de la cadena ──
+    # OK / OMITIDO_SIN_IA / OMITIDO_POR_TIEMPO / TIMEOUT / ERROR
+    cruce_clinico_estado = Column(String(30), index=True)
+    modelo_utilizado = Column(String(100))
+    duracion_ms = Column(Integer, default=0)
+    duracion_reglas_ms = Column(Integer, default=0)
+    duracion_ia_ms = Column(Integer, default=0)
+
+    # Quién pidió la evaluación: "his" cuando entra por token de máquina,
+    # el correo del usuario cuando la dispara una persona desde la pantalla.
+    actor = Column(String(120), index=True)
+
+    __table_args__ = (Index("ix_pre_auditoria_estado_creado", "estado", "creado_en"),)

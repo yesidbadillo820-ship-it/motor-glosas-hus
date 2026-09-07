@@ -12,12 +12,49 @@ import re
 
 
 def test_aurora_factor_y_tarifa_del_contrato_firmado():
+    """Los términos pactados con AURORA, para una atención DENTRO de la vigencia.
+
+    01-09-2026 — esta prueba llamaba a `get_contrato("AURORA")` sin fecha, o
+    sea contra el día de hoy, y eso la ató al calendario: los contratos
+    GID-ARL-0090 y GID-AP-0090 vencieron el 31-08-2026 y desde el día
+    siguiente la ficha —con toda la razón— responde «CONTRATO CON VIGENCIA
+    TERMINADA» y factor 1.00.
+
+    Lo que la prueba vigila no es qué día es hoy: es que el catálogo conserve
+    los términos reales del contrato firmado (TARIFAS PROPIAS + SOAT −3%) y no
+    se vuelva a caer a SOAT pleno. Eso se pregunta con una fecha dentro de la
+    vigencia. La ruta de contrato vencido tiene su propia prueba abajo.
+    """
     from app.services.glosa_ia_prompts import get_contrato
 
-    ficha = get_contrato("AURORA")
+    ficha = get_contrato("AURORA", dt.date(2026, 5, 1))
     assert ficha["factor"] == 0.97, "el catálogo volvió a SOAT pleno"
     assert "PROPIAS" in ficha["tarifa"] and "3%" in ficha["tarifa"]
     assert "GID-ARL-0090" in ficha["numero"]
+
+
+def test_aurora_vencida_avisa_y_no_afirma_tarifa():
+    """Después del 31-08-2026 el contrato de AURORA ya no rige.
+
+    Sin fecha de prestación no se puede afirmar qué tarifa aplica, así que la
+    ficha lo dice en vez de inventarla. Y nombra el factor que estaba en juego
+    (0.97) para que el gestor vea qué se discute.
+    """
+    from app.services.glosa_ia_prompts import get_contrato
+
+    # SIN fecha: es el caso real del formulario —«Fechas no ingresadas»— y es
+    # la única rama que emite la advertencia. Con una fecha explícita posterior
+    # al vencimiento la ficha responde «SIN CONTRATO PACTADO», que para ESE día
+    # es cierto: no había contrato.
+    ficha = get_contrato("AURORA", None)
+    assert ficha.get("_vigencia_vencida") is True
+    assert "VIGENCIA TERMINADA" in ficha["numero"]
+    assert "2026-08-31" in ficha["numero"], "no dice cuándo venció"
+    assert ficha["tarifa"].startswith("TARIFA NO DETERMINADA")
+    assert "0.97" in ficha["tarifa"], "no nombra el factor que estaba en juego"
+    assert "SIN CONTRATO PACTADO" not in ficha["numero"], (
+        "negar un contrato que sí existió también es mentir"
+    )
 
 
 # ─── POLICÍA: la entrada de oncología ya es alcanzable ───────────────

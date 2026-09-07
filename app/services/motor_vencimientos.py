@@ -52,6 +52,11 @@ from app.core.logging_utils import logger
 
 # Estados en los que la glosa ya no compite contra el reloj.
 ESTADOS_CERRADOS = {
+    # V3 Pilar 1 (03-09-2026): radicada en el portal de la EPS. El reloj
+    # INTERNO del hospital se detiene aquí — la glosa sale de las barras
+    # rojas y ámbar y pasa a «En espera de EPS», donde corre un reloj
+    # PASIVO que mide al pagador, no a nosotros.
+    "RADICADA_EN_EPS",
     "LEVANTADA",
     "ACEPTADA",
     "CONCILIADA",
@@ -254,7 +259,18 @@ def evaluar(glosas: Iterable[Any], umbrales: Optional[Umbrales] = None) -> Resum
         resumen.total_evaluadas += 1
         if not esta_en_juego(g):
             continue
-        dias = getattr(g, "dias_restantes", None)
+        # 03-09-2026 (V2, Pilar 4) — el plazo se calcula EN CALIENTE contra la
+        # fecha de hoy (hábiles sin festivos), no se lee de la columna: esa se
+        # escribió el día del análisis y quedó congelada. La columna guardada
+        # queda solo como respaldo para glosas sin fechas.
+        try:
+            from app.services.vencimiento_dinamico import dias_restantes_de
+
+            dias = dias_restantes_de(g)
+        except Exception:  # noqa: BLE001 — sin cálculo vivo, manda el respaldo
+            dias = None
+        if dias is None:
+            dias = getattr(g, "dias_restantes", None)
         if dias is None:
             resumen.sin_plazo += 1
             continue

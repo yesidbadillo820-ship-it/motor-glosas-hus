@@ -1,0 +1,333 @@
+{
+ "tipo": "sonidos",
+ "variante": "bokmål",
+ "version": 1,
+ "nota": "Guía de pronunciación para hispanohablantes. Las respelling («jei», «shu») son APROXIMACIONES pensadas para un hispanohablante, no transcripciones del Alfabeto Fonético Internacional. Sirven para arrancar; el oído se afina escuchando.",
+ "palabras": [
+  {
+   "id": "p-Æ æ",
+   "letra": "Æ æ",
+   "nombre": "La æ",
+   "como": "Una «a» que se va hacia la «e». Es el sonido de «cat» en inglés.",
+   "ejemplos": [
+    {
+     "no": "være",
+     "es": "ser/estar",
+     "pron": "VÆ-re"
+    },
+    {
+     "no": "lære",
+     "es": "aprender",
+     "pron": "LÆ-re"
+    },
+    {
+     "no": "her",
+     "es": "aquí",
+     "pron": "hær"
+    }
+   ],
+   "consejo": "Di «a» y sonríe al mismo tiempo. No es ni «a» ni «e» del español: está en la mitad.",
+   "nivel": "cero"
+  },
+  {
+   "id": "p-Ø ø",
+   "letra": "Ø ø",
+   "nombre": "La ø",
+   "como": "No existe en español. Pon los labios como para decir «o» y di «e».",
+   "ejemplos": [
+    {
+     "no": "søster",
+     "es": "hermana",
+     "pron": "SØS-ter"
+    },
+    {
+     "no": "øl",
+     "es": "cerveza",
+     "pron": "øl"
+    },
+    {
+     "no": "kjøpe",
+     "es": "comprar",
+     "pron": "SHØ-pe"
+    }
+   ],
+   "consejo": "Es la «eu» del francés en «deux». Practica: e… e… ahora redondea los labios sin cambiar la lengua.",
+   "nivel": "cero"
+  },
+  {
+   "id": "p-Å å",
+   "letra": "Å å",
+   "nombre": "La å",
+   "como": "Una «o» cerrada, como la «o» de «sol» pero más redonda y larga.",
+   "ejemplos": [
+    {
+     "no": "år",
+     "es": "año",
+     "pron": "or"
+    },
+    {
+     "no": "gå",
+     "es": "caminar",
+     "pron": "go"
+    },
+    {
+     "no": "måned",
+     "es": "mes",
+     "pron": "MÅ-ned"
+    }
+   ],
+   "consejo": "Es la letra más fácil para un hispanohablante: suena casi como tu «o».",
+   "nivel": "cero"
+  },
+  {
+   "id": "p-U u",
+   "letra": "U u",
+   "nombre": "La u noruega",
+   "como": "NO es la «u» española. Los labios van muy adelante y la lengua sube: queda entre «u» e «i».",
+   "ejemplos": [
+    {
+     "no": "hus",
+     "es": "casa",
+     "pron": "jus"
+    },
+    {
+     "no": "du",
+     "es": "tú",
+     "pron": "du"
+    },
+    {
+     "no": "buss",
+     "es": "bus",
+     "pron": "bus"
+    }
+   ],
+   "consejo": "Di «i» y luego saca los labios hacia adelante sin mover la lengua. Si suena a «u» española, todavía no es.",
+   "nivel": "cero"
+  },
+  {
+   "id": "p-Y y",
+   "letra": "Y y",
+   "nombre": "La y",
+   "como": "Como la «i» pero con los labios redondeados de «u».",
+   "ejemplos": [
+    {
+     "no": "by",
+     "es": "ciudad",
+     "pron": "by"
+    },
+    {
+     "no": "ny",
+     "es": "nuevo",
+     "pron": "ny"
+    },
+    {
+     "no": "syk",
+     "es": "enfermo",
+     "pron": "syk"
+    }
+   ],
+   "consejo": "Di «i» y redondea los labios. Es la «u» del francés en «tu».",
+   "nivel": "cero"
+  },
+  {
+   "id": "p-O o",
+   "letra": "O o",
+   "nombre": "La o que suena «u»",
+   "como": "La mayoría de las veces, la «o» noruega suena como la «u» española.",
+   "ejemplos": [
+    {
+     "no": "bok",
+     "es": "libro",
+     "pron": "buk"
+    },
+    {
+     "no": "bo",
+     "es": "vivir",
+     "pron": "bu"
+    },
+    {
+     "no": "stor",
+     "es": "grande",
+     "pron": "stur"
+    }
+   ],
+   "consejo": "Regla práctica: si ves «o», prueba primero con «u». Ante consonante doble suele sonar «o» (komme = KOM-me).",
+   "nivel": "cero"
+  },
+  {
+   "id": "p-J j",
+   "letra": "J j",
+   "nombre": "La j",
+   "como": "Suena como la «y» española de «ya», nunca como la «j» de «jamón».",
+   "ejemplos": [
+    {
+     "no": "jeg",
+     "es": "yo",
+     "pron": "yei"
+    },
+    {
+     "no": "ja",
+     "es": "sí",
+     "pron": "ya"
+    },
+    {
+     "no": "jobbe",
+     "es": "trabajar",
+     "pron": "YOB-be"
+    }
+   ],
+   "consejo": "Este es el error número uno del hispanohablante. «Jeg» es «yei», no «jeg» con jota.",
+   "nivel": "cero"
+  },
+  {
+   "id": "p-H h",
+   "letra": "H h",
+   "nombre": "La h",
+   "como": "Sí se pronuncia, pero es un soplido suave. NO es la «j» fuerte del español.",
+   "ejemplos": [
+    {
+     "no": "hei",
+     "es": "hola",
+     "pron": "jei"
+    },
+    {
+     "no": "hus",
+     "es": "casa",
+     "pron": "jus"
+    },
+    {
+     "no": "ha",
+     "es": "tener",
+     "pron": "ja"
+    }
+   ],
+   "consejo": "En esta app la escribimos «j» porque es lo más cercano, pero debe salir suave, como al empañar un vidrio.",
+   "nivel": "cero"
+  },
+  {
+   "id": "p-Kj _ Tj",
+   "letra": "Kj / Tj",
+   "nombre": "El sonido kj",
+   "como": "Un sonido suave, entre «sh» y «ch». No existe en español.",
+   "ejemplos": [
+    {
+     "no": "kjøkken",
+     "es": "cocina",
+     "pron": "SHØK-ken"
+    },
+    {
+     "no": "kjøre",
+     "es": "conducir",
+     "pron": "SHØ-re"
+    },
+    {
+     "no": "tjue",
+     "es": "veinte",
+     "pron": "SHU-e"
+    }
+   ],
+   "consejo": "Pon la lengua como para decir «ñ» y sopla. También aparece en «k» antes de i, y, ei: «kirke» = SHIR-ke.",
+   "nivel": "cero"
+  },
+  {
+   "id": "p-Sj _ Skj _ Sk",
+   "letra": "Sj / Skj / Sk",
+   "nombre": "El sonido sh",
+   "como": "Como el «sh» del inglés «shop».",
+   "ejemplos": [
+    {
+     "no": "sju",
+     "es": "siete",
+     "pron": "shu"
+    },
+    {
+     "no": "stasjon",
+     "es": "estación",
+     "pron": "sta-SHUN"
+    },
+    {
+     "no": "ski",
+     "es": "esquí",
+     "pron": "shi"
+    }
+   ],
+   "consejo": "«Sk» antes de i, y, øy también suena «sh»: «skinne» = SHIN-ne.",
+   "nivel": "cero"
+  },
+  {
+   "id": "p-Rs",
+   "letra": "Rs",
+   "nombre": "El sonido rs",
+   "como": "Cuando una «r» se junta con una «s», las dos se funden en «sh».",
+   "ejemplos": [
+    {
+     "no": "norsk",
+     "es": "noruego",
+     "pron": "noshk"
+    },
+    {
+     "no": "først",
+     "es": "primero",
+     "pron": "føsht"
+    },
+    {
+     "no": "tørst",
+     "es": "sediento",
+     "pron": "tøsht"
+    }
+   ],
+   "consejo": "Pasa incluso entre palabras: «har sett» suena «ha shet». Es típico del noruego del este (Oslo).",
+   "nivel": "A1"
+  },
+  {
+   "id": "p-Letras mudas",
+   "letra": "Letras mudas",
+   "nombre": "Letras que no se pronuncian",
+   "como": "El noruego escribe letras que luego no suenan.",
+   "ejemplos": [
+    {
+     "no": "det",
+     "es": "eso",
+     "pron": "de"
+    },
+    {
+     "no": "god",
+     "es": "bueno",
+     "pron": "gu"
+    },
+    {
+     "no": "hva",
+     "es": "qué",
+     "pron": "va"
+    },
+    {
+     "no": "huset",
+     "es": "la casa",
+     "pron": "JU-se"
+    }
+   ],
+   "consejo": "Las cuatro reglas: la «d» final casi nunca suena; la «h» de hv- no suena; la «g» de -eg/-ig no suena; y la «t» de la forma definida neutra («huset») tampoco.",
+   "nivel": "A1"
+  },
+  {
+   "id": "p-Tonelag",
+   "letra": "Tonelag",
+   "nombre": "Los dos tonos",
+   "como": "El noruego tiene dos melodías. Cambian el significado de palabras que se escriben igual.",
+   "ejemplos": [
+    {
+     "no": "bønder",
+     "es": "campesinos (tono 1)",
+     "pron": "BØN-der"
+    },
+    {
+     "no": "bønner",
+     "es": "frijoles / oraciones (tono 2)",
+     "pron": "BØN-ner"
+    }
+   ],
+   "consejo": "No te preocupes por esto al principio: te van a entender igual. Se aprende escuchando, no estudiando. Escucha mucho y déjalo entrar solo.",
+   "nivel": "B1"
+  }
+ ]
+}

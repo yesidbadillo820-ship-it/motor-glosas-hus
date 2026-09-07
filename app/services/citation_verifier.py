@@ -23,6 +23,8 @@ import re
 import logging
 from typing import Optional
 
+from app.core.tz import ahora_utc
+
 logger = logging.getLogger("motor_glosas")
 
 
@@ -400,6 +402,96 @@ def _verificar_cups(texto: str, issues: list[dict]) -> None:
                 ),
             }
         )
+
+
+def _falta_del_corpus(tipo_label: str, numero: str, anio) -> dict:
+    """Qué decir de una norma que el corpus no tiene. Son DOS casos distintos.
+
+    27-08-2026 — El dictamen GL-135 citó la Resolución 839 de 2017 y esto la
+    marcaba «NO EXISTE» en severidad ALTA. Verificada contra el normograma
+    oficial de la Supersalud, esa resolución EXISTE: es conjunta de MinSalud y
+    MinCultura y modifica justamente la Res. 1995 de 1999 que el mismo dictamen
+    cita. El sello le estaba diciendo al auditor que una norma buena era
+    inventada — el error contrario al que este revisor existe para evitar, y el
+    que más rápido le quita credibilidad al sello.
+
+    Pero no todo es igual. Hay citas que SÍ se pueden dar por falsas sin
+    consultar nada, y la más clara es una norma con **fecha futura**: no puede
+    existir una resolución de un año que todavía no llega. Esa sigue en ALTA.
+
+    El resto —una norma plausible que el corpus no trae— es «no la tengo», que
+    no es lo mismo que «no existe»: el corpus carga las normas de uso diario,
+    no las miles que hay.
+    """
+    try:
+        anio_num = int(str(anio)[:4])
+    except (TypeError, ValueError):
+        anio_num = 0
+    anio_actual = ahora_utc().year  # del reloj, no escrito a mano: en enero cambiaría solo
+
+    if anio_num > anio_actual:
+        return {
+            "tipo": "NORMA_INEXISTENTE",
+            "severidad": "ALTA",
+            "cita": f"{tipo_label} {numero} de {anio}",
+            "detalle": (
+                f"{tipo_label} {numero} de {anio} no puede existir: está fechada en "
+                f"{anio_num} y estamos en {anio_actual}. Es una cita inventada."
+            ),
+            "sugerencia": "Quite la cita o reemplácela por la norma que de verdad aplica.",
+        }
+
+    return {
+        "tipo": "NORMA_SIN_VERIFICAR",
+        "severidad": "MEDIA",
+        "cita": f"{tipo_label} {numero} de {anio}",
+        "detalle": (
+            f"{tipo_label} {numero} de {anio} no está cargada en el corpus del motor, "
+            "así que aquí no se pudo comprobar. Esto NO quiere decir que no exista: "
+            "el corpus solo trae las normas de uso diario. Confírmela usted antes de "
+            "radicar."
+        ),
+        "sugerencia": (
+            "Búsquela en el normograma de la Supersalud o en la página del Ministerio. "
+            "Si es correcta y se va a usar seguido, pídame cargarla al corpus para que "
+            "quede verificada de aquí en adelante."
+        ),
+    }
+
+
+def _estado_del_corpus() -> dict:
+    """Cuánto del corpus está contrastado contra fuente oficial.
+
+    Se cuentan solo las normas que guardan el TEXTO de algún artículo, que son
+    las que se pueden citar entre comillas y por tanto las que hay que haber
+    verificado. Una norma que solo tiene nombre y título no se cita literal.
+    """
+    try:
+        from app.services.normativa_completa import _TODAS_LAS_NORMAS
+
+        verificadas = sin_verificar = 0
+        for norma in _TODAS_LAS_NORMAS.values():
+            arts = norma.get("articulos") or {}
+            if not any(isinstance(d, dict) and d.get("texto") for d in arts.values()):
+                continue
+            if norma.get("verificada"):
+                verificadas += 1
+            else:
+                sin_verificar += 1
+        return {
+            "normas_verificadas": verificadas,
+            "normas_sin_verificar": sin_verificar,
+            "leyenda": (
+                f"{verificadas} normas contrastadas contra fuente oficial"
+                + (
+                    f" · {sin_verificar} SIN CONTRASTAR"
+                    if sin_verificar
+                    else " · ninguna sin contrastar"
+                )
+            ),
+        }
+    except Exception:  # pragma: no cover - sin corpus no se promete nada
+        return {"normas_verificadas": 0, "normas_sin_verificar": 0, "leyenda": ""}
 
 
 def _norma_sucesora_ya_nombrada(derogada_por: str, texto: str) -> bool:
@@ -922,11 +1014,23 @@ def verificar_citas(
                 if not clave:
                     issues.append(
                         {
-                            "tipo": "NORMA_INEXISTENTE",
-                            "severidad": "ALTA",
-                            "cita": f"{tipo_label} {numero} de {anio}",
-                            "detalle": f"No existe en el corpus normativo cargado ({tipo_label} {numero}/{anio}).",
-                            "sugerencia": "Verifica la cita o reemplaza por una norma vigente del corpus.",
+                            # 27-08-2026 — «NO LA TENGO» NO ES «NO EXISTE».
+                            # El dictamen GL-135 citó la Resolución 839 de 2017
+                            # y esto la marcó NORMA_INEXISTENTE en severidad
+                            # ALTA. Verificada contra el normograma oficial de
+                            # la Supersalud, esa resolución EXISTE: es conjunta
+                            # de MinSalud y MinCultura y modifica justamente la
+                            # Res. 1995 de 1999 que el mismo dictamen cita.
+                            # O sea que el sello le decía al auditor que una
+                            # norma real y pertinente era inventada — el error
+                            # exactamente contrario al que este revisor existe
+                            # para evitar, y el que más rápido le quita la
+                            # credibilidad al sello.
+                            # El corpus tiene 26 normas de las miles que hay:
+                            # que una no esté cargada no dice nada sobre si
+                            # existe. Se avisa, en severidad media, con lo
+                            # único que este revisor puede afirmar.
+                            **_falta_del_corpus(tipo_label, numero, anio),
                         }
                     )
                 elif normas[clave].get("vigente") is False:
@@ -1204,4 +1308,11 @@ def verificar_citas(
         "tiene_problemas_graves": tiene_graves,
         # Sí se revisó de verdad: la pantalla puede estampar el sello.
         "verificado": True,
+        # 26-08-2026: el sello decía «N citas contra corpus · 0 hallazgos» sin
+        # decir NUNCA qué tan de fiar es ese corpus. Esa semana se descubrió
+        # que 21 de las 26 normas guardadas tenían algún artículo con el nombre
+        # o el texto inventado — o sea que el sello estuvo meses certificando
+        # contra una lista que nadie había contrastado.
+        # Ahora el sello lleva su propia hoja de vida.
+        "corpus": _estado_del_corpus(),
     }

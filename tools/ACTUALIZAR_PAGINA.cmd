@@ -123,8 +123,13 @@ goto :esperar
 
 :no_subio
 echo.
-echo  [!] El motor no volvio solo. Se arranca directo...
-start "MotorGlosas" /min cmd /s /c ""%REPO%\venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8080 >> "%REPO%\data\servidor.log" 2>&1"
+echo  [!] El motor no volvio solo. Se arranca por la puerta oficial...
+REM  ARRANQUE UNIFICADO (03-09-2026): aqui se lanzaba uvicorn CRUDO y el
+REM  motor quedaba sin SOPORTES_ROOT, sin AUTO_PILOT_ENABLED y sin el
+REM  .env del dia, ocupando el 8080 mientras el vigilante de verdad
+REM  esperaba parqueado detras. Ahora se llama al arranque oficial, que
+REM  prepara el entorno completo y ademas queda de vigilante.
+start "MotorGlosasServidor" /min cmd /s /c ""%REPO%\tools\servidor_motor_local.cmd""
 ping -n 16 127.0.0.1 >nul
 powershell -NoProfile -Command "try{ $r=Invoke-WebRequest -Uri 'http://127.0.0.1:8080/health' -TimeoutSec 5 -UseBasicParsing; exit 0 }catch{ exit 1 }"
 if errorlevel 1 (

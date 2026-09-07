@@ -253,6 +253,25 @@ def test_resolver_codigo_directo():
     assert (r.slnserpro, r.metodo) == ("873420", org.METODO_CODIGO)
 
 
+def test_resolver_trae_el_centro_de_costo_de_la_linea():
+    """La pantalla de Recepción de Objeción tiene su columna Centro Costo.
+
+    Salía siempre vacía —las 2.079 filas del paquete 31068— aunque el cruce sí
+    hubiera acertado el servicio, porque el centro de costo se perdía al armar
+    el renglón.
+    """
+    lineas = [
+        org.LineaDgh(
+            slnserpro="FMQ0365",
+            nombre_medicamento="EQUIPO DE BOMBA (FOTOPROTECTOR)",
+            centro_costo="732109",
+            valor=40300,
+        )
+    ]
+    r = org.resolver_slnserpro(_fila("FMQ0365"), lineas, {})
+    assert (r.slnserpro, r.centro_costo) == ("FMQ0365", "732109")
+
+
 def test_resolver_codigo_directo_ignora_ceros_de_relleno():
     """DGH escribe 19935303-04 y el ADRES 19935303-4: es el mismo medicamento."""
     lineas = [org.LineaDgh(slnserpro="19935303-04", nombre_medicamento="ACETAMINOFEN", valor=800)]
@@ -868,3 +887,64 @@ def test_reporte_que_no_es_el_del_adres_avisa_claro(tmp_path):
     otro = _libro(tmp_path, "OTRO.xlsx", {"Hoja1": [["A", "B"], [1, 2]]})
     with pytest.raises(ValueError, match="no parece el reporte de reclamaciones"):
         org.leer_reporte_reclamaciones(otro)
+
+
+class TestQueCodigoVaEnSlnserpro:
+    """La columna SLNSERPRO: el código de DGH o el de la factura del ADRES.
+
+    La pantalla de Recepción de Objeción muestra dos columnas de código:
+    «Codigo» (21705, el del ADRES) y «Codigo Cups» (879122). El auditor busca
+    por la primera, así que con el CUPS el renglón no le sirve. Para COOSALUD
+    en cambio sigue yendo el código interno de DGH.
+    """
+
+    def _armar(self, codigo_servicio):
+        fila = org.FilaAdres(
+            factura="HUS0000356290",
+            cod_elemento="21705",
+            codigo_glosa="TA0801",
+            valor_glosado=799900.0,
+            descripcion="SILLA TURCA U OIDO",
+        )
+        linea = org.LineaDgh(
+            slnserpro="879122",
+            cups="879122",
+            desc_cups="TOMOGRAFIA DE SILLA TURCA",
+            centro_costo="734103",
+            valor=799900.0,
+            saldo=3221600.0,
+        )
+        conversion = org.construir_registros(
+            [fila],
+            {"HUS0000356290": [linea]},
+            {"21705": {"879122"}},
+            _dt.datetime(2026, 8, 28),
+            codigo_servicio=codigo_servicio,
+        )
+        return conversion.registros[0]
+
+    def test_por_defecto_sigue_yendo_el_codigo_de_dgh(self):
+        assert self._armar(org.CODIGO_DGH)["SLNSERPRO"] == "879122"
+
+    def test_en_modo_adres_va_el_codigo_de_la_factura(self):
+        assert self._armar(org.CODIGO_ADRES)["SLNSERPRO"] == "21705"
+
+    def test_el_centro_de_costo_sigue_saliendo_de_dgh(self):
+        for modo in (org.CODIGO_DGH, org.CODIGO_ADRES):
+            assert self._armar(modo)["CTNCENCOS"] == "734103"
+
+    def test_sin_codigo_del_adres_no_deja_el_renglon_vacio(self):
+        """DGH rechaza la fila sin servicio: mejor el código de DGH que nada."""
+        fila = org.FilaAdres(
+            factura="HUS0000356290", cod_elemento="", codigo_glosa="TA0801", valor_glosado=100.0
+        )
+        linea = org.LineaDgh(slnserpro="879122", centro_costo="734103", valor=100.0, saldo=100.0)
+        conversion = org.construir_registros(
+            [fila],
+            {"HUS0000356290": [linea]},
+            {},
+            _dt.datetime(2026, 8, 28),
+            completar_servicios=True,
+            codigo_servicio=org.CODIGO_ADRES,
+        )
+        assert conversion.registros[0]["SLNSERPRO"] == "879122"

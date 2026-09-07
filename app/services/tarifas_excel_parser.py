@@ -1090,7 +1090,7 @@ def parsear_excel_tarifas(contenido: bytes, filename: str = "") -> dict:
         except Exception:
             pass
 
-    filas_total = _resolver_repetidos(filas_total, errores)
+    filas_total = _resolver_repetidos(filas_total, errores, meta_global.get("eps") or "")
 
     return {
         "eps": meta_global["eps"],
@@ -1103,7 +1103,72 @@ def parsear_excel_tarifas(contenido: bytes, filename: str = "") -> dict:
     }
 
 
-def _resolver_repetidos(filas: list[dict], errores: list[str]) -> list[dict]:
+def _el_que_cuadra_con_lo_pactado(
+    codigo: str, grupo: list[dict], eps: str
+) -> tuple[dict | None, str]:
+    """Entre varios valores para el mismo código, el que cuadra con el contrato.
+
+    26-08-2026, decisión del área. Antes, un código con dos valores no se
+    cargaba: el parser no sabía cuál regía y omitirlo era lo honesto. Yesid
+    decidió la regla: «¿cuál queda? el que mejor se ajuste a las tarifas
+    pactadas».
+
+    Y eso SÍ se puede probar, porque el contrato tiene fórmula. Se toma el
+    valor SOAT oficial del código (Circular 047/2025), se le aplica el factor
+    del contrato de esa entidad —Compensar SOAT UVB −5 %, Positiva SOAT −15 %,
+    Dispensario SOAT/SMLV −20 %— y se escoge el candidato que caiga sobre ese
+    número.
+
+    NO es «el más parecido»: se exige que quede a menos del 2 % del valor
+    esperado y que ningún otro candidato quede igual de cerca. Si nada cuadra,
+    o cuadran dos, devuelve None y el código se sigue omitiendo — que es lo
+    que hacía antes. La regla resuelve lo que puede probar, no adivina el resto.
+    """
+    if not codigo or not eps:
+        return None, ""
+    try:
+        from app.services.glosa_ia_prompts import CONTRATOS_HUS
+        from app.services.tarifas_oficiales import buscar_tarifa_soat_2026
+
+        eps_up = str(eps).upper().strip()
+        factor = None
+        mejor = ""
+        for clave, ficha in CONTRATOS_HUS.items():
+            if clave in eps_up or eps_up in clave:
+                if len(clave) > len(mejor):
+                    mejor, factor = clave, ficha.get("factor")
+        if not factor or float(factor) >= 1.0:
+            # Sin descuento pactado no hay contra qué comparar: SOAT pleno es
+            # el valor de tabla, y cualquiera de los candidatos podría serlo.
+            return None, ""
+        soat = buscar_tarifa_soat_2026(str(codigo))
+        if not soat or not soat.get("valor_pesos_2026"):
+            return None, ""
+        esperado = float(soat["valor_pesos_2026"]) * float(factor)
+        if esperado <= 0:
+            return None, ""
+        TOLERANCIA = 0.02
+        cerca = [
+            f for f in grupo if abs(float(f["valor_pactado"]) - esperado) / esperado <= TOLERANCIA
+        ]
+        # Un solo candidato pegado al valor esperado: ese es. Si hay dos igual
+        # de cerca, el archivo sigue sin decir cuál rige.
+        valores_cerca = {f["valor_pactado"] for f in cerca}
+        if len(valores_cerca) != 1:
+            return None, ""
+        elegido = cerca[0]
+        pct = int(round((1 - float(factor)) * 100))
+        return (
+            elegido,
+            f"${float(elegido['valor_pactado']):,.0f}".replace(",", ".")
+            + f" (SOAT ${float(soat['valor_pesos_2026']):,.0f}".replace(",", ".")
+            + f" −{pct} %)",
+        )
+    except Exception:  # ante cualquier duda, no se elige nada
+        return None, ""
+
+
+def _resolver_repetidos(filas: list[dict], errores: list[str], eps: str = "") -> list[dict]:
     """Un mismo código con DOS valores distintos no se carga: se omite y se avisa.
 
     POR QUÉ (24-08-2026, el Excel de POSITIVA). El mismo CUPS aparecía varias
@@ -1129,20 +1194,39 @@ def _resolver_repetidos(filas: list[dict], errores: list[str]) -> list[dict]:
 
     limpias: list[dict] = []
     conflictos: list[str] = []
+    resueltos: list[str] = []
     for codigo, grupo in por_codigo.items():
         valores = sorted({f["valor_pactado"] for f in grupo})
         if len(valores) == 1:
             limpias.append(grupo[0])
             continue
+        # 26-08-2026, decisión del área: «¿cuál queda? el que mejor se ajuste a
+        # las tarifas pactadas». Se intenta resolverlo con la fórmula del
+        # contrato; si no se puede probar, se sigue omitiendo como antes.
+        elegido, motivo = _el_que_cuadra_con_lo_pactado(codigo, grupo, eps)
+        if elegido is not None:
+            limpias.append(elegido)
+            resueltos.append(f"{codigo}: {motivo}")
+            continue
         pintados = " / ".join(f"${v:,.0f}".replace(",", ".") for v in valores)
         conflictos.append(f"{codigo}: {pintados}")
 
+    if resueltos:
+        MOSTRAR = 25
+        errores.append(
+            f"{len(resueltos)} códigos venían con VALORES DISTINTOS y se resolvieron "
+            f"aplicando la fórmula del contrato (se cargó el que cuadra con lo "
+            f"pactado; los demás se descartaron): "
+            + " · ".join(resueltos[:MOSTRAR])
+            + (f" · … y {len(resueltos) - MOSTRAR} más" if len(resueltos) > MOSTRAR else "")
+        )
     if conflictos:
         MOSTRAR = 40
         errores.append(
             f"{len(conflictos)} códigos vienen con VALORES DISTINTOS en el "
-            f"archivo y NO se cargaron (el contrato debe decir cuál rige; "
-            f"cargarlos al azar produce dictámenes falsos): "
+            f"archivo y NO se cargaron: ninguno cuadra con la fórmula del contrato, "
+            f"así que el motor no sabe cuál rige y cargarlo al azar produce "
+            f"dictámenes falsos. Lo decide el auditor: "
             + " · ".join(conflictos[:MOSTRAR])
             + (f" · … y {len(conflictos) - MOSTRAR} más" if len(conflictos) > MOSTRAR else "")
         )

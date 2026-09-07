@@ -157,6 +157,69 @@ if not defined FORZADO if "%OCUPADO%"=="SI" (
 )
 if exist "%ESPERA%" del "%ESPERA%" >nul 2>&1
 
+rem ---------------------------------------------------------------
+rem  NO BAJAR CODIGO QUE LA REVISION AUTOMATICA DEJO EN ROJO
+rem  (27-08-2026).
+rem
+rem  El 26 de agosto entraron TRES defectos al PC de cartera antes de
+rem  que nadie supiera que estaban mal. Ninguno paso desapercibido:
+rem  la revision automatica de GitHub los cazo a los tres. El problema
+rem  es que este bot no la esperaba -se bajaba el codigo apenas
+rem  quedaba fusionado- asi que llegaban aca primero.
+rem
+rem  Uno de esos defectos dejaba muerta una direccion de la pagina.
+rem  Otro hacia que una factura mixta se le cargara al ADRES marcada
+rem  como administrativa. Es el tipo de cosa que nadie nota mirando
+rem  la pantalla.
+rem
+rem  QUE HACE AHORA, en orden:
+rem    revision EN VERDE     -> se aplica, como siempre.
+rem    revision EN ROJO      -> NO se aplica. Se anota por que y se
+rem                             reintenta en 5 minutos. Cuando alguien
+rem                             suba el arreglo, la revision pasa a
+rem                             verde y entra sola.
+rem    revision CORRIENDO    -> se espera. Tarda unos 9 minutos.
+rem    NO SE PUDO PREGUNTAR  -> se aplica igual, como hasta hoy, pero
+rem                             queda anotado en el registro. No saber
+rem                             no es lo mismo que saber que esta mal,
+rem                             y dejar el hospital sin desplegar por
+rem                             una consulta que falla seria peor.
+rem
+rem  LA ORDEN DEL AUDITOR SIGUE MANDANDO: llamando al bot con YA se
+rem  aplica aunque este en rojo. Se anota en mayusculas para que
+rem  quede el rastro. Asi esto nunca puede dejar el hospital atascado:
+rem  si la revision se queda roja por algo ajeno, hay salida.
+rem
+rem  LA LLAVE DE GITHUB, si el repositorio es privado: se pone en
+rem  data\github_token.txt (ese archivo NO se sube al repositorio) o en
+rem  la variable GITHUB_TOKEN. Sin llave, y si el repositorio es
+rem  publico, la consulta funciona igual.
+rem ---------------------------------------------------------------
+set "REVISION="
+for /f "usebackq delims=" %%R in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%REPO%\tools\estado_revision.ps1" -Sha "%REMOTO%" -Repo "%REPO%"`) do set "REVISION=%%R"
+if not defined REVISION set "REVISION=NOSESABE"
+
+if "%REVISION%"=="ROJO" (
+  if defined FORZADO (
+    echo [%date% %time%] *** LA REVISION AUTOMATICA ESTA EN ROJO Y SE PIDIO YA: SE APLICA IGUAL, BAJO RESPONSABILIDAD DE QUIEN LO PIDIO *** >> "%LOG%"
+  ) else (
+    echo [%date% %time%] la revision automatica de %REMOTO:~0,7% esta EN ROJO: NO se aplica. Se reintenta en 5 min; cuando suban el arreglo entra sola. Para aplicarlo igual: autodeploy_motor_local.cmd YA >> "%LOG%"
+    goto :asegurar
+  )
+)
+if "%REVISION%"=="CORRIENDO" (
+  if defined FORZADO (
+    echo [%date% %time%] la revision aun corre, pero se pidio YA: se aplica igual >> "%LOG%"
+  ) else (
+    echo [%date% %time%] la revision automatica de %REMOTO:~0,7% todavia esta corriendo ^(tarda unos 9 min^): se espera y se reintenta en 5 min >> "%LOG%"
+    goto :asegurar
+  )
+)
+if "%REVISION%"=="NOSESABE" (
+  echo [%date% %time%] no se pudo preguntar por la revision automatica ^(sin internet, sin llave, o GitHub no contesto^): se aplica igual, como hasta hoy. Si esto sale siempre, revise data\github_token.txt >> "%LOG%"
+)
+
+
 echo [%date% %time%] codigo nuevo detectado: %REMOTO:~0,7% — aplicando... >> "%LOG%"
 git reset --hard origin/motor-glosas >> "%LOG%" 2>&1
 rem psycopg2 es solo para PostgreSQL: aca la base es SQLite, se salta
@@ -239,10 +302,24 @@ rem      mensajes propios. Justo el archivo donde habia que mirar para
 rem      entender por que no bajaba nada.
 rem
 rem  Ahora se abre en su propia ventana (`cmd /s /c`, que ademas es la
-rem  forma segura de pasar comillas dentro de comillas) y escribe en
-rem  servidor.log, que es donde va lo del servidor. Esta tarea termina
-rem  enseguida y la siguiente pasada corre normal.
-start "MotorGlosasRescate" /min cmd /s /c ""%REPO%\venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8080 >> "%REPO%\data\servidor.log" 2>&1"
+rem  forma segura de pasar comillas dentro de comillas) y lo del
+rem  servidor sigue yendo a servidor.log — desde el 03-09-2026 lo
+rem  escribe el propio arranque oficial, no esta linea. Esta tarea
+rem  termina enseguida y la siguiente pasada corre normal.
+rem
+rem  ARRANQUE UNIFICADO (03-09-2026). Aqui se lanzaba uvicorn CRUDO, y
+rem  eso dejaba un motor A MEDIO CONFIGURAR: sin SOPORTES_ROOT (la
+rem  pantalla de Diagnostico mostraba «/data/soportes» en rojo, como si
+rem  se hubiera perdido la carpeta del servidor de radicacion), sin
+rem  AUTO_PILOT_ENABLED y sin releer el .env del dia. Y encima ese motor
+rem  ocupaba el puerto 8080, con lo que el vigilante de verdad se quedaba
+rem  PARQUEADO esperando su turno: el motor a medias se quedaba arriba
+rem  indefinidamente. Paso el 03-09 y costo media tarde entenderlo.
+rem
+rem  Ahora el rescate entra por la PUERTA OFICIAL (servidor_motor_local),
+rem  que prepara el entorno completo y ademas queda de vigilante. Si ya
+rem  habia uno, el nuevo se cierra solo (su propio guardian lo cuida).
+start "MotorGlosasServidor" /min cmd /s /c ""%REPO%\tools\servidor_motor_local.cmd""
 rem  Misma espera con preguntas: un arranque en frio puede tardar.
 set /a INTENTOS=0
 :esperar_al_rescate

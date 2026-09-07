@@ -26,6 +26,21 @@ def _texto() -> str:
     return RUTA.read_bytes().decode("utf-8", errors="replace")
 
 
+def _bloque_del_candado(t: str) -> str:
+    """Lo que se ejecuta cuando sobra un vigilante: desde el `if errorlevel 1 (`
+    que sigue a la cuenta, hasta su paréntesis de cierre.
+
+    Antes esto se miraba con una ventana de 400 caracteres desde la cuenta. Era
+    frágil: el 03-09-2026 se documentó ahí por qué el aviso pasó a la pantalla,
+    y el comentario empujó el `exit /b 0` fuera de la ventana — la prueba se
+    puso roja sin que el comportamiento hubiera cambiado.
+    """
+    i = t.index("$n -gt 1")
+    j = t.index("if errorlevel 1 (", i)
+    fin = t.index("\n)", j)
+    return t[j:fin]
+
+
 class TestElCandadoExiste:
     def test_cuenta_los_vigilantes_antes_de_seguir(self):
         t = _texto()
@@ -41,14 +56,27 @@ class TestElCandadoExiste:
         assert i_candado < i_uvicorn, (
             "El candado quedó DESPUÉS de arrancar uvicorn: no sirve de nada."
         )
-        assert "exit /b 0" in t[i_candado : i_candado + 400]
+        assert "exit /b 0" in _bloque_del_candado(t)
 
     def test_deja_constancia_en_el_registro(self):
         """Si se cierra en silencio y sin dejar rastro, nadie entiende por qué
         la ventana desapareció."""
-        t = _texto()
-        i = t.index("$n -gt 1")
-        assert "servidor.log" in t[i : i + 400]
+        bloque = _bloque_del_candado(_texto())
+        assert "log_seguro" in bloque or "servidor.log" in bloque, (
+            "el vigilante que sobra ya no deja constancia en el registro"
+        )
+        # 03-09-2026: el registro NO alcanza. El día que otro proceso lo tenía
+        # tomado, el auditor solo vio el error crudo de Windows y creyó que el
+        # arranque había fallado. La explicación tiene que salir por pantalla.
+        en_pantalla = [
+            ln.strip()
+            for ln in bloque.splitlines()
+            if ln.strip().lower().startswith("echo") and ">>" not in ln
+        ]
+        assert any("vigilante" in ln.lower() for ln in en_pantalla), (
+            "el aviso no se ve en pantalla: si el registro está bloqueado, "
+            "el auditor se queda sin ninguna explicación"
+        )
 
 
 class TestNoRompeLoQueYaFuncionaba:
