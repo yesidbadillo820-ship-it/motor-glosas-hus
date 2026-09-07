@@ -1688,3 +1688,51 @@ class PreAuditoriaEventoRecord(Base):
     actor = Column(String(120), index=True)
 
     __table_args__ = (Index("ix_pre_auditoria_estado_creado", "estado", "creado_en"),)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  MEMORIA DE TIPIFICACIÓN PARA LAS MESAS DE CONCILIACIÓN
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class ConciliacionTipificacionRecord(Base):
+    """Qué era cada glosa, para no volver a preguntarlo.
+
+    «Estas facturas son las mismas que trabajamos acá siempre», dijo el
+    auditor, y tiene razón: las cuentas vuelven mesa tras mesa. La
+    tipificación (TARIFAS, SOPORTES, PERTINENCIA, FACTURACIÓN) sale sola del
+    código de glosa, pero el TIPO —administrativa, mixta o médica— no: en las
+    de pertinencia lo decide un médico auditor mirando el caso.
+
+    Acá queda escrito lo que decidió, por factura y código. La próxima vez que
+    esa glosa aparezca en un acta, el armador ya lo sabe y no la marca. Con el
+    tiempo, hasta las de pertinencia se llenan solas.
+
+    Se guarda también lo que el motor dedujo, para poder mirar después en qué
+    se equivocó la deducción y en qué no.
+    """
+
+    __tablename__ = "conciliacion_tipificacion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    actualizado_en = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # La llave: la factura en dígitos (sin prefijo ni ceros) y el código.
+    factura_clave = Column(String(30), index=True, nullable=False)
+    cod_glosa = Column(String(12), index=True, nullable=False)
+
+    # TARIFAS / SOPORTES / PERTINENCIA / FACTURACION — se deduce del código.
+    tipificacion = Column(String(30))
+    # ADMINISTRATIVA / MIXTA / MEDICO — lo que decidió una persona.
+    tipo_glosa = Column(String(30), index=True)
+
+    # Lo que el motor había deducido solo, para poder auditar la deducción.
+    tipo_deducido = Column(String(30))
+    # Quién lo decidió y en qué acta.
+    definido_por = Column(String(200))
+    numero_acta = Column(String(60), index=True)
+
+    __table_args__ = (
+        Index("ix_conciliacion_tipif_llave", "factura_clave", "cod_glosa", unique=True),
+    )

@@ -1,5 +1,39 @@
 # Registro de cambios
 
+## Sesión 07-sep-2026 (tarde) — Armar el ACTA SINAC desde la lista y el archivo de la EPS
+
+Faltaba el paso de **aguas arriba** del módulo de conciliación: ya se sabía
+leer, revisar y optimizar un acta llena, pero no armarla. Se hacía a mano.
+
+- **`app/services/acta_conciliacion_armar.py`** — cruza la lista de facturas
+  con el consolidado de la EPS y produce `Acta` + `LineaActa`, las mismas
+  estructuras de `acta_conciliacion_excel`, así que lo generado pasa tal cual
+  por el `revisar()` que ya existía: el acta sale llena **y cuadrada**.
+  - Llave del cruce tolerante a los tres formatos del número de factura.
+  - Encabezados de la EPS buscados **por nombre**, no por posición (cada EPS
+    manda el consolidado en otro orden), con emparejado exacto para que
+    «VALOR FACTURA» no le robe la columna a «FACTURA».
+  - Tipificación deducida del código (CL/FA/SO/TA), verificada contra las 257
+    líneas del acta 709 del Dispensario.
+  - `escribir_en_modelo()` vuelca sobre el `.xlsm` oficial con `keep_vba`,
+    resolviendo las celdas combinadas del encabezado (openpyxl solo deja
+    escribir en la superior izquierda del grupo).
+- **`ConciliacionTipificacionRecord`** — memoria por factura + código de lo
+  que decidió una persona. Lo que el código no puede deducir (pertinencia
+  mixta vs. médica) se pregunta una vez y queda guardado.
+- **`POST /conciliaciones/acta-excel/armar`** — con `solo_revisar` devuelve el
+  parte; si no, el `.xlsm` con el parte en la cabecera `X-Acta-Parte`.
+  **`POST /conciliaciones/acta-excel/aprender`** alimenta la memoria desde el
+  acta ya trabajada.
+- **Pantalla** en Conciliación: dos zonas de arrastre, las casillas del
+  encabezado, «Ver qué sale» y «Armar y descargar acta».
+- **`plantillas/ACTA_SINAC_modelo.xlsm`** — el formato oficial en blanco.
+- **58 pruebas nuevas** (39 de servicio, 19 de ruta y pantalla).
+
+Lo que NO se rellena solo: el tipo de las glosas de pertinencia (decisión
+clínica) y los valores de aceptar/levantar/ratificar, que se escriben en la
+audiencia.
+
 ## Sesión 07-sep-2026 — Pre-Auditoría: tres defectos de producción
 
 Hallados auditando el código, no por una prueba fallida: los tres se

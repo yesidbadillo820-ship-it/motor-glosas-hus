@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
@@ -683,6 +683,155 @@ def _acta_o_400(contenido: bytes):
         raise HTTPException(400, str(e))
     except Exception:
         raise HTTPException(400, "No se pudo leer el Excel: ¿es el formato del acta de la mesa?")
+
+
+@router.post("/acta-excel/armar")
+async def acta_excel_armar(
+    facturas: UploadFile = File(..., description="Excel con la columna de facturas"),
+    archivo_eps: UploadFile = File(..., description="Consolidado que manda la EPS"),
+    nit: str = Form(default=""),
+    razon_social: str = Form(default=""),
+    numero_acta: str = Form(default=""),
+    periodo: str = Form(default=""),
+    fecha_conciliacion: str = Form(default=""),
+    solo_revisar: bool = Form(default=False),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Arma el ACTA SINAC desde la lista de facturas y el archivo de la EPS.
+
+    Reemplaza el copiado a mano de renglón por renglón. Con `solo_revisar`
+    devuelve el parte sin generar el archivo: cuántas líneas salen, cuánto
+    hay para conciliar y qué casillas quedan para una persona.
+
+    Sale el MISMO libro del formato oficial, con sus macros: el acta que se
+    lleva a la mesa es esa, no una copia limpia.
+    """
+    import io as _io
+    from datetime import date as _date
+    from pathlib import Path as _Path
+
+    from fastapi.responses import StreamingResponse
+
+    from app.services import acta_conciliacion_armar as armador
+
+    crudo_facturas = await facturas.read()
+    crudo_eps = await archivo_eps.read()
+    if not crudo_facturas or not crudo_eps:
+        raise HTTPException(400, "Faltó uno de los dos archivos.")
+
+    try:
+        lista = armador.leer_lista_facturas(crudo_facturas)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, f"No se pudo leer la lista de facturas: {e}") from e
+    if not lista:
+        raise HTTPException(
+            422,
+            "La lista no trae ninguna factura reconocible. Se espera una columna "
+            "con los números (HUS0000542497, 542497 o HUS542497).",
+        )
+
+    try:
+        filas_eps, _ = armador.leer_archivo_eps(crudo_eps)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, f"No se pudo leer el archivo de la EPS: {e}") from e
+    if not filas_eps:
+        raise HTTPException(
+            422,
+            "En el archivo de la EPS no se encontró la fila de encabezados. Se "
+            "buscan las columnas FACTURA y VALOR OBJETADO.",
+        )
+
+    fecha = None
+    if fecha_conciliacion.strip():
+        try:
+            fecha = _date.fromisoformat(fecha_conciliacion.strip()[:10])
+        except ValueError:
+            raise HTTPException(422, "La fecha de conciliación va como AAAA-MM-DD.") from None
+
+    encabezado = armador.Encabezado(
+        nit=nit.strip(),
+        razon_social=razon_social.strip(),
+        fecha_conciliacion=fecha,
+        numero_acta=numero_acta.strip(),
+        periodo=periodo.strip(),
+    )
+    resultado = armador.armar(lista, filas_eps, encabezado, memoria=armador.memoria_de(db, lista))
+
+    parte = {
+        "lineas": len(resultado.acta.lineas),
+        "facturas_con_glosa": resultado.acta.cantidad_facturas_declarada,
+        "valor_a_conciliar": resultado.acta.valor_a_conciliar_declarado,
+        "facturas_en_lista": len(lista),
+        "sin_glosas": resultado.sin_glosas[:100],
+        "fuera_de_lista": resultado.fuera_de_lista[:100],
+        "avisos": [
+            {"factura": a.factura, "motivo": a.motivo, "fila_eps": a.fila_excel}
+            for a in resultado.avisos[:100]
+        ],
+        "total_avisos": len(resultado.avisos),
+    }
+    if solo_revisar:
+        return parte
+
+    if not resultado.acta.lineas:
+        raise HTTPException(
+            422,
+            "Ninguna de las facturas de la lista tiene glosas en el archivo de la "
+            "EPS. Revise que los dos archivos sean de la misma tanda.",
+        )
+
+    modelo = _Path("plantillas/ACTA_SINAC_modelo.xlsm")
+    if not modelo.is_file():
+        raise HTTPException(
+            503,
+            "Falta el modelo del acta en el servidor (plantillas/ACTA_SINAC_modelo.xlsm).",
+        )
+
+    try:
+        libro = armador.escribir_en_modelo(resultado, modelo.read_bytes(), encabezado)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"No se pudo escribir el acta sobre el modelo: {e}") from e
+
+    nombre = f"ACTA_SINAC_{numero_acta.strip() or 'NUEVA'}.xlsm".replace(" ", "_")
+    import json as _json
+
+    return StreamingResponse(
+        _io.BytesIO(libro),
+        media_type="application/vnd.ms-excel.sheet.macroEnabled.12",
+        headers={
+            "Content-Disposition": f'attachment; filename="{nombre}"',
+            "X-Acta-Parte": _json.dumps(
+                {k: parte[k] for k in ("lineas", "facturas_con_glosa", "total_avisos")}
+            ),
+        },
+    )
+
+
+@router.post("/acta-excel/aprender")
+async def acta_excel_aprender(
+    archivo: UploadFile = File(...),
+    numero_acta: str = Form(default=""),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Guarda la tipificación que decidió una persona en el acta trabajada.
+
+    Lo que se aprende acá es lo que el armador no puede deducir: si una glosa
+    de pertinencia es MIXTA o MÉDICO. La próxima vez que esa factura y ese
+    código aparezcan, salen llenos.
+    """
+    from app.services import acta_conciliacion_armar as armador
+
+    contenido, _ = await _leer_upload_acta(archivo)
+    acta = _acta_o_400(contenido)
+    parte = armador.aprender(
+        db,
+        acta.lineas,
+        numero_acta=numero_acta.strip(),
+        usuario=str(getattr(current_user, "email", "") or ""),
+    )
+    return {"aprendido": parte, "lineas_del_acta": len(acta.lineas)}
 
 
 @router.post("/acta-excel/revisar")
