@@ -393,3 +393,112 @@ class TestElArchivoQueSaleAlaMesa:
         assert acta.razon_social and "DISPENSARIO" in acta.razon_social.upper()
         assert acta.cantidad_facturas_declarada == 3
         assert acta.valor_a_conciliar_declarado == r.acta.valor_a_conciliar_declarado
+
+
+# ══════════════════════════════════════════════════════════════════════════
+@pytest.mark.skipif(not MODELO.is_file(), reason="falta plantillas/ACTA_SINAC_modelo.xlsm")
+class TestElActaNoSaleReparada:
+    """Excel abría el acta generada diciendo «[Reparado]» (07-09-2026).
+
+    La causa no era un detalle de openpyxl que se pudiera ajustar: openpyxl
+    **no edita** el .xlsm, lo RECONSTRUYE, y al hacerlo se lleva por delante
+    3 de los 5 nombres definidos del modelo —los autofiltros de ACTA, GLOSAS
+    y TRAMITES— dejando el único que sobrevive apuntando a otra hoja.
+
+    Un acta que Excel tiene que reparar es un acta que el auditor no sabe si
+    puede firmar, y esta sale de una mesa de conciliación con una EPS.
+    """
+
+    def _generar(self, n_lineas: int = 3) -> bytes:
+        glosas = [_glosa_eps(f"54{i:04d}", "TA0201", 1000 + i) for i in range(n_lineas)]
+        eps = leer_archivo_eps(_archivo_eps(glosas))[0]
+        enc = Encabezado(nit="901541137", razon_social="DISPENSARIO MEDICO", numero_acta="710")
+        r = armar([armador.clave_factura(g[9]) for g in glosas], eps, enc)
+        return armador.escribir_en_modelo(r, MODELO.read_bytes(), enc)
+
+    def _nombres(self, crudo: bytes) -> list[tuple[str, str]]:
+        import re
+        import zipfile
+
+        xml = zipfile.ZipFile(BytesIO(crudo)).read("xl/workbook.xml").decode("utf-8")
+        m = re.search(r"<definedNames>(.*?)</definedNames>", xml, re.S)
+        return re.findall(r'name="([^"]+)"[^>]*>([^<]*)<', m.group(1)) if m else []
+
+    def test_los_cinco_nombres_definidos_sobreviven(self):
+        del_modelo = self._nombres(MODELO.read_bytes())
+        del_acta = self._nombres(self._generar())
+        assert len(del_acta) == len(del_modelo) == 5
+        assert sorted(del_acta) == sorted(del_modelo), "openpyxl volvió a comerse los autofiltros"
+
+    def test_cada_autofiltro_sigue_en_SU_hoja(self):
+        """El síntoma más feo del defecto: el filtro de ACTA quedaba
+        apuntando a Hoja3."""
+        hojas = {v.split("!")[0] for n, v in self._nombres(self._generar()) if "Filter" in n}
+        assert {"ACTA", "GLOSAS", "TRAMITES", "Hoja3"} == hojas
+
+    def test_no_falta_ninguna_parte_salvo_las_cachés(self):
+        """`calcChain` y `sharedStrings` se dejan fuera A PROPÓSITO: Excel las
+        rehace, y un calcChain viejo —de antes de escribir— es otra de las
+        cosas que disparan la reparación."""
+        import zipfile
+
+        del_modelo = set(zipfile.ZipFile(MODELO.open("rb")).namelist())
+        del_acta = set(zipfile.ZipFile(BytesIO(self._generar())).namelist())
+        assert del_modelo - del_acta == {"xl/calcChain.xml", "xl/sharedStrings.xml"}
+
+    def test_la_configuracion_de_impresora_vuelve(self):
+        """El acta se imprime para firmarla: perder el área de impresión y la
+        configuración de página no es cosmético."""
+        import zipfile
+
+        partes = set(zipfile.ZipFile(BytesIO(self._generar())).namelist())
+        assert any("printerSettings" in p for p in partes)
+        assert any(n == "_xlnm.Print_Area" for n, _ in self._nombres(self._generar()))
+
+
+@pytest.mark.skipif(not MODELO.is_file(), reason="falta plantillas/ACTA_SINAC_modelo.xlsm")
+class TestSinCuadriculaVaciaDebajo:
+    """El modelo trae 260 renglones con bordes ya puestos: un acta de tres
+    líneas salía con 257 filas de cuadrícula vacía debajo."""
+
+    def _acta(self, n_lineas: int):
+        glosas = [_glosa_eps(f"54{i:04d}", "TA0201", 1000 + i) for i in range(n_lineas)]
+        eps = leer_archivo_eps(_archivo_eps(glosas))[0]
+        enc = Encabezado(nit="901541137", razon_social="DISPENSARIO MEDICO")
+        r = armar([armador.clave_factura(g[9]) for g in glosas], eps, enc)
+        libro = armador.escribir_en_modelo(r, MODELO.read_bytes(), enc)
+        return openpyxl.load_workbook(BytesIO(libro))["ACTA"], len(r.acta.lineas)
+
+    @staticmethod
+    def _tiene_borde(celda) -> bool:
+        b = celda.border
+        return bool(
+            b
+            and any(
+                getattr(b, lado) and getattr(b, lado).style
+                for lado in ("left", "right", "top", "bottom")
+            )
+        )
+
+    @pytest.mark.parametrize("n", [1, 3, 25])
+    def test_debajo_de_la_ultima_linea_no_queda_cuadricula(self, n):
+        ws, usadas = self._acta(n)
+        sobrantes = [
+            f
+            for f in range(12 + usadas, 272)
+            if any(self._tiene_borde(ws.cell(f, c)) for c in range(3, 24))
+        ]
+        assert sobrantes == [], f"quedaron {len(sobrantes)} filas con bordes"
+
+    def test_las_lineas_de_verdad_conservan_su_formato(self):
+        """Limpiar lo que sobra no puede llevarse lo que sí va."""
+        ws, usadas = self._acta(3)
+        assert all(self._tiene_borde(ws.cell(f, 5)) for f in range(12, 12 + usadas))
+
+    def test_el_pie_del_acta_no_se_movio(self):
+        """Por eso NO se borran las filas: borrarlas correría el pie hacia
+        arriba y rompería sus celdas combinadas."""
+        ws, _ = self._acta(3)
+        del_modelo = openpyxl.load_workbook(MODELO, keep_vba=True)["ACTA"]
+        assert len(ws.merged_cells.ranges) == len(del_modelo.merged_cells.ranges)
+        assert any(str(r) == "C274:W276" for r in ws.merged_cells.ranges)
