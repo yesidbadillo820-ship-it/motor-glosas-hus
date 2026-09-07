@@ -226,6 +226,46 @@ está urgente, qué está pendiente y qué quejas conviene radicar.
 **Para la próxima vez.** Subir los documentos nuevos de Sura al chat y pedir
 «actualizar el tablero de cuidados»; Claude entrega el HTML al día.
 
+### 04-09-2026 (noche) — Dispensario Médico, 3 de septiembre: 145 de 145 ubicadas
+
+Tercer lote del día, ahora del **Dispensario Médico**: 145 objeciones de **118
+facturas** por **$10.744.054**, cruzadas contra el export del DGH (213
+renglones de esas mismas 118 facturas).
+
+**Resultado: las 145 quedaron con su servicio identificado** (29 en confianza
+ALTA y 116 en MEDIA), ninguna en revisión. Salió así de limpio porque el Excel
+del Dispensario trae el **nombre del servicio en su propia columna**, y ese
+nombre viene del catálogo del hospital: calza exacto con el del DGH en 143 de
+los 145 renglones. Los otros dos también estaban bien, sólo que el DGH usa un
+nombre más largo para lo mismo («SONDA FOLEY DOS VIAS 14 FR **BALON 5-10CC**»).
+
+**Lo que hubo que construir.** El bot del Dispensario
+(`organizar_objeciones_dispensario.py`) sólo sabía leer el **PDF** del auditor.
+Ahora también lee el **Excel de glosa inicial** (`--entrada-excel`), que es como
+llega el listado hoy: FACTURA | VALOR GLOSA INICIAL | SERVICIO OBJETADO |
+CODIGO GLOSA INICIAL | DESCRIPCION GLOSA INICIAL. De ahí saca el código de
+glosa (viene partido: «TA08 01 TARIFAS-…» → `TA0801`) y arma las 16 columnas de
+siempre, con `CTNCENCOS` vacía y `CROTIPOBJ` por factura (las 118 dieron 0,
+administrativas).
+
+**El motor del cruce quedó compartido.** Para no tener dos copias de la misma
+lógica, lo que se escribió para FAMISANAR se movió a **`tools/_cruce_dgh.py`**
+(igual que `_dinero.py`) y ahora lo usan los dos bots. Se comprobó que los dos
+lotes de FAMISANAR salen **idénticos** después del cambio: mismo archivo, celda
+por celda.
+
+**Una regla nueva del cruce, que pidió este lote.** El Dispensario objeta la
+**diferencia** de tarifa, así que el valor de la objeción casi nunca coincide
+con el del renglón facturado (glosa $16.600 de un servicio de $740.516). Antes
+eso dejaba el cruce en confianza baja aunque el nombre calzara exacto. Ahora,
+si el nombre coincide exacto **y en la factura hay un solo servicio que se
+llame así**, eso identifica el renglón — es la misma idea del «valor único en
+la factura», pero por el lado del nombre.
+
+**Archivos entregados:** `OBJECIONES_DISPENSARIO_03092026.xlsx` (el que se
+sube) y `CRUCE_DISPENSARIO_03-09-2026.xlsx` (el respaldo, con la hoja REVISAR
+vacía).
+
 ### 04-09-2026 (tarde) — FAMISANAR 2 de septiembre: 104 de 105 al primer intento
 
 Segundo lote de FAMISANAR con el mismo procedimiento del de la mañana: el
@@ -11006,6 +11046,14 @@ valor leido del PDF o con el objetado.
   (con ayuno de 8–10 horas, menos la creatinina), y **confirmar el inicio**
   de las terapias de deglución y respiratoria ya autorizadas.
 
+### Dispensario Médico — objeciones del 3 de septiembre (04-09)
+- **Piloto de una factura en DGH** antes del cargue de las 118 (regla del
+  repo). El archivo no dejó nada en REVISAR, pero el piloto se hace igual.
+- **Ojo con HUS0000550812:** son 11 objeciones del mismo servicio (`891901H`,
+  monitorización electroencefalográfica, $234.057 cada una). Está bien —la
+  factura tiene 12 renglones de ese servicio, uno por unidad— pero conviene
+  mirarlo en pantalla la primera vez.
+
 ### FAMISANAR — objeciones del 2 de septiembre (04-09)
 - **Completar la SO0101 de HUS0000544976** ($1.500.000). Candidato con el valor
   exacto: `120B01` SALA ESPECIAL (INCUBADORA III NIVEL), 3 × $500.000. Falta
@@ -11876,10 +11924,11 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 2. Llamar a la IPS del programa domiciliario para **agendar la visita del
    médico** antes de que se venza la fórmula del mes.
 
-### FAMISANAR — lo primero
-1. Revisar la hoja **REVISAR** de los dos cruces (1 y 2 de septiembre) y hacer
-   el **piloto de una factura** en DGH. Si el piloto entra bien, cargar el
-   resto de los dos lotes.
+### Objeciones para DGH — lo primero
+1. Revisar la hoja **REVISAR** de los cruces de FAMISANAR (1 y 2 de
+   septiembre) y hacer el **piloto de una factura** en DGH con cada uno de
+   los tres archivos (FAMISANAR 1-sep, FAMISANAR 2-sep y Dispensario 3-sep).
+   Si el piloto entra bien, cargar el resto.
 
 ### Análisis de velas — lo primero
 1. **Armar la aplicación con su histórico** y abrirla en el celular. En el PC

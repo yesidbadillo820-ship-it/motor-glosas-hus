@@ -48,7 +48,60 @@ por una corrida que genera un Excel por factura, listo para revisar e importar.
 
 ---
 
-## 2) Uso
+## 2) La otra entrada: el Excel de glosa inicial (`--entrada-excel`)
+
+Además del PDF, el listado llega ahora como **Excel de glosa inicial**, con
+cinco columnas:
+
+```
+FACTURA | VALOR GLOSA INICIAL | SERVICIO OBJETADO | CODIGO GLOSA INICIAL | DESCRIPCION GLOSA INICIAL
+```
+
+Ese archivo trae el **nombre** del servicio pero **no su código**, y DGH sólo
+reconoce el suyo. Con `--servicios-dgh` (el export de servicios facturados) el
+bot busca, dentro de esa misma factura, de qué renglón del DGH habla cada
+objeción y deja `SLNSERPRO` con el código bueno. El motor del cruce es el
+compartido con el bot de FAMISANAR (`tools/_cruce_dgh.py`): puntúa por código,
+nombre y valor, marca cada renglón con su confianza (ALTA / MEDIA / BAJA /
+SIN CRUCE) y **nunca inventa un servicio** — sin cruce confiable deja
+`SLNSERPRO` vacío y manda el renglón a la hoja REVISAR.
+
+Aquí el nombre pesa más que el valor, y por una razón: el Dispensario objeta la
+**diferencia** de tarifa, así que el valor de la objeción casi nunca es igual al
+del renglón facturado. Por eso, cuando el nombre calza exacto y en la factura
+sólo hay un servicio que se llame así, eso basta para identificarlo.
+
+### Cómo lee cada columna
+
+| Salida | Origen |
+|---|---|
+| `CRNCXC` | `FACTURA` (a 10 dígitos) |
+| `CRNCONOBJ` | `CODIGO GLOSA INICIAL`: `TA08 01 TARIFAS-…` → `TA0801` |
+| `SLNSERPRO` | del cruce contra el DGH usando `SERVICIO OBJETADO` |
+| `CROVALOBJ` | `VALOR GLOSA INICIAL` |
+| `CRDOBSERV` | `<código> <concepto>: <motivo>$<valor>` |
+| `CDCONSEC` | consecutivo **por factura** (vuelve a 1 en los archivos por factura) |
+| `CROTIPOBJ` | **0 = ADMINISTRATIVA**, **1 = MEDICA**, **2 = MIXTA**, por factura |
+| `CTNCENCOS` | **siempre vacía** (regla del área) |
+
+### Comando
+
+```powershell
+py tools\organizar_objeciones_dispensario.py `
+  --entrada-excel "D:\...\dispensario_3_septiembre.xlsx" `
+  --servicios-dgh "D:\...\SERVICIOS_FACTURADOS_DGH.xlsx" `
+  --consolidado   "D:\...\OBJECIONES_DISPENSARIO_03092026.xlsx" `
+  --reporte-cruce "D:\...\CRUCE_DISPENSARIO_03-09-2026.xlsx" `
+  --fecha 03/09/2026
+```
+
+Sin `--consolidado` genera un archivo por factura. `--reporte-cruce` escribe el
+respaldo del auditor (hojas `CRUCE`, `REVISAR` y `RESUMEN`) y necesita
+`--servicios-dgh`.
+
+---
+
+## 3) Uso
 
 ```powershell
 cd C:\temp-notas
@@ -90,7 +143,7 @@ generan archivo.
 
 ---
 
-## 3) Después de generar
+## 4) Después de generar
 
 1. Abrir cada Excel y **revisarlo** antes de importar a DGH (igual que con el
    flujo de EMSSANAR): verificar códigos `CRNCONOBJ`, completar `SLNSERPRO`
@@ -105,7 +158,7 @@ generan archivo.
 
 ---
 
-## 4) Si el PDF cambia de formato
+## 5) Si el PDF cambia de formato
 
 - El layout está fijado en `COLUMNAS` (rangos X de cada columna, página de
   1029 pt). Si el auditor cambia la plantilla, ajustar esos rangos.
@@ -115,7 +168,7 @@ generan archivo.
 - Diagnóstico rápido: correr con un solo `--pdf` y comparar el log
   (`N objeciones, total $X ✓/✗`) contra el "Total Factura" del PDF.
 
-## 5) Dependencias
+## 6) Dependencias
 
 ```powershell
 py -m pip install pdfplumber openpyxl
