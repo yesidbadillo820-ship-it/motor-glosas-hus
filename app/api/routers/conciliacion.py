@@ -10,7 +10,7 @@ from app.database import get_db
 from app.models.db import UsuarioRecord, GlosaRecord
 from app.repositories.conciliacion_repository import ConciliacionRepository
 from app.repositories.audit_repository import AuditRepository
-from app.api.deps import get_usuario_actual, get_auditor_o_superior
+from app.api.deps import get_auditor_o_superior, get_coordinador_o_admin, get_usuario_actual
 
 router = APIRouter(prefix="/conciliaciones", tags=["conciliacion"])
 
@@ -685,6 +685,291 @@ def _acta_o_400(contenido: bytes):
         raise HTTPException(400, "No se pudo leer el Excel: ¿es el formato del acta de la mesa?")
 
 
+async def _leer_los_dos_archivos(facturas, archivo_eps) -> tuple[list[str], list[dict]]:
+    """La lista de facturas y el consolidado de la EPS, ya leídos y validados.
+
+    Lo usan los dos caminos —bajar el Excel de una, o abrir la mesa— y por
+    eso vive acá: si mañana cambia el mensaje de un error, cambia para los
+    dos. Los errores dicen QUÉ hacer, porque un 422 pelado deja al auditor
+    mirando la pantalla sin saber cuál de los dos archivos estaba mal.
+    """
+    from app.services import acta_conciliacion_armar as armador
+
+    crudo_facturas = await facturas.read()
+    crudo_eps = await archivo_eps.read()
+    if not crudo_facturas or not crudo_eps:
+        raise HTTPException(400, "Faltó uno de los dos archivos.")
+
+    try:
+        lista = armador.leer_lista_facturas(crudo_facturas)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, f"No se pudo leer la lista de facturas: {e}") from e
+    if not lista:
+        raise HTTPException(
+            422,
+            "La lista no trae ninguna factura reconocible. Se espera una columna "
+            "con los números (HUS0000542497, 542497 o HUS542497).",
+        )
+
+    try:
+        filas_eps, _ = armador.leer_archivo_eps(crudo_eps)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, f"No se pudo leer el archivo de la EPS: {e}") from e
+    if not filas_eps:
+        raise HTTPException(
+            422,
+            "En el archivo de la EPS no se encontró la fila de encabezados. Se "
+            "buscan las columnas FACTURA y VALOR OBJETADO.",
+        )
+    return lista, filas_eps
+
+
+# ══ La mesa: el acta vive en el motor mientras se trabaja ═══════════════
+
+
+def _mesa_o_404(db, mesa_id: int):
+    from app.models.db import MesaConciliacionRecord
+
+    mesa = db.query(MesaConciliacionRecord).filter(MesaConciliacionRecord.id == mesa_id).first()
+    if mesa is None:
+        raise HTTPException(404, "Esa mesa de conciliación no existe.")
+    return mesa
+
+
+def _mesa_json(db, mesa) -> dict:
+    from app.services import mesa_conciliacion as svc_mesa
+
+    lineas = svc_mesa.lineas_de(db, mesa.id)
+    return {
+        "id": mesa.id,
+        "estado": mesa.estado,
+        "nit": mesa.nit or "",
+        "razon_social": mesa.razon_social or "",
+        "numero_acta": mesa.numero_acta or "",
+        "periodo": mesa.periodo or "",
+        "fecha_conciliacion": (
+            mesa.fecha_conciliacion.date().isoformat() if mesa.fecha_conciliacion else None
+        ),
+        "creado_en": mesa.creado_en.isoformat() if mesa.creado_en else None,
+        "creado_por": mesa.creado_por or "",
+        "facturas_en_lista": mesa.facturas_en_lista or 0,
+        "resumen": svc_mesa.resumen(db, mesa.id),
+        "lineas": [
+            {
+                "id": x.id,
+                "orden": x.orden,
+                "item": x.item or "",
+                "radicado": x.radicado or "",
+                "factura": x.factura or "",
+                "fecha_factura": x.fecha_factura or "",
+                "cod_glosa": x.cod_glosa or "",
+                "descripcion": x.descripcion or "",
+                "tipificacion": x.tipificacion or "",
+                "tipo_glosa": x.tipo_glosa or "",
+                "aviso": x.aviso or "",
+                "valor_factura": x.valor_factura or 0.0,
+                "glosa_inicial": x.glosa_inicial or 0.0,
+                "acepta_ips": x.acepta_ips or 0.0,
+                "levanta_entidad": x.levanta_entidad or 0.0,
+                "ratificado": x.ratificado or 0.0,
+                "pendiente": x.pendiente,
+                "texto_conciliacion": x.texto_conciliacion or "",
+                "centro_costo": x.centro_costo or "",
+                "cuenta_contable": x.cuenta_contable or "",
+                "concepto_nota": x.concepto_nota or "",
+            }
+            for x in lineas
+        ],
+    }
+
+
+@router.post("/mesa/abrir", status_code=201)
+async def mesa_abrir(
+    facturas: UploadFile = File(...),
+    archivo_eps: UploadFile = File(...),
+    nit: str = Form(default=""),
+    razon_social: str = Form(default=""),
+    numero_acta: str = Form(default=""),
+    periodo: str = Form(default=""),
+    fecha_conciliacion: str = Form(default=""),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Arma el acta y la deja EN EL MOTOR, lista para trabajar en pantalla.
+
+    A diferencia de `/acta-excel/armar`, que devuelve el Excel y se olvida,
+    acá el acta se guarda: la audiencia dura horas y el trabajo no puede
+    depender de que no se cierre una pestaña.
+    """
+    from datetime import date as _date
+
+    from app.services import acta_conciliacion_armar as armador
+    from app.services import mesa_conciliacion as svc_mesa
+
+    lista, filas_eps = await _leer_los_dos_archivos(facturas, archivo_eps)
+
+    fecha = None
+    if fecha_conciliacion.strip():
+        try:
+            fecha = _date.fromisoformat(fecha_conciliacion.strip()[:10])
+        except ValueError:
+            raise HTTPException(422, "La fecha de conciliación va como AAAA-MM-DD.") from None
+
+    encabezado = armador.Encabezado(
+        nit=nit.strip(),
+        razon_social=razon_social.strip(),
+        fecha_conciliacion=fecha,
+        numero_acta=numero_acta.strip(),
+        periodo=periodo.strip(),
+    )
+    mesa = svc_mesa.abrir(
+        db, lista, filas_eps, encabezado, usuario=str(getattr(current_user, "email", "") or "")
+    )
+    if not svc_mesa.lineas_de(db, mesa.id):
+        raise HTTPException(
+            422,
+            "Ninguna de las facturas de la lista tiene glosas en el archivo de la "
+            "EPS. Revise que los dos archivos sean de la misma tanda.",
+        )
+    return _mesa_json(db, mesa)
+
+
+@router.get("/mesa")
+def mesa_listar(
+    estado: str = Query(default=""),
+    limite: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Las mesas, de la más nueva a la más vieja. Sin los renglones."""
+    from app.models.db import MesaConciliacionRecord
+    from app.services import mesa_conciliacion as svc_mesa
+
+    q = db.query(MesaConciliacionRecord)
+    if estado:
+        q = q.filter(MesaConciliacionRecord.estado == estado.strip().upper())
+    filas = q.order_by(MesaConciliacionRecord.id.desc()).limit(limite).all()
+    return [
+        {
+            "id": m.id,
+            "estado": m.estado,
+            "numero_acta": m.numero_acta or "",
+            "razon_social": m.razon_social or "",
+            "creado_en": m.creado_en.isoformat() if m.creado_en else None,
+            "creado_por": m.creado_por or "",
+            "resumen": svc_mesa.resumen(db, m.id),
+        }
+        for m in filas
+    ]
+
+
+@router.get("/mesa/{mesa_id}")
+def mesa_ver(
+    mesa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """La mesa con todos sus renglones, para pintarla en pantalla."""
+    return _mesa_json(db, _mesa_o_404(db, mesa_id))
+
+
+class LineaMesaIn(BaseModel):
+    tipo_glosa: Optional[str] = None
+    acepta_ips: Optional[float] = None
+    levanta_entidad: Optional[float] = None
+    ratificado: Optional[float] = None
+    texto_conciliacion: Optional[str] = None
+    centro_costo: Optional[str] = None
+    cuenta_contable: Optional[str] = None
+    concepto_nota: Optional[str] = None
+
+
+@router.patch("/mesa/{mesa_id}/linea/{linea_id}")
+def mesa_guardar_linea(
+    mesa_id: int,
+    linea_id: int,
+    body: LineaMesaIn,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Guarda un renglón mientras se negocia. Se llama a cada cambio."""
+    from app.services import mesa_conciliacion as svc_mesa
+
+    r = svc_mesa.guardar_linea(
+        db,
+        mesa_id,
+        linea_id,
+        body.model_dump(exclude_none=True),
+        usuario=str(getattr(current_user, "email", "") or ""),
+    )
+    if r.get("estado") == "no_existe":
+        raise HTTPException(404, "Esa mesa no existe.")
+    if r.get("estado") == "no_existe_linea":
+        raise HTTPException(404, "Ese renglón no es de esta mesa.")
+    if r.get("estado") == "cerrada":
+        raise HTTPException(409, r.get("detalle", "La mesa está cerrada."))
+    r["resumen"] = svc_mesa.resumen(db, mesa_id)
+    return r
+
+
+@router.post("/mesa/{mesa_id}/cerrar")
+def mesa_cerrar(
+    mesa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Congela la mesa y aprende la tipificación que decidió una persona."""
+    from app.services import mesa_conciliacion as svc_mesa
+
+    _mesa_o_404(db, mesa_id)
+    return svc_mesa.cerrar(db, mesa_id, usuario=str(getattr(current_user, "email", "") or ""))
+
+
+@router.post("/mesa/{mesa_id}/reabrir")
+def mesa_reabrir(
+    mesa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Vuelve a abrir una mesa: la audiencia se reanudó, o se cerró antes de
+    tiempo. Lo aprendido no se borra."""
+    from app.services import mesa_conciliacion as svc_mesa
+
+    _mesa_o_404(db, mesa_id)
+    return svc_mesa.reabrir(db, mesa_id, usuario=str(getattr(current_user, "email", "") or ""))
+
+
+@router.get("/mesa/{mesa_id}/acta.xlsm")
+def mesa_descargar(
+    mesa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """El acta del formato oficial con lo que se concilió en la mesa."""
+    import io as _io
+    from pathlib import Path as _Path
+
+    from fastapi.responses import StreamingResponse
+
+    from app.services import mesa_conciliacion as svc_mesa
+
+    mesa = _mesa_o_404(db, mesa_id)
+    modelo = _Path("plantillas/ACTA_SINAC_modelo.xlsm")
+    if not modelo.is_file():
+        raise HTTPException(503, "Falta el modelo del acta en el servidor.")
+    try:
+        libro = svc_mesa.a_excel(db, mesa, modelo.read_bytes())
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, f"No se pudo generar el acta: {e}") from e
+
+    nombre = f"ACTA_SINAC_{(mesa.numero_acta or mesa.id)}.xlsm".replace(" ", "_")
+    return StreamingResponse(
+        _io.BytesIO(libro),
+        media_type="application/vnd.ms-excel.sheet.macroEnabled.12",
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
 @router.post("/acta-excel/armar")
 async def acta_excel_armar(
     facturas: UploadFile = File(..., description="Excel con la columna de facturas"),
@@ -715,32 +1000,7 @@ async def acta_excel_armar(
 
     from app.services import acta_conciliacion_armar as armador
 
-    crudo_facturas = await facturas.read()
-    crudo_eps = await archivo_eps.read()
-    if not crudo_facturas or not crudo_eps:
-        raise HTTPException(400, "Faltó uno de los dos archivos.")
-
-    try:
-        lista = armador.leer_lista_facturas(crudo_facturas)
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(400, f"No se pudo leer la lista de facturas: {e}") from e
-    if not lista:
-        raise HTTPException(
-            422,
-            "La lista no trae ninguna factura reconocible. Se espera una columna "
-            "con los números (HUS0000542497, 542497 o HUS542497).",
-        )
-
-    try:
-        filas_eps, _ = armador.leer_archivo_eps(crudo_eps)
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(400, f"No se pudo leer el archivo de la EPS: {e}") from e
-    if not filas_eps:
-        raise HTTPException(
-            422,
-            "En el archivo de la EPS no se encontró la fila de encabezados. Se "
-            "buscan las columnas FACTURA y VALOR OBJETADO.",
-        )
+    lista, filas_eps = await _leer_los_dos_archivos(facturas, archivo_eps)
 
     fecha = None
     if fecha_conciliacion.strip():
