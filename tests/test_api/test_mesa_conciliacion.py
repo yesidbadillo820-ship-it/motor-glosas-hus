@@ -360,6 +360,171 @@ class TestCerrarYReabrir:
         assert otra["lineas"][0]["aviso"] == ""
 
 
+class TestElDetalleParaRefutarEnLaMesa:
+    """Cuando la EPS sostiene una glosa: ¿qué tenemos para refutarla?"""
+
+    def _con_glosa_en_el_motor(self, cliente, db):
+        from app.models.db import GlosaRecord
+
+        db.add(
+            GlosaRecord(
+                eps="COOSALUD",
+                factura="HUS0000542497",
+                codigo_glosa="TA0201",
+                valor_objetado=6685,
+                estado="PENDIENTE",
+                workflow_state="RESPONDIDA",
+                etapa="OBJECION",
+                dictamen="<div>ESE HUS NO ACEPTA LA GLOSA</div>",
+            )
+        )
+        db.commit()
+        return _abrir(cliente, _lista("542497"), _eps(("542497", "TA0201", 6685))).json()
+
+    def test_el_renglon_se_enlaza_con_la_glosa_del_motor(self, cliente, db):
+        m = self._con_glosa_en_el_motor(cliente, db)
+        d = cliente.get(f"/conciliaciones/mesa/{m['id']}/linea/{m['lineas'][0]['id']}").json()
+        assert d["glosa_id"]
+        assert d["glosa"]["dictamen"], "sin el dictamen no hay con qué refutar en la mesa"
+        assert d["glosa"]["workflow_state"] == "RESPONDIDA"
+
+    def test_una_glosa_que_el_motor_no_tiene_lo_dice_sin_fallar(self, cliente):
+        """Hay facturas que la EPS glosa y que nunca entraron por recepción."""
+        m = _abrir(cliente, _lista("542497"), _eps(("542497", "TA0201", 100))).json()
+        d = cliente.get(f"/conciliaciones/mesa/{m['id']}/linea/{m['lineas'][0]['id']}").json()
+        assert d["glosa_id"] is None and d["glosa"] is None
+        assert "no está en el historial del motor" in d["nota"]
+
+    def test_el_enlace_respeta_el_codigo_no_solo_la_factura(self, cliente, db):
+        """Una factura tiene varias glosas: traerse la primera sería mostrar
+        el historial de otra."""
+        from app.models.db import GlosaRecord
+
+        db.add(
+            GlosaRecord(
+                eps="X",
+                factura="HUS0000542497",
+                codigo_glosa="SO9999",
+                valor_objetado=1,
+                estado="P",
+                dictamen="OTRA COSA",
+            )
+        )
+        db.commit()
+        m = _abrir(cliente, _lista("542497"), _eps(("542497", "TA0201", 100))).json()
+        d = cliente.get(f"/conciliaciones/mesa/{m['id']}/linea/{m['lineas'][0]['id']}").json()
+        assert d["glosa_id"] is None, "se enlazó a una glosa de otro código"
+
+    def test_los_soportes_dicen_cual_de_los_tres_estados(self, cliente):
+        m = _abrir(cliente, _lista("542497"), _eps(("542497", "TA0201", 100))).json()
+        d = cliente.get(f"/conciliaciones/mesa/{m['id']}/linea/{m['lineas'][0]['id']}").json()
+        assert d["soportes"]["estado"] in (
+            "CON_SOPORTES",
+            "SIN_SOPORTES",
+            "INDEXANDO",
+            "SIN_INDICE",
+        )
+
+    def test_el_soporte_llega_con_su_nombre_y_no_en_blanco(self, cliente, monkeypatch):
+        """El indexador contesta con DICCIONARIOS, no con objetos.
+
+        Si se leen con `getattr` en vez de `.get`, el cajón muestra la
+        cantidad correcta pero la lista sale con los nombres vacíos: el
+        auditor ve «3 soportes» y tres renglones en blanco, y en una
+        audiencia eso es lo mismo que no tener nada.
+        """
+        from app.services import soportes_autodiscovery_service as sas
+
+        class _IndiceFalso:
+            def stats(self):
+                return {"construyendo": False}
+
+            def lookup(self, factura, auto_rebuild=True):
+                return [
+                    {
+                        "nombre_archivo": "FEV-HUS542497.pdf",
+                        "tipo": "factura_electronica",
+                        "tipo_codigo": "FEV",
+                        "tamano_kb": 210,
+                        "ruta": "/soportes/FEV-HUS542497.pdf",
+                    }
+                ]
+
+        monkeypatch.setattr(sas, "get_indexer", lambda: _IndiceFalso())
+        m = _abrir(cliente, _lista("542497"), _eps(("542497", "TA0201", 100))).json()
+        d = cliente.get(f"/conciliaciones/mesa/{m['id']}/linea/{m['lineas'][0]['id']}").json()
+
+        sop = d["soportes"]
+        assert sop["estado"] == "CON_SOPORTES" and sop["cuantos"] == 1
+        assert sop["archivos"][0]["nombre"] == "FEV-HUS542497.pdf"
+        assert sop["archivos"][0]["tipo_codigo"] == "FEV"
+
+    def test_los_soportes_de_la_mesa_se_piden_por_factura_no_por_renglon(self, cliente):
+        """Una factura con doce glosas comparte sus soportes."""
+        m = _abrir(
+            cliente,
+            _lista("542497"),
+            _eps(("542497", "TA0201", 100), ("542497", "SO3601", 200)),
+        ).json()
+        s = cliente.get(f"/conciliaciones/mesa/{m['id']}/soportes").json()
+        assert len(s) == 1 and "HUS0000542497" in s
+
+    def test_un_renglon_de_otra_mesa_no_se_puede_espiar(self, cliente, db):
+        a = self._con_glosa_en_el_motor(cliente, db)
+        b = _abrir(cliente, _lista("542497"), _eps(("542497", "TA0201", 6685))).json()
+        r = cliente.get(f"/conciliaciones/mesa/{a['id']}/linea/{b['lineas'][0]['id']}")
+        assert r.status_code == 404
+
+
+class TestComentariosDelEquipo:
+    def test_se_guardan_contra_la_glosa_para_que_sirvan_la_proxima_vez(self, cliente, db):
+        from app.models.db import ComentarioGlosaRecord, GlosaRecord
+
+        db.add(
+            GlosaRecord(
+                eps="COOSALUD",
+                factura="HUS0000542497",
+                codigo_glosa="TA0201",
+                valor_objetado=6685,
+                estado="P",
+                dictamen="<div>X</div>",
+            )
+        )
+        db.commit()
+        m = _abrir(cliente, _lista("542497"), _eps(("542497", "TA0201", 6685))).json()
+        lid = m["lineas"][0]["id"]
+
+        r = cliente.post(
+            f"/conciliaciones/mesa/{m['id']}/linea/{lid}/comentario",
+            json={"texto": "La EPS insiste; buscar la factura de compra."},
+        )
+        assert r.status_code == 201
+        # Contra la glosa, no contra la mesa: la misma glosa puede volver a
+        # otra audiencia y lo anotado sirve las dos veces.
+        assert db.query(ComentarioGlosaRecord).one().glosa_id == r.json()["glosa_id"]
+
+        d = cliente.get(f"/conciliaciones/mesa/{m['id']}/linea/{lid}").json()
+        assert d["comentarios"][0]["texto"].startswith("La EPS insiste")
+        assert d["comentarios"][0]["autor"] == "aud@hus.gov.co"
+
+    def test_sin_glosa_enlazada_se_explica_en_vez_de_perder_el_comentario(self, cliente):
+        m = _abrir(cliente, _lista("542497"), _eps(("542497", "TA0201", 100))).json()
+        r = cliente.post(
+            f"/conciliaciones/mesa/{m['id']}/linea/{m['lineas'][0]['id']}/comentario",
+            json={"texto": "algo"},
+        )
+        assert r.status_code == 409
+        assert "no está enlazado" in r.json()["detail"]
+
+    def test_un_comentario_vacio_se_rechaza(self, cliente):
+        m = _abrir(cliente, _lista("542497"), _eps(("542497", "TA0201", 100))).json()
+        r = cliente.post(
+            f"/conciliaciones/mesa/{m['id']}/linea/{m['lineas'][0]['id']}/comentario",
+            json={"texto": "   "},
+        )
+        assert r.status_code in (409, 422)
+
+
 @pytest.mark.skipif(not MODELO.is_file(), reason="falta el modelo del acta")
 class TestElActaQueSaleDeLaMesa:
     def test_sale_con_lo_conciliado_y_con_macros(self, cliente):

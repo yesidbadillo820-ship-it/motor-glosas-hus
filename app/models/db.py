@@ -1797,6 +1797,13 @@ class MesaLineaRecord(Base):
     mesa_id = Column(Integer, index=True, nullable=False)
     orden = Column(Integer, default=0)
 
+    # La glosa del motor a la que corresponde este renglón, si la tenemos.
+    # Los renglones vienen del archivo de la EPS, no del historial, así que
+    # puede estar vacía: hay facturas que la EPS glosa y que el motor nunca
+    # recibió. Cuando está, abre la puerta al historial, a los comentarios
+    # del equipo y a los soportes que ya se le cargaron.
+    glosa_id = Column(Integer, index=True)
+
     # ── Lo que vino del archivo de la EPS ──
     item = Column(String(10))
     radicado = Column(String(60))

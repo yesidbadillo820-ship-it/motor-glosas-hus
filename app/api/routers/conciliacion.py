@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
@@ -968,6 +968,95 @@ def mesa_reabrir(
 
     _mesa_o_404(db, mesa_id)
     return svc_mesa.reabrir(db, mesa_id, usuario=str(getattr(current_user, "email", "") or ""))
+
+
+@router.get("/mesa/{mesa_id}/soportes")
+def mesa_soportes(
+    mesa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Qué soportes tiene cada factura de la mesa.
+
+    Va aparte de `/mesa/{id}` a propósito: consultar el índice de soportes
+    puede tardar, y la tabla tiene que pintarse ya. Las insignias llegan
+    después y se colocan solas.
+    """
+    from app.services import mesa_conciliacion as svc_mesa
+
+    _mesa_o_404(db, mesa_id)
+    return svc_mesa.soportes_de_la_mesa(db, mesa_id)
+
+
+@router.get("/mesa/{mesa_id}/linea/{linea_id}")
+def mesa_ver_linea(
+    mesa_id: int,
+    linea_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """El detalle de un renglón: dictamen, soportes y comentarios del equipo.
+
+    Es lo que se abre en la audiencia cuando la EPS sostiene una glosa y hay
+    que responder «¿qué tenemos para refutar esto?» sin salir de la mesa.
+    """
+    from app.services import mesa_conciliacion as svc_mesa
+
+    _mesa_o_404(db, mesa_id)
+    r = svc_mesa.detalle_linea(db, mesa_id, linea_id)
+    if r.get("estado") == "no_existe":
+        raise HTTPException(404, "Ese renglón no es de esta mesa.")
+    return r
+
+
+class ComentarioMesaIn(BaseModel):
+    texto: str = Field(..., min_length=1, max_length=4000)
+
+
+@router.post("/mesa/{mesa_id}/linea/{linea_id}/comentario", status_code=201)
+def mesa_comentar_linea(
+    mesa_id: int,
+    linea_id: int,
+    body: ComentarioMesaIn,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Un comentario del equipo sobre la glosa de este renglón.
+
+    Se guarda contra la GLOSA, no contra la mesa: la misma glosa puede
+    volver a otra audiencia, y lo que anotó un compañero sirve las dos veces.
+    Por eso reusa `comentarios_glosa` en vez de una tabla nueva.
+    """
+    from app.models.db import ComentarioGlosaRecord, MesaLineaRecord
+
+    _mesa_o_404(db, mesa_id)
+    linea = (
+        db.query(MesaLineaRecord)
+        .filter(MesaLineaRecord.id == linea_id)
+        .filter(MesaLineaRecord.mesa_id == mesa_id)
+        .first()
+    )
+    if linea is None:
+        raise HTTPException(404, "Ese renglón no es de esta mesa.")
+    if not linea.glosa_id:
+        raise HTTPException(
+            409,
+            "Este renglón no está enlazado a una glosa del motor: vino en el "
+            "archivo de la EPS y no se recibió por el flujo normal, así que no "
+            "hay dónde guardar el comentario.",
+        )
+
+    comentario = ComentarioGlosaRecord(
+        glosa_id=linea.glosa_id,
+        autor_email=str(getattr(current_user, "email", "") or "")[:200],
+        autor_nombre=str(getattr(current_user, "nombre", "") or "")[:200] or None,
+        autor_rol=str(getattr(current_user, "rol", "") or "")[:40] or None,
+        texto=body.texto.strip(),
+    )
+    db.add(comentario)
+    db.commit()
+    db.refresh(comentario)
+    return {"id": comentario.id, "glosa_id": linea.glosa_id}
 
 
 @router.get("/mesa/{mesa_id}/acta.xlsm")
