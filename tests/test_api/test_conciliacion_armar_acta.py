@@ -169,12 +169,14 @@ class TestVerQueSaleAntesDeGenerar:
         from app.api.routers.conciliacion import _avisos_agrupados
         from app.services.acta_conciliacion_armar import Aviso
 
-        agrupados = _avisos_agrupados([
-            Aviso("HUS1", "falta el tipo", 2),
-            Aviso("HUS1", "falta el tipo", 3),
-            Aviso("HUS1", "familia CO sin tipificación", 4),
-            Aviso("HUS2", "falta el tipo", 5),
-        ])
+        agrupados = _avisos_agrupados(
+            [
+                Aviso("HUS1", "falta el tipo", 2),
+                Aviso("HUS1", "falta el tipo", 3),
+                Aviso("HUS1", "familia CO sin tipificación", 4),
+                Aviso("HUS2", "falta el tipo", 5),
+            ]
+        )
         assert len(agrupados) == 3
         assert [a["renglones"] for a in agrupados] == [2, 1, 1]
 
