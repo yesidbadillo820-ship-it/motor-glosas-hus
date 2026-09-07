@@ -91,6 +91,21 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 07-09-2026 (tarde, 3) — «Plata recuperada» se resistía a irse del menú
+
+Al aplicar lo del día anterior (ocultar cuatro botones), **tres se fueron**
+—Alertas, Resumen del mes y Gobierno IA— pero **«Plata recuperada» seguía
+apareciendo** para Yesid. La razón: ese botón tiene una marca de «solo
+coordinación», y la función que decide qué ve cada rol volvía a **mostrarlo**
+a la coordinación, ganándole a la orden de esconderlo.
+
+Se corrigió: un botón marcado como «oculto» ahora **se queda oculto aunque sea
+de coordinación**. «Plata recuperada» ya no reaparece, y las demás pantallas de
+coordinación (Inteligencia, Expediente, Usuarios) se siguen viendo igual. Queda
+con su prueba para que no vuelva a pasar.
+
+---
+
 ### 07-09-2026 (tarde, 2) — El acta de conciliación se arma sola
 
 **El trabajo que quita.** Antes de cada mesa de conciliación, alguien se

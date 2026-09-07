@@ -2384,7 +2384,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
         <!-- 04-09-2026: Yesid pidió quitarlos del menú («nunca tendrán utilidad»).
              Se ocultan (como «Plantillas Gold»), no se borran: reversible quitando
              el display:none, y sin tocar el panel ni el backend. -->
-        <button class="sn-item" data-solo-coordinacion="1" data-tip="Plata recuperada" onclick="sidebarTab(this,'plata')" id="sn-plata" style="display:none">
+        <button class="sn-item" data-solo-coordinacion="1" data-oculto="1" data-tip="Plata recuperada" onclick="sidebarTab(this,'plata')" id="sn-plata" style="display:none">
           <svg class="i i-md" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           <span class="sn-item-label">Plata recuperada</span>
         </button>
@@ -13942,6 +13942,14 @@ function aplicarPermisosDelMenu(){
   var puede = esDeCoordinacion();
   var items = document.querySelectorAll('[data-solo-coordinacion="1"]');
   for(var i = 0; i < items.length; i++){
+    // 07-09-2026: un botón marcado data-oculto se queda oculto aunque sea de
+    // coordinación. Es lo que pidió Yesid para «Plata recuperada»: sin esto,
+    // esta función le ganaba a su display:none y el botón reaparecía. El
+    // `getAttribute &&` deja pasar los elementos de mentira de las pruebas.
+    if(items[i].getAttribute && items[i].getAttribute('data-oculto') === '1'){
+      items[i].style.display = 'none';
+      continue;
+    }
     items[i].style.display = puede ? '' : 'none';
   }
   // Las secciones que quedan sin un solo botón visible tampoco deben dejar
