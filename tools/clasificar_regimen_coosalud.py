@@ -11,11 +11,19 @@ carpeta de soportes de cada factura en el share de facturacion electronica
  2. Copia la carpeta COMPLETA de la factura (XML, PDF, RIPS, CUV) a la carpeta
     maestra de su regimen:  <destino>\\Subsidiado\\  o  <destino>\\Contributivo\\.
     Lo que no se pueda clasificar queda en <destino>\\SIN_CLASIFICAR\\.
- 3. Extrae la fecha de ATENCION y de EGRESO del RIPS (consultas, procedimientos,
-    urgencias, hospitalizacion, medicamentos, etc.) y la fecha de INGRESO y
-    EGRESO del XML de la factura (bloque Interoperabilidad del sector salud o,
-    en su defecto, el InvoicePeriod).
- 4. Genera el Excel de auditoria con las columnas:
+ 3. Busca los SOPORTES DEL SERVICIO de cada factura en las rutas de radicacion
+    (Y:\\ y \\\\Prime\\...; ver RUTAS_RADICACION_DEFECTO) y los copia en la
+    subcarpeta SOPORTES_RADICACION\\ de la factura.
+ 4. Extrae la fecha de ATENCION y de EGRESO del RIPS (fechaEgreso de
+    hospitalizacion/urgencias manda; si no hay, la ultima atencion) y la fecha
+    de INGRESO y EGRESO de la factura. OJO aprendido con la factura real
+    HUS349680: el EndDate del InvoicePeriod NO es el egreso clinico — es la
+    fecha de facturacion (identica al IssueDate) — asi que el egreso de la
+    factura se lee del PDF impreso (fv*.pdf: "Fec Ingreso ... Fec Egreso ..."),
+    o del bloque Interoperabilidad si el emisor lo trae; del InvoicePeriod solo
+    se toma el StartDate (ingreso). Sin evidencia de egreso, la celda queda
+    vacia — no se inventa.
+ 5. Genera el Excel de auditoria con las columnas:
     Factura | Régimen | RIPS_Atencion | RIPS_Egreso | Factura_Ingreso |
     Factura_Egreso | Alerta_Diferencia (SI/NO) + columnas de apoyo.
 
@@ -27,11 +35,16 @@ USO tipico (PowerShell, desde C:\\temp-notas):
         --piloto 5
 
     * quitar --piloto para procesar todas las facturas.
-    * --sin-copiar genera solo el informe (no copia carpetas).
+    * --sin-copiar genera solo el informe (no copia carpetas ni busca soportes).
+    * --sin-soportes procesa y copia la factura electronica pero NO busca en
+      las rutas de radicacion (mas rapido).
+    * --raiz-soportes "<ruta>" (repetible) reemplaza las rutas de radicacion.
     * --meses 202605,202606 limita la busqueda a esos meses del share.
 
 DEPENDENCIAS:
-    py -m pip install openpyxl
+    py -m pip install openpyxl pymupdf
+    (pymupdf es para leer las fechas del PDF de la factura; sin el, esas
+     fechas se omiten y se avisa en el log)
 """
 
 from __future__ import annotations
@@ -40,10 +53,12 @@ import argparse
 import html
 import json
 import logging
+import os
 import re
 import shutil
 import sys
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
@@ -52,6 +67,27 @@ logger = logging.getLogger("clasificar_regimen")
 
 DEFAULT_SHARE = r"\\172.16.32.83\factura_electronica_net22"
 RE_MES = re.compile(r"^\d{6}$")
+
+# Rutas donde viven los soportes del servicio (PDF, FEV, HEV, etc.) que se
+# radican con la factura. Se recorren TODAS y se copia lo que aparezca de cada
+# factura (carpeta HUS<n> completa o archivos sueltos con el numero adentro).
+RUTAS_RADICACION_DEFECTO: tuple[str, ...] = (
+    r"Y:\6. JUNIO 2026 - SOPORTES RADICACION",
+    "\\\\Prime\\servidor_radicación\\SERVIDOR RADICACION\\2. SINAC SC SAS - 2026",
+    "\\\\Prime\\servidor_radicación\\SERVIDOR RADICACION\\1. SINAC SC SAS - 2025",
+    r"\\Prime\radicacion_2026\8. AGOSTO 2026 - SOPORTES RADICACION",
+    r"\\Prime\radicacion_2026\9.SEPTIEMBRE - SOPORTES RADICACION",
+    r"\\Prime\radicacion_2026\2. FEBRERO 2026 - SOPORTES RADICACION CARPETA 2",
+    r"\\Prime\radicacion_2026\3. MARZO 2026 - SOPORTES RADICACION",
+    r"\\Prime\radicacion_2026\4. ABRIL 2026 - SOPORTES RADICACION",
+    r"\\Prime\radicacion_2026\5. MAYO 2026 - SOPORTES RADICACION",
+    r"\\Prime\radicacion_2026\6. JUNIO 2026 - SOPORTES RADICACION",
+    r"\\Prime\radicacion_2026\7. JULIO 2026 - SOPORTES RADICACION",
+)
+
+# Numero de factura dentro de nombres de carpeta/archivo del share de
+# radicacion (FEV_900006037_HUS349680.pdf, carpeta "HUS349680_PEND...", etc.).
+_RE_NUM_FACTURA = re.compile(r"HUS\s*0*(\d{4,12})", re.IGNORECASE)
 
 # tipoUsuario del RIPS JSON (Res. 2275/2023, tabla tipoUsuario)
 TIPOS_CONTRIBUTIVO = {"01", "02", "03"}
@@ -80,6 +116,15 @@ def norm_factura(valor: str) -> str:
     if m and m.group(2):
         return m.group(1) + m.group(2)
     return v
+
+
+def clave_numerica(valor: str) -> str:
+    """HUS0000349680 → '349680': la llave para cruzar contra nombres del share."""
+    m = _RE_NUM_FACTURA.search(str(valor or "").upper())
+    if m:
+        return m.group(1).lstrip("0") or "0"
+    digitos = re.sub(r"\D", "", str(valor or ""))
+    return digitos.lstrip("0") or ("0" if digitos else "")
 
 
 def _decodificar(crudo: bytes) -> str:
@@ -299,12 +344,13 @@ _RE_PAR_SALUD = re.compile(
 
 
 @dataclass
-class DatosXml:
+class DatosFactura:
     ingreso: date | None = None
     egreso: date | None = None
     fuente: str = ""
     regimen_hint: str = ""
     archivo: str = ""
+    obs: list[str] = field(default_factory=list)
 
 
 def _texto_xml(ruta: Path) -> str:
@@ -332,67 +378,150 @@ def _elegir_xml(carpeta: Path) -> Path | None:
     return candidatos[0] if candidatos else None
 
 
-def analizar_xml_factura(carpeta: Path) -> DatosXml:
-    datos = DatosXml()
+# ── Fechas clinicas desde el PDF impreso de la factura (fv*.pdf) ─────────────
+#
+# En las facturas del HUS el XML NO trae el egreso clinico (el EndDate del
+# InvoicePeriod es la fecha de facturacion). El PDF impreso si lo trae:
+#   "Fec Ingreso 07 feb. 2025 11:02 a. m."  /  "Fec Egreso 10 feb. 2025 12:15 p. m."
+
+_MESES_ES = {
+    "ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6,
+    "jul": 7, "ago": 8, "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dic": 12,
+}  # fmt: skip
+_RE_FEC_PDF = re.compile(
+    r"Fec\.?\s*(Ingreso|Egreso)\s*:?\s*(\d{1,2})\s+([a-záéíóú]{3,5})\.?\s+(\d{4})",
+    re.IGNORECASE,
+)
+_aviso_sin_pymupdf = False
+
+
+def _texto_pdf(ruta: Path) -> str | None:
+    """Texto de la primera pagina del PDF. None si no hay lector instalado."""
+    global _aviso_sin_pymupdf
+    try:
+        import pymupdf  # type: ignore[import-not-found]
+    except ImportError:
+        try:
+            import fitz as pymupdf  # type: ignore[import-not-found]  # PyMuPDF viejo
+        except ImportError:
+            if not _aviso_sin_pymupdf:
+                _aviso_sin_pymupdf = True
+                logger.warning(
+                    "pymupdf no esta instalado: no se leeran las fechas del PDF de la "
+                    "factura. Instalalo con: py -m pip install pymupdf"
+                )
+            return None
+    try:
+        with pymupdf.open(ruta) as doc:
+            return doc[0].get_text() if doc.page_count else ""
+    except Exception:
+        return ""
+
+
+def _fechas_desde_texto_pdf(texto: str) -> dict[str, date]:
+    """{'ingreso': date, 'egreso': date} con lo que el PDF traiga legible."""
+    fechas: dict[str, date] = {}
+    for etiqueta, dia, mes_txt, anio in _RE_FEC_PDF.findall(texto or ""):
+        mes = _MESES_ES.get(mes_txt.lower().rstrip("."))
+        if mes is None:
+            continue
+        try:
+            f = date(int(anio), mes, int(dia))
+        except ValueError:
+            continue
+        clave = etiqueta.lower()
+        if clave not in fechas:
+            fechas[clave] = f
+    return fechas
+
+
+def _elegir_pdf(carpeta: Path) -> Path | None:
+    candidatos = sorted(p for p in carpeta.glob("*.pdf") if p.is_file())
+    for p in candidatos:
+        if p.name.lower().startswith("fv"):
+            return p
+    return candidatos[0] if candidatos else None
+
+
+def analizar_factura(carpeta: Path) -> DatosFactura:
+    """Fechas de ingreso/egreso de la factura + pista de regimen.
+
+    Prioridad de fechas: (1) el PDF impreso de la factura, (2) el bloque
+    Interoperabilidad del XML, (3) SOLO el StartDate del InvoicePeriod como
+    ingreso. El EndDate del InvoicePeriod NUNCA se usa como egreso: en el HUS
+    es la fecha de facturacion (= IssueDate), no el egreso clinico."""
+    datos = DatosFactura()
+
+    # 1) PDF impreso de la factura.
+    pdf = _elegir_pdf(carpeta)
+    if pdf is not None:
+        texto_pdf = _texto_pdf(pdf)
+        if texto_pdf:
+            fechas = _fechas_desde_texto_pdf(texto_pdf)
+            if fechas:
+                datos.ingreso = fechas.get("ingreso")
+                datos.egreso = fechas.get("egreso")
+                datos.fuente = "PDF factura"
+                datos.archivo = pdf.name
+
+    # 2) XML: Interoperabilidad + InvoicePeriod (solo ingreso) + pista regimen.
     ruta = _elegir_xml(carpeta)
     if ruta is None:
+        if datos.fuente == "":
+            datos.obs.append("sin XML en la carpeta")
         return datos
-    datos.archivo = ruta.name
+    datos.archivo = datos.archivo or ruta.name
     texto = _texto_xml(ruta)
-    if not texto:
-        return datos
+    if texto:
+        pares = {
+            n.strip().upper(): re.sub(r"\s+", " ", v).strip()
+            for n, v in _RE_PAR_SALUD.findall(texto)
+        }
+        uso_interop = False
+        for nombre, valor in pares.items():
+            if "FECHA" not in nombre:
+                continue
+            f = parse_fecha(valor)
+            if f is None:
+                continue
+            if datos.ingreso is None and ("INGRESO" in nombre or "INICIO" in nombre):
+                datos.ingreso = f
+                uso_interop = True
+            if datos.egreso is None and ("EGRESO" in nombre or "FIN" in nombre):
+                datos.egreso = f
+                uso_interop = True
+        if uso_interop:
+            datos.fuente = (datos.fuente + "+Interoperabilidad").lstrip("+")
 
-    # 1) Pares Name/Value del bloque Interoperabilidad (sector salud).
-    pares = {
-        n.strip().upper(): re.sub(r"\s+", " ", v).strip() for n, v in _RE_PAR_SALUD.findall(texto)
-    }
-    for nombre, valor in pares.items():
-        if "FECHA" not in nombre:
-            continue
-        f = parse_fecha(valor)
-        if f is None:
-            continue
-        if datos.ingreso is None and ("INGRESO" in nombre or "INICIO" in nombre):
-            datos.ingreso = f
-            datos.fuente = "Interoperabilidad"
-        if datos.egreso is None and ("EGRESO" in nombre or "FIN" in nombre):
-            datos.egreso = f
-            datos.fuente = "Interoperabilidad"
+        if datos.ingreso is None:
+            m = re.search(
+                r"<(?:\w+:)?InvoicePeriod>(.*?)</(?:\w+:)?InvoicePeriod>",
+                texto,
+                re.DOTALL | re.IGNORECASE,
+            )
+            if m:
+                inicio = re.search(r"<(?:\w+:)?StartDate>([^<]+)<", m.group(1), re.IGNORECASE)
+                if inicio:
+                    datos.ingreso = parse_fecha(inicio.group(1))
+                    if datos.ingreso is not None:
+                        datos.fuente = (datos.fuente + "+InvoicePeriod (solo ingreso)").lstrip("+")
 
-    # 2) Respaldo: InvoicePeriod de la factura (StartDate/EndDate del bloque).
-    if datos.ingreso is None or datos.egreso is None:
-        m = re.search(
-            r"<(?:\w+:)?InvoicePeriod>(.*?)</(?:\w+:)?InvoicePeriod>",
-            texto,
-            re.DOTALL | re.IGNORECASE,
+        for nombre, valor in pares.items():
+            if "REGIMEN" in nombre or "TIPO_USUARIO" in nombre:
+                datos.regimen_hint = valor
+                break
+        if not datos.regimen_hint:
+            mayus = texto.upper()
+            if "SUBSIDIADO" in mayus and "CONTRIBUTIVO" not in mayus:
+                datos.regimen_hint = "SUBSIDIADO"
+            elif "CONTRIBUTIVO" in mayus and "SUBSIDIADO" not in mayus:
+                datos.regimen_hint = "CONTRIBUTIVO"
+
+    if datos.egreso is None:
+        datos.obs.append(
+            "la factura no trae egreso clinico legible (el EndDate del XML es la "
+            "fecha de facturacion, no se usa)"
         )
-        if m:
-            bloque = m.group(1)
-            inicio = re.search(r"<(?:\w+:)?StartDate>([^<]+)<", bloque, re.IGNORECASE)
-            fin = re.search(r"<(?:\w+:)?EndDate>([^<]+)<", bloque, re.IGNORECASE)
-            uso_periodo = False
-            if datos.ingreso is None and inicio:
-                datos.ingreso = parse_fecha(inicio.group(1))
-                uso_periodo = datos.ingreso is not None
-            if datos.egreso is None and fin:
-                datos.egreso = parse_fecha(fin.group(1))
-                uso_periodo = uso_periodo or datos.egreso is not None
-            if uso_periodo:
-                datos.fuente = (
-                    (datos.fuente + "+InvoicePeriod") if datos.fuente else "InvoicePeriod"
-                )
-
-    # 3) Pista de regimen (solo como ULTIMO recurso para clasificar).
-    for nombre, valor in pares.items():
-        if "REGIMEN" in nombre or "TIPO_USUARIO" in nombre:
-            datos.regimen_hint = valor
-            break
-    if not datos.regimen_hint:
-        mayus = texto.upper()
-        if "SUBSIDIADO" in mayus and "CONTRIBUTIVO" not in mayus:
-            datos.regimen_hint = "SUBSIDIADO"
-        elif "CONTRIBUTIVO" in mayus and "SUBSIDIADO" not in mayus:
-            datos.regimen_hint = "CONTRIBUTIVO"
     return datos
 
 
@@ -405,6 +534,71 @@ def regimen_de_hint(hint: str) -> str:
     if "CONTRIBUTIVO" in h or norm_factura(h) in ("1", "01", "02", "03", "2", "3"):
         return REGIMEN_CON
     return ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Soportes del servicio en las rutas de radicacion (Y:\ y \\Prime\...)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def indexar_radicacion(raices: list[Path], objetivos: set[str]) -> dict[str, list[Path]]:
+    """Recorre cada raiz UNA vez y devuelve {clave_numerica: [hallazgos]}.
+
+    Un hallazgo es una carpeta nombrada con la factura (se copia completa) o un
+    archivo suelto con el numero en el nombre (FEV_..._HUS349680.pdf). Poda: no
+    desciende a carpetas de OTRAS facturas (las mas numerosas del share) ni a
+    las carpetas objetivo ya encontradas. Un hilo por raiz: el costo es
+    latencia de red, no CPU."""
+    hallados: dict[str, list[Path]] = {k: [] for k in objetivos}
+
+    def _explorar(raiz: Path) -> tuple[Path, int, int]:
+        vistos = 0
+        hits = 0
+        for root, dirs, files in os.walk(str(raiz), onerror=lambda _e: None):
+            vistos += 1
+            conservar = []
+            for d in dirs:
+                m = _RE_NUM_FACTURA.search(d)
+                if m:
+                    num = m.group(1).lstrip("0") or "0"
+                    if num in objetivos:
+                        hallados[num].append(Path(root) / d)
+                        hits += 1
+                    continue  # carpeta de factura (objetivo o no): no descender
+                conservar.append(d)
+            dirs[:] = conservar
+            for fn in files:
+                m = _RE_NUM_FACTURA.search(fn)
+                if not m:
+                    continue
+                num = m.group(1).lstrip("0") or "0"
+                if num in objetivos:
+                    hallados[num].append(Path(root) / fn)
+                    hits += 1
+        return raiz, vistos, hits
+
+    with ThreadPoolExecutor(max_workers=max(1, min(len(raices), 12))) as pool:
+        for raiz, vistos, hits in pool.map(_explorar, raices):
+            logger.info(f"  soportes: {raiz} — {vistos} carpetas revisadas, {hits} hallazgos")
+    return hallados
+
+
+def copiar_soportes(soportes: list[Path], destino_fac: Path) -> tuple[int, list[str]]:
+    """Copia los hallazgos a <destino_fac>\\SOPORTES_RADICACION\\. Devuelve
+    (archivos copiados, observaciones de fallos)."""
+    obs: list[str] = []
+    sop_dir = destino_fac / "SOPORTES_RADICACION"
+    for hit in soportes:
+        try:
+            if hit.is_dir():
+                shutil.copytree(hit, sop_dir / hit.name, dirs_exist_ok=True)
+            else:
+                sop_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(hit, sop_dir / hit.name)
+        except OSError as exc:
+            obs.append(f"NO se pudo copiar soporte {hit.name}: {exc}")
+    copiados = sum(1 for p in sop_dir.rglob("*") if p.is_file()) if sop_dir.is_dir() else 0
+    return copiados, obs
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -428,6 +622,8 @@ class Resultado:
     origen: str = ""
     destino: str = ""
     copiados: int = 0
+    soportes_origen: str = ""
+    soportes_copiados: int = 0
     obs: list[str] = field(default_factory=list)
 
 
@@ -460,11 +656,25 @@ def procesar_factura(
     carpetas: list[Path],
     destino: Path,
     copiar: bool,
+    soportes: list[Path] | None = None,
+    con_soportes: bool = False,
 ) -> Resultado:
     r = Resultado(factura=factura)
+    soportes = soportes or []
+    if soportes:
+        r.soportes_origen = "; ".join(str(h) for h in soportes[:5]) + (
+            f" (+{len(soportes) - 5} mas)" if len(soportes) > 5 else ""
+        )
     if not carpetas:
         r.regimen = "NO_ENCONTRADA"
-        r.obs.append("la factura no aparece en el share")
+        r.obs.append("la factura no aparece en el share de facturacion electronica")
+        # Aunque no este la factura electronica, los soportes de radicacion
+        # que si aparecieron se guardan para no perderlos.
+        if copiar and soportes:
+            destino_fac = destino / SIN_CLASIFICAR / (norm_factura(factura) or factura)
+            r.soportes_copiados, obs_sop = copiar_soportes(soportes, destino_fac)
+            r.destino = str(destino_fac)
+            r.obs.extend(obs_sop)
         return r
     # Si esta en varios meses se usa la carpeta del mes mas reciente.
     carpeta = sorted(carpetas, key=lambda p: str(p))[-1]
@@ -473,15 +683,14 @@ def procesar_factura(
         r.obs.append(f"aparece en {len(carpetas)} carpetas del share; se uso la mas reciente")
 
     rips = leer_rips_carpeta(carpeta)
-    xml = analizar_xml_factura(carpeta)
+    fe = analizar_factura(carpeta)
 
     r.rips_atencion, r.rips_egreso = rips.atencion, rips.egreso
-    r.fact_ingreso, r.fact_egreso = xml.ingreso, xml.egreso
+    r.fact_ingreso, r.fact_egreso = fe.ingreso, fe.egreso
     r.tipos_usuario = ", ".join(sorted(set(rips.tipos_usuario)))
-    r.fuente_fechas_xml = xml.fuente or (
-        "sin fechas en " + xml.archivo if xml.archivo else "sin XML"
-    )
+    r.fuente_fechas_xml = fe.fuente or ("sin fechas en " + fe.archivo if fe.archivo else "sin XML")
     r.obs.extend(rips.obs)
+    r.obs.extend(fe.obs)
 
     regimen, detalle = regimen_de_tipos(rips.tipos_usuario)
     if regimen in (REGIMEN_SUB, REGIMEN_CON):
@@ -494,11 +703,11 @@ def procesar_factura(
         r.fuente_regimen = rips.fuente
         r.obs.append("tipoUsuario fuera de contributivo/subsidiado: " + detalle)
     else:
-        desde_xml = regimen_de_hint(xml.regimen_hint)
+        desde_xml = regimen_de_hint(fe.regimen_hint)
         if desde_xml:
             r.regimen = desde_xml
             r.fuente_regimen = "XML (verificar manualmente)"
-            r.obs.append(f"regimen tomado del XML ('{xml.regimen_hint}'): sin RIPS legible")
+            r.obs.append(f"regimen tomado del XML ('{fe.regimen_hint}'): sin RIPS legible")
         else:
             r.regimen = SIN_CLASIFICAR
             r.obs.append("sin RIPS legible ni pista de regimen en el XML")
@@ -514,6 +723,13 @@ def procesar_factura(
             r.copiados = sum(1 for p in destino_fac.rglob("*") if p.is_file())
         except OSError as exc:
             r.obs.append(f"NO se pudo copiar: {exc}")
+        if soportes:
+            r.soportes_copiados, obs_sop = copiar_soportes(soportes, destino_fac)
+            r.obs.extend(obs_sop)
+            # El conteo de la carpeta de la factura ya incluye los soportes.
+            r.copiados = sum(1 for p in destino_fac.rglob("*") if p.is_file())
+        elif con_soportes:
+            r.obs.append("sin soportes en las rutas de radicacion")
     return r
 
 
@@ -575,6 +791,8 @@ ENCABEZADOS = (
     "Fuente_Regimen",
     "Fuente_Fechas_Factura",
     "Archivos_Copiados",
+    "Soportes_Radicacion",
+    "Archivos_Soportes",
     "Carpeta_Origen",
     "Carpeta_Destino",
     "Observaciones",
@@ -612,6 +830,8 @@ def escribir_auditoria(resultados: list[Resultado], salida: Path) -> Path:
                 r.fuente_regimen,
                 r.fuente_fechas_xml,
                 r.copiados or "",
+                r.soportes_origen,
+                r.soportes_copiados or "",
                 r.origen,
                 r.destino,
                 " | ".join(r.obs),
@@ -625,7 +845,7 @@ def escribir_auditoria(resultados: list[Resultado], salida: Path) -> Path:
             celda_alerta.fill = rojo
         elif r.alerta == "NO":
             celda_alerta.fill = verde
-    anchos = (16, 14, 13, 13, 14, 14, 16, 34, 18, 22, 20, 16, 52, 52, 60)
+    anchos = (16, 14, 13, 13, 14, 14, 16, 34, 18, 22, 22, 16, 52, 16, 52, 52, 60)
     for i, ancho in enumerate(anchos, 1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = ancho
     ws.freeze_panes = "A2"
@@ -675,6 +895,18 @@ def main() -> int:
     parser.add_argument(
         "--sin-copiar", action="store_true", help="Solo el informe: no copia carpetas."
     )
+    parser.add_argument(
+        "--sin-soportes",
+        action="store_true",
+        help="No buscar soportes en las rutas de radicacion (mas rapido).",
+    )
+    parser.add_argument(
+        "--raiz-soportes",
+        action="append",
+        default=None,
+        metavar="RUTA",
+        help="Ruta de radicacion donde buscar soportes (repetible; reemplaza las default).",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -706,11 +938,37 @@ def main() -> int:
         return 1
     logger.info(f"Indice listo: {len(indice)} carpetas de factura en el share.")
 
+    # Soportes del servicio en las rutas de radicacion (solo si se va a copiar).
+    soportes_idx: dict[str, list[Path]] = {}
+    buscar_soportes = not args.sin_copiar and not args.sin_soportes
+    if buscar_soportes:
+        raices = [Path(p) for p in (args.raiz_soportes or RUTAS_RADICACION_DEFECTO)]
+        accesibles = []
+        for raiz in raices:
+            if raiz.is_dir():
+                accesibles.append(raiz)
+            else:
+                logger.warning(f"  ruta de soportes NO accesible (se omite): {raiz}")
+        if accesibles:
+            logger.info(
+                f"Buscando soportes de radicacion de {len(facturas)} facturas "
+                f"en {len(accesibles)} rutas (esto puede tardar)..."
+            )
+            soportes_idx = indexar_radicacion(accesibles, {clave_numerica(f) for f in facturas})
+        else:
+            buscar_soportes = False
+            logger.warning("Ninguna ruta de soportes accesible: se continua sin soportes.")
+
     salida = args.salida or (args.destino / "AUDITORIA_FECHAS_REGIMEN.xlsx")
     resultados: list[Resultado] = []
     for i, fac in enumerate(facturas, 1):
         r = procesar_factura(
-            fac, indice.get(norm_factura(fac), []), args.destino, not args.sin_copiar
+            fac,
+            indice.get(norm_factura(fac), []),
+            args.destino,
+            not args.sin_copiar,
+            soportes=soportes_idx.get(clave_numerica(fac), []),
+            con_soportes=buscar_soportes,
         )
         resultados.append(r)
         rango_rips = (
@@ -723,8 +981,9 @@ def main() -> int:
             if r.fact_ingreso and r.fact_egreso
             else "—"
         )
+        sop = f" | sop {r.soportes_copiados}" if r.soportes_copiados else ""
         logger.info(
-            f"[{i}/{len(facturas)}] {fac} → {r.regimen or '?'} | RIPS {rango_rips} | FE {rango_fe} | alerta {r.alerta}"
+            f"[{i}/{len(facturas)}] {fac} → {r.regimen or '?'} | RIPS {rango_rips} | FE {rango_fe} | alerta {r.alerta}{sop}"
         )
 
     salida_real = escribir_auditoria(resultados, salida)
@@ -736,6 +995,9 @@ def main() -> int:
     for regimen, n in conteo.most_common():
         logger.info(f"  {regimen}: {n}")
     logger.info(f"  Con diferencia de fechas (Alerta SI): {alertas}")
+    if buscar_soportes:
+        con_sop = sum(1 for r in resultados if r.soportes_copiados)
+        logger.info(f"  Con soportes de radicacion hallados: {con_sop} de {len(resultados)}")
     logger.info(f"  Excel de auditoria: {salida_real}")
     if not args.sin_copiar:
         logger.info(f"  Carpetas copiadas bajo: {args.destino}")

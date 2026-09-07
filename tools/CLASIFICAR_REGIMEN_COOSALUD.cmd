@@ -57,6 +57,10 @@ if not defined PYEXE (
     echo [i] Instalando el componente de Excel ^(openpyxl^), espere...
     %PYEXE% -m pip install --quiet --user openpyxl >nul 2>&1
 )
+%PYEXE% -c "import pymupdf" >nul 2>&1 || %PYEXE% -c "import fitz" >nul 2>&1 || (
+    echo [i] Instalando el lector de PDF ^(pymupdf^) para las fechas de la factura...
+    %PYEXE% -m pip install --quiet --user pymupdf >nul 2>&1
+)
 
 if not exist "%AQUI%\clasificar_regimen_coosalud.py" (
     echo [X] Falta clasificar_regimen_coosalud.py junto a este .cmd.

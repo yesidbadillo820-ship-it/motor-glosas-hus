@@ -115,6 +115,23 @@ Excel está abierto, guarda el informe con sufijo de hora en vez de perder
 la corrida (con su prueba; van 8). El informe se regenera con `--sin-copiar`
 sin volver a copiar nada.
 
+**Revisión con la factura real (noche):** el auditor subió la carpeta completa
+de la HUS349680 (XML, PDF, RIPS) y detectó que **Factura_Egreso salía mal**
+(11/02 en vez del 10/02 real). Al disecar el paquete se descubrió que el
+`EndDate` del XML **no es el egreso del paciente: es la fecha de facturación**
+(idéntica al IssueDate) — por eso 199 de las 200 «alertas» de la corrida eran
+falsas alarmas de ese mismo artefacto. El egreso clínico real solo vive en el
+RIPS y en el **PDF impreso de la factura** (`fv*.pdf`: «Fec Ingreso… Fec
+Egreso…»). El bot ahora lee las fechas de la factura del PDF (con pymupdf,
+que el doble clic instala solo); del XML solo toma el ingreso, y si no hay
+evidencia de egreso deja la celda vacía — no inventa. Verificado contra la
+factura real: RIPS 07/02–10/02 vs Factura 07/02–10/02, **alerta NO**. Además
+el bot ahora **busca los soportes del servicio en las 11 rutas de radicación**
+(`Y:\` y `\\Prime\...`) y los copia en `SOPORTES_RADICACION\` dentro de cada
+factura, con dos columnas nuevas en el informe (de dónde salieron y cuántos
+archivos). Van 14 pruebas. **Pendiente:** repetir la corrida completa con el
+bot corregido (los soportes tardan más por el recorrido de los servidores).
+
 ### 07-09-2026 (tarde) — FAMISANAR 3 de septiembre: el lote donde por fin aparecieron glosas médicas
 
 Cuarto archivo de objeciones con el mismo procedimiento: **321 objeciones de 12
