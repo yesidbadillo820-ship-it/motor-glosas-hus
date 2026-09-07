@@ -4324,6 +4324,46 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <span style="font-size:.75rem;color:var(--text3);align-self:center">Formato oficial idéntico al ACTA_SINAC_N_XXX. Acepta N facturas en una sola acta.</span>
         </div>
 
+        <!-- ARMAR el acta antes de la mesa: la lista de facturas + el archivo
+             que manda la EPS salen convertidos en el acta del formato oficial,
+             para no copiar doscientos renglones a mano. -->
+        <div class="form-card" style="margin-bottom:1rem">
+          <h3 style="margin:0 0 .3rem">🧰 Armar el acta (antes de la mesa)</h3>
+          <p style="margin:0 0 .6rem;font-size:.8rem;color:var(--text3)">Subí <b>la lista de facturas</b> que van a esta mesa y <b>el archivo que mandó la EPS</b>. El sistema los cruza y arma el acta en el formato oficial, con la tipificación puesta. Lo que no se pueda deducir queda marcado <b>◄ DEFINIR</b> para que lo resuelva una persona.</p>
+
+          <div class="concil-armar-archivos" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.6rem">
+            <div class="auto-drop" id="armar-drop-fact" onclick="document.getElementById('armar-file-fact').click()"
+                 ondragover="event.preventDefault();this.classList.add('sobre')"
+                 ondragleave="this.classList.remove('sobre')"
+                 ondrop="armarSoltar(event,'fact')">
+              <div class="auto-drop-txt" id="armar-txt-fact">1 · Lista de facturas<small>una columna en Excel · .xlsx</small></div>
+              <input type="file" id="armar-file-fact" accept=".xlsx,.xlsm" onchange="armarElegido('fact')" hidden>
+            </div>
+            <div class="auto-drop" id="armar-drop-eps" onclick="document.getElementById('armar-file-eps').click()"
+                 ondragover="event.preventDefault();this.classList.add('sobre')"
+                 ondragleave="this.classList.remove('sobre')"
+                 ondrop="armarSoltar(event,'eps')">
+              <div class="auto-drop-txt" id="armar-txt-eps">2 · Archivo de la EPS<small>el consolidado de glosas · .xlsx</small></div>
+              <input type="file" id="armar-file-eps" accept=".xlsx,.xlsm" onchange="armarElegido('eps')" hidden>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.5rem;margin-top:.7rem">
+            <div class="field"><label>NIT de la entidad</label><input type="text" id="armar-nit" placeholder="901541137"></div>
+            <div class="field"><label>Razón social</label><input type="text" id="armar-razon" placeholder="DISPENSARIO MEDICO"></div>
+            <div class="field"><label>Número de acta</label><input type="text" id="armar-acta" placeholder="710"></div>
+            <div class="field"><label>Periodo</label><input type="text" id="armar-periodo" placeholder="SEP 2026"></div>
+            <div class="field"><label>Fecha conciliación</label><input type="date" id="armar-fecha"></div>
+          </div>
+
+          <div id="armar-resumen" style="display:none;margin-top:.6rem"></div>
+          <div class="auto-acciones" style="margin-top:.6rem">
+            <button class="btn btn-ghost btn-sm" id="armar-btn-ver" onclick="armarVer()">Ver qué sale</button>
+            <button class="btn btn-primary btn-sm" id="armar-btn-bajar" onclick="armarDescargar()">Armar y descargar acta</button>
+          </div>
+          <div class="auto-estado" id="armar-estado" style="margin-top:.4rem"></div>
+        </div>
+
         <!-- El acta que se trabaja en Excel en la audiencia: se cuadra sola,
              vuelve optimizada y sale el acta firmable. -->
         <div class="form-card" style="margin-bottom:1rem">
@@ -24438,6 +24478,111 @@ async function registrarResultadoConciliacion(id){
 
 // ─── ACTA SINAC multi-glosa ───────────────────────────────────────────────
 var AS_FILAS = [];
+
+// ── Armar el acta antes de la mesa: lista de facturas + archivo de la EPS ──
+function armarArchivo(cual){
+  var i = document.getElementById('armar-file-' + cual);
+  return (i && i.files && i.files[0]) || null;
+}
+function armarSoltar(ev, cual){
+  ev.preventDefault();
+  var drop = document.getElementById('armar-drop-' + cual);
+  if(drop) drop.classList.remove('sobre');
+  var fs = ev.dataTransfer && ev.dataTransfer.files;
+  if(!fs || !fs.length) return;
+  document.getElementById('armar-file-' + cual).files = fs;
+  armarElegido(cual);
+}
+function armarElegido(cual){
+  var f = armarArchivo(cual); if(!f) return;
+  var rotulo = (cual === 'fact') ? '1 · Lista de facturas' : '2 · Archivo de la EPS';
+  document.getElementById('armar-txt-' + cual).innerHTML =
+    '<b>' + escHtml(f.name) + '</b><small>' + rotulo + ' · ' + (f.size/1048576).toFixed(1) + ' MB</small>';
+  document.getElementById('armar-drop-' + cual).classList.add('con-archivo');
+  armarEstado('','');
+}
+function armarEstado(msg, clase){
+  var e = document.getElementById('armar-estado');
+  if(!e) return;
+  e.className = 'auto-estado ' + (clase||'');
+  e.innerHTML = msg;
+}
+function armarDatos(){
+  var fact = armarArchivo('fact'), eps = armarArchivo('eps');
+  if(!fact || !eps){
+    toast('Faltan archivos','Se necesitan los dos: la lista de facturas y el archivo de la EPS','warning');
+    return null;
+  }
+  var fd = new FormData();
+  fd.append('facturas', fact);
+  fd.append('archivo_eps', eps);
+  fd.append('nit', (document.getElementById('armar-nit').value||'').trim());
+  fd.append('razon_social', (document.getElementById('armar-razon').value||'').trim());
+  fd.append('numero_acta', (document.getElementById('armar-acta').value||'').trim());
+  fd.append('periodo', (document.getElementById('armar-periodo').value||'').trim());
+  fd.append('fecha_conciliacion', (document.getElementById('armar-fecha').value||'').trim());
+  return fd;
+}
+function armarPintarParte(d){
+  var html = '<div class="auto-resumen"><b>' + d.lineas + ' líneas de glosa</b> · '
+    + d.facturas_con_glosa + ' de ' + d.facturas_en_lista + ' facturas de la lista'
+    + ' · a conciliar ' + fmtCOP(d.valor_a_conciliar||0);
+  if(d.total_avisos){
+    html += '<br><b style="color:var(--c-amber,#d97706)">' + d.total_avisos
+      + ' casilla(s) que decide una persona:</b>';
+    (d.avisos||[]).slice(0,6).forEach(function(a){
+      html += '<br>· ' + escHtml(a.factura) + ': ' + escHtml(a.motivo);
+    });
+    if(d.total_avisos > 6) html += '<br>· … y ' + (d.total_avisos-6) + ' más, marcadas ◄ DEFINIR en el acta';
+  } else {
+    html += '<br><b style="color:var(--c-verde,#16a34a)">Todas las líneas quedaron tipificadas solas.</b>';
+  }
+  if(d.sin_glosas && d.sin_glosas.length){
+    html += '<br><span style="color:var(--text3)">' + d.sin_glosas.length
+      + ' factura(s) de la lista no tienen glosas en el archivo de la EPS: '
+      + escHtml(d.sin_glosas.slice(0,5).join(', ')) + (d.sin_glosas.length>5 ? '…' : '') + '</span>';
+  }
+  if(d.fuera_de_lista && d.fuera_de_lista.length){
+    html += '<br><span style="color:var(--text3)">' + d.fuera_de_lista.length
+      + ' factura(s) del archivo de la EPS no estaban en la lista y quedaron fuera.</span>';
+  }
+  html += '</div>';
+  var res = document.getElementById('armar-resumen');
+  res.innerHTML = html; res.style.display = 'block';
+}
+async function armarVer(){
+  var fd = armarDatos(); if(!fd) return;
+  fd.append('solo_revisar', 'true');
+  armarEstado('Cruzando los dos archivos…','auto-corriendo');
+  try{
+    var r = await fetch('/conciliaciones/acta-excel/armar', {method:'POST', headers: authH(), body: fd});
+    if(r.status===403){ armarEstado('Tu perfil no puede usar esto (se necesita auditor o superior).','auto-error'); return; }
+    if(!r.ok){ var e = await r.json().catch(function(){return {}}); armarEstado(escHtml(e.detail||('HTTP '+r.status)),'auto-error'); return; }
+    armarPintarParte(await r.json());
+    armarEstado('','');
+  }catch(e){ armarEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+async function armarDescargar(){
+  var fd = armarDatos(); if(!fd) return;
+  armarEstado('Armando el acta…','auto-corriendo');
+  try{
+    var r = await fetch('/conciliaciones/acta-excel/armar', {method:'POST', headers: authH(), body: fd});
+    if(r.status===403){ armarEstado('Tu perfil no puede usar esto (se necesita auditor o superior).','auto-error'); return; }
+    if(!r.ok){ var e = await r.json().catch(function(){return {}}); armarEstado(escHtml(e.detail||('HTTP '+r.status)),'auto-error'); return; }
+    var parte = {};
+    try{ parte = JSON.parse(r.headers.get('X-Acta-Parte')||'{}'); }catch(_){}
+    var blob = await r.blob();
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url;
+    a.download = 'ACTA_SINAC_' + ((document.getElementById('armar-acta').value||'NUEVA').trim() || 'NUEVA') + '.xlsm';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    var aviso = parte.total_avisos
+      ? ' · ' + parte.total_avisos + ' casilla(s) marcadas ◄ DEFINIR'
+      : ' · todo tipificado';
+    armarEstado('Acta descargada: ' + (parte.lineas||0) + ' líneas' + aviso + '.','auto-ok');
+  }catch(e){ armarEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
 
 // ── Acta de la mesa (Excel): revisar cuadre, optimizar e imprimir ──
 function actaxArchivo(){

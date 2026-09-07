@@ -91,6 +91,55 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 07-09-2026 (tarde, 2) — El acta de conciliación se arma sola
+
+**El trabajo que quita.** Antes de cada mesa de conciliación, alguien se
+sentaba a copiar a mano —renglón por renglón— los datos del archivo que manda
+la EPS al formato del acta. Cien facturas son más de doscientos renglones con
+nueve datos cada uno: **media jornada de digitar**, y un número mal copiado se
+discute en la mesa como si fuera cierto.
+
+**Cómo queda ahora.** En la pantalla de **Conciliación** hay un cuadro nuevo,
+«🧰 Armar el acta». Se suben dos archivos:
+
+1. **la lista de facturas** que van a esa mesa (una columna en Excel — sirve
+   `HUS0000542497`, `542497` o `HUS542497`, da igual cómo esté escrita);
+2. **el archivo que mandó la EPS**, tal como llega.
+
+Se escribe el NIT, la razón social, el número de acta, el periodo y la fecha,
+y sale el acta **en el formato oficial, con sus macros**, lista para llevar a
+la audiencia.
+
+Antes de bajarla se puede oprimir **«Ver qué sale»**: dice cuántos renglones
+salen, cuánta plata hay para conciliar, qué facturas de la lista no tienen
+glosas en el archivo de la EPS, y cuáles del archivo quedaron por fuera.
+
+**Lo que el sistema decide solo, y lo que no.** La tipificación sale del
+código de glosa, que no deja lugar a dudas: CL es pertinencia, FA facturación,
+SO soportes y TA tarifas. El tipo también, para tres de ellas: facturación,
+soportes y tarifas son **siempre** administrativas.
+
+Las de **pertinencia** no. Se reparten entre mixtas y médicas según el caso,
+y eso lo decide un médico auditor mirando la historia. El sistema **no las
+rellena**: las deja marcadas «◄ DEFINIR» para que se vean. En un acta de cien
+renglones una casilla vacía se pasa por alto; un texto raro, no. Poner el tipo
+equivocado manda la glosa al abogado que no es.
+
+**Y aprende.** Como bien dijo Yesid, «son las mismas cuentas de siempre».
+Cuando el médico auditor reparte una glosa de pertinencia, esa decisión queda
+guardada por factura y código. La próxima vez que esa misma glosa aparezca en
+un acta, ya sale llena. Con el tiempo, hasta las de pertinencia se van
+llenando solas.
+
+Probado con los archivos reales: el consolidado del Dispensario con 146
+glosas se convirtió en un acta de $211.374.401, con **139 de las 146 líneas
+tipificadas solas** y las 7 restantes marcadas con su motivo. El acta que sale
+la lee y la cuadra el mismo revisor que ya existía, sin un solo hallazgo.
+
+58 pruebas nuevas.
+
+---
+
 ### 07-09-2026 — Tres cosas que iban a fallar en producción, y ninguna prueba las veía
 
 No las destapó un error del auditor ni una prueba: salieron de revisar el
