@@ -475,6 +475,38 @@ def cruzar_codigo(
     return None
 
 
+# Mínimo de caracteres para fiarse del principio de una descripción. Con menos
+# ("SOL", "GEL") el parecido no dice nada. Con 6 alcanza para OXIGENO.
+MIN_DESC_PRINCIPIO = 6
+
+
+def cruzar_por_principio_desc(cruces: dict, fact: str, descripcion: object) -> str | None:
+    """Último respaldo: la descripción del portal es el PRINCIPIO de la de DGH.
+
+    COOSALUD glosa "OXIGENO" y DGH lo tiene como "OXIGENO MEDICINAL": el código
+    no se parece en nada (1O1044511000101 contra V03AN01) y la descripción no
+    es idéntica, así que ningún respaldo anterior lo agarra. DGH rechaza esas
+    filas con "la cuenta por cobrar no tiene asociado el servicio" y, como el
+    cargue es todo o nada, tumba el archivo entero.
+
+    Solo cruza si dentro de ESA factura hay UN único servicio cuya descripción
+    empiece igual. Si hay varios —"OXIGENO" también empieza la de "OXIGENO
+    MEDICINAL" pero no la de "CANULA NASAL PARA OXIGENO"— se deja quieto y la
+    fila va a NO_CRUZADOS para revisarla a mano. Mejor perder una objeción que
+    objetarle a DGH un servicio que no es.
+    """
+    d = norm_desc(descripcion)
+    if len(d) < MIN_DESC_PRINCIPIO:
+        return None
+    candidatos = {
+        cod
+        for desc_dgh, cod in cruces.get("desc_lista", {}).get(fact, ())
+        if len(desc_dgh) >= MIN_DESC_PRINCIPIO
+        and (desc_dgh.startswith(d) or d.startswith(desc_dgh))
+    }
+    return next(iter(candidatos)) if len(candidatos) == 1 else None
+
+
 def a_numero(v: object) -> float | None:
     """Valor monetario → número, con el lector único de `tools/_dinero.py`.
 
@@ -1183,12 +1215,19 @@ def cargar_base_dgh(
 
     # La descripción solo sirve de cruce si es inequívoca (un único código DGH).
     cruce_desc = {k: next(iter(v)) for k, v in desc_a_cod.items() if len(v) == 1}
+    # Índice por factura para el respaldo por PRINCIPIO de la descripción (ver
+    # cruzar_por_principio_desc): solo entran las descripciones inequívocas.
+    desc_por_fact: dict[str, list[tuple[str, str]]] = {}
+    for (f_desc, d_desc), cods in desc_a_cod.items():
+        if len(cods) == 1:
+            desc_por_fact.setdefault(f_desc, []).append((d_desc, next(iter(cods))))
     cruces = {
         "srv_exact": cruce_srv_exact,
         "exact": cruce_exact,
         "sufijo": cruce_sufijo,
         "base": cruce_base,
         "desc": cruce_desc,
+        "desc_lista": desc_por_fact,
         "nom_med": {f: tuple(s) for f, s in nom_med_idx.items()},
         "valor": valor,
         "saldo": saldo,
@@ -1275,9 +1314,13 @@ def generar_objeciones(
                 cruces, fkey, srv["codigo_servicio"], srv.get("descripcion", "")
             )
             if not del_dgh:
-                # Último respaldo: por descripción (rescata códigos totalmente
+                # Respaldo por descripción exacta (rescata códigos totalmente
                 # distintos, p. ej. DERECHOS DE SALA PARA CURACIONES).
                 del_dgh = cruces["desc"].get((fkey, norm_desc(srv.get("descripcion", ""))))
+            if not del_dgh:
+                # Y por el PRINCIPIO de la descripción, si es inequívoco dentro
+                # de la factura (OXIGENO -> OXIGENO MEDICINAL).
+                del_dgh = cruzar_por_principio_desc(cruces, fkey, srv.get("descripcion", ""))
             if del_dgh:
                 if del_dgh != cod_portal:
                     por_respaldo += 1
