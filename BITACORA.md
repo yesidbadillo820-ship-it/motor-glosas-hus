@@ -139,6 +139,30 @@ salvado no se haya aflojado, y que nadie vuelva a poner el tope viejo.
 
 ---
 
+### 07-09-2026 (tarde) — La app «Cuidados de Emely» ahora lee los PDF sola
+
+**Lo que se pidió.** Convertir el tablero del frente personal (proyecto 12) en
+una aplicación de verdad: que uno le suba el PDF de Sura (orden, autorización,
+fórmula, MIPRES, oficio) y ella misma lo lea, diga de qué tipo es, saque los
+datos, encuentre el registro al que pertenece y lo actualice sin duplicar.
+
+**Lo que se entregó (por chat y como página web PRIVADA, nada al repo).**
+- La app publicada como página privada de Claude: botón flotante «+ Subir
+  documento», lectura automática del PDF, pantalla de confirmación (nada se
+  guarda sin el visto bueno), cruce por número de autorización/orden/MIPRES,
+  detección de vencimientos e inconsistencias, sección «Mi día», buscador que
+  entiende frases, línea de tiempo por servicio y trazabilidad (cada dato
+  dice de qué documento salió). Los datos quedan sincronizados para la
+  familia en la base privada de la página; también se entregó el archivo
+  HTML para la copia del PC.
+- El motor de lectura se probó contra los 21 PDF reales del paquete
+  DECISIONES: 94 verificaciones automáticas en verde, y el flujo completo
+  (subir → leer → cruzar → guardar) probado en Chromium en celular y PC.
+
+**Para la próxima vez.** Los documentos nuevos de Sura se suben directamente
+en la app; si un PDF es escaneado y la IA de la página no puede leerlo, se
+manda al chat y se pide «actualizar el tablero de cuidados».
+
 ### 07-09-2026 — Nace el frente personal «Cuidados médicos de la familiar» (EPS Sura)
 
 **Lo que se pidió.** Organizar en un tablero los documentos de EPS Sura de la
