@@ -1147,8 +1147,26 @@ def generar_objeciones(
     consecutivo = 0
     factura_actual: str | None = None
 
-    # CROTIPOBJ se fija por FACTURA más abajo, según el CRNCONOBJ realmente
-    # escrito en cada fila (no según las glosas crudas). Ver el bloque al final.
+    # Topes sacados del PROPIO detalle de COOSALUD (no necesitan la base DGH):
+    # por (factura, código de servicio), la suma del valor de todas sus líneas
+    # menos la suma de sus copagos. DGH le descuenta el copago al valor del
+    # servicio, así que ese es el máximo que acepta objetar. Se usan cuando no
+    # hay base DGH, para que el cargue no se caiga por el error de siempre
+    # ("El VALOR OBJECION no puede ser mayor al valor del servicio").
+    # Si a alguna línea de un código le falta el valor, ese código no se topa
+    # (mejor no capar que capar con un tope incompleto).
+    topes_portal: dict[tuple[str, str], float] = {}
+    _sin_valor: set[tuple[str, str]] = set()
+    for _s in glosados:
+        _k = (norm_factura(_s["factura"]), norm_codigo(_s["codigo_servicio"]))
+        _v = a_numero(_s.get("valor_servicio"))
+        if _v is None:
+            _sin_valor.add(_k)
+            continue
+        topes_portal[_k] = topes_portal.get(_k, 0.0) + _v - (a_numero(_s.get("copago")) or 0.0)
+    for _k in _sin_valor:
+        topes_portal.pop(_k, None)
+
     for srv in glosados:
         fact = srv["factura"]
         if _num_factura(fact) is None:
@@ -1161,8 +1179,8 @@ def generar_objeciones(
         slnserpro = cod_portal or None
         valor_final = srv["valor_glosado"]
         motivo = None
+        fkey = norm_factura(fact)
         if cruces is not None:
-            fkey = norm_factura(fact)
             del_dgh = cruzar_codigo(
                 cruces, fkey, srv["codigo_servicio"], srv.get("descripcion", "")
             )
@@ -1177,73 +1195,77 @@ def generar_objeciones(
             else:
                 motivo = "no está en DGH"
 
-            # --- Guardián de valor/saldo (solo si el código cruzó) ---
-            # DGH no acepta objetar más que el valor del servicio ni más que el
-            # saldo de la cuenta. Se CAPA la objeción a lo que quede disponible
-            # (para no perder la objeción entera) y se reporta el ajuste. Si ya
-            # no queda cupo, se manda a NO_CRUZADOS.
-            if motivo is None:
-                valobj = a_numero(srv["valor_glosado"])
-                if valobj is not None:
+        # --- Guardián de valor/saldo ---
+        # DGH no acepta objetar más que el valor del servicio ni más que el
+        # saldo de la cuenta. Se CAPA la objeción a lo que quede disponible
+        # (para no perder la objeción entera) y se reporta el ajuste. Si ya
+        # no queda cupo, se manda a NO_CRUZADOS.
+        # CON base DGH el tope es el de DGH; SIN base DGH se usa el del propio
+        # detalle de COOSALUD (topes_portal), que ya ataja el error del COPAGO.
+        if motivo is None:
+            valobj = a_numero(srv["valor_glosado"])
+            if valobj is not None:
+                if cruces is not None:
                     lim_cod = cruces["valor"].get((fkey, slnserpro))
                     lim_sal = cruces["saldo"].get(fkey)
-                    cupo = float("inf")
-                    if lim_cod is not None:
-                        cupo = min(cupo, lim_cod - acum_cod.get((fkey, slnserpro), 0.0))
-                    if lim_sal is not None:
-                        cupo = min(cupo, lim_sal - acum_fac.get(fkey, 0.0))
-                    # Copago (cuota moderadora): DGH descuenta el copago del
-                    # valor del servicio, así que el máximo objetable de esta
-                    # línea es (valor del servicio - copago). La cuota la paga
-                    # el paciente, no la EPS; si se objeta de más, DGH la rechaza
-                    # con "El VALOR OBJECION no puede ser mayor al valor del
-                    # servicio". Se capa la línea a lo que DGH sí acepta.
-                    vserv = a_numero(srv.get("valor_servicio"))
-                    copago = a_numero(srv.get("copago")) or 0.0
-                    if vserv is not None and copago > 0.5:
-                        tope_copago = vserv - copago
-                        if tope_copago < cupo:
-                            cupo = tope_copago
-                            capados_copago += 1
-                    if cupo <= 0.5:
-                        motivo = "sin cupo en DGH (servicio o saldo ya cubierto por otras glosas)"
-                    elif valobj > cupo + 0.5:
-                        # Capar al máximo que DGH acepta y registrar el ajuste.
-                        capado = int(round(cupo))
-                        ajustados.append(
-                            [
-                                factura_dgh(fact),
-                                srv["id_detalle"],
-                                slnserpro,
-                                srv.get("descripcion", ""),
-                                srv["valor_glosado"],
-                                capado,
-                                srv["observacion"][:90],
-                            ]
-                        )
-                        valor_final = capado
-                        valobj = float(capado)
-                    acum_cod[(fkey, slnserpro)] = acum_cod.get((fkey, slnserpro), 0.0) + (
-                        valobj or 0.0
+                else:
+                    lim_cod = topes_portal.get((fkey, cod_portal))
+                    lim_sal = None
+                cupo = float("inf")
+                if lim_cod is not None:
+                    cupo = min(cupo, lim_cod - acum_cod.get((fkey, slnserpro), 0.0))
+                if lim_sal is not None:
+                    cupo = min(cupo, lim_sal - acum_fac.get(fkey, 0.0))
+                # Copago (cuota moderadora): DGH descuenta el copago del
+                # valor del servicio, así que el máximo objetable de esta
+                # línea es (valor del servicio - copago). La cuota la paga
+                # el paciente, no la EPS; si se objeta de más, DGH la rechaza
+                # con "El VALOR OBJECION no puede ser mayor al valor del
+                # servicio". Se capa la línea a lo que DGH sí acepta.
+                vserv = a_numero(srv.get("valor_servicio"))
+                copago = a_numero(srv.get("copago")) or 0.0
+                if vserv is not None and copago > 0.5:
+                    tope_copago = vserv - copago
+                    if tope_copago < cupo:
+                        cupo = tope_copago
+                        capados_copago += 1
+                if cupo <= 0.5:
+                    motivo = "sin cupo en DGH (servicio o saldo ya cubierto por otras glosas)"
+                elif valobj > cupo + 0.5:
+                    # Capar al máximo que DGH acepta y registrar el ajuste.
+                    capado = int(round(cupo))
+                    ajustados.append(
+                        [
+                            factura_dgh(fact),
+                            srv["id_detalle"],
+                            slnserpro,
+                            srv.get("descripcion", ""),
+                            srv["valor_glosado"],
+                            capado,
+                            srv["observacion"][:90],
+                        ]
                     )
-                    acum_fac[fkey] = acum_fac.get(fkey, 0.0) + (valobj or 0.0)
+                    valor_final = capado
+                    valobj = float(capado)
+                acum_cod[(fkey, slnserpro)] = acum_cod.get((fkey, slnserpro), 0.0) + (valobj or 0.0)
+                acum_fac[fkey] = acum_fac.get(fkey, 0.0) + (valobj or 0.0)
 
-            if motivo:
-                no_cruzados.append(
-                    [
-                        factura_dgh(fact),
-                        srv["id_detalle"],
-                        srv["codigo_servicio"],
-                        srv.get("descripcion", ""),
-                        srv["valor_glosado"],
-                        motivo,
-                        srv["observacion"][:90],
-                    ]
-                )
-                if excluir_no_cruzados:
-                    # No se agrega al OBJECIONES (DGH lo marcaría con error).
-                    excluidos += 1
-                    continue
+        if motivo:
+            no_cruzados.append(
+                [
+                    factura_dgh(fact),
+                    srv["id_detalle"],
+                    srv["codigo_servicio"],
+                    srv.get("descripcion", ""),
+                    srv["valor_glosado"],
+                    motivo,
+                    srv["observacion"][:90],
+                ]
+            )
+            if excluir_no_cruzados:
+                # No se agrega al OBJECIONES (DGH lo marcaría con error).
+                excluidos += 1
+                continue
 
         # El consecutivo solo avanza para las filas que SÍ quedan en el archivo,
         # para no dejar huecos cuando se excluyen los no cruzados.
@@ -1605,11 +1627,24 @@ def main(argv: list[str] | None = None) -> int:
                     ", ".join(sorted(res_rta["sin_radicacion"])[:5]),
                 )
             if res_rta["sin_texto"]:
-                logger.warning(
-                    "  Glosas A TIEMPO que responde AUDITORÍA MÉDICA (quedan sin "
-                    "código ni observación, las diligencian las doctoras): %s",
-                    " · ".join(f"{t}: {n}" for t, n in res_rta["sin_texto"].items()),
-                )
+                # Ojo con quién responde cada una: las doctoras solo contestan
+                # CALIDAD (pertinencia). COBERTURA la contesta CARTERA — sale
+                # aquí porque todavía no hay texto tipificado, no porque haya
+                # que esperar a auditoría médica.
+                medicas = {t: n for t, n in res_rta["sin_texto"].items() if t == "CALIDAD"}
+                cartera = {t: n for t, n in res_rta["sin_texto"].items() if t != "CALIDAD"}
+                if medicas:
+                    logger.warning(
+                        "  Glosas A TIEMPO que responde AUDITORÍA MÉDICA (quedan sin "
+                        "código ni observación, las diligencian las doctoras): %s",
+                        " · ".join(f"{t}: {n}" for t, n in medicas.items()),
+                    )
+                if cartera:
+                    logger.warning(
+                        "  Glosas A TIEMPO que responde CARTERA y quedaron sin texto "
+                        "tipificado (hay que definirlo, NO son de las doctoras): %s",
+                        " · ".join(f"{t}: {n}" for t, n in cartera.items()),
+                    )
 
             if base_ok:
                 # Solo las filas DGH de las facturas de ESTE lote.

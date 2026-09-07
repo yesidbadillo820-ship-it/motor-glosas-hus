@@ -52,6 +52,13 @@ ESTADO_GLOSA_RADICADA = "RADICADA_EN_EPS"
 # Solo se radica lo que un humano dejó listo.
 ESTADO_GLOSA_EXIGIDO = "RESPONDIDA"
 
+# Cuántas veces se deja que una fila vuelva a la cola tras una caída temprana
+# del bot. A la tercera deja de rebotar y la mira una persona: si un PC se
+# cayó tres veces en el mismo sitio, no es mala suerte, es que le falta algo
+# (playwright sin instalar, Chrome sin abrir, el motor apagado) y ninguna
+# cuarta pasada lo va a arreglar sola.
+MAX_INTENTOS_RESCATE = 3
+
 # ── Matriz de portales (decisión del auditor, 03-09-2026) ───────────────
 # Usuario y contraseña: el bot puede de punta a punta.
 PORTALES_AUTOMATIZABLES = {"COOSALUD", "SIMED", "MUTUAL_SER"}
@@ -371,6 +378,70 @@ def marcar_fallida(db: Any, radicacion_id: int, error: str) -> dict:
     fila.ultimo_error = (error or "")[:4000]
     db.commit()
     return {"estado": fila.estado}
+
+
+def rescatar_reclamada(
+    db: Any,
+    radicacion_id: int,
+    error: str,
+    max_intentos: int = MAX_INTENTOS_RESCATE,
+) -> dict:
+    """El bot se cayó CON LA FILA EN LA MANO, antes de tocar el portal.
+
+    El agujero que tapa: `reclamar_una` marca la fila RECLAMADA y, si el bot
+    se muere en el paso siguiente —playwright sin instalar, Chrome sin abrir,
+    el navegador que no arranca—, esa fila se quedaba RECLAMADA para siempre.
+    No aparecía como pendiente para ningún otro PC, no aparecía como atorada
+    para ninguna persona: simplemente desaparecía del mundo con la glosa
+    adentro.
+
+    Qué hace: devuelve la fila a PENDIENTE para que otro equipo sano la tome,
+    y deja escrito en `ultimo_error` de qué se murió el que la tenía.
+
+    DÓNDE NO SE METE (y es lo importante). Solo rescata filas en RECLAMADA.
+    Una fila en EN_PORTAL_SIN_CONFIRMAR NO se toca ni por equivocación: ahí
+    ya se pulsó «radicar» y no se leyó el comprobante. Devolverla a la cola
+    sería invitar a radicar dos veces la misma glosa, que es el daño real que
+    este módulo existe para evitar (idea 2 de la cabecera).
+
+    EL CONTADOR NO SE TOCA ACÁ, y es a propósito: `reclamar_una` ya sumó el
+    intento al entregar la fila. Volver a sumarlo haría que el cortacircuito
+    saltara a la mitad de los intentos anunciados — dos vueltas en vez de
+    tres. Acá solo se LEE para decidir si ya fueron suficientes.
+    """
+    fila = db.query(RadicacionEpsRecord).filter(RadicacionEpsRecord.id == radicacion_id).first()
+    if fila is None:
+        return {"estado": "no_existe"}
+    if fila.estado != RAD_RECLAMADA:
+        # Puede ser una carrera normal (el bot alcanzó a reportar y además
+        # avisó de su caída). No es un error: simplemente no hay qué rescatar.
+        return {"estado": "no_rescatable", "actual": fila.estado}
+
+    intentos = int(fila.intentos or 0)
+    fila.ultimo_error = (error or "")[:4000]
+
+    if intentos >= max_intentos:
+        # Cortacircuito: deja de rebotar entre equipos y pasa a manos de una
+        # persona, que es quien puede arreglar lo que le falta al PC.
+        fila.estado = RAD_HUMANO_REQUERIDO
+        db.commit()
+        logger.warning(
+            f"[RADICACION] rescate agotado glosa={fila.glosa_id} "
+            f"intentos={intentos} → {RAD_HUMANO_REQUERIDO}"
+        )
+        return {"estado": RAD_HUMANO_REQUERIDO, "intentos": intentos, "agotada": True}
+
+    fila.estado = RAD_PENDIENTE
+    # Se le quita el sello del PC que la tenía: vuelve a estar libre, y una
+    # fila pendiente con el nombre de un equipo encima confunde a quien mira
+    # la bandeja.
+    fila.actor = ACTOR_BOT
+    db.commit()
+    logger.info(
+        f"[RADICACION] fila rescatada glosa={fila.glosa_id} "
+        f"intentos={intentos}/{max_intentos} → {RAD_PENDIENTE}"
+    )
+    return {"estado": RAD_PENDIENTE, "intentos": intentos, "agotada": False}
 
 
 def marcar_humano_requerido(db: Any, radicacion_id: int, motivo: str) -> dict:

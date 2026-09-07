@@ -2454,6 +2454,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 14l2 2 4-4"/></svg>
           <span class="sn-item-label">Glosas ADRES</span>
         </button>
+        <button id="sn-pre-auditoria" class="sn-item" data-tip="Pre-Auditoría: lo que el HIS consulta antes de timbrar" onclick="sidebarTab(this,'pre-auditoria')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 22S20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+          <span class="sn-item-label">Pre-Auditoría</span>
+        </button>
         <!-- 04-09-2026: oculto a pedido de Yesid (ver nota arriba). Reversible.
              También se quita de la barra consolidada de Reportes (pintarRepTabbars). -->
         <button class="sn-item" data-tip="Resumen mensual ejecutivo" onclick="sidebarTab(this,'resumen-mes')" style="display:none">
@@ -3308,6 +3312,32 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <button class="btn btn-ghost" onclick="document.getElementById('ga-modal-cargue').style.display='none'">Cancelar</button>
           <button class="btn btn-primary" id="ga-btn-cargar" onclick="gaCargar()">Cargar</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Pre-Auditoría Concurrente (V3, Pilar 2): lo que el HIS consulta ANTES de timbrar -->
+    <div class="panel" id="p-pre-auditoria">
+      <div class="dash-area">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700;color:var(--text)">Pre-Auditoría Concurrente</div>
+            <div style="font-size:.78rem;color:var(--text3)">Lo que el sistema del hospital nos consulta <b>antes</b> de timbrar cada factura. Cada peso corregido acá es un peso que no entra a cartera.</div>
+          </div>
+          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+            <select id="preaud-estado" onchange="preAudCargar()" style="padding:.42rem .6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.8rem">
+              <option value="">Todos los dictámenes</option>
+              <option value="BLOQUEO">Solo bloqueos</option>
+              <option value="ADVERTENCIA">Solo advertencias</option>
+              <option value="APROBADO">Solo aprobados</option>
+            </select>
+            <input id="preaud-factura" placeholder="Buscar factura" onkeydown="if(event.key==='Enter')preAudCargar()"
+                   style="padding:.42rem .6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.8rem;width:150px">
+            <button class="btn btn-ghost" onclick="preAudCargar()" style="font-size:.8rem">⟳ Actualizar</button>
+          </div>
+        </div>
+
+        <div id="preaud-tarjetas" class="preaud-grid"></div>
+        <div id="preaud-tabla"></div>
       </div>
     </div>
 
@@ -4299,6 +4329,46 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             📄 Generar Acta SINAC (multi-glosa)
           </button>
           <span style="font-size:.75rem;color:var(--text3);align-self:center">Formato oficial idéntico al ACTA_SINAC_N_XXX. Acepta N facturas en una sola acta.</span>
+        </div>
+
+        <!-- ARMAR el acta antes de la mesa: la lista de facturas + el archivo
+             que manda la EPS salen convertidos en el acta del formato oficial,
+             para no copiar doscientos renglones a mano. -->
+        <div class="form-card" style="margin-bottom:1rem">
+          <h3 style="margin:0 0 .3rem">🧰 Armar el acta (antes de la mesa)</h3>
+          <p style="margin:0 0 .6rem;font-size:.8rem;color:var(--text3)">Subí <b>la lista de facturas</b> que van a esta mesa y <b>el archivo que mandó la EPS</b>. El sistema los cruza y arma el acta en el formato oficial, con la tipificación puesta. Lo que no se pueda deducir queda marcado <b>◄ DEFINIR</b> para que lo resuelva una persona.</p>
+
+          <div class="concil-armar-archivos" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.6rem">
+            <div class="auto-drop" id="armar-drop-fact" onclick="document.getElementById('armar-file-fact').click()"
+                 ondragover="event.preventDefault();this.classList.add('sobre')"
+                 ondragleave="this.classList.remove('sobre')"
+                 ondrop="armarSoltar(event,'fact')">
+              <div class="auto-drop-txt" id="armar-txt-fact">1 · Lista de facturas<small>una columna en Excel · .xlsx</small></div>
+              <input type="file" id="armar-file-fact" accept=".xlsx,.xlsm" onchange="armarElegido('fact')" hidden>
+            </div>
+            <div class="auto-drop" id="armar-drop-eps" onclick="document.getElementById('armar-file-eps').click()"
+                 ondragover="event.preventDefault();this.classList.add('sobre')"
+                 ondragleave="this.classList.remove('sobre')"
+                 ondrop="armarSoltar(event,'eps')">
+              <div class="auto-drop-txt" id="armar-txt-eps">2 · Archivo de la EPS<small>el consolidado de glosas · .xlsx</small></div>
+              <input type="file" id="armar-file-eps" accept=".xlsx,.xlsm" onchange="armarElegido('eps')" hidden>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.5rem;margin-top:.7rem">
+            <div class="field"><label>NIT de la entidad</label><input type="text" id="armar-nit" placeholder="901541137"></div>
+            <div class="field"><label>Razón social</label><input type="text" id="armar-razon" placeholder="DISPENSARIO MEDICO"></div>
+            <div class="field"><label>Número de acta</label><input type="text" id="armar-acta" placeholder="710"></div>
+            <div class="field"><label>Periodo</label><input type="text" id="armar-periodo" placeholder="SEP 2026"></div>
+            <div class="field"><label>Fecha conciliación</label><input type="date" id="armar-fecha"></div>
+          </div>
+
+          <div id="armar-resumen" style="display:none;margin-top:.6rem"></div>
+          <div class="auto-acciones" style="margin-top:.6rem">
+            <button class="btn btn-ghost btn-sm" id="armar-btn-ver" onclick="armarVer()">Ver qué sale</button>
+            <button class="btn btn-primary btn-sm" id="armar-btn-bajar" onclick="armarDescargar()">Armar y descargar acta</button>
+          </div>
+          <div class="auto-estado" id="armar-estado" style="margin-top:.4rem"></div>
         </div>
 
         <!-- El acta que se trabaja en Excel en la audiencia: se cuadra sola,
@@ -8660,6 +8730,7 @@ function tab(btn,id){
   if(id==='dashboard') loadDash();
   if(id==='glosas-adres') loadGlosasAdres();
   if(id==='resumen-mes') loadResumenMes();
+  if(id==='pre-auditoria') preAudCargar();
   if(id==='mando'){ loadMando(); loadOperacion(); }
   if(id==='mi-dia') cargarMiDia();
   if(id==='plata') cargarPlata();
@@ -24416,6 +24487,111 @@ async function registrarResultadoConciliacion(id){
 // ─── ACTA SINAC multi-glosa ───────────────────────────────────────────────
 var AS_FILAS = [];
 
+// ── Armar el acta antes de la mesa: lista de facturas + archivo de la EPS ──
+function armarArchivo(cual){
+  var i = document.getElementById('armar-file-' + cual);
+  return (i && i.files && i.files[0]) || null;
+}
+function armarSoltar(ev, cual){
+  ev.preventDefault();
+  var drop = document.getElementById('armar-drop-' + cual);
+  if(drop) drop.classList.remove('sobre');
+  var fs = ev.dataTransfer && ev.dataTransfer.files;
+  if(!fs || !fs.length) return;
+  document.getElementById('armar-file-' + cual).files = fs;
+  armarElegido(cual);
+}
+function armarElegido(cual){
+  var f = armarArchivo(cual); if(!f) return;
+  var rotulo = (cual === 'fact') ? '1 · Lista de facturas' : '2 · Archivo de la EPS';
+  document.getElementById('armar-txt-' + cual).innerHTML =
+    '<b>' + escHtml(f.name) + '</b><small>' + rotulo + ' · ' + (f.size/1048576).toFixed(1) + ' MB</small>';
+  document.getElementById('armar-drop-' + cual).classList.add('con-archivo');
+  armarEstado('','');
+}
+function armarEstado(msg, clase){
+  var e = document.getElementById('armar-estado');
+  if(!e) return;
+  e.className = 'auto-estado ' + (clase||'');
+  e.innerHTML = msg;
+}
+function armarDatos(){
+  var fact = armarArchivo('fact'), eps = armarArchivo('eps');
+  if(!fact || !eps){
+    toast('Faltan archivos','Se necesitan los dos: la lista de facturas y el archivo de la EPS','warning');
+    return null;
+  }
+  var fd = new FormData();
+  fd.append('facturas', fact);
+  fd.append('archivo_eps', eps);
+  fd.append('nit', (document.getElementById('armar-nit').value||'').trim());
+  fd.append('razon_social', (document.getElementById('armar-razon').value||'').trim());
+  fd.append('numero_acta', (document.getElementById('armar-acta').value||'').trim());
+  fd.append('periodo', (document.getElementById('armar-periodo').value||'').trim());
+  fd.append('fecha_conciliacion', (document.getElementById('armar-fecha').value||'').trim());
+  return fd;
+}
+function armarPintarParte(d){
+  var html = '<div class="auto-resumen"><b>' + d.lineas + ' líneas de glosa</b> · '
+    + d.facturas_con_glosa + ' de ' + d.facturas_en_lista + ' facturas de la lista'
+    + ' · a conciliar ' + fmtCOP(d.valor_a_conciliar||0);
+  if(d.total_avisos){
+    html += '<br><b style="color:var(--c-amber,#d97706)">' + d.total_avisos
+      + ' casilla(s) que decide una persona:</b>';
+    (d.avisos||[]).slice(0,6).forEach(function(a){
+      html += '<br>· ' + escHtml(a.factura) + ': ' + escHtml(a.motivo);
+    });
+    if(d.total_avisos > 6) html += '<br>· … y ' + (d.total_avisos-6) + ' más, marcadas ◄ DEFINIR en el acta';
+  } else {
+    html += '<br><b style="color:var(--c-verde,#16a34a)">Todas las líneas quedaron tipificadas solas.</b>';
+  }
+  if(d.sin_glosas && d.sin_glosas.length){
+    html += '<br><span style="color:var(--text3)">' + d.sin_glosas.length
+      + ' factura(s) de la lista no tienen glosas en el archivo de la EPS: '
+      + escHtml(d.sin_glosas.slice(0,5).join(', ')) + (d.sin_glosas.length>5 ? '…' : '') + '</span>';
+  }
+  if(d.fuera_de_lista && d.fuera_de_lista.length){
+    html += '<br><span style="color:var(--text3)">' + d.fuera_de_lista.length
+      + ' factura(s) del archivo de la EPS no estaban en la lista y quedaron fuera.</span>';
+  }
+  html += '</div>';
+  var res = document.getElementById('armar-resumen');
+  res.innerHTML = html; res.style.display = 'block';
+}
+async function armarVer(){
+  var fd = armarDatos(); if(!fd) return;
+  fd.append('solo_revisar', 'true');
+  armarEstado('Cruzando los dos archivos…','auto-corriendo');
+  try{
+    var r = await fetch('/conciliaciones/acta-excel/armar', {method:'POST', headers: authH(), body: fd});
+    if(r.status===403){ armarEstado('Tu perfil no puede usar esto (se necesita auditor o superior).','auto-error'); return; }
+    if(!r.ok){ var e = await r.json().catch(function(){return {}}); armarEstado(escHtml(e.detail||('HTTP '+r.status)),'auto-error'); return; }
+    armarPintarParte(await r.json());
+    armarEstado('','');
+  }catch(e){ armarEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+async function armarDescargar(){
+  var fd = armarDatos(); if(!fd) return;
+  armarEstado('Armando el acta…','auto-corriendo');
+  try{
+    var r = await fetch('/conciliaciones/acta-excel/armar', {method:'POST', headers: authH(), body: fd});
+    if(r.status===403){ armarEstado('Tu perfil no puede usar esto (se necesita auditor o superior).','auto-error'); return; }
+    if(!r.ok){ var e = await r.json().catch(function(){return {}}); armarEstado(escHtml(e.detail||('HTTP '+r.status)),'auto-error'); return; }
+    var parte = {};
+    try{ parte = JSON.parse(r.headers.get('X-Acta-Parte')||'{}'); }catch(_){}
+    var blob = await r.blob();
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url;
+    a.download = 'ACTA_SINAC_' + ((document.getElementById('armar-acta').value||'NUEVA').trim() || 'NUEVA') + '.xlsm';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    var aviso = parte.total_avisos
+      ? ' · ' + parte.total_avisos + ' casilla(s) marcadas ◄ DEFINIR'
+      : ' · todo tipificado';
+    armarEstado('Acta descargada: ' + (parte.lineas||0) + ' líneas' + aviso + '.','auto-ok');
+  }catch(e){ armarEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+
 // ── Acta de la mesa (Excel): revisar cuadre, optimizar e imprimir ──
 function actaxArchivo(){
   var i = document.getElementById('actax-file');
@@ -27247,6 +27423,159 @@ function paAjustarMisGlosas(){
     return r;
   };
 })();
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PRE-AUDITORÍA CONCURRENTE (V3, Pilar 2) — el tablero de prevención
+//
+//  El HIS del hospital consulta el motor ANTES de timbrar cada factura.
+//  Acá se ve qué le contestamos: cuántas pasaron, cuántas se bloquearon y
+//  —lo que de verdad importa— cuánta plata se corrigió antes de que la
+//  factura saliera. Prefijo preAud* porque pa* ya está tomado en esta
+//  página por el ajuste de «Mis glosas».
+// ═══════════════════════════════════════════════════════════════════════
+var PREAUD = { eventos: [], resumen: null };
+
+function preAudPill(estado){
+  var mapa = {
+    APROBADO:    ['✓ Aprobado',    'var(--sinac-green-600,#059669)'],
+    ADVERTENCIA: ['⚠ Advertencia', 'var(--sinac-amber-600,#D97706)'],
+    BLOQUEO:     ['⛔ Bloqueo',     'var(--sinac-red-600,#DC2626)']
+  };
+  var m = mapa[estado] || ['— ' + (estado || 'sin dictamen'), 'var(--text3)'];
+  return '<span style="display:inline-block;padding:.15rem .5rem;border-radius:999px;' +
+    'font-size:.72rem;font-weight:700;white-space:nowrap;color:#fff;background:' + m[1] + '">' +
+    escHtml(m[0]) + '</span>';
+}
+
+function preAudTarjeta(titulo, valor, nota, color){
+  return '<div class="chart-card" style="padding:.9rem 1rem">' +
+    '<div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">' + escHtml(titulo) + '</div>' +
+    '<div style="font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums;margin-top:.15rem;color:' + (color || 'var(--text)') + '">' + valor + '</div>' +
+    '<div style="font-size:.72rem;color:var(--text3);margin-top:.15rem">' + escHtml(nota) + '</div>' +
+  '</div>';
+}
+
+function preAudPintarResumen(r){
+  var host = document.getElementById('preaud-tarjetas');
+  if(!host) return;
+  var pe = r.por_estado || {};
+  host.innerHTML =
+    preAudTarjeta('Dinero salvado', fmtCOP(r.dinero_salvado || 0),
+      (r.facturas_corregidas || 0) + ' factura(s) bloqueada(s) que se corrigieron y volvieron a pasar',
+      'var(--sinac-green-600,#059669)') +
+    preAudTarjeta('Riesgo sin resolver', fmtCOP(r.riesgo_sin_resolver || 0),
+      'Bloqueadas que todavía no han vuelto: no sabemos qué se hizo con ellas',
+      'var(--sinac-red-600,#DC2626)') +
+    preAudTarjeta('Evaluaciones', fmtNum(r.evaluaciones || 0),
+      (pe.APROBADO || 0) + ' aprobadas · ' + (pe.ADVERTENCIA || 0) + ' con reparo · ' + (pe.BLOQUEO || 0) + ' bloqueadas', null) +
+    preAudTarjeta('Facturas bloqueadas', fmtNum(r.facturas_bloqueadas || 0),
+      'Distintas, no evaluaciones: una factura puede consultarse varias veces', null);
+}
+
+function preAudFila(e){
+  var alertas = Number(e.total_alertas || 0);
+  var sinIA = String(e.cruce_clinico_estado || '').indexOf('OMITIDO') === 0;
+  return '<tr style="border-top:1px solid var(--border);cursor:pointer" onclick="preAudVerDetalle(' + Number(e.id) + ')" title="Ver los reparos de esta evaluación">' +
+    '<td style="padding:.5rem .6rem;font-weight:600">' + escHtml(e.factura || '—') + '</td>' +
+    '<td style="padding:.5rem .6rem;color:var(--text3);font-size:.76rem;white-space:nowrap">' + escHtml(fmtFecha(e.creado_en)) + '</td>' +
+    '<td style="padding:.5rem .6rem">' + preAudPill(e.estado) + '</td>' +
+    '<td style="padding:.5rem .6rem;text-align:center">' + (alertas ? alertas : '—') + '</td>' +
+    '<td class="num" style="padding:.5rem .6rem;text-align:right">' + fmtCOP(e.valor_en_riesgo || 0) + '</td>' +
+    '<td class="num" style="padding:.5rem .6rem;text-align:right;color:var(--text3)">' + fmtCOP(e.valor_factura || 0) + '</td>' +
+    '<td style="padding:.5rem .6rem;font-size:.72rem;color:var(--text3);white-space:nowrap">' +
+      (sinIA ? 'sin cruce clínico' : escHtml(e.modelo_utilizado || '—')) + '</td>' +
+  '</tr>';
+}
+
+function preAudPintarTabla(lista){
+  var host = document.getElementById('preaud-tabla');
+  if(!host) return;
+  if(!lista.length){
+    host.innerHTML = '<div class="chart-card" style="padding:1.6rem;text-align:center;color:var(--text3)">' +
+      'Todavía no hay evaluaciones. Cuando el sistema del hospital empiece a consultar antes de timbrar, cada factura aparece acá.</div>';
+    return;
+  }
+  host.innerHTML = '<div class="chart-card" style="padding:.4rem;overflow-x:auto">' +
+    '<table style="width:100%;border-collapse:collapse;font-size:.82rem">' +
+    '<thead><tr style="text-align:left;color:var(--text3);font-size:.74rem">' +
+      '<th style="padding:.5rem .6rem">Factura</th>' +
+      '<th style="padding:.5rem .6rem">Fecha</th>' +
+      '<th style="padding:.5rem .6rem">Dictamen</th>' +
+      '<th style="padding:.5rem .6rem;text-align:center">Reparos</th>' +
+      '<th style="padding:.5rem .6rem;text-align:right">En riesgo</th>' +
+      '<th style="padding:.5rem .6rem;text-align:right">Valor factura</th>' +
+      '<th style="padding:.5rem .6rem">Cruce clínico</th>' +
+    '</tr></thead><tbody>' + lista.map(preAudFila).join('') + '</tbody></table></div>';
+}
+
+function preAudPedir(url){
+  return fetch(url, {headers: authH()}).then(function(r){
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  });
+}
+
+function preAudCargar(){
+  var host = document.getElementById('preaud-tabla');
+  if(host) host.innerHTML = '<div class="chart-card" style="padding:1.6rem;text-align:center;color:var(--text3)">Cargando…</div>';
+  var estado = (document.getElementById('preaud-estado') || {}).value || '';
+  var factura = ((document.getElementById('preaud-factura') || {}).value || '').trim();
+  var qs = '?limite=300';
+  if(estado) qs += '&estado=' + encodeURIComponent(estado);
+  if(factura) qs += '&factura=' + encodeURIComponent(factura);
+
+  preAudPedir('/pre-auditoria/resumen')
+    .then(function(r){ PREAUD.resumen = r; preAudPintarResumen(r); })
+    .catch(function(e){
+      var t = document.getElementById('preaud-tarjetas');
+      if(t) t.innerHTML = '<div class="chart-card" style="padding:1rem;color:var(--text3)">No se pudieron traer las cifras (' + escHtml(e.message || 'error') + ').</div>';
+    });
+
+  preAudPedir('/pre-auditoria/eventos' + qs)
+    .then(function(lista){ PREAUD.eventos = lista || []; preAudPintarTabla(PREAUD.eventos); })
+    .catch(function(e){
+      if(host) host.innerHTML = '<div class="chart-card" style="padding:1.4rem;color:var(--text3)">' +
+        'No se pudo leer el tablero de pre-auditoría (' + escHtml(e.message || 'error') + '). ' +
+        '<button class="btn btn-ghost" onclick="preAudCargar()" style="font-size:.78rem;margin-left:.4rem">Reintentar</button></div>';
+    });
+}
+
+function preAudVerDetalle(id){
+  preAudPedir('/pre-auditoria/eventos/' + id)
+    .then(function(e){
+      var alertas = e.alertas || [];
+      var cuerpo = alertas.length
+        ? alertas.map(function(a){
+            var color = a.severidad === 'BLOQUEO' ? 'var(--sinac-red-600,#DC2626)' : 'var(--sinac-amber-600,#D97706)';
+            return '<div style="border-left:3px solid ' + color + ';padding:.5rem .7rem;margin-bottom:.6rem;background:var(--bg-card);border-radius:6px">' +
+              '<div style="font-weight:700;font-size:.85rem">' + escHtml(a.titulo || '') +
+                ' <span style="font-weight:500;color:var(--text3);font-size:.75rem">' + escHtml(a.codigo_glosa || '') + '</span></div>' +
+              '<div style="font-size:.78rem;color:var(--text2);margin-top:.2rem">' + escHtml(a.detalle || '') + '</div>' +
+              '<div style="font-size:.72rem;color:var(--text3);margin-top:.25rem">' +
+                escHtml(a.origen === 'IA' ? 'Lo levantó la IA — lo decide el médico auditor' : 'Regla determinista') +
+                ' · en riesgo ' + fmtCOP(a.valor_en_riesgo || 0) + '</div>' +
+            '</div>';
+          }).join('')
+        : '<div style="color:var(--text3);font-size:.82rem">Sin reparos: esta factura pasó limpia.</div>';
+      preAudModal('Factura ' + escHtml(e.factura || '') + ' · ' + preAudPill(e.estado), cuerpo);
+    })
+    .catch(function(e){ toast('No se pudo abrir', e.message || 'Error', 'error'); });
+}
+
+function preAudModal(titulo, cuerpo){
+  var viejo = document.getElementById('preaud-modal');
+  if(viejo) viejo.remove();
+  var d = document.createElement('div');
+  d.id = 'preaud-modal';
+  d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;display:flex;align-items:center;justify-content:center';
+  d.innerHTML = '<div style="background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:1.3rem;max-width:680px;width:92%;max-height:82vh;overflow:auto">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:.9rem">' +
+      '<div style="font-weight:700;font-size:1rem">' + titulo + '</div>' +
+      '<button class="btn btn-ghost" onclick="document.getElementById(\'preaud-modal\').remove()" style="font-size:.8rem">✕ Cerrar</button>' +
+    '</div>' + cuerpo + '</div>';
+  d.addEventListener('click', function(ev){ if(ev.target === d) d.remove(); });
+  document.body.appendChild(d);
+}
 </script>
 <!-- SINAC UX 2.0 — Modo Enfocado + Command Palette + atajos -->
 <script src="/static/sinac-ux.js"></script>

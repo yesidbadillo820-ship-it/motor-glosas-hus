@@ -10,8 +10,9 @@ REM   2) Las REGLAS GENERALES de la Circular: campos separados por coma,
 REM      sin comillas, fechas DD/MM/AAAA, numeros sin puntos ni comas,
 REM      sin relleno de ceros/espacios, longitudes MAXIMAS.
 REM   3) La malla campo a campo de FURIPS 1 (102 campos) y FURIPS 2 (9).
-REM  Deja el reporte de errores en JSON y CSV (se abre en Excel):
-REM  REPORTE_PLANOS_ADRES_<fecha>.csv / .json
+REM  Deja un INFORME EXCEL detallado (RESUMEN con semaforo, HALLAZGOS,
+REM  POR CAMPO, AVISOS y LEYENDA): REPORTE_PLANOS_ADRES_<fecha>.xlsx
+REM  (con --formato tambien puede salir en CSV o JSON).
 REM
 REM  USO:
 REM   1) Copie este .cmd JUNTO con validar_planos_adres.py y
@@ -19,7 +20,8 @@ REM      validar_furips.py a la carpeta donde estan los TXT.
 REM   2) Doble clic. Tambien puede ARRASTRAR una carpeta o un TXT
 REM      encima del .cmd.
 REM
-REM  No instala nada (Python puro) y NO modifica los archivos: solo LEE.
+REM  Instala solo openpyxl (para el Excel) si falta; NO modifica los
+REM  archivos validados: solo LEE.
 REM ====================================================================
 chcp 65001 >nul 2>&1
 setlocal EnableExtensions DisableDelayedExpansion
@@ -62,10 +64,15 @@ if not exist "%~dp0validar_furips.py" (
     exit /b 1
 )
 
+%PYEXE% -c "import openpyxl" >nul 2>&1 || (
+    echo [i] Instalando el componente de Excel ^(openpyxl^), espere...
+    %PYEXE% -m pip install --quiet --user openpyxl
+)
+
 %PYEXE% "%~dp0validar_planos_adres.py" --ruta "%RUTA%"
 echo.
 echo ============================================================
-echo   Listo. Revise REPORTE_PLANOS_ADRES_*.csv ^(se abre en
-echo   Excel^) o el .json en: "%RUTA%"
+echo   Listo. Revise el Excel REPORTE_PLANOS_ADRES_*.xlsx
+echo   que quedo en: "%RUTA%"
 echo ============================================================
 pause

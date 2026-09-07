@@ -4,8 +4,10 @@ Valida los archivos planos de reclamaciones ante la ADRES **antes de
 radicarlos**: revisa la NOMENCLATURA del nombre del archivo, las REGLAS
 GENERALES del anexo técnico (delimitador coma, fechas DD/MM/AAAA, números
 sin separadores, sin comillas, sin relleno, longitudes MÁXIMAS) y, donde el
-anexo está cargado, la malla campo a campo. Entrega el reporte de errores
-en JSON y CSV con: Nombre del Archivo, Línea, Campo, Valor y Descripción.
+anexo está cargado, la malla campo a campo. Entrega un INFORME EXCEL
+detallado (hojas RESUMEN con semáforo por archivo y errores más repetidos,
+HALLAZGOS, POR CAMPO, AVISOS y LEYENDA) y, si se pide, el mismo reporte en
+JSON o CSV con: Nombre del Archivo, Línea, Campo, Valor y Descripción.
 
 ARCHIVOS QUE RECONOCE (nomenclatura estricta, validada con expresión regular)
 ----------------------------------------------------------------------------
@@ -52,8 +54,9 @@ USO
     py validar_planos_adres.py --ruta FURIPS1...01102023.txt      (un archivo)
     py validar_planos_adres.py --ruta . --formato json            (solo JSON)
 
-Salidas: REPORTE_PLANOS_ADRES_<fecha>.json y .csv en la carpeta validada.
-Solo LEE los archivos; no modifica nada. Sin dependencias (Python puro).
+Salida: REPORTE_PLANOS_ADRES_<fecha>.xlsx en la carpeta validada (con
+--formato también .csv o .json). Solo LEE los archivos; no modifica nada.
+Única dependencia: openpyxl para el Excel (sin él, entrega CSV).
 Normalmente se lanza con doble clic desde VALIDAR_PLANOS_ADRES.cmd.
 """
 
@@ -475,6 +478,209 @@ def escribir_csv(hallazgos: list[Hallazgo], destino: Path) -> None:
             w.writerow([h.archivo, h.linea, h.campo, h.valor, h.descripcion, h.severidad])
 
 
+def escribir_xlsx(hallazgos: list[Hallazgo], archivos_meta: list[dict], destino: Path) -> None:
+    """Informe Excel detallado: RESUMEN, HALLAZGOS, POR CAMPO, AVISOS, LEYENDA."""
+    from collections import Counter
+
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
+    AZUL = "1F4E79"
+    FILL_HEADER = PatternFill("solid", fgColor=AZUL)
+    FONT_HEADER = Font(color="FFFFFF", bold=True, size=10)
+    FILLS = {
+        ERROR: PatternFill("solid", fgColor="FFC7CE"),
+        ADVERTENCIA: PatternFill("solid", fgColor="FFEB9C"),
+        INFO: PatternFill("solid", fgColor="DDEBF7"),
+        "OK": PatternFill("solid", fgColor="C6EFCE"),
+    }
+    FONTS = {
+        ERROR: Font(color="9C0006", bold=True, size=10),
+        ADVERTENCIA: Font(color="9C6500", size=10),
+        INFO: Font(color="1F4E79", size=10),
+        "OK": Font(color="006100", size=10),
+    }
+    BORDE = Border(*(Side(style="thin", color="D9D9D9"),) * 4)
+
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    def hoja(nombre, encabezados, anchos):
+        ws = wb.create_sheet(nombre)
+        for j, (enc, ancho) in enumerate(zip(encabezados, anchos, strict=False), 1):
+            cel = ws.cell(row=1, column=j, value=enc)
+            cel.fill, cel.font = FILL_HEADER, FONT_HEADER
+            cel.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            ws.column_dimensions[get_column_letter(j)].width = ancho
+        ws.freeze_panes = "A2"
+        ws.row_dimensions[1].height = 28
+        return ws
+
+    def fila(ws, valores, estado=None, col_estado=None):
+        r = ws.max_row + 1
+        for j, v in enumerate(valores, 1):
+            cel = ws.cell(row=r, column=j, value=v)
+            cel.border = BORDE
+            cel.alignment = Alignment(vertical="top", wrap_text=True)
+            if estado and (col_estado is None or j == col_estado):
+                cel.fill, cel.font = FILLS[estado], FONTS[estado]
+
+    errores = [h for h in hallazgos if h.severidad == ERROR]
+    advertencias = [h for h in hallazgos if h.severidad == ADVERTENCIA]
+    avisos = [h for h in hallazgos if h.severidad == INFO]
+
+    # ── RESUMEN ──────────────────────────────────────────────────────────────
+    ws = wb.create_sheet("RESUMEN")
+    ws.cell(row=1, column=1, value="VALIDACIÓN DE ARCHIVOS PLANOS — CIRCULAR 022 DE 2023 ADRES")
+    ws.cell(row=1, column=1).fill = FILL_HEADER
+    ws.cell(row=1, column=1).font = Font(color="FFFFFF", bold=True, size=12)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=7)
+    generales = [
+        ("Generado", f"{datetime.now():%d/%m/%Y %H:%M}"),
+        ("Archivos validados", len(archivos_meta)),
+        ("Errores (corregir ANTES de radicar)", len(errores)),
+        ("Advertencias (revisar)", len(advertencias)),
+        ("Avisos informativos", len(avisos)),
+    ]
+    for i, (a, b) in enumerate(generales, 3):
+        ws.cell(row=i, column=1, value=a).font = Font(bold=True, size=10)
+        ws.cell(row=i, column=2, value=b)
+    ws.column_dimensions["A"].width = 36
+
+    fila_tabla = len(generales) + 4
+    encabezados = ["ARCHIVO", "TIPO", "LÍNEAS", "ERRORES", "ADVERTENCIAS", "AVISOS", "ESTADO"]
+    anchos = [36, 10, 9, 10, 14, 9, 14]
+    for j, (enc, ancho) in enumerate(zip(encabezados, anchos, strict=False), 1):
+        cel = ws.cell(row=fila_tabla, column=j, value=enc)
+        cel.fill, cel.font = FILL_HEADER, FONT_HEADER
+        ws.column_dimensions[get_column_letter(j)].width = ancho
+    r = fila_tabla
+    for meta in archivos_meta:
+        propios = [h for h in hallazgos if h.archivo == meta["archivo"]]
+        ne = sum(1 for h in propios if h.severidad == ERROR)
+        na = sum(1 for h in propios if h.severidad == ADVERTENCIA)
+        ni = sum(1 for h in propios if h.severidad == INFO)
+        estado = "CON ERRORES" if ne else ("REVISAR" if na else "CUMPLE")
+        clave = ERROR if ne else (ADVERTENCIA if na else "OK")
+        r += 1
+        valores = [meta["archivo"], meta["tipo"], meta["lineas"], ne, na, ni, estado]
+        for j, v in enumerate(valores, 1):
+            cel = ws.cell(row=r, column=j, value=v)
+            cel.border = BORDE
+            if j == 7:
+                cel.fill, cel.font = FILLS[clave], FONTS[clave]
+
+    r += 2
+    ws.cell(
+        row=r, column=1, value="LOS ERRORES MÁS REPETIDOS (para corregir en bloque)"
+    ).font = Font(bold=True, size=11, color=AZUL)
+    top = Counter(h.descripcion for h in errores).most_common(10)
+    r += 1
+    for j, enc in enumerate(("VECES", "DESCRIPCIÓN DEL ERROR"), 1):
+        cel = ws.cell(row=r, column=j, value=enc)
+        cel.fill, cel.font = FILL_HEADER, FONT_HEADER
+    for desc, veces in top:
+        r += 1
+        ws.cell(row=r, column=1, value=veces).border = BORDE
+        cel = ws.cell(row=r, column=2, value=desc)
+        cel.border = BORDE
+        cel.alignment = Alignment(wrap_text=True)
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=7)
+
+    # ── HALLAZGOS (errores y advertencias, para trabajar) ────────────────────
+    ws = hoja(
+        "HALLAZGOS",
+        ["ARCHIVO", "LÍNEA", "CAMPO QUE FALLA", "VALOR", "DESCRIPCIÓN DEL ERROR", "SEVERIDAD"],
+        [30, 7, 30, 24, 70, 13],
+    )
+    for h in errores + advertencias:
+        fila(
+            ws,
+            [h.archivo, h.linea, h.campo, h.valor, h.descripcion, h.severidad],
+            estado=h.severidad,
+            col_estado=6,
+        )
+    ws.auto_filter.ref = f"A1:F{ws.max_row}"
+
+    # ── POR CAMPO (agrupado: qué campo corregir y dónde) ─────────────────────
+    ws = hoja(
+        "POR CAMPO",
+        ["CAMPO QUE FALLA", "VECES", "ARCHIVO(S)", "LÍNEAS (primeras)", "ERROR TÍPICO"],
+        [32, 8, 30, 24, 66],
+    )
+    grupos: dict[str, list[Hallazgo]] = {}
+    for h in errores + advertencias:
+        grupos.setdefault(h.campo, []).append(h)
+    for campo, lista in sorted(grupos.items(), key=lambda kv: -len(kv[1])):
+        archivos_grupo = sorted({h.archivo for h in lista})
+        lineas = sorted({h.linea for h in lista})
+        tipica = Counter(h.descripcion for h in lista).most_common(1)[0][0]
+        fila(
+            ws,
+            [
+                campo,
+                len(lista),
+                " | ".join(archivos_grupo),
+                ", ".join(str(n) for n in lineas[:12]) + ("…" if len(lineas) > 12 else ""),
+                tipica,
+            ],
+        )
+    ws.auto_filter.ref = f"A1:E{ws.max_row}"
+
+    # ── AVISOS (INFO: no bloquean, contexto) ─────────────────────────────────
+    ws = hoja(
+        "AVISOS",
+        ["ARCHIVO", "LÍNEA", "CAMPO", "AVISO (no bloquea la radicación)"],
+        [30, 7, 30, 100],
+    )
+    for h in avisos:
+        fila(ws, [h.archivo, h.linea, h.campo, h.descripcion], estado=INFO, col_estado=4)
+    ws.auto_filter.ref = f"A1:D{ws.max_row}"
+
+    # ── LEYENDA ──────────────────────────────────────────────────────────────
+    ws = hoja("LEYENDA", ["TEMA", "EXPLICACIÓN"], [30, 110])
+    leyenda = [
+        ("ERROR", "Incumple la Circular 022/2023: corregirlo ANTES de radicar ante la ADRES."),
+        (
+            "ADVERTENCIA",
+            "No bloquea, pero conviene revisarlo (p. ej. extensión .csv en vez de .txt).",
+        ),
+        (
+            "AVISO (hoja AVISOS)",
+            "Información: campos con obligatoriedad condicional que evalúa el "
+            "validador profundo (validar_furips.py), o archivos omitidos.",
+        ),
+        (
+            "Línea descuadrada",
+            "Cuando una línea tiene campos de MÁS o de MENOS (casi siempre por una "
+            "coma dentro de un texto libre o una coma sobrante), los demás errores de ESA línea "
+            "suelen ser consecuencia del corrimiento: corrija primero la coma y vuelva a validar.",
+        ),
+        (
+            "Reglas generales",
+            "Separador: solo comas (vacíos como ,,). Sin comillas dobles ni "
+            "caracteres de control. Fechas DD/MM/AAAA reales. Números sin puntos ni comas. Sin "
+            "relleno de espacios; sin ceros a la izquierda en consecutivos, cantidades y valores. "
+            "Las longitudes del anexo son MÁXIMOS.",
+        ),
+        (
+            "Nomenclatura",
+            "FURIPS1/FURIPS2/FURTRAN + habilitación (12 dígitos) + DDMMAAAA; "
+            "FUCTAS2 + aseguradora (6) + MMAAAA; FURCEN + código del evento + DDMMAAAA + HHMM.",
+        ),
+        (
+            "Mallas cargadas",
+            "FURIPS 1 (102 campos) y FURIPS 2 (9). FURTRAN/FUCTAS/FURCEN: por "
+            "ahora nomenclatura + reglas generales (falta cargar su anexo técnico).",
+        ),
+    ]
+    for tema, exp in leyenda:
+        fila(ws, [tema, exp])
+
+    wb.save(destino)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -484,7 +690,10 @@ def main() -> int:
         "--salida", type=Path, default=None, help="Base del reporte (sin extensión)"
     )
     parser.add_argument(
-        "--formato", choices=("json", "csv", "ambos"), default="ambos", help="Formato del reporte"
+        "--formato",
+        choices=("xlsx", "json", "csv", "todos"),
+        default="xlsx",
+        help="Formato del reporte (por defecto Excel detallado)",
     )
     args = parser.parse_args()
 
@@ -508,9 +717,17 @@ def main() -> int:
         return 2
 
     hallazgos: list[Hallazgo] = []
+    archivos_meta: list[dict] = []
     for ruta in archivos:
         propios = validar_archivo(ruta)
         hallazgos.extend(propios)
+        try:
+            lineas = sum(1 for ln in _leer_texto(ruta).splitlines() if ln.strip())
+        except OSError:
+            lineas = 0
+        archivos_meta.append(
+            {"archivo": ruta.name, "tipo": detectar_tipo(ruta.stem) or "?", "lineas": lineas}
+        )
         ne = sum(1 for h in propios if h.severidad == ERROR)
         na = sum(1 for h in propios if h.severidad == ADVERTENCIA)
         estado = "SIN ERRORES" if ne == 0 else f"{ne} error(es)"
@@ -518,12 +735,23 @@ def main() -> int:
 
     carpeta = args.ruta if args.ruta.is_dir() else args.ruta.parent
     base = args.salida or carpeta / f"REPORTE_PLANOS_ADRES_{datetime.now():%Y%m%d_%H%M%S}"
-    if args.formato in ("json", "ambos"):
+    formato = args.formato
+    if formato in ("xlsx", "todos"):
+        try:
+            escribir_xlsx(hallazgos, archivos_meta, base.with_suffix(".xlsx"))
+            logger.info(f"\nREPORTE EXCEL: {base.with_suffix('.xlsx')}")
+        except ImportError:
+            logger.warning(
+                "openpyxl no está instalado: se entrega el reporte en CSV. "
+                "Para el Excel detallado: py -m pip install openpyxl"
+            )
+            formato = "csv" if formato == "xlsx" else formato
+    if formato in ("json", "todos"):
         escribir_json(hallazgos, base.with_suffix(".json"))
-        logger.info(f"\nREPORTE JSON: {base.with_suffix('.json')}")
-    if args.formato in ("csv", "ambos"):
+        logger.info(f"REPORTE JSON:  {base.with_suffix('.json')}")
+    if formato in ("csv", "todos"):
         escribir_csv(hallazgos, base.with_suffix(".csv"))
-        logger.info(f"REPORTE CSV:  {base.with_suffix('.csv')}")
+        logger.info(f"REPORTE CSV:   {base.with_suffix('.csv')}")
 
     errores = sum(1 for h in hallazgos if h.severidad == ERROR)
     logger.info("=" * 70)

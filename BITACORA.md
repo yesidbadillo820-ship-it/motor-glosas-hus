@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 04-09-2026
+**Última actualización:** 07-09-2026
 
 ---
 
@@ -30,6 +30,7 @@
 | 9 | **Informes de cartera y conciliaciones** | Consolidados de estado de cartera por entidad (formato FAMISANAR), análisis de actas (ej. PROTEGER EPS) e informes en Word para la mesa. | Usted sube el Excel de la entidad al chat; Claude entrega el informe verificado al centavo. |
 | 10 | **Caja de bots del PC del auditor** | Bots de doble clic entregados POR CHAT (no van al repo porque procesan datos reales): ORGANIZAR ARCHIVOS, BAJAR PESO EXCEL, PARTIR/UNIR archivos grandes, OCR a PDF (PC y celular), UNIR EXCELES, CORREOS DE PAGOS, AUTORIZACIONES RIPS, DE1601 (NUEVA EPS), HERRAMIENTAS DE IMÁGENES. | Se piden por chat, llegan en ZIP, se descomprimen y doble clic al `.bat`. Si uno falla, pegue la pantalla del error en el chat. |
 | 11 | **Módulos personales de estudio** | Tres programas aparte, que no tocan el motor: **ICFES** (`icfes/`, preparación para el Saber 11), **noruego** (`noruego/`, curso de idioma para el celular) y **velas japonesas** (`mercados/`, detecta los 28 patrones en su histórico y mide si de verdad cumplen). Cada uno con su aplicación web que funciona sin internet. | Doble clic en `tools\ICFES.cmd` o `tools\NORUEGO.cmd`; el de velas se corre con `python -m mercados`. Guías: `docs/GUIA_SISTEMA_ICFES.md`, `docs/GUIA_CURSO_NORUEGO.md` y `docs/GUIA_ANALISIS_VELAS.md`. |
+| 12 | **Cuidados médicos de la familiar (personal)** | Seguimiento de las autorizaciones, citas, medicamentos e insumos de EPS Sura de una familiar del auditor (paciente en casa), con su tablero HTML y los borradores de quejas/memoriales. | Se trabaja POR CHAT: usted sube los PDF/pantallazos de Sura y Claude entrega el tablero actualizado. Nada de datos de la paciente se guarda en este repositorio. |
 
 **Regla de oro:** no importa en qué chat esté — todo lo trabajado se anota en
 esta bitácora al terminar, y por eso cualquier chat nuevo "se acuerda" de todo.
@@ -90,6 +91,573 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 07-09-2026 (tarde, 2) — El acta de conciliación se arma sola
+
+**El trabajo que quita.** Antes de cada mesa de conciliación, alguien se
+sentaba a copiar a mano —renglón por renglón— los datos del archivo que manda
+la EPS al formato del acta. Cien facturas son más de doscientos renglones con
+nueve datos cada uno: **media jornada de digitar**, y un número mal copiado se
+discute en la mesa como si fuera cierto.
+
+**Cómo queda ahora.** En la pantalla de **Conciliación** hay un cuadro nuevo,
+«🧰 Armar el acta». Se suben dos archivos:
+
+1. **la lista de facturas** que van a esa mesa (una columna en Excel — sirve
+   `HUS0000542497`, `542497` o `HUS542497`, da igual cómo esté escrita);
+2. **el archivo que mandó la EPS**, tal como llega.
+
+Se escribe el NIT, la razón social, el número de acta, el periodo y la fecha,
+y sale el acta **en el formato oficial, con sus macros**, lista para llevar a
+la audiencia.
+
+Antes de bajarla se puede oprimir **«Ver qué sale»**: dice cuántos renglones
+salen, cuánta plata hay para conciliar, qué facturas de la lista no tienen
+glosas en el archivo de la EPS, y cuáles del archivo quedaron por fuera.
+
+**Lo que el sistema decide solo, y lo que no.** La tipificación sale del
+código de glosa, que no deja lugar a dudas: CL es pertinencia, FA facturación,
+SO soportes y TA tarifas. El tipo también, para tres de ellas: facturación,
+soportes y tarifas son **siempre** administrativas.
+
+Las de **pertinencia** no. Se reparten entre mixtas y médicas según el caso,
+y eso lo decide un médico auditor mirando la historia. El sistema **no las
+rellena**: las deja marcadas «◄ DEFINIR» para que se vean. En un acta de cien
+renglones una casilla vacía se pasa por alto; un texto raro, no. Poner el tipo
+equivocado manda la glosa al abogado que no es.
+
+**Y aprende.** Como bien dijo Yesid, «son las mismas cuentas de siempre».
+Cuando el médico auditor reparte una glosa de pertinencia, esa decisión queda
+guardada por factura y código. La próxima vez que esa misma glosa aparezca en
+un acta, ya sale llena. Con el tiempo, hasta las de pertinencia se van
+llenando solas.
+
+Probado con los archivos reales: el consolidado del Dispensario con 146
+glosas se convirtió en un acta de $211.374.401, con **139 de las 146 líneas
+tipificadas solas** y las 7 restantes marcadas con su motivo. El acta que sale
+la lee y la cuadra el mismo revisor que ya existía, sin un solo hallazgo.
+
+58 pruebas nuevas.
+
+---
+
+### 07-09-2026 — COOSALUD: paquete de 560 facturas y el copago que tumbaba el cargue
+
+Llegó el paquete **COOSALUD_07092026** (GI-33-5434-2026): **560 facturas,
+66.388 glosas, $5.841.913.158**. Radicadas entre el 31/07 y el 13/08, glosadas
+el 07/09 — o sea que el **62% llegó extemporáneo** (40.986 glosas por
+$3.653.206.514 van con la aceptación tácita del artículo 57 de la Ley 1438).
+La respuesta en el portal vence el **14/09/2026**.
+
+Quedó organizado, consolidado y con los dos archivos de OBJECIONES (300 y 260
+facturas, que es el tope de DGH), las 4 listas para correr el portal en
+paralelo y el Excel de control con el GI ya escrito.
+
+**El copago ya no tumba el cargue.** El bot solo capaba las objeciones cuando
+se le pasaba la base de servicios de DGH. Pero el dato para capar **no es de
+DGH**: el valor del servicio y la cuota moderadora vienen del propio DETALLE de
+COOSALUD. Con la base sin bajar, las 11 facturas con copago salían objetando el
+valor completo del servicio y DGH las rechaza con *«El VALOR OBJECION no puede
+ser mayor al valor del servicio»* — y como el cargue es todo o nada, se caía el
+archivo entero.
+
+Ahora el guardián de valor corre **siempre**. Sin base DGH el tope sale del
+detalle de COOSALUD: por cada (factura, servicio), la **suma** del valor de sus
+líneas menos la suma de sus copagos — la misma regla de capacidad que enseñaron
+las 8 estancias. En este lote capó **167 objeciones** (136 por copago), sin
+perder ni una línea, y la revisión de las 62.130 filas contra el tope da **cero
+servicios por encima**. Son $500.534 menos objetados: justo la parte que paga
+el paciente. Cada ajuste queda en la hoja `VALOR_AJUSTADO` del archivo
+`REVISAR (no van en el cargue)`. 4 pruebas nuevas.
+
+**Las doctoras solo contestan CALIDAD.** El bot venía metiendo COBERTURA en el
+mismo saco y sacaba la factura completa a esperar auditoría médica. Cobertura
+la contesta cartera. Ahora se reportan aparte: 783 glosas de CALIDAD en 36
+facturas esperan a las doctoras, y 281 de COBERTURA en **una sola** factura
+(HUS545379, $47.882.455) esperan a que el área defina el texto — son CO4601,
+accidente de tránsito, la EPS pide agotar primero los topes del SOAT.
+
+---
+
+### 07-09-2026 — Tres cosas que iban a fallar en producción, y ninguna prueba las veía
+
+No las destapó un error del auditor ni una prueba: salieron de revisar el
+código a conciencia buscando qué se puede romper cuando el uso crezca. Las
+tres viven en la letra chica y solo aparecen **con volumen o con el paso del
+tiempo**, que es justamente cuando ya hay gente dependiendo del sistema.
+
+**1. Una factura grande tumbaba la respuesta.** Pasando los 2.000 renglones,
+la Pre-Auditoría contestaba con un error de servidor en vez de un dictamen.
+Una estancia larga de UCI llega a esa cifra **solo en medicamentos e insumos
+del día a día**, así que no es un caso raro: es la factura cara, la que más
+importa revisar. El facturador quedaba sin respuesta y sin saber si timbrar.
+
+Ahora aguanta hasta 20.000 renglones. Y si de verdad llega un archivo
+equivocado —un envío de cápita, un mes entero en un solo archivo— lo rechaza
+**diciendo qué pasó y qué hacer**, en vez de morirse. Importa que rechace y no
+que recorte: descartar renglones en silencio dentro de una auditoría de plata
+es peor que decir «esto no lo puedo revisar así».
+
+**2. La pantalla del tablero se traía media base de datos para no mostrarla.**
+Cada evaluación guarda el archivo del HIS tal como llegó, y el de una factura
+grande pesa medio megabyte. La lista del tablero los cargaba **todos** —hasta
+500 de una— para pintar una tabla que no muestra ni una letra de ese archivo.
+Son unos 265 MB por cada vez que alguien abría la pantalla. Con dos personas
+mirando al tiempo, se caía el motor entero, no solo el tablero.
+
+Ahora la lista pide únicamente las columnas que se ven. El archivo completo se
+sigue leyendo cuando uno abre **una** factura, que es donde hace falta.
+
+**3. «Dinero salvado» se iba a congelar al mes, sin avisar.** La cifra se
+calculaba sobre las primeras 5.000 evaluaciones. A unas 200 facturas diarias
+eso es un mes: de ahí en adelante el tablero habría seguido mostrando los
+números del primer mes, la plata salvada habría dejado de crecer y **nadie se
+habría dado cuenta**. Para el número que va a mirar gerencia, equivocarse en
+silencio y hacia abajo es lo peor que puede pasar.
+
+Ahora la cifra cubre **los últimos 90 días**, sin tope de filas, y el tablero
+dice el periodo que está mostrando — «desde siempre» era mentira.
+
+12 pruebas nuevas. Cuatro existen por el riesgo del propio arreglo: que al
+acotar la consulta no se hubiera vaciado la pantalla, que el detalle de una
+factura siga trayendo sus reparos, que la definición estricta de dinero
+salvado no se haya aflojado, y que nadie vuelva a poner el tope viejo.
+
+---
+
+---
+
+### 07-09-2026 (noche) — «Cuidados Inteligentes»: la app del expediente médico
+
+**Lo que se pidió.** Que el tablero del frente personal (proyecto 12) dejara de
+parecer una página y se comportara como un programa de verdad: que responda
+«¿qué tengo que hacer hoy?», que uno le suba cualquier documento y ella sola lo
+lea y lo archive donde va, y que avise cuando dos papeles se contradicen.
+
+**Lo que se entregó (página privada + archivo, nada de datos al repositorio).**
+- **Cinco pantallas** con barra de navegación abajo (como una app de celular):
+  Inicio, Servicios, Documentos, Agenda y Más.
+- **Inicio** abre con lo urgente numerado y el botón para llamar al prestador;
+  debajo, el resumen, los vencimientos de los próximos 30 días, las
+  contradicciones y «¿qué cambió?».
+- **Analizar documento**: acepta PDF y **fotos tomadas con el celular**. Lee,
+  dice qué encontró («He detectado»), señala de qué página salió cada dato,
+  busca si el servicio ya existe y **actualiza sin duplicar**, diciendo
+  exactamente qué cambió.
+- **Expediente por servicio** con su trayecto (orden → solicitud →
+  autorización → inicio → seguimiento → vencimiento → renovación) y cada hito
+  enlazado a su documento.
+- **Ocho contradicciones** encontradas entre los propios documentos, todas con
+  su cita y su página. Dos ejemplos: la fórmula ordena un medicamento por sonda
+  de gastrostomía cuando la historia registra sonda nasogástrica; y dos
+  medicamentos del plan no aparecen en la fórmula del mismo día.
+- **Agenda** en calendario, lista y línea de tiempo; **módulo de medicamentos**
+  con fechas de renovación; **ficha de la paciente**; y todo lo anterior
+  (directorio, borradores, filtros, buscador) conservado.
+- **Accesibilidad y seguridad**: modo claro, oscuro y alto contraste; letra
+  A− / A / A+; el documento y el teléfono salen tapados por defecto; y **PIN
+  opcional** que se guarda cifrado (nunca el número en claro) con bloqueo
+  automático por inactividad.
+
+**Cómo se probó.** 42 pruebas automáticas en el navegador (Chromium), en 320,
+375, 390, 414, 768, 1024 y 1280 píxeles: navegación, carga de dos PDF reales,
+cruce sin duplicados, calendario, buscador, temas, PIN y desbordes. Las 42 en
+verde. De paso, la prueba destapó un error grave: al elegir un tema, el
+programa dejaba de responder a casi todos los botones. Ya quedó corregido.
+
+### 07-09-2026 (tarde) — La app «Cuidados de Emely» ahora lee los PDF sola
+
+**Lo que se pidió.** Convertir el tablero del frente personal (proyecto 12) en
+una aplicación de verdad: que uno le suba el PDF de Sura (orden, autorización,
+fórmula, MIPRES, oficio) y ella misma lo lea, diga de qué tipo es, saque los
+datos, encuentre el registro al que pertenece y lo actualice sin duplicar.
+
+**Lo que se entregó (por chat y como página web PRIVADA, nada al repo).**
+- La app publicada como página privada de Claude: botón flotante «+ Subir
+  documento», lectura automática del PDF, pantalla de confirmación (nada se
+  guarda sin el visto bueno), cruce por número de autorización/orden/MIPRES,
+  detección de vencimientos e inconsistencias, sección «Mi día», buscador que
+  entiende frases, línea de tiempo por servicio y trazabilidad (cada dato
+  dice de qué documento salió). Los datos quedan sincronizados para la
+  familia en la base privada de la página; también se entregó el archivo
+  HTML para la copia del PC.
+- El motor de lectura se probó contra los 21 PDF reales del paquete
+  DECISIONES: 94 verificaciones automáticas en verde, y el flujo completo
+  (subir → leer → cruzar → guardar) probado en Chromium en celular y PC.
+
+**Para la próxima vez.** Los documentos nuevos de Sura se suben directamente
+en la app; si un PDF es escaneado y la IA de la página no puede leerlo, se
+manda al chat y se pide «actualizar el tablero de cuidados».
+
+### 07-09-2026 — Nace el frente personal «Cuidados médicos de la familiar» (EPS Sura)
+
+**Lo que se pidió.** Organizar en un tablero los documentos de EPS Sura de la
+familiar del auditor que está en cuidado en casa (autorizaciones, citas,
+medicamentos, insumos y el proceso que ya está en la Supersalud), y avisar qué
+está urgente, qué está pendiente y qué quejas conviene radicar.
+
+**Lo que se entregó (todo POR CHAT, nada al repositorio).**
+- El **tablero «Cuidados de Emely»** en HTML (se abre en el navegador del
+  celular o del PC): semáforo de urgente/pendiente/al día, la tabla completa
+  de las 24 gestiones con sus números de autorización y vigencias, el
+  directorio de teléfonos para agendar y **dos borradores listos para
+  radicar** (memorial de impulso a la Supersalud y queja a Sura) con botón
+  de copiar.
+- El análisis en el chat: 16 autorizaciones de Sura leídas una a una, más la
+  historia clínica, la epicrisis, el escrito de la Supersalud y 13
+  pantallazos. Los PDF de resultados de Sura que piden clave se abren con la
+  cédula de la paciente.
+- Regla que quedó fija: los datos de la paciente **no** se suben al
+  repositorio; este frente vive en el chat y en los archivos que se
+  entregan.
+
+**Para la próxima vez.** Subir los documentos nuevos de Sura al chat y pedir
+«actualizar el tablero de cuidados»; Claude entrega el HTML al día.
+
+### 04-09-2026 (tarde) — FAMISANAR 2 de septiembre: 104 de 105 al primer intento
+
+Segundo lote de FAMISANAR con el mismo procedimiento del de la mañana: el
+listado de objeciones (105 renglones, 6 facturas, **$9.158.433**) cruzado
+contra el export de servicios del DGH (197 renglones de esas mismas 6
+facturas).
+
+**Resultado: 104 objeciones con el servicio identificado en confianza ALTA y
+1 sin cruce.** Salió mucho más limpio que el del 1 de septiembre porque esta
+vez FAMISANAR escribió los códigos **del hospital** (FMQ0112, FMQ0178-3…) y no
+los de su catálogo IUM. Las 104 quedaron con un código que el DGH reconoce;
+`CTNCENCOS` vacía en las 105 y `CROTIPOBJ` en 0 (las 6 facturas son
+administrativas: ninguna trae códigos CL).
+
+**La que quedó sin cruce:** la SO0101 de HUS0000544976 por **$1.500.000**
+(epicrisis que soporta la estancia). El texto de FAMISANAR viene cortado —
+«…se realiza objeción por falta o inconsistencia en el» — y no nombra ningún
+servicio, así que el bot no lo inventa. De los renglones de estancia de esa
+factura, el único que cuadra con el valor es **`120B01` SALA ESPECIAL
+(INCUBADORA III NIVEL)**: 3 unidades × $500.000 = $1.500.000 exactos (la
+factura trae 4 unidades por $2.000.000). Se le dejó al auditor para que
+confirme, como se hizo con la SO0101 del lote anterior.
+
+**Un arreglo que destapó este lote.** El export del DGH traía la columna del
+código escrita **`SERVICOS DGH`** (sin la «I»). El lector no la reconocía y la
+habría dejado pasar en silencio: el archivo habría salido con `SLNSERPRO`
+vacío en todo, aunque el cruce sí encontrara el renglón. Se agregó el alias, y
+además ahora el lector **falla con mensaje claro** si el export no trae
+ninguna columna de código, en vez de seguir de largo; si falta la de servicio
+pero está el CUPS o el código de medicamento, los usa y avisa.
+
+**Archivos entregados:** `OBJECIONES_FAMISANAR_02092026.xlsx` (el que se sube)
+y `CRUCE_FAMISANAR_02-09-2026.xlsx` (el respaldo, 1 renglón en REVISAR).
+
+### 04-09-2026 — Las objeciones de FAMISANAR: el código que FAMISANAR escribe no es el que DGH entiende
+
+**Lo que se pidió.** Armar el archivo de objeciones de FAMISANAR (1 de
+septiembre) para subirlo a Dinámica Gerencial, como el de COOSALUD o el del
+ADRES. Llegaron dos archivos: las **398 objeciones** de FAMISANAR (14 facturas,
+$31.439.029) y el **export de servicios facturados del DGH** (831 renglones de
+esas mismas 14 facturas).
+
+**El problema, que ya no es nuevo.** Es el mismo del ADRES en agosto: FAMISANAR
+y el hospital hablan idiomas distintos. FAMISANAR nombra los dispositivos con
+su propio catálogo IUM —`91022534`, «LINEA INFUSION E INYECCION - JERINGA 1ML
+25G x 16 mm»— y el DGH los tiene como `FMQ3616-1`, «JERINGA 1ML + TAPON PARA
+DOSIS UNITARIA». Con los medicamentos pasa algo más fino: FAMISANAR escribe
+`P32606-02` donde el HUS tiene `32606-2` (la letra de adelante y un cero de
+relleno). Si el archivo se sube así, DGH no reconoce el renglón.
+
+**Qué tan grave era.** Se midió sobre el archivo real, corriendo el bot como
+estaba:
+
+| | Como estaba | Con el cruce |
+|---|---|---|
+| Renglones con un código que DGH reconoce | **184 de 398 (46 %)** | **395 de 398 (99 %)** |
+| Renglones con un código que NO existe en el DGH | 191 | **0** |
+| Renglones sin código | 23 | 3 |
+| Centro de costo (`CTNCENCOS`) lleno | **0** | **395** |
+
+**Lo que se hizo.** `tools/organizar_objeciones_famisanar.py` aprendió a leer el
+export de servicios del DGH (`--servicios-dgh`) y a buscar, **dentro de esa
+misma factura**, de qué servicio habla cada objeción: por código (tolerando las
+tres formas de escribirlo), por nombre (separando número y unidad, `1ML` = `1
+ML`, y probando lo que va después del guion, porque FAMISANAR antepone la
+categoría) y por valor. Cuando en toda la factura un valor lo tiene un solo
+servicio, eso identifica el renglón aunque el código y el nombre sean de otro
+catálogo; cuando lo comparten varios, desempata el nombre. Cada renglón queda
+marcado con su confianza (ALTA / MEDIA / BAJA / SIN CRUCE) y hay un reporte
+aparte (`--reporte-cruce`) con las hojas CRUCE, REVISAR y RESUMEN.
+
+**La regla que no se rompió:** si el cruce no es confiable **no se inventa un
+servicio** — queda lo que decía el texto y el renglón se manda a REVISAR. De
+las 398: 263 ALTA, 46 MEDIA, 86 BAJA y **3 sin cruce** (las 3 son objeciones
+donde FAMISANAR no nombró ningún servicio: una SO0101 de epicrisis con el texto
+cortado, una CO0601 que sólo trae el texto de la norma y una FA0502 «incluido
+en derechos de sala»).
+
+**Dos cosas que aparecieron por el camino.**
+
+1. **La palabra «VALOR» se estaba yendo a `SLNSERPRO`.** Cuando FAMISANAR deja
+   la etiqueta CÓDIGO vacía —«… FMQ0113 CATETER INTRAVENOSO 20 CÓDIGO   VALOR
+   UNITARIO FACTURADO…»— el bot tomaba la palabra siguiente como si fuera el
+   código. Ahora se exige que el código traiga al menos un dígito y, cuando la
+   etiqueta va vacía, se recupera el código que está **pegado adelante del
+   nombre** (que es donde FAMISANAR lo pone en esos casos).
+
+2. **FAMISANAR busca algunos códigos en el catálogo CUPS y no en el del
+   hospital.** Las 4 objeciones AU5802 de HUS0000549272 dicen «BIOPSIA DE
+   MUSCULO O TENDON EXTRAOCULAR, código 150101»; en el DGH el `150101` es
+   **ENSURE CLINICAL** (fórmula enteral), y el valor, la cantidad y el número
+   de renglones cuadran exacto con esa línea. El cruce las deja amarradas al
+   servicio correcto pero con el aviso «el nombre del servicio no coincide»,
+   para que el auditor lo confirme. Son 11 renglones con ese aviso.
+
+**Corrección del mismo día (la pidió Yesid).** Dos reglas del formato que ya
+venían de chats anteriores y que yo no respeté:
+
+1. **`CTNCENCOS` va SIEMPRE vacía** en el archivo de FAMISANAR. Yo la había
+   llenado con el centro de costo que traía el cruce, creyendo que ayudaba
+   (venía del arreglo del ADRES del 28-08, donde sí se pedía llenarla). No es
+   lo mismo: el export del DGH sólo trae el **nombre** del centro
+   («URGENCIAS ADULTOS») y esa columna es de código. Corregido en el bot, con
+   prueba que lo fija, y las 395 celdas borradas del archivo del auditor. El
+   nombre del centro sigue apareciendo en el reporte de cruce, como pista.
+2. **`CROTIPOBJ` = 0 ADMINISTRATIVA / 1 MEDICA / 2 MIXTA**, por factura. Se
+   revisó el archivo entregado: las 14 facturas estaban bien clasificadas (13
+   en 0 y HUS0000542699 en 2, porque mezcla CL0601 con cobertura). Quedó
+   escrito así en el código y en la guía para que no se vuelva a interpretar.
+
+El auditor completó a mano las 3 objeciones que quedaron sin cruce:
+HUS0000549506 (SO0101, estancia) → `105M01`; HUS0000546202 (CO0601) →
+`FMQ0952` y (FA0502) → `FMQ3605`. Con eso el archivo quedó con los 398
+renglones identificados.
+
+**Archivos entregados:** `OBJECIONES_FAMISANAR_01-09-2026.xlsx` (el que se
+sube, 398 renglones en las 16 columnas de siempre) y
+`CRUCE_FAMISANAR_01-09-2026.xlsx` (el respaldo del auditor, 100 renglones en
+REVISAR). Guía actualizada en `tools/README_organizar_objeciones_famisanar.md`;
+67 tests en `tests/test_tools/test_organizar_objeciones_famisanar.py`.
+
+### 04-09-2026 (noche, 5) — La primera factura de verdad destapó dos falsos positivos
+
+**La prueba.** Se le pasó a la Pre-Auditoría una factura real del share:
+HUS559077, de $141.720.044, con 531 KB de servicios. Contestó en **32
+milisegundos** (el compromiso con el facturador son 10 segundos, así que
+sobra tiempo de aquí a la esquina). Pero levantó **63 alertas**, y dos
+fuentes de ese ruido eran errores nuestros.
+
+**1. Cuarenta y ocho alertas de tarifa que nadie podía resolver.** El
+archivo del HIS **no dice qué EPS paga** la factura. Sin saber quién paga no
+existe «tarifa pactada» — pero el motor, al no encontrarla, se iba a comparar
+contra el catálogo de precios propio del hospital y cantaba diferencia. Y
+para colmo, en el mismo mensaje avisaba que la tarifa NO se había revisado.
+El tablero se contradecía a sí mismo, y eso es lo más rápido para que un
+auditor deje de creerle.
+
+**Ahora:** sin EPS, el motor **se calla** en materia de tarifas y lo dice. El
+día que el HIS mande el campo, la revisión vuelve a operar igual que siempre.
+
+**2. Un insumo bloqueado por «servicio pediátrico en un paciente adulto».**
+Era el material FMQ0098. En un insumo, «pediátrico» es un **calibre** —una
+sonda pediátrica se le pone a un adulto todos los días—, no una restricción
+de paciente.
+
+**Ahora:** la revisión de edad mira **servicios**, no artículos. En un insumo
+o un medicamento, la palabra que nombra una edad es una talla o una dosis. La
+regla sigue igual de firme donde sí importa: una **estancia** en UCI
+pediátrica facturada a un adulto se sigue bloqueando.
+
+Con las dos correcciones, esa misma factura pasa de 63 alertas a unas 15
+—estancia, UCI y servicios repetidos—, que son las que el facturador de
+verdad puede revisar antes de timbrar.
+
+9 pruebas nuevas, incluidas las que impiden que arreglar esto haya debilitado
+las reglas donde sirven.
+
+---
+
+### 04-09-2026 (noche, 4) — Entregado el Excel del lote 04-sep, y un tercer hueco de lectura tapado
+
+**Lo que se entregó.** El Excel del lote del 04 de septiembre quedó armado y
+en manos del auditor: **88 respuestas para cargar** (63 facturas, $17.060.666
+objetados) más las **6 objeciones CL** de glosas médicas y mixtas aisladas en
+su hoja, que las trabaja el equipo médico. De las 88 líneas, 62 tienen su
+tarifa del contrato 440 identificada y 59 la citan en el texto.
+
+**Con una salvedad dicha de frente:** ese archivo se generó desde el
+computador de Claude, que **no ve la unidad `Y:`**, así que ninguna factura
+pudo leerse en PDF y las columnas del cotejo salieron sin el valor facturado.
+Para que el cotejo salga completo hay que correr el mismo bot en el equipo de
+cartera, donde sí están los soportes. Las respuestas son las mismas.
+
+**El tercer error de lectura.** Revisando el lector contra renglones como los
+que traen las facturas reales aparecieron dos casos más en los que no se leía
+ningún valor: cuando el PDF devuelve **el renglón entero dentro de una sola
+celda** (`890275H CONSULTA 1 192.600 192.600`), las letras del código hacían
+descartar toda la línea; y una celda escrita `$ 192.600` perdía el valor por
+el espacio. Ahora se mira palabra por palabra, así que en el mismo renglón
+pueden convivir el código, la fecha, el NIT y los importes sin que ninguno se
+confunda con plata.
+
+
+### 04-09-2026 (noche, 3) — La respuesta ahora se escribe según lo que dice el cotejo
+
+**Lo que faltaba.** El cotejo ya sabía si el cobro estaba a tarifa, si el
+mayor valor era el aumento del año o si había sobrecobro de verdad, pero la
+respuesta que se sube al portal seguía diciendo lo mismo en los tres casos.
+
+**Lo que se hizo.** El texto ahora lo dicta el veredicto, y usa exactamente
+las mismas cifras que el cotejo verificó, así que el texto y las columnas del
+Excel nunca pueden decir cosas distintas:
+
+- **Cobrado a tarifa:** la respuesta afirma que el valor facturado es la
+  tarifa pactada exacta del contrato 440 y que la causal es infundada.
+- **Aumento de la vigencia 2026:** la respuesta explica que el mayor valor es
+  la actualización de tarifas que prevén los parágrafos 3 y 4 del contrato
+  (modificatorio y resolución del hospital) y que el cobro es válido. Esta es
+  la que sirve para las 43 glosas del lote del 04-09.
+- **Sobrecobro real:** la respuesta reconoce la tarifa pactada, el valor
+  facturado y acepta la glosa por la diferencia, pidiendo el levantamiento
+  del resto.
+
+**Con un freno en el tercer caso.** Ese texto acepta una glosa, así que por
+defecto NO se sube: queda en la columna RESPUESTA SUGERIDA y en la hoja de
+trabajo, para que usted decida. Si quiere que se suba redactado, se corre el
+bot con `--redactar-aceptacion`.
+
+**Lo que no cambió, y es lo que protege al hospital.** Cuando no se pudo
+cotejar (sin PDF, código que no está en el anexo, o una línea con varios
+valores donde no se sabe cuál es el unitario), sigue mandando la redacción
+prudente: cita el soporte y el anexo, pero no proclama ninguna cifra. Es la
+lección del caso de la factura 542497.
+
+**Un detalle de presentación que se corrigió a tiempo:** el servicio se nombra
+con su código y su descripción, no con el renglón crudo del PDF, que metía
+cantidades y valores sueltos en mitad de la frase que lee la EPS.
+
+6 pruebas nuevas (87 en total en esta línea de trabajo).
+
+---
+
+### 04-09-2026 (noche, 2) — El bot ya dice si DE VERDAD estamos cobrando de más
+
+**Lo que faltaba.** El bot defendía siempre al hospital: toda glosa por mayor
+valor cobrado la contestaba pidiendo el levantamiento. Pero a veces la EPS
+tiene razón, y contestar «no aceptamos» cuando sí se cobró de más solo alarga
+el pleito y deja la plata quieta.
+
+**Lo que se hizo.** El bot abre el PDF de la factura, busca el renglón del
+servicio glosado, saca **el valor por el que realmente se facturó** y lo
+compara con **la tarifa pactada en el anexo del contrato 440**. Al lado de
+cada respuesta, en el mismo Excel, quedan siete columnas nuevas: valor
+facturado, tarifa pactada, diferencia, si hay sobrecobro, cuánto se sugiere
+aceptar, la **RESPUESTA SUGERIDA** redactada, y de qué archivo salió cada
+cifra. Lo que hay que decidir queda además en una hoja aparte,
+**«COTEJO DE COBRO»**, para no tener que leer las 88 filas.
+
+**La trampa que se descubrió a tiempo.** En el lote del 04-09, 24 facturas
+venían al 7% por encima del anexo y 19 al 31,25%. Un cotejo ingenuo habría
+gritado «sobrecobro» en todo el lote y nos habría hecho aceptar glosas que no
+proceden: ese mayor valor **es la actualización de tarifas del año 2026**, que
+el propio contrato prevé en los parágrafos 3 y 4 (SOAT 2026 menos 20% para
+unas, y para las tarifas propias de la ESE un modificatorio que reconoce el
+incremento). Por eso el bot mira todo el lote antes de opinar: si la misma
+diferencia porcentual se repite en varias facturas, la marca como
+**vigencia** y dice que NO se acepte sin antes sustentar con la resolución.
+El sobrecobro suelto, el que no le pasa a nadie más, sí lo marca verificado y
+propone: «se acepta la glosa por $X por mayor valor cobrado».
+
+**Nunca acepta solo.** El Excel del cargue sigue con Valor Aceptado en 0. La
+sugerencia es para que usted decida y la escriba, por lo mismo de la directriz
+CL: si el hospital acepta, la nota crédito tiene que poder cruzar.
+
+**Además, dos errores de lectura corregidos** que hacían ver cobros que no
+existían: el código del servicio (890275H) se estaba leyendo como si fueran
+$890.275, y de las facturas que no dibujan la tabla no se sacaba ningún
+renglón. También se aceleró la búsqueda de soportes en la unidad `Y:`: ahora
+se recorre **una sola vez** y se prefiere el archivo `FEV_...` de cada carpeta
+de factura, que es la factura electrónica.
+
+29 pruebas nuevas (80 en total en esta línea de trabajo).
+
+---
+
+### 04-09-2026 (tarde, 7) — La Pre-Auditoría ya habla el idioma del HIS, y tiene pantalla
+
+**Llegó el archivo de verdad.** Yesid sacó del SINAC el RIPS de la factura
+HUS558039 y con eso se acabó de adivinar. El HIS manda el **RIPS de la
+Resolución 2275 de 2023** — la misma estructura con la que se le reporta al
+Ministerio—, y el motor ahora la recibe tal cual, sin que el hospital tenga
+que transformar nada.
+
+**Lo que el archivo enseñó, y que no se sabía.**
+
+- **El RIPS no trae la EPS.** El único NIT que viene es el del propio
+  hospital. Sin EPS no se puede cruzar la tarifa pactada ni el contrato
+  vigente: esas dos revisiones **se callan y lo dicen**, en vez de inventar
+  un pagador.
+- **El RIPS no trae epicrisis ni notas.** Entonces el cruce clínico con IA
+  no corre — no hay texto que cruzar—, y **la factura se evalúa igual** con
+  las reglas de siempre. Nada se detiene por eso.
+- **No trae el total de la factura:** se suma de los valores de cada
+  servicio.
+
+Si algún día el HIS puede mandar la EPS y las notas al lado del RIPS, el
+motor las usa automáticamente. Mientras tanto, cada respuesta trae una lista
+de **«lo que no se pudo revisar y por qué»**, aparte de los reparos, para que
+nadie confunda «esto está bien» con «esto no lo miramos».
+
+**La pantalla nueva: Pre-Auditoría.** En el menú lateral, al lado de Glosas
+ADRES. Muestra, factura por factura, qué le contestamos al HIS: el dictamen
+(aprobado / advertencia / bloqueo), cuántos reparos, cuánta plata está en
+juego y el valor de la factura. Al hacer clic en una fila se abren los
+reparos, cada uno con el código de glosa oficial con el que la EPS lo
+objetaría.
+
+**Arriba, cuatro cifras.** La que importa es **DINERO SALVADO**, y está
+definida con cuidado: solo cuenta las facturas que fueron **bloqueadas y
+después volvieron a pasar** — o sea, las que de verdad se corrigieron antes
+de timbrar. Una factura bloqueada que nunca volvió **no se cuenta**: no
+sabemos si la corrigieron o si la timbraron igual, y esa plata sale aparte
+como **riesgo sin resolver**. Es una cifra que se puede defender ante
+gerencia sin que nadie la tumbe con una pregunta.
+
+70 pruebas nuevas, incluidas las que corren sobre el archivo real del HIS.
+No se tocó ninguna otra pantalla.
+
+---
+
+### 04-09-2026 (tarde, 6) — Las glosas que se perdían cuando el bot se caía
+
+**El hueco.** Cuando un bot de radicación pide una glosa, el motor se la
+entrega y la marca como «tomada». Si el bot se moría en el segundo siguiente
+—porque a ese PC le falta un programa, porque el navegador no arrancó, porque
+el portal no abrió—, esa glosa **se quedaba tomada para siempre**:
+
+- los demás computadores no la veían, porque solo miran las que están libres;
+- las personas tampoco, porque la bandeja muestra las atoradas;
+- y la glosa desaparecía sin que nadie se enterara.
+
+Nadie la había perdido de vista a propósito: sencillamente no había forma de
+saber que existía.
+
+**Lo que se hizo.** Ahora el bot, al caerse, **suelta la glosa antes de
+morirse**: la devuelve a la cola para que otro computador sano la tome, y deja
+escrito de qué se murió («a este PC le falta playwright», «no arrancó el
+navegador»). El auditor ve el motivo en la bandeja, en la columna del último
+error.
+
+**Para que no rebote sin fin.** A los **3 intentos**, la glosa deja de dar
+vueltas y pasa a «la revisa una persona». Si un computador falló tres veces en
+el mismo punto, no es mala suerte: le falta algo, y una cuarta pasada no lo va
+a arreglar sola.
+
+**Lo que sigue intacto, y es lo importante.** Una glosa que **ya se pulsó en el
+portal** NO se devuelve a la cola por nada del mundo. Ahí no se sabe si quedó
+radicada, y devolverla sería invitar a radicarla dos veces ante la EPS — el
+daño que este módulo existe para evitar. Esa sigue saliendo solo por la
+bandeja, cuando una persona mira el portal y dice qué pasó.
+
+27 pruebas nuevas, entre ellas la caída del bot con la glosa en la mano.
+
+---
+
 ### 04-09-2026 (tarde, 6) — Se quitan del menú cuatro botones que no se usan
 
 **Lo que pidió Yesid.** Quitar del menú lateral cuatro botones que «realmente
@@ -112,6 +680,8 @@ alguno vuelve a hacer falta, se muestra de nuevo sin rehacer nada.
 
 Nada más cambia: las demás pantallas y los contadores del menú (Vencimientos,
 Contratos) siguen igual.
+
+---
 
 ---
 
@@ -175,6 +745,22 @@ Esta entrega es **solo el motor y sus pruebas** (108 pruebas nuevas). La
 pantalla se hace después.
 
 ---
+
+### 04-09-2026 (noche) — Validador de planos: informe EXCEL detallado
+- El auditor corrió el validador con sus FURIPS reales (3 reclamaciones,
+  262 líneas de servicios) y pidió el reporte en **Excel detallado** en vez
+  del CSV. Hecho: ahora el bot entrega `REPORTE_PLANOS_ADRES_<fecha>.xlsx`
+  con 5 hojas — **RESUMEN** (semáforo por archivo + los errores más
+  repetidos para corregir en bloque), **HALLAZGOS** (solo errores y
+  advertencias, con filtros), **POR CAMPO** (agrupado: qué campo corregir,
+  cuántas veces y en qué líneas), **AVISOS** (los informativos aparte, para
+  que no estorben) y **LEYENDA**. CSV y JSON siguen disponibles con
+  `--formato`.
+- En sus archivos reales encontró de una vez: una coma de más en la línea 3
+  del FURIPS1 (corre todos los campos), registros INVIMA de 17 caracteres
+  donde la Circular permite 15, descripciones con comillas y comas
+  internas, naturaleza del evento '1' en vez de '01' y espacios de relleno.
+- 21 pruebas automáticas en verde.
 
 ### 04-09-2026 (tarde, 4) — Frente ADRES: validador de ARCHIVOS PLANOS de la Circular 022
 - Nuevo bot **`tools/adres/validar_planos_adres.py`** + doble clic
@@ -10437,9 +11023,135 @@ lo confirmó** y quedó en firme:
 9 pruebas nuevas (las del comando y la que deja escrito que la 4302 es
 TARIFAS).
 
+### 03/04-09-2026 — Dispensario: directriz nueva (las CL médicas no las toca el bot) y lote 04-sep
+
+**Directriz de negocio nueva, pedida por el auditor y ya montada en el
+generador oficial (`tools/glosas_dispensario/gen_lote.py`, con su prueba):**
+las objeciones con causal **CL** de glosas **Médica o Mixta** ya NO se
+responden con el robot. Quedan aisladas en una hoja aparte del mismo Excel
+(**"PARA GESTION MEDICA"**, encabezado rojo) para que las trabaje el equipo
+médico a mano. La razón: cuando el equipo médico acepta una de esas glosas
+debe cruzar una nota crédito, y una respuesta genérica ya cargada por el bot
+impide ese cruce y daña la conciliación. Las objeciones excluidas conservan
+su número de la grilla del portal, así el robot responde las demás sin
+correrse de fila. La regla quedó también en
+`docs/CONTEXTO_DISPENSARIO_GLOSAS.md` (punto 9).
+
+**Lote GLOSAS_04_SEPTIEMBRE:** 94 objeciones de 64 facturas del Dispensario.
+Con la directriz aplicada: **88 respuestas para el robot ($17.060.666)** y
+**6 objeciones CL médicas/mixtas apartadas para el equipo médico
+($19.066.935)** — son 2 facturas: HUS0000545263 (osteotomía, tendón de
+Aquiles y anclaje PEEK) y HUS0000545286 (resección de colon, anastomosis y
+linfadenectomía). Cuadre al peso contra la hoja INICIAL (respondidas +
+apartadas = valor total). Vencimientos: 45 facturas el 16-09 y 19 el 18-09
+(las 45 son las mismas que el cruce de GI detectó como "glosas nuevas").
+
+**Otros cierres de estos días que faltaban por anotar:** el cruce de GI por
+factura que pidió el auditor quedó completo (227 facturas: 24 del
+GI-33-5369-2026, 128 del lote 31-ago, 20 del GI-33-5335-2026, 3 del
+GI-33-5251-2026, 1 respondida por otra vía y **6 que se saltaron entre
+lotes** — de esas 6 aún falta el export DGH para responderlas, vencían 4 y
+7-09); el cargue de notas de septiembre (acta 1121/1122) avanzó hasta dejar
+solo 3 notas rechazadas por CUV en la grilla (332871, 332846, 332847, a la
+espera de SISTEMAS) más la nota nueva 332519 con su triada armada; y el acta
+863 de FAMISANAR quedó armada desde el detalle 7883 de la EPS (586 facturas,
+$987 millones conciliados al peso, en xlsm y xlsx).
+
+### 04-09-2026 (tarde) — Nace el BOT RPA del paquete GI (Dispensario de punta a punta)
+
+El auditor amplió las instrucciones y quedó construido el **bot que arma el
+paquete completo en un solo comando**
+(`tools/glosas_dispensario/bot_lote_dispensario.py`): pide el código GI,
+crea la carpeta del paquete con su subcarpeta `soportes`, genera las
+respuestas (heredando la directriz CL: las médicas/mixtas con causal CL van
+a la hoja "PARA GESTION MEDICA" y el bot no las toca), **busca el PDF de
+cada factura en las carpetas de radicación de la unidad Y:** y lo copia al
+paquete, **lee cada PDF con lectura en cascada** (pdfplumber → PyPDF2 → OCR
+con Tesseract para escaneadas, `extraer_factura_pdf.py`) y ancla a la
+respuesta SOLO lo que de verdad se leyó (paciente y valor total — lo
+ilegible no se inventa), **cruza cada glosa de tarifas con el tarifario del
+contrato 440** que entregó Contratación (`tarifario_440.py`: anexo 6.2 por
+CUPS/código IPS y anexos de medicamentos por CUM, 12.128 códigos indexados)
+citando la tarifa pactada exacta, corre el robot del portal (piloto primero)
+y deja las evidencias en el PDF del paquete. Todo con sus pruebas (9 en
+total con las de la directriz).
+
+**Probado con datos reales:** en el lote del 04-09, 59 de las 80 objeciones
+de tarifas encontraron su tarifa pactada en el anexo y la citan con código,
+descripción y valor (las 21 sin pacto son códigos FMO de farmacia — a esas
+no se les cita nada, regla de no invención). Quedó entregada la **versión
+CON TARIFAS** del Excel del lote 04-sep.
+
+**Ajuste del mismo dia — el constructor de respuestas con TRAZABILIDAD:** el
+auditor pidio eliminar las aperturas genericas y que cada respuesta se
+redacte sobre la evidencia leida. Ahora el bot arma un **parrafo de
+evidencia** que entra justo despues del encabezado de la respuesta: abre
+citando el PDF fuente ("AL REVISAR EL DOCUMENTO DE SOPORTE <archivo>..."),
+nombra al paciente extraido, cita el servicio y el valor leidos del PDF, y
+cruza con la tarifa pactada del contrato 440. Regla dura de honestidad:
+**"CORRESPONDE EXACTAMENTE" solo se afirma cuando los numeros de verdad
+coinciden**; si no coinciden o no se leyo el dato, se cita la tarifa pactada
+sin afirmar coincidencias (y lo ilegible no se menciona). 6 pruebas nuevas
+(15 en el modulo).
+
+**Y la leccion del caso HUS0000542497 (hallada por el auditor):** la
+respuesta citaba la tarifa del anexo ($180.000) sin cotejarla con lo
+facturado, mientras el argumento decia "el valor facturado ES la tarifa
+pactada" — una contradiccion que la EPS podia usar para ratificar con el
+propio soporte del hospital. Regla nueva del constructor: **sin cotejo
+verificado no se proclama cifra** — se cita que el codigo esta pactado y se
+remite la fila, sin valor; la cifra solo aparece cuando coincide con el
+valor leido del PDF o con el objetado.
+
 ---
 
 ## 3) PENDIENTE
+
+### COOSALUD — paquete del 07-09 (GI-33-5434-2026)
+- **DECISIÓN SUYA: el texto de COBERTURA.** Son 281 glosas CO4601 en la factura
+  HUS545379 ($47.882.455). Apenas el área dicte el texto, se deja fijo en
+  `consolidar_coosalud.py` junto a los de TARIFAS, AUTORIZACIÓN, FACTURACIÓN y
+  SOPORTES, y esa factura queda lista. No se inventa.
+- **Falta la base de servicios de DGH.** Bajar el export SERVICIOS FACTURADOS de
+  COOSALUD con facturación del **26/06/2026 al 02/08/2026** y recortarlo con
+  FILTRAR BASE DGH usando el TXT de las 560. Sin ella, SLNSERPRO lleva el CUPS
+  de COOSALUD y CTNCENCOS e IDRIPS van vacías. El tope de valor ya quedó
+  resuelto sin la base, pero el código y el centro de costos no.
+- **36 facturas esperan auditoría médica** (783 glosas de CALIDAD). Las gruesas:
+  HUS543423 ($46,9 mill), HUS543160 ($20,9 mill), HUS541431 ($17,2 mill),
+  HUS543764 ($15,8 mill).
+- **Responder el portal antes del 14/09/2026.** Eso sí se puede hacer ya.
+### Cuidados médicos de la familiar — EPS Sura (07-09)
+- **Radicar el memorial de impulso** al proceso de la Supersalud (el plazo de
+  respuesta ya se venció) y **la queja a Sura** por lo que sigue sin
+  autorizar (oxígeno de respaldo, renovación del aspirador, terapias física y
+  ocupacional, pañales, ambulancia). Los dos borradores están en el tablero
+  HTML entregado el 07-09.
+- **Agendar esta semana la visita del médico domiciliario** (autorizada el
+  01-09): ahí se renuevan la fórmula del mes (vence hacia el 14-09) y el
+  MIPRES de los pañales (la última entrega se acaba hacia el 16-09).
+- **Agendar** geriatría, nefrología, fisiatría y los laboratorios a domicilio
+  (con ayuno de 8–10 horas, menos la creatinina), y **confirmar el inicio**
+  de las terapias de deglución y respiratoria ya autorizadas.
+
+### FAMISANAR — objeciones del 2 de septiembre (04-09)
+- **Completar la SO0101 de HUS0000544976** ($1.500.000). Candidato con el valor
+  exacto: `120B01` SALA ESPECIAL (INCUBADORA III NIVEL), 3 × $500.000. Falta
+  que el auditor lo confirme antes de subir.
+- **Piloto de una factura** también en este lote. La más pequeña es
+  HUS0000548590 (5 objeciones) y la más grande HUS0000549340 (40).
+
+### FAMISANAR — objeciones del 1 de septiembre (04-09)
+- **Revisar los 100 renglones de la hoja REVISAR** de
+  `CRUCE_FAMISANAR_01-09-2026.xlsx`: 86 de confianza BAJA (se ubicaron por
+  valor, hay que confirmar que sea ese servicio), 11 con el aviso de que el
+  nombre no coincide y 3 sin cruce (esas se completan a mano).
+- **Piloto de una factura en DGH** antes del cargue completo (regla del repo).
+  La más limpia para el piloto es HUS0000549272 (68 objeciones, todas ALTA o
+  MEDIA) o HUS0000548556 (3 objeciones, las tres ALTA).
+- **HUS0000543238 es la pesada:** 155 objeciones y 70 en revisión. Casi todas
+  son dispositivos con nomenclatura IUM; si el maestro de equivalencias
+  FAMISANAR→HUS aparece, se cargan con `--mapa-servicios` y quedan en ALTA.
 
 ### Análisis de velas (actualizado 04-09)
 - **~~Probarlo con un histórico de verdad~~ — YA HECHO (04-09).** Se midió con
@@ -11119,6 +11831,21 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     al tórax se le descontaron $7.800 cuando se aceptó por $758.700.
 
 ### Dispensario — respuesta de glosas SIMED y conciliación
+0. **(04-09, lo primero de mañana) Correr el lote del 04 de septiembre.** El
+   Excel ya está entregado (`respuestas_glosa_DISPENSARIO_04SEP_FINAL.xlsx`,
+   88 respuestas / 63 facturas / $17.060.666). Dos pasos, en el equipo de
+   cartera y no en el chat, porque allá sí se ven los soportes de la `Y:`:
+   primero **volver a generarlo con el bot** para que las columnas del cotejo
+   salgan llenas (el que se entregó salió sin el valor facturado), y después
+   el cargue: piloto con HUS0000542497 y luego `--todas --reporte`. Falta el
+   **código GI** del paquete para la carpeta y el PDF de evidencias. Las 6
+   objeciones CL de la hoja "PARA GESTION MEDICA" no las sube el bot: van al
+   equipo médico.
+0-bis. **Pedirle a Contratación el modificatorio de tarifas 2026 y la
+   resolución del hospital.** Es el documento que tumba de una sola vez las
+   43 glosas del lote 04-sep que vienen con el aumento del año (24 al 7% y 19
+   al 31,25% por encima del anexo). El bot ya las tiene marcadas una por una
+   en la hoja «COTEJO DE COBRO».
 10. **Las 3 facturas de junio** (518186 / 515107 / 515773): en el pantallazo
     de pendientes del 05-08 **ya no figuran por cargar**. Verificar en el
     portal cómo quedaron radicadas (¿respuesta cargada o cerradas por
@@ -11268,6 +11995,24 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
   son para que el área los mire, no se unieron por parecido.
 
 ## 4) PARA MAÑANA
+
+**COOSALUD 07-09 — lo primero.** Correr el portal con las 4 listas (vence el
+14/09) y, en paralelo, bajar de DGH la base de servicios del 26/06 al 02/08
+para poder regenerar los dos OBJECIONES con los códigos de DGH. Si el área ya
+dictó el texto de cobertura, se deja fijo en el bot y se cierra HUS545379.
+
+### Cuidados médicos de la familiar — lo primero
+1. Radicar el **Borrador A** (impulso a la Supersalud) por el correo oficial
+   que la misma Supersalud indicó, y el **Borrador B** (queja) en la oficina
+   de Sura pidiendo radicado escrito. Ambos están en el tablero HTML del
+   07-09 con botón de copiar.
+2. Llamar a la IPS del programa domiciliario para **agendar la visita del
+   médico** antes de que se venza la fórmula del mes.
+
+### FAMISANAR — lo primero
+1. Revisar la hoja **REVISAR** de los dos cruces (1 y 2 de septiembre) y hacer
+   el **piloto de una factura** en DGH. Si el piloto entra bien, cargar el
+   resto de los dos lotes.
 
 ### Análisis de velas — lo primero
 1. **Armar la aplicación con su histórico** y abrirla en el celular. En el PC

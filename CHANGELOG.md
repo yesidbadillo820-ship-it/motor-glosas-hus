@@ -1,5 +1,148 @@
 # Registro de cambios
 
+## Sesión 07-sep-2026 (tarde) — Armar el ACTA SINAC desde la lista y el archivo de la EPS
+
+Faltaba el paso de **aguas arriba** del módulo de conciliación: ya se sabía
+leer, revisar y optimizar un acta llena, pero no armarla. Se hacía a mano.
+
+- **`app/services/acta_conciliacion_armar.py`** — cruza la lista de facturas
+  con el consolidado de la EPS y produce `Acta` + `LineaActa`, las mismas
+  estructuras de `acta_conciliacion_excel`, así que lo generado pasa tal cual
+  por el `revisar()` que ya existía: el acta sale llena **y cuadrada**.
+  - Llave del cruce tolerante a los tres formatos del número de factura.
+  - Encabezados de la EPS buscados **por nombre**, no por posición (cada EPS
+    manda el consolidado en otro orden), con emparejado exacto para que
+    «VALOR FACTURA» no le robe la columna a «FACTURA».
+  - Tipificación deducida del código (CL/FA/SO/TA), verificada contra las 257
+    líneas del acta 709 del Dispensario.
+  - `escribir_en_modelo()` vuelca sobre el `.xlsm` oficial con `keep_vba`,
+    resolviendo las celdas combinadas del encabezado (openpyxl solo deja
+    escribir en la superior izquierda del grupo).
+- **`ConciliacionTipificacionRecord`** — memoria por factura + código de lo
+  que decidió una persona. Lo que el código no puede deducir (pertinencia
+  mixta vs. médica) se pregunta una vez y queda guardado.
+- **`POST /conciliaciones/acta-excel/armar`** — con `solo_revisar` devuelve el
+  parte; si no, el `.xlsm` con el parte en la cabecera `X-Acta-Parte`.
+  **`POST /conciliaciones/acta-excel/aprender`** alimenta la memoria desde el
+  acta ya trabajada.
+- **Pantalla** en Conciliación: dos zonas de arrastre, las casillas del
+  encabezado, «Ver qué sale» y «Armar y descargar acta».
+- **`plantillas/ACTA_SINAC_modelo.xlsm`** — el formato oficial en blanco.
+- **58 pruebas nuevas** (39 de servicio, 19 de ruta y pantalla).
+
+Lo que NO se rellena solo: el tipo de las glosas de pertinencia (decisión
+clínica) y los valores de aceptar/levantar/ratificar, que se escriben en la
+audiencia.
+
+## Sesión 07-sep-2026 — Pre-Auditoría: tres defectos de producción
+
+Hallados auditando el código, no por una prueba fallida: los tres se
+manifiestan solo con volumen o con el paso del tiempo.
+
+- **HTTP 500 en facturas de más de 2.000 renglones.** `traducir()` corría
+  fuera del `try/except` del router, así que el tope de `items` del
+  `PayloadFactura` salía como `ValidationError` crudo — y el docstring del
+  endpoint promete que lo único que devuelve error es un cuerpo ilegible
+  (422). Además los modelos del RIPS no tenían tope, de modo que el cuerpo
+  entero se convertía en objetos Pydantic antes de que nada lo revisara: un
+  RIPS de cápita podía agotar la memoria del proceso, que es uno solo para
+  todo el hospital. Se sube `items` a 20.000, se agregan `MAX_POR_FAMILIA` y
+  `MAX_USUARIOS` en `preauditoria_rips.py` (cortan antes de construir), y se
+  envuelve `traducir()` con un 422 que explica la salida. Verificado: 2.001 y
+  5.000 ítems → 200; 20.001 → 422. No se trunca: descartar renglones en
+  silencio en una auditoría financiera es peor que rechazar.
+- **~265 MB por consulta en el tablero.** `db.query(PreAuditoriaEventoRecord)`
+  cargaba la entidad completa, incluido `payload_base` (531 KB en HUS559077),
+  para pintar una tabla que no lo muestra. Se pasa a `load_only` con las trece
+  columnas que la vista usa; `/eventos/{id}` sigue leyendo el payload entero,
+  que es una sola fila.
+- **`dinero_salvado` congelado a los 5.000 eventos.** El `limit(5000)` iba
+  sobre `order_by(id.asc())`, o sea que conservaba los más viejos: al mes de
+  uso la cifra dejaba de crecer, en silencio y a la baja. Se reemplaza por una
+  ventana de 90 días (`creado_en >= ahora - 90d`), sin tope de filas, y el
+  resumen devuelve `dias`. El orden ascendente se conserva: la lógica de
+  «bloqueada y después pasó» solo se lee hacia adelante en el tiempo.
+- **12 pruebas nuevas** en `tests/test_api/test_preauditoria_limites_y_metrica.py`,
+  cuatro de ellas candados contra el propio arreglo.
+
+## Sesión 04-sep-2026 (hotfix) — Falsos positivos de la Pre-Auditoría
+
+Primera prueba contra una factura real del share (`Rips_HUS559077.json`,
+531 KB, $141.720.044): respondió en **32 ms** pero con 63 alertas, dos
+fuentes de ruido propias.
+
+- **`regla_topes_tarifarios` calla sin EPS.** El RIPS de la Res. 2275 no trae
+  pagador; sin él `tarifa_pactada_de` caía al catálogo oficial del HUS y
+  comparaba contra el precio propio del hospital — 48 BLOQUEOS irresolubles,
+  mientras `omisiones` afirmaba que la tarifa no se había cruzado. Ahora la
+  guarda es `ctx.db is None or not payload.eps.strip()`, y el mensaje de
+  omisión dice la verdad. Con EPS la regla opera sin cambios.
+- **`regla_cruce_edad` ignora DISPOSITIVO y MEDICAMENTO.** En un artículo,
+  «neonatal / pediátrico / adulto» es talla o dosis, no paciente: el insumo
+  `FMQ0098` salía BLOQUEADO como servicio pediátrico en adulto. La regla
+  sigue firme en estancias, consultas y procedimientos.
+- **9 pruebas nuevas** (`tests/test_services/test_preauditoria_falsos_positivos.py`),
+  la mitad de ellas comprobando que el arreglo NO debilitó las reglas: UCI
+  pediátrica en adulto y procedimiento neonatal en adulto siguen bloqueando,
+  y con EPS los topes siguen disparando con el mismo valor en riesgo.
+
+## Sesión 04-sep-2026 — V3 Pilar 2: mapeo RIPS real + tablero
+
+Con el primer archivo real del HIS (`Rips_HUS558039.json`) se ajusta el
+endpoint al formato normativo y se construye la pantalla.
+
+- **`app/services/preauditoria_rips.py`** — modelos Pydantic del RIPS
+  (Res. 2275/2023) y traductor a `PayloadFactura`. Se traduce en vez de
+  reescribir las reglas: las nueve duras y sus 108 pruebas no se tocaron.
+  Lee las siete familias de servicios (`consultas`, `procedimientos`,
+  `urgencias`, `hospitalizacion`, `recienNacidos`, `medicamentos`,
+  `otrosServicios`) con `extra="ignore"` y arreglos en `null` tolerados.
+- **`POST /pre-auditoria/evaluar`** acepta el RIPS (se reconoce por
+  `usuarios`) o la forma interna; 422 explícito si no es ninguna.
+- **Tres huecos del RIPS, dichos en voz alta** en el campo `omisiones` de la
+  respuesta, no como alertas: sin EPS (no se cruza tarifa ni contrato), sin
+  notas clínicas (nuevo estado `OMITIDO_SIN_NOTAS`, la IA no corre y no
+  aborta) y sin total de factura. `eps` deja de ser obligatoria en
+  `PayloadFactura`.
+- **Con varios usuarios en una factura no se cruzan sexo ni edad**: el RIPS
+  no dice de quién es cada servicio cuando se leen juntos. La plata sí se
+  suma toda.
+- **`GET /pre-auditoria/resumen`** y `preauditoria_concurrente.resumen()` —
+  dinero salvado = facturas BLOQUEADAS que después volvieron a pasar; las que
+  nunca volvieron van aparte en `riesgo_sin_resolver`. Una sola consulta.
+- **Pantalla Pre-Auditoría** en `static/index.html` (panel `p-pre-auditoria`,
+  entrada de menú, prefijo `preAud*` porque `pa*` ya estaba tomado):
+  tarjetas, tabla con filtros por dictamen y factura, y modal de reparos.
+  Verificada en Chromium a 1280/900/480/360 px.
+- **70 pruebas nuevas**: 21 del traductor sobre el archivo real, 20 del
+  endpoint y el tablero, 29 de la pantalla.
+
+## Sesión 04-sep-2026 (hotfix) — Rescate de filas RECLAMADAS
+
+Tapa una fuga del Pilar 1: `reclamar_una` marcaba la fila `RECLAMADA` y, si el
+bot moría en el paso siguiente (playwright ausente, navegador que no arranca,
+portal que no abre), la fila quedaba invisible para todos — los demás equipos
+solo ven `PENDIENTE` y las personas miran las atoradas.
+
+- **`radicacion_eps.rescatar_reclamada()`** — devuelve la fila a `PENDIENTE`,
+  escribe el diagnóstico en `ultimo_error` y limpia el sello del equipo. Solo
+  actúa sobre `RECLAMADA`: cualquier otro estado responde `no_rescatable`, y en
+  particular `EN_PORTAL_SIN_CONFIRMAR` no se trae de vuelta jamás.
+- **Cortacircuito** — a `MAX_INTENTOS_RESCATE` (3) muta a `HUMANO_REQUERIDO` en
+  vez de seguir rebotando. El contador NO se incrementa en el rescate:
+  `reclamar_una` ya lo sumó al entregar la fila, y volver a sumarlo haría
+  saltar el corte a las dos vueltas en vez de a las tres.
+- **`POST /radicacion/{id}/rescatar`** — puerta del agente (token de máquina).
+- **`radicador_comun`** — `ColaMotor.rescatar()` (se traga los fallos de red:
+  se llama cuando el bot ya se está muriendo) y perímetro de rescate en
+  `correr()` alrededor del import de playwright, del arranque del navegador y
+  de `abrir_sesion`. `SesionNoDisponible` sigue yendo a `humano_requerido`, no
+  a la cola: un portal con captcha no es un equipo enfermo.
+- **27 pruebas nuevas** (`tests/test_api/test_rescate_fila_reclamada.py`),
+  incluida la caída del worker con la fila en la mano y el ciclo completo de
+  tres intentos hasta el cortacircuito.
+- Máquina de estados actualizada en `docs/ARQUITECTURA_V3_PILAR1_RPA.md`.
+
 ## Sesión 04-sep-2026 — V3 Pilar 2: Pre-Auditoría Concurrente (backend)
 
 El HIS del hospital consulta el motor **antes de timbrar** una factura y recibe
