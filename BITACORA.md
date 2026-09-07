@@ -105,8 +105,15 @@ las de ingreso/egreso del XML de la factura, con la columna
 **Alerta_Diferencia (SI/NO)** pintada en rojo/verde. Lo que no se puede
 clasificar queda en `SIN_CLASIFICAR\` con la razón anotada — nada se inventa.
 Con 7 pruebas de pytest (share simulado con los dos formatos de RIPS).
-**Pendiente:** correr el piloto de 5 facturas en el PC del hospital y revisar
-que las fechas del XML salgan de donde esperamos.
+**Corrida real del mismo día:** el piloto de 5 salió bien y la corrida
+completa procesó las **356 de 356** (índice del share: 423 mil carpetas en
+~3 minutos). Resultado grueso: casi todas Subsidiado, unas 40 Contributivo,
+4 SIN_CLASIFICAR (facturas viejas sin RIPS en la carpeta) y 1 «Otro (05)»
+(paciente no afiliado). La única falla fue al final: el Excel de auditoría
+estaba **abierto** y Windows no dejó guardarlo. Se blindó el bot: si el
+Excel está abierto, guarda el informe con sufijo de hora en vez de perder
+la corrida (con su prueba; van 8). El informe se regenera con `--sin-copiar`
+sin volver a copiar nada.
 
 ### 07-09-2026 (tarde) — FAMISANAR 3 de septiembre: el lote donde por fin aparecieron glosas médicas
 
