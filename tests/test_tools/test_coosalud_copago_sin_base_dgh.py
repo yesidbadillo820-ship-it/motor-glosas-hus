@@ -104,3 +104,60 @@ def test_sin_valor_de_servicio_no_se_capa(coo):
 
     assert _valores(filas) == [97_671]
     assert ajustados == []
+
+
+# ─── Textos de respuesta actualizados por el área el 07-09-2026 ───────────────
+
+
+def test_la_extemporanea_lleva_los_dias_y_la_fecha_de_la_factura(coo):
+    # Antes iba un texto genérico y al auditor le tocaba completar a mano los
+    # días hábiles y la fecha en cada factura.
+    from datetime import date
+
+    texto = coo.obs_extemporanea(25, date(2026, 7, 31))
+
+    assert "HAN TRANSCURRIDO 25 DÍAS HÁBILES" in texto
+    assert "(2026-07-31)" in texto
+    assert "DECRETO 441 DE 2022" in texto, "la nota de aceptación tácita debe ir"
+    assert "xx" not in texto and "XXXX-XX-XX" not in texto
+
+
+def test_sin_datos_la_extemporanea_deja_los_huecos_a_la_vista(coo):
+    # Si no hay días ni fecha, el hueco se ve: nadie debe dar por buena una
+    # respuesta a medio llenar.
+    texto = coo.obs_extemporanea()
+
+    assert "HAN TRANSCURRIDO xx DÍAS HÁBILES" in texto
+    assert "(XXXX-XX-XX)" in texto
+
+
+def test_cobertura_la_responde_cartera_y_tiene_texto(coo):
+    # Las doctoras solo contestan CALIDAD. Cobertura tiene su propio texto, así
+    # que no puede quedar sin responder ni sacar la factura del cargue.
+    assert coo.TIPO_POR_PREFIJO["CO"] == "COBERTURA"
+    texto = coo.OBS_POR_TIPO["COBERTURA"]
+
+    assert texto, "COBERTURA debe tener texto del área"
+    assert "68001S00060339-24" in texto and "68001C00060340-24" in texto
+    assert "DECRETO 441 DE 2022" in texto
+    assert "CALIDAD" not in coo.OBS_POR_TIPO, "CALIDAD sí la responden las doctoras"
+
+
+def test_autorizacion_no_nombra_a_otro_pagador(coo):
+    # El área entregó el texto nombrando a NUEVA EPS (venía de ese flujo).
+    # Mandarle a COOSALUD una respuesta que nombra a otro pagador es regalarle
+    # la glosa.
+    texto = coo.OBS_POR_TIPO["AUTORIZACION"]
+
+    assert "NUEVA EPS" not in texto
+    assert "COOSALUD" in texto
+    assert "DECRETO 4747 DE 2007" in texto
+
+
+def test_el_texto_de_topes_queda_guardado_pero_no_se_aplica_solo(coo):
+    # Decisión del área (07-09-2026): las glosas de cobertura salen con RE9901 y
+    # el texto de COBERTURA. El RE9602 queda disponible para cuando el área diga
+    # en qué lote usarlo, pero el bot no lo pone por su cuenta.
+    assert coo.COD_RTA_TOPES == "RE9602"
+    assert "EXCEDE TOPES AUTORIZADOS" in coo.OBS_TOPES_AUTORIZADOS
+    assert coo.OBS_TOPES_AUTORIZADOS not in coo.OBS_POR_TIPO.values()
