@@ -290,7 +290,7 @@ UMBRAL_MEDIA = 4.5
 AVISO_SIN_FACTURA = "la factura no está en el export del DGH"
 AVISO_SIN_CRUCE = "no se identificó el servicio: completar a mano"
 AVISO_DEBIL = "cruce débil: verificar antes de subir"
-AVISO_NOMBRE = "el nombre del servicio en el archivo de la entidad no coincide con el del DGH"
+AVISO_NOMBRE = "el nombre del servicio no coincide con el del DGH: confirmar el renglón"
 
 
 class Cruce:

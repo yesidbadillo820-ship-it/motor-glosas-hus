@@ -108,6 +108,45 @@ Con 7 pruebas de pytest (share simulado con los dos formatos de RIPS).
 **Pendiente:** correr el piloto de 5 facturas en el PC del hospital y revisar
 que las fechas del XML salgan de donde esperamos.
 
+### 07-09-2026 (tarde) — FAMISANAR 3 de septiembre: el lote donde por fin aparecieron glosas médicas
+
+Cuarto archivo de objeciones con el mismo procedimiento: **321 objeciones de 12
+facturas por $41.259.676**, cruzadas contra el export del DGH (676 renglones de
+esas mismas 12 facturas).
+
+**Resultado: 318 de las 321 con el servicio identificado** (242 ALTA, 20 MEDIA,
+56 BAJA) y 3 sin cruce. En la hoja REVISAR quedaron 60 renglones.
+
+**Lo nuevo de este lote: trae glosas de CALIDAD.** Es el primero con códigos CL
+(CL0101, CL0701, CL2301, CL5801) y por eso es el primero donde `CROTIPOBJ` no
+sale todo en 0: cuatro facturas —HUS0000547688, HUS0000549332, HUS0000549336 y
+HUS0000549608— mezclan glosas clínicas con administrativas y salieron en **2 =
+MIXTA**, que es lo que corresponde. Las otras ocho, en 0. Se revisó factura por
+factura contra la regla.
+
+**Las 3 que quedaron sin cruce, y por qué está bien que quedaran así.**
+
+| Factura | Glosa | Valor | Por qué |
+|---|---|---|---|
+| HUS0000551404 | SO0101 | $6.467.100 | La epicrisis de la estancia. El texto viene cortado y no nombra servicio. Candidato con el valor exacto: **`108A01`** UCI intensivo neonatal, 3 × $2.155.700. |
+| HUS0000547688 | CO0601 | $4.000 | FAMISANAR sólo mandó el texto de la norma. En la factura ese valor lo tienen **dos** servicios distintos (solución salina 250 ml, o 5 electrodos de $800): no hay forma de saber cuál sin adivinar. |
+| HUS0000547688 | CO0601 | $6.200 | Igual, pero peor: **tres** sondas Foley de distinto calibre, todas a $6.200. |
+
+Los dos últimos son el ejemplo de para qué sirve la regla de no inventar: el
+valor solo no alcanza cuando varios servicios de la misma factura valen lo
+mismo, y el bot se abstiene en vez de escribir un código al azar.
+
+**Un aviso que vale la pena mirar y que resultó correcto.** El renglón
+`U44762-03` «FOSFOLIPIDOS NATURALES (SURVANTA)» por $1.417.593 salió marcado
+con «el nombre no coincide», porque el DGH lo llama **`44762-3` SURFACTANTE
+PULMONAR AMP X 200 MG/8ML**. Es el mismo medicamento —Survanta *es* surfactante
+pulmonar de fosfolípidos naturales— y coinciden el código, el valor unitario y
+el del renglón: el nombre comercial contra el genérico. El cruce quedó bien; el
+aviso hizo su trabajo de ponerlo a la vista.
+
+**Archivos entregados:** `OBJECIONES_FAMISANAR_03092026.xlsx` (el que se sube)
+y `CRUCE_FAMISANAR_03-09-2026.xlsx` (el respaldo, 60 renglones en REVISAR).
+
 ### 07-09-2026 — Tres cosas que iban a fallar en producción, y ninguna prueba las veía
 
 No las destapó un error del auditor ni una prueba: salieron de revisar el
@@ -11063,6 +11102,16 @@ valor leido del PDF o con el objetado.
   (con ayuno de 8–10 horas, menos la creatinina), y **confirmar el inicio**
   de las terapias de deglución y respiratoria ya autorizadas.
 
+### FAMISANAR — objeciones del 3 de septiembre (07-09)
+- **Completar las 3 sin cruce** (tabla en la entrada del 07-09): la SO0101 de
+  HUS0000551404 tiene candidato con el valor exacto (`108A01`, 3 unidades); las
+  dos CO0601 de HUS0000547688 hay que resolverlas mirando la factura, porque
+  varios servicios valen lo mismo.
+- **Revisar los 56 renglones de confianza BAJA** de
+  `CRUCE_FAMISANAR_03-09-2026.xlsx`.
+- **Confirmar el renglón del SURVANTA** (`44762-3`, $1.417.593): el cruce se ve
+  correcto —nombre comercial contra genérico— pero conviene verlo.
+
 ### Dispensario Médico — objeciones del 3 de septiembre (04-09)
 - **Piloto de una factura en DGH** antes del cargue de las 118 (regla del
   repo). El archivo no dejó nada en REVISAR, pero el piloto se hace igual.
@@ -11942,10 +11991,9 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
    médico** antes de que se venza la fórmula del mes.
 
 ### Objeciones para DGH — lo primero
-1. Revisar la hoja **REVISAR** de los cruces de FAMISANAR (1 y 2 de
-   septiembre) y hacer el **piloto de una factura** en DGH con cada uno de
-   los tres archivos (FAMISANAR 1-sep, FAMISANAR 2-sep y Dispensario 3-sep).
-   Si el piloto entra bien, cargar el resto.
+1. Revisar la hoja **REVISAR** de los cuatro cruces y hacer el **piloto de
+   una factura** en DGH con cada archivo (FAMISANAR 1-sep, 2-sep y 3-sep, y
+   Dispensario 3-sep). Si el piloto entra bien, cargar el resto.
 
 ### Análisis de velas — lo primero
 1. **Armar la aplicación con su histórico** y abrirla en el celular. En el PC
