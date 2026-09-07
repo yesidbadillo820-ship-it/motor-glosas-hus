@@ -90,6 +90,31 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 04-09-2026 (tarde, 6) — Se quitan del menú cuatro botones que no se usan
+
+**Lo que pidió Yesid.** Quitar del menú lateral cuatro botones que «realmente
+nunca tendrán utilidad»: **Gobierno IA**, **Alertas**, **Plata recuperada** y
+**Resumen del mes**. Este último, además, aparecía **dos veces** (en el menú y
+como pestaña dentro de la barra de Reportes que se ve arriba de Dashboard y
+Glosas ADRES).
+
+**Cómo se hizo, y por qué así.** No se borró nada: los cuatro botones se
+**ocultaron** (igual que ya estaba «Plantillas Gold», que también se escondió
+cuando el equipo confirmó que no la usaban). Es reversible con una línea, y no
+se tocó ni la pantalla que abría cada botón ni el servidor — si algún día
+alguno vuelve a hacer falta, se muestra de nuevo sin rehacer nada.
+
+- Los cuatro salen del menú lateral.
+- «Resumen del mes» sale también de la barra de Reportes: ya no aparece dos
+  veces.
+- Y salen de los atajos de Ctrl+K (la búsqueda rápida), para que no se
+  reabran por ahí sin querer.
+
+Nada más cambia: las demás pantallas y los contadores del menú (Vencimientos,
+Contratos) siguen igual.
+
+---
+
 ### 04-09-2026 (tarde, 5) — Arranca el Pilar 2: el motor revisa la factura ANTES de timbrarla
 
 **El cambio de reloj.** Hasta hoy el hospital audita **después**: la EPS glosa
