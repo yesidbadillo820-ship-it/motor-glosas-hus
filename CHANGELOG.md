@@ -1,5 +1,36 @@
 # Registro de cambios
 
+## Sesión 07-sep-2026 — Pre-Auditoría: tres defectos de producción
+
+Hallados auditando el código, no por una prueba fallida: los tres se
+manifiestan solo con volumen o con el paso del tiempo.
+
+- **HTTP 500 en facturas de más de 2.000 renglones.** `traducir()` corría
+  fuera del `try/except` del router, así que el tope de `items` del
+  `PayloadFactura` salía como `ValidationError` crudo — y el docstring del
+  endpoint promete que lo único que devuelve error es un cuerpo ilegible
+  (422). Además los modelos del RIPS no tenían tope, de modo que el cuerpo
+  entero se convertía en objetos Pydantic antes de que nada lo revisara: un
+  RIPS de cápita podía agotar la memoria del proceso, que es uno solo para
+  todo el hospital. Se sube `items` a 20.000, se agregan `MAX_POR_FAMILIA` y
+  `MAX_USUARIOS` en `preauditoria_rips.py` (cortan antes de construir), y se
+  envuelve `traducir()` con un 422 que explica la salida. Verificado: 2.001 y
+  5.000 ítems → 200; 20.001 → 422. No se trunca: descartar renglones en
+  silencio en una auditoría financiera es peor que rechazar.
+- **~265 MB por consulta en el tablero.** `db.query(PreAuditoriaEventoRecord)`
+  cargaba la entidad completa, incluido `payload_base` (531 KB en HUS559077),
+  para pintar una tabla que no lo muestra. Se pasa a `load_only` con las trece
+  columnas que la vista usa; `/eventos/{id}` sigue leyendo el payload entero,
+  que es una sola fila.
+- **`dinero_salvado` congelado a los 5.000 eventos.** El `limit(5000)` iba
+  sobre `order_by(id.asc())`, o sea que conservaba los más viejos: al mes de
+  uso la cifra dejaba de crecer, en silencio y a la baja. Se reemplaza por una
+  ventana de 90 días (`creado_en >= ahora - 90d`), sin tope de filas, y el
+  resumen devuelve `dias`. El orden ascendente se conserva: la lógica de
+  «bloqueada y después pasó» solo se lee hacia adelante en el tiempo.
+- **12 pruebas nuevas** en `tests/test_api/test_preauditoria_limites_y_metrica.py`,
+  cuatro de ellas candados contra el propio arreglo.
+
 ## Sesión 04-sep-2026 (hotfix) — Falsos positivos de la Pre-Auditoría
 
 Primera prueba contra una factura real del share (`Rips_HUS559077.json`,

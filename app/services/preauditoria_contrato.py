@@ -205,7 +205,13 @@ class PayloadFactura(BaseModel):
     regimen: str = Field(default="", max_length=40)
     paciente: Paciente = Field(default_factory=Paciente)
     atencion: Atencion = Field(default_factory=Atencion)
-    items: list[ItemFactura] = Field(default_factory=list, max_length=2000)
+    # 2.000 se quedaba corto y además fallaba MAL: una estancia larga de UCI
+    # pasa de esa cifra solo en medicamentos e insumos del día a día, y el
+    # ValidationError salía sin atajar como HTTP 500 — el facturador sin
+    # dictamen y sin saber si timbrar. El tope existe igual, para que un RIPS
+    # de cápita no se coma la memoria del proceso, pero ahora es un techo de
+    # verdad y quien lo pasa recibe un 422 que explica qué hacer.
+    items: list[ItemFactura] = Field(default_factory=list, max_length=20000)
     valor_total: float = 0.0
     epicrisis: str = Field(default="", max_length=40000)
 
