@@ -63,6 +63,44 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 07-09-2026 — COOSALUD: paquete de 560 facturas y el copago que tumbaba el cargue
+
+Llegó el paquete **COOSALUD_07092026** (GI-33-5434-2026): **560 facturas,
+66.388 glosas, $5.841.913.158**. Radicadas entre el 31/07 y el 13/08, glosadas
+el 07/09 — o sea que el **62% llegó extemporáneo** (40.986 glosas por
+$3.653.206.514 van con la aceptación tácita del artículo 57 de la Ley 1438).
+La respuesta en el portal vence el **14/09/2026**.
+
+Quedó organizado, consolidado y con los dos archivos de OBJECIONES (300 y 260
+facturas, que es el tope de DGH), las 4 listas para correr el portal en
+paralelo y el Excel de control con el GI ya escrito.
+
+**El copago ya no tumba el cargue.** El bot solo capaba las objeciones cuando
+se le pasaba la base de servicios de DGH. Pero el dato para capar **no es de
+DGH**: el valor del servicio y la cuota moderadora vienen del propio DETALLE de
+COOSALUD. Con la base sin bajar, las 11 facturas con copago salían objetando el
+valor completo del servicio y DGH las rechaza con *«El VALOR OBJECION no puede
+ser mayor al valor del servicio»* — y como el cargue es todo o nada, se caía el
+archivo entero.
+
+Ahora el guardián de valor corre **siempre**. Sin base DGH el tope sale del
+detalle de COOSALUD: por cada (factura, servicio), la **suma** del valor de sus
+líneas menos la suma de sus copagos — la misma regla de capacidad que enseñaron
+las 8 estancias. En este lote capó **167 objeciones** (136 por copago), sin
+perder ni una línea, y la revisión de las 62.130 filas contra el tope da **cero
+servicios por encima**. Son $500.534 menos objetados: justo la parte que paga
+el paciente. Cada ajuste queda en la hoja `VALOR_AJUSTADO` del archivo
+`REVISAR (no van en el cargue)`. 4 pruebas nuevas.
+
+**Las doctoras solo contestan CALIDAD.** El bot venía metiendo COBERTURA en el
+mismo saco y sacaba la factura completa a esperar auditoría médica. Cobertura
+la contesta cartera. Ahora se reportan aparte: 783 glosas de CALIDAD en 36
+facturas esperan a las doctoras, y 281 de COBERTURA en **una sola** factura
+(HUS545379, $47.882.455) esperan a que el área defina el texto — son CO4601,
+accidente de tránsito, la EPS pide agotar primero los topes del SOAT.
+
+---
+
 ### 26-08-2026 (cierre 2) — El detallado quedaba de tercero, y la factura no lleva índice
 
 El área revisó los folios ya armados y mandó tres correcciones. Las tres
@@ -8063,6 +8101,21 @@ hallazgo.
 
 ## 3) PENDIENTE
 
+### COOSALUD — paquete del 07-09 (GI-33-5434-2026)
+- **DECISIÓN SUYA: el texto de COBERTURA.** Son 281 glosas CO4601 en la factura
+  HUS545379 ($47.882.455). Apenas el área dicte el texto, se deja fijo en
+  `consolidar_coosalud.py` junto a los de TARIFAS, AUTORIZACIÓN, FACTURACIÓN y
+  SOPORTES, y esa factura queda lista. No se inventa.
+- **Falta la base de servicios de DGH.** Bajar el export SERVICIOS FACTURADOS de
+  COOSALUD con facturación del **26/06/2026 al 02/08/2026** y recortarlo con
+  FILTRAR BASE DGH usando el TXT de las 560. Sin ella, SLNSERPRO lleva el CUPS
+  de COOSALUD y CTNCENCOS e IDRIPS van vacías. El tope de valor ya quedó
+  resuelto sin la base, pero el código y el centro de costos no.
+- **36 facturas esperan auditoría médica** (783 glosas de CALIDAD). Las gruesas:
+  HUS543423 ($46,9 mill), HUS543160 ($20,9 mill), HUS541431 ($17,2 mill),
+  HUS543764 ($15,8 mill).
+- **Responder el portal antes del 14/09/2026.** Eso sí se puede hacer ya.
+
 ### Folio ADRES del paquete 31068 (26-08, cierre)
 - **DECISIÓN SUYA: las cinco respuestas del Word «PARA_CORREGIR».** Se enviaron
   dos versiones. La **A** incluye 310 glosas «SE SUBSANA» que hoy se omiten
@@ -8557,6 +8610,11 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     el JSON debe llevar el número nuevo, no `MED737`.
 
 ## 4) PARA MAÑANA
+
+**COOSALUD 07-09 — lo primero.** Correr el portal con las 4 listas (vence el
+14/09) y, en paralelo, bajar de DGH la base de servicios del 26/06 al 02/08
+para poder regenerar los dos OBJECIONES con los códigos de DGH. Si el área ya
+dictó el texto de cobertura, se deja fijo en el bot y se cierra HUS545379.
 
 **Folio ADRES — HAY QUE VOLVER A CORRER LOS TRES GESTORES (26-08 cierre 2).**
 Los 223 folios se armaron con el orden viejo del folio de la factura (el
