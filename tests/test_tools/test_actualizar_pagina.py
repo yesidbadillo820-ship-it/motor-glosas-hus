@@ -75,7 +75,16 @@ class TestElBotDeDobleClic:
     def test_comprueba_que_la_pagina_volvio_a_responder(self):
         t = _texto(MANUAL)
         assert "/health" in t, "no comprueba que la página conteste"
-        assert "arranca directo" in t.lower(), "no hay red de seguridad si el motor no vuelve"
+        # 03-09-2026: la red de seguridad SIGUE, pero ya no arranca uvicorn
+        # crudo. Aquel arranque directo dejaba el motor sin SOPORTES_ROOT ni
+        # AUTO_PILOT_ENABLED, ocupando el 8080 mientras el vigilante de verdad
+        # esperaba parqueado detrás. Ahora entra por el arranque oficial, que
+        # prepara el entorno completo — por eso se comprueba la puerta, no la
+        # frase de antes.
+        assert ":no_subio" in t, "no hay red de seguridad si el motor no vuelve"
+        assert "servidor_motor_local.cmd" in t, (
+            "la red de seguridad no pasa por el arranque oficial"
+        )
 
     def test_le_dice_al_auditor_lo_que_sigue(self):
         """Sin el Ctrl + F5 el navegador sigue mostrando la pantalla vieja."""

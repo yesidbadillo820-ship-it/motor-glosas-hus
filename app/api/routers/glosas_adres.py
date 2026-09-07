@@ -38,7 +38,12 @@ from app.core.logging_utils import logger
 from app.database import get_db
 from app.models.db import GlosaAdresRecord, PaqueteAdresRecord, UsuarioRecord
 from app.services import preauditoria_adres as svc
-from app.services.evidencia_adres_pdf import generar_pdf_evidencia, nombre_archivo_evidencia
+from app.services.evidencia_adres_pdf import (
+    generar_pdf_evidencia,
+    generar_zip_evidencias,
+    nombre_archivo_evidencia,
+    nombre_archivo_zip,
+)
 from app.services.glosas_adres_excel import construir_informe_paquete, nombre_informe
 
 router = APIRouter(prefix="/glosas-adres", tags=["Glosas ADRES"])
@@ -124,6 +129,37 @@ async def importar_bitacora(
         raise HTTPException(413, "El archivo supera el tamaño máximo permitido.")
     n = svc.importar_bitacora(db, contenido, paquete_id=paquete_id)
     return {"ok": True, "items": n}
+
+
+@router.post("/importar-reparto")
+async def importar_reparto(
+    paquete_id: int = Form(...),
+    archivo: UploadFile = File(..., description="Tabla FACTURA / PROFESIONAL / TECNICO"),
+    db: Session = Depends(get_db),
+    usuario: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Sube el reparto del área: quién audita cada factura del paquete.
+
+    Lo pidió Yesid el 02-09-2026: la columna GESTOR del informe sale de la
+    macro y en estos paquetes viene vacía, pero el área sí tiene el reparto
+    hecho en su propia tabla de FACTURA / PROFESIONAL / TÉCNICO. El técnico es
+    el gestor y el profesional la médica auditora. La lógica vive en el
+    servicio; acá solo se recibe, se valida y se responde.
+    """
+    if db.get(PaqueteAdresRecord, paquete_id) is None:
+        raise HTTPException(404, f"No existe el paquete {paquete_id}")
+    contenido = await archivo.read()
+    if not contenido:
+        raise HTTPException(400, "El archivo llegó vacío.")
+    if len(contenido) > MAX_BYTES:
+        raise HTTPException(413, "El archivo supera el tamaño máximo permitido.")
+    try:
+        resumen = svc.importar_reparto(
+            db, contenido, paquete_id=paquete_id, nombre_archivo=archivo.filename or ""
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"ok": True, **resumen}
 
 
 @router.get("/paquetes")
@@ -312,11 +348,70 @@ def evidencia_pdf(
         pdf = generar_pdf_evidencia(datos)
     except ImportError as e:  # pragma: no cover - reportlab va en requirements
         raise HTTPException(500, "Falta la librería para generar PDF (reportlab).") from e
+    except Exception as e:  # noqa: BLE001
+        # 02-09-2026. Antes cualquier tropiezo acá salía como un error pelado
+        # del servidor y el gestor solo veía «HTTP 502». Ahora queda en el log
+        # con el número de factura y en pantalla se dice qué pasó.
+        logger.exception("PDF de evidencia de %s: no se pudo armar", numero)
+        raise HTTPException(
+            500, f"No se pudo armar el PDF de {numero}: {type(e).__name__}: {e}"
+        ) from e
     nombre = nombre_archivo_evidencia(datos.get("factura") or numero)
     return Response(
         content=pdf,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
+
+@router.get("/paquete/{paquete_id}/evidencias.zip")
+def evidencias_zip(
+    paquete_id: int,
+    estado: str | None = Query(None, description="PENDIENTE | EN PROCESO | CERRADA"),
+    db: Session = Depends(get_db),
+    _usuario: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Un ZIP con el PDF de evidencia de cada factura del paquete.
+
+    Lo pidió Yesid el 02-09-2026: «que salga una opción de descargar el PDF
+    también de forma masiva y me quede en un zip con todas las facturas, un pdf
+    por factura». Con 81 facturas, bajarlos de a uno es un día de trabajo.
+
+    Si una factura no se puede armar, el ZIP igual sale y esa queda anotada en
+    `NOVEDADES.txt`: un error en una no deja sin evidencia a las demás.
+    """
+    paquete = db.get(PaqueteAdresRecord, paquete_id)
+    if paquete is None:
+        raise HTTPException(404, f"No existe el paquete {paquete_id}")
+    facturas = svc.datos_evidencia_del_paquete(db, paquete_id, estado=estado)
+    if not facturas:
+        raise HTTPException(
+            404,
+            "Ese paquete no tiene facturas con glosas para armar evidencia"
+            + (f" en estado {estado}." if estado else "."),
+        )
+    try:
+        contenido, novedades = generar_zip_evidencias(facturas)
+    except ImportError as e:  # pragma: no cover - reportlab va en requirements
+        raise HTTPException(500, "Falta la librería para generar PDF (reportlab).") from e
+    if novedades:
+        logger.warning(
+            "ZIP de evidencias del paquete %s: %d factura(s) con novedad",
+            paquete_id,
+            len(novedades),
+        )
+    return Response(
+        content=contenido,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{nombre_archivo_zip(paquete.numero_paquete)}"'
+            ),
+            # Para que la pantalla pueda avisar sin abrir el ZIP.
+            "X-Facturas": str(len(facturas)),
+            "X-Novedades": str(len(novedades)),
+            "Access-Control-Expose-Headers": "X-Facturas, X-Novedades",
+        },
     )
 
 

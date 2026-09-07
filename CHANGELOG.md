@@ -1,5 +1,181 @@
 # Registro de cambios
 
+## Sesión 04-sep-2026 (hotfix) — Falsos positivos de la Pre-Auditoría
+
+Primera prueba contra una factura real del share (`Rips_HUS559077.json`,
+531 KB, $141.720.044): respondió en **32 ms** pero con 63 alertas, dos
+fuentes de ruido propias.
+
+- **`regla_topes_tarifarios` calla sin EPS.** El RIPS de la Res. 2275 no trae
+  pagador; sin él `tarifa_pactada_de` caía al catálogo oficial del HUS y
+  comparaba contra el precio propio del hospital — 48 BLOQUEOS irresolubles,
+  mientras `omisiones` afirmaba que la tarifa no se había cruzado. Ahora la
+  guarda es `ctx.db is None or not payload.eps.strip()`, y el mensaje de
+  omisión dice la verdad. Con EPS la regla opera sin cambios.
+- **`regla_cruce_edad` ignora DISPOSITIVO y MEDICAMENTO.** En un artículo,
+  «neonatal / pediátrico / adulto» es talla o dosis, no paciente: el insumo
+  `FMQ0098` salía BLOQUEADO como servicio pediátrico en adulto. La regla
+  sigue firme en estancias, consultas y procedimientos.
+- **9 pruebas nuevas** (`tests/test_services/test_preauditoria_falsos_positivos.py`),
+  la mitad de ellas comprobando que el arreglo NO debilitó las reglas: UCI
+  pediátrica en adulto y procedimiento neonatal en adulto siguen bloqueando,
+  y con EPS los topes siguen disparando con el mismo valor en riesgo.
+
+## Sesión 04-sep-2026 — V3 Pilar 2: mapeo RIPS real + tablero
+
+Con el primer archivo real del HIS (`Rips_HUS558039.json`) se ajusta el
+endpoint al formato normativo y se construye la pantalla.
+
+- **`app/services/preauditoria_rips.py`** — modelos Pydantic del RIPS
+  (Res. 2275/2023) y traductor a `PayloadFactura`. Se traduce en vez de
+  reescribir las reglas: las nueve duras y sus 108 pruebas no se tocaron.
+  Lee las siete familias de servicios (`consultas`, `procedimientos`,
+  `urgencias`, `hospitalizacion`, `recienNacidos`, `medicamentos`,
+  `otrosServicios`) con `extra="ignore"` y arreglos en `null` tolerados.
+- **`POST /pre-auditoria/evaluar`** acepta el RIPS (se reconoce por
+  `usuarios`) o la forma interna; 422 explícito si no es ninguna.
+- **Tres huecos del RIPS, dichos en voz alta** en el campo `omisiones` de la
+  respuesta, no como alertas: sin EPS (no se cruza tarifa ni contrato), sin
+  notas clínicas (nuevo estado `OMITIDO_SIN_NOTAS`, la IA no corre y no
+  aborta) y sin total de factura. `eps` deja de ser obligatoria en
+  `PayloadFactura`.
+- **Con varios usuarios en una factura no se cruzan sexo ni edad**: el RIPS
+  no dice de quién es cada servicio cuando se leen juntos. La plata sí se
+  suma toda.
+- **`GET /pre-auditoria/resumen`** y `preauditoria_concurrente.resumen()` —
+  dinero salvado = facturas BLOQUEADAS que después volvieron a pasar; las que
+  nunca volvieron van aparte en `riesgo_sin_resolver`. Una sola consulta.
+- **Pantalla Pre-Auditoría** en `static/index.html` (panel `p-pre-auditoria`,
+  entrada de menú, prefijo `preAud*` porque `pa*` ya estaba tomado):
+  tarjetas, tabla con filtros por dictamen y factura, y modal de reparos.
+  Verificada en Chromium a 1280/900/480/360 px.
+- **70 pruebas nuevas**: 21 del traductor sobre el archivo real, 20 del
+  endpoint y el tablero, 29 de la pantalla.
+
+## Sesión 04-sep-2026 (hotfix) — Rescate de filas RECLAMADAS
+
+Tapa una fuga del Pilar 1: `reclamar_una` marcaba la fila `RECLAMADA` y, si el
+bot moría en el paso siguiente (playwright ausente, navegador que no arranca,
+portal que no abre), la fila quedaba invisible para todos — los demás equipos
+solo ven `PENDIENTE` y las personas miran las atoradas.
+
+- **`radicacion_eps.rescatar_reclamada()`** — devuelve la fila a `PENDIENTE`,
+  escribe el diagnóstico en `ultimo_error` y limpia el sello del equipo. Solo
+  actúa sobre `RECLAMADA`: cualquier otro estado responde `no_rescatable`, y en
+  particular `EN_PORTAL_SIN_CONFIRMAR` no se trae de vuelta jamás.
+- **Cortacircuito** — a `MAX_INTENTOS_RESCATE` (3) muta a `HUMANO_REQUERIDO` en
+  vez de seguir rebotando. El contador NO se incrementa en el rescate:
+  `reclamar_una` ya lo sumó al entregar la fila, y volver a sumarlo haría
+  saltar el corte a las dos vueltas en vez de a las tres.
+- **`POST /radicacion/{id}/rescatar`** — puerta del agente (token de máquina).
+- **`radicador_comun`** — `ColaMotor.rescatar()` (se traga los fallos de red:
+  se llama cuando el bot ya se está muriendo) y perímetro de rescate en
+  `correr()` alrededor del import de playwright, del arranque del navegador y
+  de `abrir_sesion`. `SesionNoDisponible` sigue yendo a `humano_requerido`, no
+  a la cola: un portal con captcha no es un equipo enfermo.
+- **27 pruebas nuevas** (`tests/test_api/test_rescate_fila_reclamada.py`),
+  incluida la caída del worker con la fila en la mano y el ciclo completo de
+  tres intentos hasta el cortacircuito.
+- Máquina de estados actualizada en `docs/ARQUITECTURA_V3_PILAR1_RPA.md`.
+
+## Sesión 04-sep-2026 — V3 Pilar 2: Pre-Auditoría Concurrente (backend)
+
+El HIS del hospital consulta el motor **antes de timbrar** una factura y recibe
+un dictamen en menos de 10 segundos. Solo backend y pruebas; la pantalla queda
+para después.
+
+- **`POST /pre-auditoria/evaluar`** — sincrónico, dos puertas: el HIS con
+  `X-Agente-Token` (comparado con `compare_digest`) y el auditor con su sesión.
+  Contrato rígido de salida: `status`, `alertas`, `valor_en_riesgo`,
+  `recomendacion_accion`, más trazabilidad.
+- **Cadena de validación (Chain of Responsibility)** en
+  `app/services/preauditoria_reglas_duras.py`: aritmética, topes tarifarios,
+  cruce de género y de edad, vías quirúrgicas excluyentes, coherencia de fechas
+  y estancia, doble facturación, contrato vigente y UCI sin criterio escrito.
+  Todas deterministas; ninguna inventa (sin tarifa cargada, la regla calla).
+- **Cruce clínico con Groq** (`preauditoria_cruce_clinico.py`) al final de la
+  cadena, con reloj propio: tope de 6 s y corte por `asyncio.wait_for`. Sus
+  hallazgos son siempre ADVERTENCIA — la IA nunca bloquea una factura. Modelo
+  dedicado (`preauditoria_modelo`, por defecto `llama-3.3-70b-versatile`): el
+  `groq_model` general es un razonador y no cabe en el presupuesto de tiempo.
+- **Presupuesto de latencia** en `preauditoria_concurrente.py`: techo duro de
+  10 s (reglas + IA + escritura), con degradación elegante si la IA falla.
+- **Tabla `pre_auditoria_eventos`** — un evento por evaluación, con el payload
+  tal como llegó, el dictamen, la plata en riesgo y los tiempos por tramo.
+- **Códigos de glosa oficiales** del Manual Único (`catalogo_glosas.py`)
+  proyectados por tipo de servicio; una prueba impide que se cuele un código
+  inventado.
+- `tarifa_lookup_service.tarifa_pactada_de()` y
+  `reglas_casos_fno.sexo_exigido_por_el_procedimiento()`: dos accesos públicos
+  a lógica que ya existía, para no duplicarla.
+- **108 pruebas nuevas** (64 de reglas, 44 de la ruta), con los casos que pidió
+  el auditor: múltiples cirugías por vías excluyentes y estancia en UCI
+  injustificada.
+- Arquitectura: `docs/ARQUITECTURA_V3_PILAR2_PREAUDITORIA.md`.
+
+## Sesión 04-sep-2026 — «El CSV son solo datos, no dice nada de velas»
+
+Duda razonable del usuario, y merecía una respuesta demostrable en vez de una
+explicación: **una vela japonesa ES esos cuatro números**. El cuerpo va de la
+apertura al cierre, hueca o llena según cuál quedó arriba, y las mechas hasta
+el máximo y el mínimo. TradingView pinta exactamente eso; el gráfico no añade
+ni un dato que no esté en el archivo.
+
+- **`mercados/dibujo.py` + `python -m mercados vela`**: dibuja una sesión en la
+  consola con cada precio señalado donde le corresponde, las cuentas del libro
+  ya hechas («mecha inferior 2,3 veces el cuerpo») y qué patrones encajan ahí.
+- Se guarda el **índice** de la sesión, no la vela: dos sesiones con los mismos
+  cuatro precios son iguales entre sí, y buscarlas por valor habría devuelto la
+  primera en vez de la pedida.
+- **11 pruebas nuevas** (130 en `tests/test_mercados`, 599 en total).
+
+## Sesión 31-ago-2026 (cierre) — Análisis de velas japonesas (`mercados/`)
+
+Módulo independiente que detecta los 28 patrones del libro de Luis M. González
+sobre un histórico en CSV y **mide si cumplen lo que el libro promete**. No
+predice precios ni genera señales de compra o venta: nada en el libro ni en la
+evidencia pública lo sostiene, y construirlo habría sido inventar.
+
+### Lo que trae
+- **28 detectores** (12 individuales, 16 combinados), cada uno con la
+  definición textual del libro y su caso de prueba construido a mano.
+- **Catálogo en JSON** con el texto del libro y la página de cada patrón,
+  validado contra los detectores por `python -m mercados revisar`.
+- **Lector de CSV** tolerante: cabecera ES/EN, separador `,`/`;`/tab, decimales
+  con coma o punto, orden ascendente o descendente. Columna faltante = mensaje
+  con nombre propio.
+- **Medición** con tasa base, intervalo de Wilson y veredicto en una línea.
+- **Aplicación web** instalable, sin internet, con cuatro pantallas.
+
+### Los tres cuidados que la hacen creíble
+- **Tasa base.** Cuántas veces el precio fue en esa dirección en TODAS las
+  sesiones. Sin esa comparación, en un mercado alcista todo patrón alcista
+  «funciona».
+- **Muestra mínima de 30 casos**, dicha explícitamente en cada veredicto.
+- **Corrección por comparaciones múltiples (Bonferroni).** Se hacen 112
+  preguntas (28 patrones × 4 horizontes): al 95 % de siempre, ~6 salen
+  «significativas» por azar. Comprobado con datos aleatorios: sin corregir
+  aparecía un patrón con +19 puntos sobre su base en 37 casos; con la
+  corrección, ninguno.
+
+### Accesibilidad de las gráficas
+El validador de la guía de visualización da **ΔE 4,1 (deutan)** entre el verde
+y el rojo: por debajo del mínimo de 8. El color no lleva significado — la vela
+que sube va **hueca** y la que baja **llena** (la forma original japonesa), y
+toda etiqueta de dirección lleva ▲/▼ junto a la palabra. Las barras de medición
+usan una sola serie con la base como marca de referencia; lo que no llega a 30
+casos sale rayado.
+
+### Honestidad de fuente
+Las etiquetas de fiabilidad del libro se muestran **atribuidas al autor** y sin
+respaldo declarado. La «Cubierta de la Nube Oscura» queda marcada con
+`"revisar"`: el libro no exige el cierre bajo la mitad del cuerpo que sí pide
+la literatura clásica, y se implementó lo que dice el libro.
+
+Pruebas: **112** (`tests/test_mercados`), 586 con las del ICFES y noruego.
+Comprobado además en Chromium a 390 px: cuatro pantallas, 28 fichas, 120 velas,
+sin errores de JavaScript ni desbordes.
+
 ## Sesión 31-ago-2026 (noche 6) — Todos los botones 🔊 estaban mudos
 
 La causa de fondo de todo el enredo de la voz.

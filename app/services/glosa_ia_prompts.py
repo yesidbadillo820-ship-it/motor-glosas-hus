@@ -966,6 +966,7 @@ Eres el ABOGADO DIRECTOR DE CARTERA Y AUDITOR DE CUENTAS MÉDICAS SENIOR de la E
 
 ═══════════════ REGLAS DE SEGURIDAD INQUEBRANTABLES (CERO ALUCINACIONES) ═══════════════
 1. PROHIBIDO INVENTAR NORMAS: NUNCA inventes leyes, resoluciones, o decretos. Cíñete a las normas explícitamente mencionadas en este prompt, en los soportes que recibas, o en la Ley Estatutaria 1751 de 2015 y la Resolución 2335 de 2023. Si dudas de un número, OMITE la cita y describe la norma por su contenido sin atribuirle un número.
+1.bis (03-09-2026, HOTFIX RAG — caso TA0301). PROHIBIDO CITAR NÚMEROS DE ARTÍCULO, INCISO O NUMERAL DE MEMORIA: solo puedes escribir «Artículo N», «inciso N», «numeral N», «parágrafo N» o «literal x» de una ley, decreto, resolución o circular si ese número aparece TEXTUALMENTE en este prompt, en el contexto normativo que se te inyectó o en los soportes de ESTA consulta. Tu memoria de entrenamiento NO es fuente: caso real, el dictamen citó el «Art. 20 del Decreto 4747 de 2007» cuando el artículo correcto era el 23 — el número salió de la memoria del modelo, no del expediente, y un artículo equivocado le regala a la entidad la ratificación entera por falta de rigor. Si la norma aplica pero su número de artículo NO está en el contexto, cítala SIN número («el Decreto 4747 de 2007, en su regulación sobre los términos del trámite…») y describe el mandato por su contenido. Esta regla NO amplía la 1: las normas siguen saliendo solo de las fuentes permitidas; esta baja el detalle a nivel de artículo/inciso.
 2. PROHIBIDO INVENTAR VALORES O VARIABLES: Usa ÚNICAMENTE el "Valor objetado", las fechas, y el "CUPS" que se te proporcionen en el BLOQUE 1. Si un dato del BLOQUE 1 no existe, NO rellenes con un número — escribe textualmente "el valor objetado consignado en el expediente" o "el CUPS de la factura". NUNCA escribas un valor monetario o un código que no esté escrito tal cual en el BLOQUE 1. Caso real (19-08-2026): la glosa decía solo «CONSULTA DE URGENCIAS, POR ESPECIALISTA», sin código, y el dictamen escribió «CUPS 348240» — un código que no existe en el catálogo oficial. La EPS cruza los CUPS contra su sistema: uno inventado tumba la defensa completa por bien que esté el argumento jurídico.
 2.bis. PROHIBIDO ESTIMAR TARIFAS: Si la glosa no trae valor monetario y vos "conocés" la tarifa habitual del procedimiento (ej. ecografía Doppler ≈ $950.000, hemograma ≈ $50.000, UCI ≈ $1.500.000/día), TODA ESTIMACIÓN ES ALUCINACIÓN porque no está soportada en factura. Caso real (24-jun-2026): glosa de doppler obstétrica sin valor pasado → IA escribió "$950.000" → EPS desestima porque no hay soporte. La defensa correcta es escribir literal "el valor objetado consignado en el expediente" sin cifra.
 2.ter. PROHIBIDO INVENTAR SOPORTES: NUNCA enumeres un documento que no conste en el expediente que se te entregó. Caso real (19-08-2026, factura HUS468334, glosa SO0201 por «ausencia de soportes de la CONSULTA DE URGENCIAS»): el expediente traía factura, historia clínica, epicrisis, hoja de administración de medicamentos, hoja de atención de urgencias, RIPS, CUV y anexos — y el dictamen escribió que incluía además «AUTORIZACIÓN PREVIA» y «DESCRIPCIÓN QUIRÚRGICA». Ninguna de las dos estaba, y era una consulta de urgencias donde NO hubo cirugía. El dictamen se contradecía con su propia tabla de soportes en la misma hoja. Si recibes un bloque «SOPORTES QUE DE VERDAD OBRAN EN EL EXPEDIENTE», esa lista es la ÚNICA fuente: no agregues, no completes con lo que «suele» anexarse, no uses listas de memoria. Si no recibes ese bloque, NO enumeres documentos: escribe que los soportes obran en el expediente institucional, sin lista. Afirmar que se remitió algo que no está es lo que hace que la EPS ratifique la glosa.
@@ -1054,6 +1055,51 @@ la liquidación para tumbar la respuesta entera.
 
 Si la glosa objeta plata, NO la contestes: la otra capa lo hace. Si necesitás
 nombrarla para hilar la frase, decí «la objeción tarifaria» y seguí.
+
+⛔⛔ PROHIBICIÓN ABSOLUTA — LO QUE UNA NORMA NO DICE. La Resolución 2284 de
+2023 es el MANUAL ÚNICO DE DEVOLUCIONES, GLOSAS Y RESPUESTAS: define los
+CÓDIGOS de glosa y de respuesta y el trámite. NO establece reglas de pago, NO
+dice qué cobertura paga primero, NO dice que un servicio «deba ser
+reconocido». Citarla para eso es citarla para lo que no dice, y la entidad lo
+tumba abriendo la resolución. Lo mismo vale para cualquier norma: se cita
+SOLO por lo que su texto contiene. Ante la duda, se cita la norma marco (Ley
+100/1993, Decreto 780/2016) por su materia, sin atribuirle frases.
+
+Por qué: el 02-09-2026 (caso CO4601) escribiste que la Resolución 2284
+«confirma que los servicios facturados sin agotar topes deben ser
+reconocidos». No dice eso ni nada parecido.
+
+⛔⛔ PROHIBICIÓN ABSOLUTA — NORMA QUE CITA LA ENTIDAD Y NO EXISTE. Si la glosa
+se apoya en una norma que no reconoces (p. ej. «Artículo 99 de la Resolución
+8888 de 2025»), NO discutas su «aplicabilidad» ni la trates como si existiera:
+eso la legitima. Di en una línea que esa norma no consta en el ordenamiento y
+funda la defensa en las normas vigentes que sí aplican al caso (urgencias:
+Art. 168 Ley 100/1993, Decreto 4747/2007, Art. 14 Ley 1751/2015).
+
+⛔⛔ PROHIBICIÓN ABSOLUTA — DEFENDER UN IMPOSIBLE. Si la propia glosa muestra
+una imposibilidad material (un procedimiento propio de un sexo en un paciente
+del sexo contrario, o una fecha de egreso anterior a la de ingreso), NO la
+defiendas con «autonomía del médico tratante» ni con teorías de «cierre
+administrativo»: reconoce el error de facturación y anuncia la corrección.
+Y cuando la glosa SÍ identifica el servicio, el CUPS, el medicamento o un
+requisito concreto (MIPRES, certificado), NUNCA respondas «devolución
+administrativa por falta de identificación»: es falso; atiende la objeción.
+
+⛔⛔ PROHIBICIÓN ABSOLUTA — HECHOS CLÍNICOS Y CIFRAS. NO escribas un diagnóstico,
+un nivel de triage, un síntoma, un signo vital, una fecha de ingreso ni un
+valor tarifario que no esté ESCRITO en el texto de los PDF aportados o en los
+datos que te da el motor. Ni uno. Si la historia clínica no está entre los
+documentos de este prompt, el argumento de urgencia es NETAMENTE NORMATIVO
+—Art. 168 Ley 100/1993, Art. 67 Ley 715/2001— y NO describe al paciente.
+
+Regla práctica: cada dato clínico que escribas tiene que poder señalarse con
+el dedo en un PDF de este prompt. «TRIAGE II» solo si el PDF dice TRIAGE II.
+«Dolor torácico» solo si el PDF lo dice. Si no hay PDF, no hay cuadro clínico
+que contar: se cuenta la norma.
+
+Por qué: un dictamen que describe un triage o un síntoma que la entidad no
+encuentra en la historia clínica es fraude documental. No pierde la glosa:
+expone al hospital. Y a la entidad le basta abrir la historia para verlo.
 
 ⛔⛔ PROHIBICIÓN ABSOLUTA — CLÁUSULAS. NUNCA pongas entre comillas el texto de
 una cláusula contractual. Ni «», ni "", ni «dispone que…», ni «reza…». Si el
@@ -1145,7 +1191,7 @@ C) EQUILIBRIO ECONÓMICO DEL CONTRATO (Ley 80/1993 Art. 27).
 D) CONTINUIDAD DEL SERVICIO PÚBLICO ESENCIAL (Ley 1751/2015 Art. 6 y 8).
 E) PREVALENCIA DEL CRITERIO MÉDICO (Ley 23/1981 Art. 11, Ley 1751/2015 Art. 17).
 F) AUTONOMÍA DEL ACTO MÉDICO + LEX ARTIS AD HOC (Ley 23/1981, Ley 1751/2015 Art. 17).
-G) CARGA DINÁMICA DE LA PRUEBA (Ley 1438/2011 Art. 57).
+G) CARGA DINÁMICA DE LA PRUEBA (Art. 167 del Código General del Proceso, Ley 1564/2012 — NO el Art. 57 de la Ley 1438, que es el trámite de glosas). SOLO cuando la entidad exige un soporte que ella misma produce o custodia (su autorización, su comprobante de pago, su acta). NUNCA para lo que la IPS debe probar por ser suya la carga: los soportes de su propia facturación y, en accidente de tránsito, el AGOTAMIENTO de la cobertura del SOAT — ese certificado lo pide la IPS a la aseguradora y lo aporta la IPS. Invocar la carga dinámica para no aportar lo propio es una excusa que la entidad tumba en una línea.
 H) DEBIDO PROCESO Y MOTIVACIÓN DE ACTOS (C.P. Art. 29, CPACA Art. 42).
 I) TIPICIDAD DE LAS CAUSALES DE GLOSA (Res. 2284/2023 Anexo Técnico 3 — Manual Único). Solo si el servicio es anterior al 01-04-2026 aplica el Anexo Técnico No. 6 de la Res. 3047/2008, hoy derogada.
 J) PROHIBICIÓN DE INTROMISIÓN EN EL ACTO MÉDICO (Ley 1438/2011 Art. 105).
@@ -1212,7 +1258,7 @@ Cuando la glosa de la EPS tenga defectos, IDENTIFÍCALOS POR SU NOMBRE TÉCNICO 
 • INMOTIVACIÓN — la EPS no expone hecho concreto, norma vulnerada ni cuadro comparativo. Cita: Decreto 4747/2007 Art. 22 + CPACA Art. 42 + Ley 1438/2011 Art. 57.
 • CONTRADICCIÓN INTERNA — el motivo escrito por el auditor se contradice con el código tipificado o con las observaciones. Cita la contradicción literal entre comillas.
 • APLICACIÓN INDEBIDA DE CAUSAL — la causal invocada (TA0201, FA0205, etc.) no corresponde al hecho real. Cita Res. 2284/2023 Anexo Técnico 3 (tipicidad); la Res. 3047/2008 Anexo 6 solo para servicios anteriores al 01-04-2026.
-• INVERSIÓN DE LA CARGA PROBATORIA — la EPS exige a la IPS soportes adicionales no tipificados en el catálogo legal. Cita Ley 1438/2011 Art. 57 (carga dinámica) + Art. 29 C.P. + CPACA Art. 42.
+• INVERSIÓN DE LA CARGA PROBATORIA — la EPS exige a la IPS soportes adicionales no tipificados en el catálogo legal. Cita Art. 167 CGP (carga dinámica, Ley 1564/2012) + Art. 29 C.P. + CPACA Art. 42. Solo aplica a soportes que la entidad produce o custodia; jamás a los propios de la IPS ni al agotamiento del SOAT.
 • MODIFICACIÓN UNILATERAL DEL CONTRATO — la EPS aplica tarifa, descuento o exclusión no pactada en vía de glosa. Cita Pacta Sunt Servanda (Art. 1602 C.C.) + Art. 871 C.Co. + cláusula contractual específica.
 • GLOSA ATÍPICA — el porcentaje o concepto NO existe en el Manual Único de Devoluciones, Glosas y Respuestas (Res. 2284/2023 Anexo Técnico 3).
 • AUSENCIA DE CONCEPTO TÉCNICO ESPECIALIZADO — en glosas de PERTINENCIA, la EPS debe acreditar concepto de par académico o auditor médico de la misma especialidad. Sin ese soporte, la glosa es inválida.
@@ -1501,6 +1547,22 @@ REGLAS:
 • Si la entidad es PPL/FOMAG/FF.MM./POLICÍA: NO uses "EPS"; usa "ENTIDAD PAGADORA" o "FONDO". Cita Dec. 1795/2000 + Acuerdo 002/2001 (FF.MM.), Ley 1709/2014 + la resolución de PPL vigente al momento de la atención (Res. 1099/2026 desde junio de 2026; Res. 5159/2015 antes), Dec. 3752/2003 (FOMAG).
 • Para ARL (Positiva/Aurora): cita Dec. 1295/1994 + Dec. 1072/2015 + Ley 1562/2012.
 • NO cites T-760/2008 si NO es EPS regular.
+
+• ACCIDENTE DE TRÁNSITO — TOPES SOAT/ADRES (CO4601 y afines). El orden de
+  cobertura lo fija el Decreto 780 de 2016 (Libro 2, Parte 6 — ECAT/SOAT): la
+  póliza SOAT responde PRIMERO hasta su tope; agotado el tope, el ADRES; y solo
+  después la EPS. Ese orden es la norma que se cita — NO la Resolución 2284, que
+  es el manual de códigos.
+  QUIÉN LO PRUEBA: la IPS. Es la IPS quien factura a la aseguradora y quien
+  obtiene de ella el CERTIFICADO DE AGOTAMIENTO de la cobertura. Está PROHIBIDO
+  trasladarle esa carga a la entidad («carga dinámica») y PROHIBIDO afirmar que
+  el tope se agotó o que el certificado existe si NO está entre los documentos
+  de este prompt.
+  SIN CERTIFICADO ENTRE LOS SOPORTES, la respuesta se limita a: (1) exponer el
+  orden de cobertura del Decreto 780 de 2016; (2) dejar constancia de que el
+  certificado de agotamiento SE APORTARÁ o de que se solicita a la entidad
+  precisar el tope que considera no agotado. Sin Ley 1751 como argumento
+  principal: aquí no se discute pertinencia, se discute quién paga primero.
 """
 )
 
@@ -2695,6 +2757,43 @@ FUNDAMENTO_POR_FAMILIA: dict[str, str] = {
 }
 
 
+# ── Accidente de tránsito: cobertura SOAT/ADRES (02-09-2026, caso CO4601) ──
+# La entidad glosa porque el hospital «no acredita el agotamiento de la cobertura
+# del SOAT». Quién lo prueba: la IPS, con el certificado de la aseguradora. Sin
+# ese certificado entre los soportes, el dictamen no puede afirmar que el tope se
+# agotó. Estos detectores lo deciden en código; el prompt y el motor los usan.
+RE_GLOSA_COBERTURA_SOAT = re.compile(
+    r"\bCO4601\b|AGOTA\w*\s+(?:LOS\s+)?TOPES?\s+(?:DE\s+)?(?:SOAT|ADRES)|"
+    r"TOPES?\s+(?:DE\s+)?SOAT|COBERTURA\s+DEL\s+SOAT|ACCIDENTE\s+DE\s+TR[ÁA]NSITO|"
+    r"P[ÓO]LIZA\s+SOAT|\bADRES\b",
+    re.IGNORECASE,
+)
+RE_CERTIFICADO_AGOTAMIENTO = re.compile(
+    r"CERTIFICA(?:DO|CI[ÓO]N)[^\n]{0,60}AGOTAMIENTO|AGOTAMIENTO[^\n]{0,60}(?:COBERTURA|P[ÓO]LIZA|TOPE)|"
+    r"TOPE[^\n]{0,30}AGOTAD|COBERTURA[^\n]{0,30}AGOTAD|PAGOS?\s+EFECTUADOS?\s+POR\s+LA\s+ASEGURADORA",
+    re.IGNORECASE,
+)
+
+
+def es_glosa_cobertura_soat(texto_glosa: str) -> bool:
+    """True si la objeción es de cobertura SOAT/ADRES en accidente de tránsito."""
+    return bool(texto_glosa) and bool(RE_GLOSA_COBERTURA_SOAT.search(texto_glosa))
+
+
+def hay_certificado_agotamiento(contexto_pdf: str) -> bool:
+    """True si entre lo aportado hay un certificado de agotamiento del SOAT.
+
+    Se mira el nombre de los archivos y su texto. Basta una señal clara.
+    """
+    ctx = contexto_pdf or ""
+    nombres = " ".join(
+        m.group(1) for m in re.finditer(r"═+\s*DOCUMENTO:\s*(.+?)\s*═+", ctx)
+    ).upper()
+    if re.search(r"AGOTAM|CERTIFIC.*(?:SOAT|ASEGURAD|POLIZA|PÓLIZA)", nombres):
+        return True
+    return bool(RE_CERTIFICADO_AGOTAMIENTO.search(ctx))
+
+
 def familias_de_objecion_en(
     texto: str,
 ) -> list[tuple[str, str, "re.Pattern[str]", tuple[str, ...]]]:
@@ -2970,6 +3069,25 @@ def build_user_prompt(
             "es defensa; llenar el renglon con un adjetivo no lo es.\n"
         )
 
+    # ─── COBERTURA SOAT/ADRES SIN CERTIFICADO DE AGOTAMIENTO (02-09-2026) ───
+    bloque_soat_str = ""
+    if es_glosa_cobertura_soat(texto_glosa or "") and not hay_certificado_agotamiento(
+        contexto_pdf or ""
+    ):
+        bloque_soat_str = (
+            "\n[⚠ COBERTURA SOAT/ADRES — NO HAY CERTIFICADO DE AGOTAMIENTO ENTRE LOS SOPORTES]\n"
+            "PROHIBIDO afirmar que el tope del SOAT se agoto, que la cobertura esta agotada o que "
+            "existe certificacion de la aseguradora: no esta entre los documentos de este prompt. "
+            "PROHIBIDO trasladarle a la entidad la carga de probar el agotamiento (nada de «carga "
+            "dinamica»): la IPS factura al SOAT y la IPS aporta el certificado. PROHIBIDO citar la "
+            "Resolucion 2284/2023 como si dijera algo sobre topes o reconocimiento: es el manual de "
+            "codigos.\n"
+            "Lo que SI se escribe: (1) el orden de cobertura del Decreto 780 de 2016 —SOAT hasta su "
+            "tope, luego ADRES, luego la EPS—; (2) que el certificado de agotamiento SE APORTARA; "
+            "(3) que se solicita a la entidad precisar el tope y el valor que considera no agotados. "
+            "El motor agrega ese parrafo con los datos; no lo redactes con cifras propias.\n"
+        )
+
     # ─── PERTINENCIA QUIRURGICA: SE CONTESTA CON LA NOTA OPERATORIA ───
     # Pedido del auditor sobre la CL4506: la autonomia medica a secas, sin
     # decir POR QUE el cirujano puso clavo Y placa, garantiza la ratificacion.
@@ -3025,7 +3143,9 @@ def build_user_prompt(
             {
                 "nombre": "INVERSION INDEBIDA DE LA CARGA PROBATORIA",
                 "ataque": "La EPS exige soportes NO tipificados en el Anexo Tecnico 1 de la Res. 2284/2023 "
-                "Anexo Tecnico No. 1. Cita Ley 1438/2011 Art. 57 (carga dinamica) + Art. 29 C.P. (debido proceso).",
+                "Anexo Tecnico No. 1. Cita Art. 167 CGP (carga dinamica) + Art. 29 C.P. (debido proceso). "
+                "SOLO para soportes que la entidad produce o custodia; NUNCA para los propios de la IPS "
+                "ni para el agotamiento del SOAT.",
             }
         )
     # Glosa atipica (porcentaje no taxativo)
@@ -3855,7 +3975,7 @@ def build_user_prompt(
 
 DATOS CLÍNICOS DEL EXPEDIENTE (úsalos SOLO si aportan al argumento; omítelos si no):
 {clinicos_str}
-{bloque_datos_clinicos_str}{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_contexto_enriquecido_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_segunda_objecion_str}{bloque_nota_operatoria_str}{bloque_vicios_str}{bloque_ratificacion_str}{bloque_referencias_str}
+{bloque_datos_clinicos_str}{bloque_regimen_str}{bloque_perfil_str}{bloque_normativa_str}{bloque_clausulas_contrato_str}{bloque_contexto_enriquecido_str}{bloque_taxativo_str}{bloque_antirebatimiento_str}{bloque_calculo_str}{bloque_complejidad_str}{bloque_multicodigo_str}{bloque_segunda_objecion_str}{bloque_nota_operatoria_str}{bloque_soat_str}{bloque_vicios_str}{bloque_ratificacion_str}{bloque_referencias_str}
 ═══ BLOQUE 2: CONCEPTO OFICIAL DEL CÓDIGO {codigo} (Manual Único Res. 2284/2023) ═══
 {concepto_oficial}
 

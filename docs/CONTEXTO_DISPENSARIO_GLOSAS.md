@@ -282,3 +282,108 @@ Stop-Process -Name python, py -Force -ErrorAction SilentlyContinue
 8. **El portal del DMBUG NO siempre tiene `RE9901`** como código de respuesta
    válido — depende del tipo de glosa. Si el dropdown rechaza el código del
    Excel, mirar qué códigos ofrece el portal y ajustar el Excel.
+9. **Directriz del 03-09-2026 — las CL médicas/mixtas NO las responde el bot.**
+   Si la glosa es de tipo Médica o Mixta y el servicio tiene causal `CL`, el
+   generador (`gen_lote.py`) la omite del cargue y la aísla en la hoja
+   **"PARA GESTION MEDICA"** del mismo Excel: esas quedan a gestión manual del
+   equipo médico. La razón: cuando el equipo médico revisa y acepta la glosa,
+   debe cruzar una nota crédito — y una respuesta genérica ya cargada por el
+   bot impide ese cruce y daña la conciliación. Las objeciones excluidas
+   conservan su número de la grilla, así el robot responde las demás sin
+   correrse de fila.
+
+## El bot RPA del paquete GI (`bot_lote_dispensario.py`, 04-09-2026)
+
+Orquesta el lote completo en un solo comando (pide el GI en pantalla):
+
+    py tools\glosas_dispensario\bot_lote_dispensario.py --excel "D:\...\GLOSAS_X.xlsx"
+
+1. Crea `D:\USUARIO CARTERA\Documents\<GI>\soportes`.
+2. Genera las respuestas con `gen_lote.py` (hereda la directriz CL).
+3. Recorre **una sola vez** las carpetas de radicación de `Y:` y arma el
+   índice de soportes por factura, para copiar el PDF de cada una a
+   `soportes`. Las carpetas vienen así:
+
+       Y:\9.SEPTIEMBRE - SOPORTES RADICACION\DISPENSARIO\LILIANA\
+           ENV-233972-OK\HUS552002\FEV_900006037_HUS552002.pdf
+
+   o sea, una carpeta por factura con varios soportes adentro. El bot escoge
+   el archivo `FEV_...` (la factura electrónica, que es la que trae el detalle
+   del cobro) y, si no está, cualquier otro soporte de esa carpeta. Entre
+   meses manda el más reciente.
+4. Lee cada PDF con la cascada pdfplumber → PyPDF2 → OCR
+   (`extraer_factura_pdf.py`) y ancla a la respuesta SOLO lo que se leyó
+   (paciente y valor total). Nada leído = nada agregado.
+5. Cruza cada glosa de tarifas con el tarifario del contrato 440
+   (`tarifario_440.py`: anexo 6.2 de servicios por CUPS/código IPS y anexos
+   de medicamentos por CUM) y cita la tarifa pactada exacta; sin
+   coincidencia no cita nada.
+6. **COTEJO DE COBRO** (ver abajo): compara lo que de verdad se facturó
+   contra lo pactado y escribe el veredicto y la respuesta sugerida.
+7. Corre el robot del portal (`--piloto HUS...` primero, siempre) y deja las
+   evidencias de la corrida en `<GI>\<GI>_EVIDENCIAS.pdf`.
+
+Con `--sin-cargue` prepara todo (carpeta, soportes, Excel enriquecido) sin
+tocar el portal. Los tarifarios se pasan con `--tarifario-servicios` y
+`--tarifario-medicamentos` (por defecto busca en
+`D:\USUARIO CARTERA\Documents\TARIFARIO_440\`).
+
+## El COTEJO DE COBRO (`cotejo_tarifa.py`, 04-09-2026)
+
+Responde la pregunta que importa cuando la EPS glosa por mayor valor cobrado:
+**¿de verdad estamos cobrando de más, y de cuánto?** El bot compara el valor
+que leyó en el PDF de la factura contra la tarifa pactada en el anexo del
+contrato 440 y escribe al lado de cada respuesta siete columnas nuevas:
+VALOR FACTURADO (PDF), TARIFA PACTADA (440), DIFERENCIA, ¿SOBRECOBRO?,
+VALOR SUGERIDO A ACEPTAR, RESPUESTA SUGERIDA y FUENTE DEL COTEJO. Lo que hay
+que decidir queda además en la hoja **"COTEJO DE COBRO"**, que es el paquete
+de trabajo del auditor, y en el archivo `cotejo_cobro_<GI>.json`.
+
+Los veredictos:
+
+| Veredicto | Qué significa | Qué sugiere |
+|---|---|---|
+| `SIN COTEJO` | no se leyó el PDF, el código no está pactado, o la línea trae varios valores y no se sabe cuál es el unitario | nada: revisar a mano |
+| `COBRO A TARIFA` | lo facturado es exactamente lo pactado (± $2 de redondeo) | no aceptar, la glosa es infundada |
+| `COBRO POR DEBAJO DE LO PACTADO` | se facturó menos que la tarifa | no aceptar |
+| `MAYOR VALOR VERIFICADO` | se cobró de más y es un caso aislado | aceptar la diferencia (o lo objetado, lo que sea menor) |
+| `MAYOR VALOR POR VIGENCIA` | se cobró de más, pero la misma diferencia porcentual se repite en el lote | no aceptar: sustentar con la resolución de tarifas del año |
+
+Ese último veredicto es el que evita el error caro. En el lote del 04-09-2026,
+24 facturas venían al 7% sobre el anexo y 19 al 31,25%: eso no es un error de
+cobro, es la actualización de tarifas de la vigencia 2026 que los **parágrafos
+3 y 4 del contrato 440** prevén (SOAT 2026 menos 20%, y para las tarifas
+propias de la ESE un modificatorio que reconoce el incremento del año). Un
+cotejo ingenuo habría sugerido aceptar glosas en todo el lote.
+
+**El bot nunca acepta solo.** El Excel del cargue conserva `Valor Aceptado` en
+0 y `RE9901`: la columna es una sugerencia para que el auditor decida y, si
+acepta, la escriba él. Aceptar una glosa es decisión del hospital, y además
+tiene que poder cruzar la nota crédito (misma razón de la directriz CL).
+
+### La redacción sigue al cotejo
+
+El argumento de cada respuesta lo dicta el veredicto, con **las mismas cifras
+que el cotejo verificó** (el texto no recalcula nada, así no puede contradecir
+a las columnas):
+
+| Escenario | Cómo queda redactada la respuesta |
+|---|---|
+| **Cobro a tarifa** | «AL REVISAR EL SOPORTE *archivo*, SE EVIDENCIA LA ATENCION DEL USUARIO *paciente*. EL VALOR FACTURADO DE *valor* POR EL SERVICIO *cups descripción* CORRESPONDE A LA TARIFA PACTADA EXACTA EN EL CONTRATO 440, POR LO QUE LA CAUSAL DE GLOSA ES INFUNDADA.» |
+| **Vigencia 2026** | «VERIFICANDO LA FACTURA *archivo* DEL USUARIO *paciente*, EL VALOR COBRADO DE *valor* POR EL SERVICIO *cups descripción* REFLEJA LA ACTUALIZACION DE TARIFAS DE LA VIGENCIA 2026 CONTEMPLADA EN LOS PARAGRAFOS 3 Y 4 DEL CONTRATO 440 (MODIFICATORIO Y RESOLUCION TARIFARIA), DOCUMENTOS QUE SE REMITEN. EL COBRO ES CONTRACTUALMENTE VALIDO.» |
+| **Sobrecobro real** | «VALIDADO EL SOPORTE *archivo* DEL USUARIO *paciente*, LA TARIFA PACTADA PARA EL CODIGO *cups* ES DE *tarifa* Y SE FACTURO *valor*. SE ACEPTA LA GLOSA POR EL MAYOR VALOR COBRADO DE *diferencia*, Y SE SOLICITA EL LEVANTAMIENTO DE LOS *resto* RESTANTES.» |
+
+Fuera de esos tres casos (sin cotejo posible, o cobrado por debajo de lo
+pactado) manda la redacción prudente de siempre: cita el PDF y el anexo, pero
+**no proclama cifras que no se cotejaron** (la lección del caso HUS0000542497).
+
+Lo que se lee del PDF entra tal cual —archivo, paciente, valor— y lo que no se
+pudo leer sencillamente no se menciona. El servicio se nombra con el código y
+la descripción del export, no con la fila cruda del PDF: esa lleva cantidades
+y valores sueltos que dentro de la frase se leen como un error, y queda en la
+columna FUENTE DEL COTEJO, que es donde sirve.
+
+**El texto del sobrecobro no se sube solo.** Como acepta una glosa, por
+defecto no entra en la respuesta que se carga al portal: queda en la columna
+RESPUESTA SUGERIDA y en la hoja de trabajo. Para que sí entre, el auditor
+corre el bot con `--redactar-aceptacion`.

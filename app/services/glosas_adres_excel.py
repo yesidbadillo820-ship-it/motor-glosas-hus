@@ -52,7 +52,9 @@ from app.models.db import (
     FacturaAdresRecord,
     GlosaAdresRecord,
     PaqueteAdresRecord,
+    UsuarioRecord,
 )
+from app.services.gestor_adres import SIN_GESTOR, quien_la_trabaja
 
 # El formato de la macro y el texto de la respuesta salen del script del bot:
 # es la fuente única del criterio, para no tener dos copias.
@@ -74,7 +76,6 @@ ROJO = "F8CECC"
 VERDE = "E2EFDA"
 
 HOJA_DATOS = "Hoja1"  # el mismo nombre de los archivos del área
-SIN_GESTOR = "(sin gestor asignado)"
 SIN_AREA = "(sin clasificar)"
 SIN_CENTRO = "(sin centro de costos)"
 ITEM = "ÍTEM"
@@ -216,6 +217,26 @@ def _reunir(db: Session, paquete_id: int) -> tuple[list[dict], list[dict]]:
     por_factura: dict[str, list[GlosaAdresRecord]] = defaultdict(list)
     for g in glosas:
         por_factura[g.factura_clave].append(g)
+
+    # 02-09-2026. La macro no trae gestor en estos paquetes, pero el sistema
+    # sí sabe quién trabaja cada factura: quién la cerró y quién decidió sus
+    # glosas. Una sola consulta de usuarios para poner nombre a los correos,
+    # y la regla (que vive en gestor_adres) decide por factura.
+    nombres = {
+        (correo or "").strip().lower(): (nombre or "").strip()
+        for correo, nombre in db.query(UsuarioRecord.email, UsuarioRecord.nombre).all()
+        if correo
+    }
+    decididos: dict[str, list[str]] = defaultdict(list)
+    for g in glosas:
+        if _texto(g.decidido_por):
+            decididos[g.factura_clave].append(g.decidido_por)
+    gestor_de: dict[str, tuple[str, str]] = {
+        f.factura_clave: quien_la_trabaja(
+            f.gestor, f.estado, f.cerrada_por, f.reabierta_por, decididos[f.factura_clave], nombres
+        )
+        for f in fichas
+    }
     aceptado_en_fila: dict[int, float] = {}
     aceptado_factura: dict[str, float] = {}
     for clave, grupo in por_factura.items():
@@ -257,7 +278,9 @@ def _reunir(db: Session, paquete_id: int) -> tuple[list[dict], list[dict]]:
                 "cantidad_aceptada": _texto(g.cantidad_aceptada),
                 "aceptado_escrito": g.valor_aceptado or 0,
                 "centro": _texto(g.centro_costos) or SIN_CENTRO,
-                "gestor": _texto(g.gestor) or SIN_GESTOR,
+                # Si el renglón trae gestor de la macro, ese; si no, el que el
+                # sistema sabe de su factura. Así la hoja POR GESTOR sí reparte.
+                "gestor": _texto(g.gestor) or gestor_de.get(g.factura_clave, (SIN_GESTOR, ""))[0],
                 "medico": _texto(g.medico),
                 "sugerencia": _texto(g.sugerencia),
                 "confianza": _texto(g.confianza),
@@ -299,7 +322,8 @@ def _reunir(db: Session, paquete_id: int) -> tuple[list[dict], list[dict]]:
                 "factura": _texto(f.factura),
                 "radicacion": _texto(f.radicacion),
                 "paciente": _texto(f.doc_victima),
-                "gestor": _texto(f.gestor) or SIN_GESTOR,
+                "gestor": gestor_de[f.factura_clave][0],
+                "gestor_origen": gestor_de[f.factura_clave][1],
                 "medico": _texto(f.medico),
                 "estado": _texto(f.estado) or "PENDIENTE",
                 "glosas": r["items"],
@@ -547,6 +571,15 @@ def construir_informe_paquete(db: Session, paquete_id: int, generado_por: str = 
             "glosó entera por el FURIPS. No se responden uno por uno, así que no cuentan como "
             "glosas a trabajar, pero su plata sí está en juego.",
             48,
+        ),
+        (
+            "EL GESTOR",
+            "Si la macro trae el gestor, se respeta. Si no, el sistema pone quién está "
+            "trabajando la factura: en las CERRADAS, quien la cerró; en las EN PROCESO, quien ha "
+            "decidido sus glosas (la persona con más glosas decididas va primero). La hoja "
+            "FACTURAS dice de dónde salió cada uno. Solo queda «(sin gestor asignado)» cuando "
+            "nadie la ha tocado.",
+            60,
         ),
     ]
     for etiqueta, texto, alto in avisos:
@@ -886,7 +919,7 @@ def construir_informe_paquete(db: Session, paquete_id: int, generado_por: str = 
         "El avance de cada una y su plata. «¿Cuadra?» compara lo que suma el sistema con la "
         "cifra oficial del archivo de facturas del ADRES: si dice NO CUADRA, hay que revisarla "
         "antes de radicar.",
-        17,
+        18,
     )
     _encabezado(
         fa,
@@ -909,8 +942,9 @@ def construir_informe_paquete(db: Session, paquete_id: int, generado_por: str = 
             "Aceptado",
             "Sigue glosado",
             "Cerrada por",
+            "De dónde sale el gestor",
         ],
-        [15, 13, 16, 20, 20, 12, 12, 11, 11, 9, 12, 16, 16, 11, 15, 15, 24],
+        [15, 13, 16, 22, 20, 12, 12, 11, 11, 9, 12, 16, 16, 11, 15, 15, 24, 22],
     )
     color_estado = {"CERRADA": VERDE, "EN PROCESO": AMBAR, "PENDIENTE": GRIS}
     for n, d in enumerate(facturas):
@@ -933,6 +967,7 @@ def construir_informe_paquete(db: Session, paquete_id: int, generado_por: str = 
             d["aceptado"],
             d["sigue_glosado"],
             d["cerrada_por"],
+            d["gestor_origen"],
         ]
         for j, v in enumerate(valores, 1):
             c = fa.cell(f, j, v)
@@ -951,10 +986,10 @@ def construir_informe_paquete(db: Session, paquete_id: int, generado_por: str = 
                 c.font = Font(name=FUENTE, size=9, bold=True, color="9C0006")
     fa.freeze_panes = "B5"
     if facturas:
-        fa.auto_filter.ref = f"A4:Q{4 + len(facturas)}"
+        fa.auto_filter.ref = f"A4:R{4 + len(facturas)}"
         tf = 5 + len(facturas)
         _celda(fa, tf, 1, "TOTAL", negrita=True, relleno=AZUL_CLARO)
-        for col in (2, 3, 4, 5, 6, 10, 14, 17):
+        for col in (2, 3, 4, 5, 6, 10, 14, 17, 18):
             _celda(fa, tf, col, "", relleno=AZUL_CLARO)
         for col, letra in ((7, "G"), (8, "H"), (9, "I"), (11, "K")):
             _celda(

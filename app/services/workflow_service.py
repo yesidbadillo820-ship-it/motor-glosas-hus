@@ -32,6 +32,14 @@ class TransicionWorkflow:
 TRANSICIONES_PERMITIDAS = [
     # Flujo normal
     TransicionWorkflow("RADICADA", "RESPONDIDA", "Responder glosa"),
+    # V3 Pilar 1: la respuesta queda RADICADA EN EL PORTAL DE LA EPS. A partir
+    # de aquí la pelota es del pagador: se detiene el reloj interno del
+    # hospital y empieza el reloj pasivo que mide a la EPS
+    # (ver docs/ARQUITECTURA_V3_PILAR1_RPA.md).
+    TransicionWorkflow("RESPONDIDA", "RADICADA_EN_EPS", "Radicada en el portal de la EPS"),
+    TransicionWorkflow("RADICADA_EN_EPS", "RATIFICADA", "EPS ratifica glosa"),
+    TransicionWorkflow("RADICADA_EN_EPS", "LEVANTADA", "EPS retira glosa"),
+    TransicionWorkflow("RADICADA_EN_EPS", "CONCILIADA", "Conciliación exitosa"),
     TransicionWorkflow("RESPONDIDA", "RATIFICADA", "EPS ratifica glosa"),
     TransicionWorkflow("RESPONDIDA", "LEVANTADA", "EPS retira glosa"),
     TransicionWorkflow("RESPONDIDA", "CONCILIADA", "Conciliación exitosa"),

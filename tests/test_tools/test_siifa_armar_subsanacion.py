@@ -226,3 +226,71 @@ def test_la_plantilla_del_hus_del_repo_cabe_y_dice_lo_que_debe():
     assert "NO ACEPTA GLOSA RATIFICADA" in texto
     assert "ARTÍCULO 57 DE LA LEY 1438 DE 2011" in texto
     assert "CONCILIACIÓN" in texto
+
+
+def test_repetir_la_respuesta_anterior_tal_cual_se_radico():
+    """El prestador puede decidir sostener el mismo argumento ante la
+    ratificación: entonces la subsanación repite texto y código."""
+    fila = _fila(
+        codigo_respuesta="RE9602",
+        observacion_respuesta="No se acepta, el valor corresponde a la Circular 047.",
+    )
+
+    glosas, _ = sub.armar([fila], "2026-09-03", repetir=True)
+
+    assert (
+        glosas[0]["OBSERVACION_RESPUESTA"]
+        == "No se acepta, el valor corresponde a la Circular 047."
+    )
+    assert glosas[0]["CODIGO_RESPUESTA"] == "RE9602"
+
+
+def test_sin_respuesta_anterior_no_se_inventa_texto():
+    """Si el informe no trae la respuesta anterior no hay nada que repetir:
+    la línea sale marcada y sin código, y el bot de cargue la deja fuera."""
+    glosas, _ = sub.armar([_fila(observacion_respuesta="")], "2026-09-03", repetir=True)
+
+    assert glosas[0]["OBSERVACION_RESPUESTA"] == ""
+    assert glosas[0]["CODIGO_RESPUESTA"] == ""
+    assert "SIN RESPUESTA ANTERIOR" in glosas[0]["REVISAR"]
+
+
+def test_repetir_no_desbloquea_las_devoluciones():
+    filas = [
+        _fila(
+            tipo_seguimiento="DEVOLUCION",
+            descripcion_reiteracion="Devolución Reiterada",
+            observacion_respuesta="Texto anterior",
+            codigo_respuesta="RE9601",
+        )
+    ]
+
+    glosas, devoluciones = sub.armar(filas, "2026-09-03", repetir=True)
+
+    assert glosas == []
+    assert devoluciones[0]["OBSERVACION_RESPUESTA"] == ""
+
+
+def test_una_respuesta_anterior_larguisima_se_recorta_al_limite():
+    fila = _fila(codigo_respuesta="RE9602", observacion_respuesta="X" * 2000)
+
+    glosas, _ = sub.armar([fila], "2026-09-03", repetir=True)
+
+    assert len(glosas[0]["OBSERVACION_RESPUESTA"]) == sub.LIMITE_OBSERVACION
+
+
+def test_pedir_plantilla_y_repetir_a_la_vez_es_un_error():
+    """Las dos opciones escriben el mismo campo: hay que elegir una."""
+    import pytest
+
+    with pytest.raises(SystemExit, match="una sola"):
+        sub.armar([_fila()], "2026-09-03", texto_fijo="TEXTO", repetir=True)
+
+
+def test_por_defecto_sigue_sin_repetir():
+    """La opción es explícita: sin pedirla, el motor redacta la subsanación."""
+    fila = _fila(observacion_respuesta="La respuesta vieja.")
+
+    glosas, _ = sub.armar([fila], "2026-09-03")
+
+    assert glosas[0]["OBSERVACION_RESPUESTA"] != "La respuesta vieja."

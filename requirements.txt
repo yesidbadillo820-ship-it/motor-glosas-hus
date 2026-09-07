@@ -46,3 +46,7 @@ pytz==2024.2
 # no existe y ZoneInfo("America/Bogota") revienta sin este paquete.
 tzdata==2026.3
 
+# 03-09-2026 (V2, Pilar 3) — ubicar el FOLIO real de un soporte dentro del
+# PDF adjunto. Estaba solo en requirements-dev.txt; el motor lo necesita en
+# producción para que el dictamen cite «folio 4» y no «está adjunto».
+pymupdf==1.28.2

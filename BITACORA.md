@@ -29,7 +29,7 @@
 | 8 | **Objeciones de otras EPS** | Bots que arman el Excel de OBJECIONES para DGH desde el archivo de cada entidad: FAMISANAR, SAVIA, EMSSANAR, Mutual Ser, FOMAG (Horus). | Cada uno con su `tools/organizar_objeciones_*.py` y su README. Si DGH devuelve errores, está `corregir_errores_dgh.py` y Claude los analiza. |
 | 9 | **Informes de cartera y conciliaciones** | Consolidados de estado de cartera por entidad (formato FAMISANAR), análisis de actas (ej. PROTEGER EPS) e informes en Word para la mesa. | Usted sube el Excel de la entidad al chat; Claude entrega el informe verificado al centavo. |
 | 10 | **Caja de bots del PC del auditor** | Bots de doble clic entregados POR CHAT (no van al repo porque procesan datos reales): ORGANIZAR ARCHIVOS, BAJAR PESO EXCEL, PARTIR/UNIR archivos grandes, OCR a PDF (PC y celular), UNIR EXCELES, CORREOS DE PAGOS, AUTORIZACIONES RIPS, DE1601 (NUEVA EPS), HERRAMIENTAS DE IMÁGENES. | Se piden por chat, llegan en ZIP, se descomprimen y doble clic al `.bat`. Si uno falla, pegue la pantalla del error en el chat. |
-| 11 | **Módulos personales de estudio** | Dos programas aparte, que no tocan el motor: **ICFES** (`icfes/`, preparación para el Saber 11) y **noruego** (`noruego/`, curso de idioma para el celular). Cada uno con su aplicación web que funciona sin internet. | Doble clic en `tools\ICFES.cmd` o `tools\NORUEGO.cmd`. Guías: `docs/GUIA_SISTEMA_ICFES.md` y `docs/GUIA_CURSO_NORUEGO.md`. |
+| 11 | **Módulos personales de estudio** | Tres programas aparte, que no tocan el motor: **ICFES** (`icfes/`, preparación para el Saber 11), **noruego** (`noruego/`, curso de idioma para el celular) y **velas japonesas** (`mercados/`, detecta los 28 patrones en su histórico y mide si de verdad cumplen). Cada uno con su aplicación web que funciona sin internet. | Doble clic en `tools\ICFES.cmd` o `tools\NORUEGO.cmd`; el de velas se corre con `python -m mercados`. Guías: `docs/GUIA_SISTEMA_ICFES.md`, `docs/GUIA_CURSO_NORUEGO.md` y `docs/GUIA_ANALISIS_VELAS.md`. |
 | 12 | **Cuidados médicos de la familiar (personal)** | Seguimiento de las autorizaciones, citas, medicamentos e insumos de EPS Sura de una familiar del auditor (paciente en casa), con su tablero HTML y los borradores de quejas/memoriales. | Se trabaja POR CHAT: usted sube los PDF/pantallazos de Sura y Claude entrega el tablero actualizado. Nada de datos de la paciente se guarda en este repositorio. |
 
 **Regla de oro:** no importa en qué chat esté — todo lo trabajado se anota en
@@ -237,6 +237,1357 @@ sube, 398 renglones en las 16 columnas de siempre) y
 REVISAR). Guía actualizada en `tools/README_organizar_objeciones_famisanar.md`;
 67 tests en `tests/test_tools/test_organizar_objeciones_famisanar.py`.
 
+### 04-09-2026 (noche, 5) — La primera factura de verdad destapó dos falsos positivos
+
+**La prueba.** Se le pasó a la Pre-Auditoría una factura real del share:
+HUS559077, de $141.720.044, con 531 KB de servicios. Contestó en **32
+milisegundos** (el compromiso con el facturador son 10 segundos, así que
+sobra tiempo de aquí a la esquina). Pero levantó **63 alertas**, y dos
+fuentes de ese ruido eran errores nuestros.
+
+**1. Cuarenta y ocho alertas de tarifa que nadie podía resolver.** El
+archivo del HIS **no dice qué EPS paga** la factura. Sin saber quién paga no
+existe «tarifa pactada» — pero el motor, al no encontrarla, se iba a comparar
+contra el catálogo de precios propio del hospital y cantaba diferencia. Y
+para colmo, en el mismo mensaje avisaba que la tarifa NO se había revisado.
+El tablero se contradecía a sí mismo, y eso es lo más rápido para que un
+auditor deje de creerle.
+
+**Ahora:** sin EPS, el motor **se calla** en materia de tarifas y lo dice. El
+día que el HIS mande el campo, la revisión vuelve a operar igual que siempre.
+
+**2. Un insumo bloqueado por «servicio pediátrico en un paciente adulto».**
+Era el material FMQ0098. En un insumo, «pediátrico» es un **calibre** —una
+sonda pediátrica se le pone a un adulto todos los días—, no una restricción
+de paciente.
+
+**Ahora:** la revisión de edad mira **servicios**, no artículos. En un insumo
+o un medicamento, la palabra que nombra una edad es una talla o una dosis. La
+regla sigue igual de firme donde sí importa: una **estancia** en UCI
+pediátrica facturada a un adulto se sigue bloqueando.
+
+Con las dos correcciones, esa misma factura pasa de 63 alertas a unas 15
+—estancia, UCI y servicios repetidos—, que son las que el facturador de
+verdad puede revisar antes de timbrar.
+
+9 pruebas nuevas, incluidas las que impiden que arreglar esto haya debilitado
+las reglas donde sirven.
+
+---
+
+### 04-09-2026 (noche, 4) — Entregado el Excel del lote 04-sep, y un tercer hueco de lectura tapado
+
+**Lo que se entregó.** El Excel del lote del 04 de septiembre quedó armado y
+en manos del auditor: **88 respuestas para cargar** (63 facturas, $17.060.666
+objetados) más las **6 objeciones CL** de glosas médicas y mixtas aisladas en
+su hoja, que las trabaja el equipo médico. De las 88 líneas, 62 tienen su
+tarifa del contrato 440 identificada y 59 la citan en el texto.
+
+**Con una salvedad dicha de frente:** ese archivo se generó desde el
+computador de Claude, que **no ve la unidad `Y:`**, así que ninguna factura
+pudo leerse en PDF y las columnas del cotejo salieron sin el valor facturado.
+Para que el cotejo salga completo hay que correr el mismo bot en el equipo de
+cartera, donde sí están los soportes. Las respuestas son las mismas.
+
+**El tercer error de lectura.** Revisando el lector contra renglones como los
+que traen las facturas reales aparecieron dos casos más en los que no se leía
+ningún valor: cuando el PDF devuelve **el renglón entero dentro de una sola
+celda** (`890275H CONSULTA 1 192.600 192.600`), las letras del código hacían
+descartar toda la línea; y una celda escrita `$ 192.600` perdía el valor por
+el espacio. Ahora se mira palabra por palabra, así que en el mismo renglón
+pueden convivir el código, la fecha, el NIT y los importes sin que ninguno se
+confunda con plata.
+
+
+### 04-09-2026 (noche, 3) — La respuesta ahora se escribe según lo que dice el cotejo
+
+**Lo que faltaba.** El cotejo ya sabía si el cobro estaba a tarifa, si el
+mayor valor era el aumento del año o si había sobrecobro de verdad, pero la
+respuesta que se sube al portal seguía diciendo lo mismo en los tres casos.
+
+**Lo que se hizo.** El texto ahora lo dicta el veredicto, y usa exactamente
+las mismas cifras que el cotejo verificó, así que el texto y las columnas del
+Excel nunca pueden decir cosas distintas:
+
+- **Cobrado a tarifa:** la respuesta afirma que el valor facturado es la
+  tarifa pactada exacta del contrato 440 y que la causal es infundada.
+- **Aumento de la vigencia 2026:** la respuesta explica que el mayor valor es
+  la actualización de tarifas que prevén los parágrafos 3 y 4 del contrato
+  (modificatorio y resolución del hospital) y que el cobro es válido. Esta es
+  la que sirve para las 43 glosas del lote del 04-09.
+- **Sobrecobro real:** la respuesta reconoce la tarifa pactada, el valor
+  facturado y acepta la glosa por la diferencia, pidiendo el levantamiento
+  del resto.
+
+**Con un freno en el tercer caso.** Ese texto acepta una glosa, así que por
+defecto NO se sube: queda en la columna RESPUESTA SUGERIDA y en la hoja de
+trabajo, para que usted decida. Si quiere que se suba redactado, se corre el
+bot con `--redactar-aceptacion`.
+
+**Lo que no cambió, y es lo que protege al hospital.** Cuando no se pudo
+cotejar (sin PDF, código que no está en el anexo, o una línea con varios
+valores donde no se sabe cuál es el unitario), sigue mandando la redacción
+prudente: cita el soporte y el anexo, pero no proclama ninguna cifra. Es la
+lección del caso de la factura 542497.
+
+**Un detalle de presentación que se corrigió a tiempo:** el servicio se nombra
+con su código y su descripción, no con el renglón crudo del PDF, que metía
+cantidades y valores sueltos en mitad de la frase que lee la EPS.
+
+6 pruebas nuevas (87 en total en esta línea de trabajo).
+
+---
+
+### 04-09-2026 (noche, 2) — El bot ya dice si DE VERDAD estamos cobrando de más
+
+**Lo que faltaba.** El bot defendía siempre al hospital: toda glosa por mayor
+valor cobrado la contestaba pidiendo el levantamiento. Pero a veces la EPS
+tiene razón, y contestar «no aceptamos» cuando sí se cobró de más solo alarga
+el pleito y deja la plata quieta.
+
+**Lo que se hizo.** El bot abre el PDF de la factura, busca el renglón del
+servicio glosado, saca **el valor por el que realmente se facturó** y lo
+compara con **la tarifa pactada en el anexo del contrato 440**. Al lado de
+cada respuesta, en el mismo Excel, quedan siete columnas nuevas: valor
+facturado, tarifa pactada, diferencia, si hay sobrecobro, cuánto se sugiere
+aceptar, la **RESPUESTA SUGERIDA** redactada, y de qué archivo salió cada
+cifra. Lo que hay que decidir queda además en una hoja aparte,
+**«COTEJO DE COBRO»**, para no tener que leer las 88 filas.
+
+**La trampa que se descubrió a tiempo.** En el lote del 04-09, 24 facturas
+venían al 7% por encima del anexo y 19 al 31,25%. Un cotejo ingenuo habría
+gritado «sobrecobro» en todo el lote y nos habría hecho aceptar glosas que no
+proceden: ese mayor valor **es la actualización de tarifas del año 2026**, que
+el propio contrato prevé en los parágrafos 3 y 4 (SOAT 2026 menos 20% para
+unas, y para las tarifas propias de la ESE un modificatorio que reconoce el
+incremento). Por eso el bot mira todo el lote antes de opinar: si la misma
+diferencia porcentual se repite en varias facturas, la marca como
+**vigencia** y dice que NO se acepte sin antes sustentar con la resolución.
+El sobrecobro suelto, el que no le pasa a nadie más, sí lo marca verificado y
+propone: «se acepta la glosa por $X por mayor valor cobrado».
+
+**Nunca acepta solo.** El Excel del cargue sigue con Valor Aceptado en 0. La
+sugerencia es para que usted decida y la escriba, por lo mismo de la directriz
+CL: si el hospital acepta, la nota crédito tiene que poder cruzar.
+
+**Además, dos errores de lectura corregidos** que hacían ver cobros que no
+existían: el código del servicio (890275H) se estaba leyendo como si fueran
+$890.275, y de las facturas que no dibujan la tabla no se sacaba ningún
+renglón. También se aceleró la búsqueda de soportes en la unidad `Y:`: ahora
+se recorre **una sola vez** y se prefiere el archivo `FEV_...` de cada carpeta
+de factura, que es la factura electrónica.
+
+29 pruebas nuevas (80 en total en esta línea de trabajo).
+
+---
+
+### 04-09-2026 (tarde, 7) — La Pre-Auditoría ya habla el idioma del HIS, y tiene pantalla
+
+**Llegó el archivo de verdad.** Yesid sacó del SINAC el RIPS de la factura
+HUS558039 y con eso se acabó de adivinar. El HIS manda el **RIPS de la
+Resolución 2275 de 2023** — la misma estructura con la que se le reporta al
+Ministerio—, y el motor ahora la recibe tal cual, sin que el hospital tenga
+que transformar nada.
+
+**Lo que el archivo enseñó, y que no se sabía.**
+
+- **El RIPS no trae la EPS.** El único NIT que viene es el del propio
+  hospital. Sin EPS no se puede cruzar la tarifa pactada ni el contrato
+  vigente: esas dos revisiones **se callan y lo dicen**, en vez de inventar
+  un pagador.
+- **El RIPS no trae epicrisis ni notas.** Entonces el cruce clínico con IA
+  no corre — no hay texto que cruzar—, y **la factura se evalúa igual** con
+  las reglas de siempre. Nada se detiene por eso.
+- **No trae el total de la factura:** se suma de los valores de cada
+  servicio.
+
+Si algún día el HIS puede mandar la EPS y las notas al lado del RIPS, el
+motor las usa automáticamente. Mientras tanto, cada respuesta trae una lista
+de **«lo que no se pudo revisar y por qué»**, aparte de los reparos, para que
+nadie confunda «esto está bien» con «esto no lo miramos».
+
+**La pantalla nueva: Pre-Auditoría.** En el menú lateral, al lado de Glosas
+ADRES. Muestra, factura por factura, qué le contestamos al HIS: el dictamen
+(aprobado / advertencia / bloqueo), cuántos reparos, cuánta plata está en
+juego y el valor de la factura. Al hacer clic en una fila se abren los
+reparos, cada uno con el código de glosa oficial con el que la EPS lo
+objetaría.
+
+**Arriba, cuatro cifras.** La que importa es **DINERO SALVADO**, y está
+definida con cuidado: solo cuenta las facturas que fueron **bloqueadas y
+después volvieron a pasar** — o sea, las que de verdad se corrigieron antes
+de timbrar. Una factura bloqueada que nunca volvió **no se cuenta**: no
+sabemos si la corrigieron o si la timbraron igual, y esa plata sale aparte
+como **riesgo sin resolver**. Es una cifra que se puede defender ante
+gerencia sin que nadie la tumbe con una pregunta.
+
+70 pruebas nuevas, incluidas las que corren sobre el archivo real del HIS.
+No se tocó ninguna otra pantalla.
+
+---
+
+### 04-09-2026 (tarde, 6) — Las glosas que se perdían cuando el bot se caía
+
+**El hueco.** Cuando un bot de radicación pide una glosa, el motor se la
+entrega y la marca como «tomada». Si el bot se moría en el segundo siguiente
+—porque a ese PC le falta un programa, porque el navegador no arrancó, porque
+el portal no abrió—, esa glosa **se quedaba tomada para siempre**:
+
+- los demás computadores no la veían, porque solo miran las que están libres;
+- las personas tampoco, porque la bandeja muestra las atoradas;
+- y la glosa desaparecía sin que nadie se enterara.
+
+Nadie la había perdido de vista a propósito: sencillamente no había forma de
+saber que existía.
+
+**Lo que se hizo.** Ahora el bot, al caerse, **suelta la glosa antes de
+morirse**: la devuelve a la cola para que otro computador sano la tome, y deja
+escrito de qué se murió («a este PC le falta playwright», «no arrancó el
+navegador»). El auditor ve el motivo en la bandeja, en la columna del último
+error.
+
+**Para que no rebote sin fin.** A los **3 intentos**, la glosa deja de dar
+vueltas y pasa a «la revisa una persona». Si un computador falló tres veces en
+el mismo punto, no es mala suerte: le falta algo, y una cuarta pasada no lo va
+a arreglar sola.
+
+**Lo que sigue intacto, y es lo importante.** Una glosa que **ya se pulsó en el
+portal** NO se devuelve a la cola por nada del mundo. Ahí no se sabe si quedó
+radicada, y devolverla sería invitar a radicarla dos veces ante la EPS — el
+daño que este módulo existe para evitar. Esa sigue saliendo solo por la
+bandeja, cuando una persona mira el portal y dice qué pasó.
+
+27 pruebas nuevas, entre ellas la caída del bot con la glosa en la mano.
+
+---
+
+### 04-09-2026 (tarde, 5) — Arranca el Pilar 2: el motor revisa la factura ANTES de timbrarla
+
+**El cambio de reloj.** Hasta hoy el hospital audita **después**: la EPS glosa
+y cartera pelea la plata durante meses. La Pre-Auditoría Concurrente le da
+vuelta al reloj — **el sistema del hospital (el HIS) nos consulta ANTES de
+timbrar la factura electrónica** y el motor le contesta si esa factura va a ser
+glosada y por cuánto. Cada peso corregido antes de timbrar es un peso que nunca
+entra en cartera.
+
+**Cómo funciona en la práctica.** El facturador le da guardar a la factura; el
+HIS nos manda los datos y, **en menos de 10 segundos**, recibe una de tres
+respuestas:
+
+- **APROBADO** — timbre tranquilo.
+- **ADVERTENCIA** — revise esto antes de timbrar.
+- **BLOQUEO** — hay algo que corregir sí o sí.
+
+Y con la respuesta viene la lista de reparos, cada uno con **el código de glosa
+oficial** con el que la EPS lo objetaría, y **cuánta plata está en juego**.
+
+**Qué revisa, sin ayuda de la IA (son cuentas, no opiniones).**
+- Que la factura **sume**: cantidad × valor de cada línea, y las líneas contra
+  el total.
+- Que ninguna línea **pase la tarifa pactada** con esa EPS. Si no hay tarifa
+  cargada, el motor **se calla** en vez de estimar: no inventa precios.
+- Que el procedimiento **corresponda al sexo** del paciente (un parto en un
+  paciente masculino no pasa).
+- Que **corresponda a la edad**: UCI neonatal en un adulto, UCI de adultos en
+  un niño.
+- **Múltiples cirugías por vías que se excluyen**: una colecistectomía es
+  abierta o laparoscópica, nunca las dos. Facturar ambas es cobrar dos veces.
+- Que las **fechas cuadren**: egreso antes del ingreso, días de estancia de
+  más, más días de UCI que de hospitalización.
+- **Doble facturación**: el mismo procedimiento dos veces el mismo día.
+- Que hubiera **contrato vigente** el día de la atención (el caso de AURORA,
+  que se venció el 31-08, sale solo).
+- **UCI sin criterio escrito**: si se factura UCI y la epicrisis no nombra
+  ningún criterio de gravedad (APACHE II, SOFA, vasopresores, ventilación
+  mecánica), avisa — es exactamente la glosa que pone la EPS.
+
+**Y después, la IA.** Solo al final se le pregunta a la IA una cosa: si cada
+servicio facturado tiene respaldo en la epicrisis. **La IA nunca bloquea una
+factura**: levanta la mano y la pertinencia la decide el médico auditor. Si la
+IA se demora o se cae, la factura se dictamina igual con todo lo anterior — y
+la respuesta lo dice, para que nadie confunda «no encontramos nada» con «no
+alcanzamos a mirar».
+
+**Queda constancia de todo.** Cada consulta deja una fila con la factura, el
+dictamen, la plata en riesgo y cuánto tardó. Sirve para responder tres
+preguntas que hoy no tienen respuesta: ¿esta factura pasó por pre-auditoría?,
+¿cuánta plata evitamos que se glosara este mes?, ¿se timbró a pesar del
+bloqueo?
+
+**Lo que este pilar NO hace.** No detiene la caja: nosotros dictaminamos, el
+facturador decide. Y no reemplaza al médico auditor.
+
+Esta entrega es **solo el motor y sus pruebas** (108 pruebas nuevas). La
+pantalla se hace después.
+
+---
+
+### 04-09-2026 (noche) — Validador de planos: informe EXCEL detallado
+- El auditor corrió el validador con sus FURIPS reales (3 reclamaciones,
+  262 líneas de servicios) y pidió el reporte en **Excel detallado** en vez
+  del CSV. Hecho: ahora el bot entrega `REPORTE_PLANOS_ADRES_<fecha>.xlsx`
+  con 5 hojas — **RESUMEN** (semáforo por archivo + los errores más
+  repetidos para corregir en bloque), **HALLAZGOS** (solo errores y
+  advertencias, con filtros), **POR CAMPO** (agrupado: qué campo corregir,
+  cuántas veces y en qué líneas), **AVISOS** (los informativos aparte, para
+  que no estorben) y **LEYENDA**. CSV y JSON siguen disponibles con
+  `--formato`.
+- En sus archivos reales encontró de una vez: una coma de más en la línea 3
+  del FURIPS1 (corre todos los campos), registros INVIMA de 17 caracteres
+  donde la Circular permite 15, descripciones con comillas y comas
+  internas, naturaleza del evento '1' en vez de '01' y espacios de relleno.
+- 21 pruebas automáticas en verde.
+
+### 04-09-2026 (tarde, 4) — Frente ADRES: validador de ARCHIVOS PLANOS de la Circular 022
+- Nuevo bot **`tools/adres/validar_planos_adres.py`** + doble clic
+  **`VALIDAR_PLANOS_ADRES.cmd`** (Python puro, no instala nada): valida los
+  archivos planos ANTES de radicarlos ante la ADRES.
+- Qué revisa: **(1) la nomenclatura del nombre** de los 5 archivos de la
+  Circular — FURIPS1, FURIPS2 y FURTRAN (prefijo + habilitación de 12
+  dígitos + fecha DDMMAAAA), FUCTAS2 (aseguradora de 6 dígitos + período
+  MMAAAA) y FURCEN (código del evento + fecha + hora HHMM) — con fechas y
+  horas que existan de verdad; **(2) las reglas generales**: solo comas como
+  separador, sin comillas, sin caracteres raros, fechas DD/MM/AAAA, números
+  sin puntos ni comas, sin rellenos de ceros o espacios, longitudes MÁXIMAS;
+  **(3) la malla campo a campo** de FURIPS 1 (102 campos) y FURIPS 2 (9),
+  reutilizando las tablas ya construidas de `validar_furips.py`.
+- El reporte sale en **CSV (se abre en Excel) y JSON** con: archivo, línea,
+  campo que falla, valor y descripción del error.
+- 20 pruebas automáticas en verde (nomenclaturas malas, fecha 32/13, hora
+  25:61, comillas, miles, decimales, ceros de relleno, obligatorios vacíos,
+  archivo vacío, JSON avisado).
+- OJO: las mallas campo a campo de **FURTRAN, FUCTAS y FURCEN (Tablas 3, 4 y
+  5)** quedaron como punto de extensión — hace falta volver a subir la
+  Circular al chat para cargarlas sin inventar nada (pendiente).
+
+### 04-09-2026 (tarde, 3) — Glosas ADRES: ya se puede REASIGNAR el área (y dejarlas todas en FACTURACIÓN)
+
+**Lo que reportó Yesid.** En Glosas ADRES, las glosas de la causal 4506 (las
+que "trabajan dos áreas": FACTURACIÓN los gestores, PERTINENCIA las médicas)
+salían en la columna «Clasificación» para repartirlas. Pero **una vez asignada
+una, quedaba en piedra**: si por error humano se ponía PERTINENCIA cuando era
+FACTURACIÓN, ya no había forma de corregirla en la pantalla. Y en esta factura
+las quería todas en FACTURACIÓN.
+
+**Qué pasaba de verdad.** El servidor **siempre** permitió reasignar (es
+reversible y deja testigo de quién y cuándo), y desde el 31-08 el permiso está
+abierto a los gestores (auditor o superior). El hueco era **solo la pantalla**:
+la celda mostraba texto plano en cuanto la glosa quedaba asignada, así que el
+selector desaparecía. Además, la pantalla seguía pidiendo SUPER_ADMIN aunque el
+servidor ya la había abierto a los gestores — el mismo tipo de descuido de
+«backend abierto, pantalla cerrada».
+
+**Lo que quedó.**
+- El selector de área queda **siempre** en las glosas de doble área: se puede
+  cambiar cuantas veces haga falta, con el área actual ya marcada y quién la
+  asignó a la vista. Un error humano ya no queda encerrado.
+- La pantalla ahora usa **el mismo permiso del servidor** (auditor o superior),
+  no SUPER_ADMIN.
+- Un aviso arriba dice cuántas glosas de doble área tiene la factura y trae dos
+  botones: **«Todas a FACTURACIÓN»** y «Todas a PERTINENCIA», para dejarlas
+  todas en un área de una vez (reversible glosa por glosa). El aviso y el botón
+  **recuerdan** que el material de osteosíntesis y el de alto costo los revisa
+  el médico auditor, para no mandar a facturación algo que le toca al médico.
+
+Nada de esto abre pantallas nuevas ni toca otras causales: fuera de la 4506 el
+servidor sigue respondiendo con error.
+
+7 pruebas nuevas (1 de servidor: reasignar de PERTINENCIA a FACTURACIÓN y de
+vuelta; 6 de pantalla).
+
+---
+
+### 04-09-2026 — Se quita el candado que paralizaba los análisis
+
+**El error fue nuestro y se corrige.** El día anterior se puso un bloqueo: si
+el buscador de soportes estaba armándose, el botón «Analizar con IA» contestaba
+un error y no dejaba trabajar. La intención era buena —evitar dictámenes «a
+ciegas»— pero la medida fue desproporcionada: **ese escaneo dura horas**
+(473.581 archivos por la red), así que en la práctica dejaba el motor inservible
+media jornada. Se eliminó.
+
+**La protección buena ya existía y se queda.** Vive por factura, no por
+servidor: mientras el índice se arma, el dictamen **no afirma que falte un
+soporte** —dice «todavía no se sabe»—, pero el análisis corre igual. «Todavía no
+sé» no es «no está», y eso no tiene por qué detener a nadie.
+
+**Sin PDFs también se defiende.** Si una glosa no tiene soportes —como las de
+prueba— el motor ya no se traba: argumenta con el texto de la glosa, los CUPS y
+la base normativa. Usa los PDFs que haya: los que el buscador alcanzó a indexar
+para esa factura, o los que usted suba a mano.
+
+**Y el buscador deja de empezar de cero.** Dos arreglos de fondo:
+
+1. **El índice se guarda en disco.** Al reiniciar el motor —cosa que pasa
+   varias veces al día por el autodespliegue— ya no se pierde: se recupera al
+   instante y el buscador responde desde el primer segundo.
+2. **Solo se relee lo que cambió.** Cada carpeta guarda una huella (cuándo
+   cambió y cuántas cosas tiene). Si está igual que la última vez, no se vuelve
+   a abrir. Lo que antes eran horas, en las pasadas siguientes es un repaso.
+
+**Un tercer defecto que salió de paso.** El buscador **vaciaba su índice al
+empezar** a reconstruirlo: durante todas esas horas contestaba vacío a todo el
+mundo. O sea, el motor quedaba ciego justo mientras trabajaba — que es, en el
+fondo, lo que había motivado el candado. Ahora arma el índice nuevo aparte y lo
+cambia de golpe al final; mientras tanto sigue contestando con el anterior.
+
+Con 10 pruebas nuevas para el buscador y las del bloqueo reescritas para que
+el candado no pueda volver sin que una prueba lo delate.
+
+---
+
+### 04-09-2026 (tarde, 2) — Mutual Ser: engancharse al Chrome del auditor
+
+**El defecto que se corrigió.** El radicador de Mutual Ser que se entregó por
+la mañana solo sabía entrar con una «sesión guardada». Y ese es justo el camino
+que el propio repositorio advierte que falla: cuando el navegador lo abre el
+robot, el reCAPTCHA lo detecta y **se niega a validar**. O sea, el bot colgaba
+del único camino poco fiable.
+
+**Cómo se entra ahora.** El auditor abre SU Chrome de siempre con un puerto de
+depuración, entra al portal a mano —resolviendo el captcha como una persona— y
+el bot se engancha a esa ventana. El captcha nunca ve un robot porque nunca lo
+hubo en el login.
+
+    chrome.exe --remote-debugging-port=9222 --user-data-dir="C:\temp-notas\zonaser-chrome"
+    py tools\radicar_glosas_mutual_ser.py --cdp http://127.0.0.1:9222
+
+**Tres cuidados que quedaron por escrito y con prueba:**
+
+1. **Ese Chrome no se cierra.** Es del auditor; el bot se desengancha y ya.
+2. **Enganchado pero sin sesión, no se toca el portal.** Si la ventana no tiene
+   el portal abierto, el bot se detiene y lo dice, en vez de hacer clics a
+   ciegas.
+3. **El aviso ahora manda por el camino bueno.** Antes decía «corra con
+   --con-cabeza», que es precisamente lo que choca contra el captcha.
+
+COOSALUD y SIMED no cambian: entran con usuario y contraseña.
+
+
+### 04-09-2026 (tarde) — Pilar 1 completo: la bandeja y los tres portales
+
+**La bandeja «En espera de EPS».** Botón nuevo 📮 en la barra. Muestra el libro
+de radicación en dos partes, y el orden es a propósito:
+
+- **Arriba, lo que necesita a una persona.** Las que se enviaron y no se pudo
+  confirmar si entraron, y las de portales que piden captcha o clave dinámica.
+  Cada una con dos botones: «✔ Sí quedó» y «✖ No quedó», que se contestan
+  DESPUÉS de mirar el portal. Esa es la única forma de sacar una radicación
+  de la duda — el robot nunca lo decide solo.
+- **Abajo, el resto del libro**, con el número de radicado y la huella del
+  comprobante. En pantalla la huella va abreviada; el dato completo queda al
+  pasar el mouse, que es el que sirve ante la Supersalud.
+
+**Los tres portales.** Ya hay robot para COOSALUD, SIMED (Dispensario) y
+Mutual Ser. Los tres comparten un mismo molde: la conversación con el motor
+vive en un solo archivo, así que un arreglo sirve para los tres. Y los tres
+traen el piloto obligatorio de 1 factura.
+
+**Una corrección importante sobre Mutual Ser.** La matriz lo daba por
+automatizable con usuario y clave, pero al revisar el robot que ya existía se
+vio que **ese portal pide reCAPTCHA**. Un robot no lo resuelve. Así que se
+construyó de la forma honesta: reutiliza una sesión que una persona siembra a
+mano una vez (con `--con-cabeza`), y si esa sesión venció **no adivina**:
+marca la glosa como «la hace una persona» y explica cómo sembrarla de nuevo.
+
+**Qué significa exactamente «radicar» aquí.** Los tres robots **cierran** en el
+portal una respuesta que ya estaba cargada; escribir la respuesta sigue siendo
+trabajo de los bots de respuesta de siempre. Conviene tenerlo claro para no
+esperar que el radicador redacte nada.
+
+Con 24 pruebas nuevas, más la validación de la bandeja en un navegador real.
+
+
+### 04-09-2026 (cierre) — Las velas contra 16 años de EUR/USD: ninguna le ganó al azar
+
+**Lo que estaba pendiente desde el 31-08.** El programa de velas japonesas se
+había comprobado solo con datos simulados. Hoy usted exportó el histórico real
+del EUR/USD y se corrió la medición de verdad.
+
+**Antes hubo una pregunta que valía la pena.** «El CSV son solo datos, no dice
+nada de velas, que es lo que realmente queremos analizar».
+
+Es la duda correcta, y la respuesta es que **una vela japonesa ES esos cuatro
+números** y nada más:
+
+| En el archivo | En el dibujo |
+|---|---|
+| Apertura y Cierre | el **cuerpo** de la vela |
+| cuál de los dos quedó arriba | **hueca** (subió) o **llena** (bajó) |
+| Máximo | la **mecha de arriba** |
+| Mínimo | la **mecha de abajo** |
+
+TradingView pinta exactamente eso: el gráfico no añade **ni un dato** que no
+esté en el archivo. Para no quedarse en la explicación, se agregó el comando
+**`python -m mercados vela`**, que dibuja en pantalla la sesión que usted pida,
+con cada precio señalado, sus medidas («la mecha inferior es 2,3 veces el
+cuerpo») y qué patrones encajan ahí. Así se ve el mismo dibujo saliendo del
+mismo archivo.
+
+**El resultado con su histórico** (4.336 sesiones diarias, del 1 de enero de
+2010 al 4 de septiembre de 2026):
+
+| | |
+|---|---|
+| Apariciones de patrones encontradas | **1.563** |
+| Patrones que llegan a 30 apariciones (el mínimo para concluir) | **4** de 28 |
+| Mediciones con muestra suficiente | **16** |
+| **Mediciones que le ganan a su tasa base** | **0** |
+
+Dicho en español claro: **en 16 años de EUR/USD, ningún patrón del libro
+demostró servir.** No es que salieran mal —ninguno quedó tampoco por debajo—:
+es que **ninguno se distingue de lo que el precio hace de todos modos**.
+
+**El que estuvo cerca, y por qué no cuenta.** El Elefante Verde acertó el 68 %
+a cinco sesiones, contra una base del 48 %: veinte puntos de ventaja, que a
+primera vista es muchísimo. Pero son 44 casos, y con esa cantidad el margen va
+del **42 % al 86 %** — y ese margen **abarca la base**, así que la ventaja
+verdadera puede ser cero. Sin la corrección por preguntar 112 cosas a la vez,
+el margen habría dado 53 %–80 %, no habría tocado la base, y el hallazgo habría
+pasado por bueno. **Para eso exactamente está la corrección**, y esta fue la
+primera vez que hizo su trabajo con datos reales.
+
+**Dos etiquetas del libro quedan contradichas por su propio histórico:** el
+**Elefante Verde** (el libro dice fiabilidad «muy alta») y el **Elefante Rojo**
+(«bastante alta»). El programa los marca solo, sin que nadie tenga que
+acordarse de revisarlo.
+
+**Qué significa esto, sin rodeos.** No significa que las velas japonesas «no
+sirvan». Significa que **en este mercado, en este marco de tiempo y por sí
+solas, no le ganan a lanzar una moneda**. El libro afirma que la probabilidad
+va «al menos por encima del 50 %» y no publica un solo número que lo sostenga;
+ahora hay un número, sacado de su propio histórico. Eso es justo lo que este
+programa se construyó para hacer: no repetir la promesa, sino comprobarla —
+y el resultado incómodo se entrega igual.
+
+**Si quiere seguir mirando:** el mismo comando funciona con cualquier CSV —una
+acción colombiana, un índice, una cripto— y con otros marcos de tiempo. Puede
+que en otro mercado sí haya señal; el programa lo dirá con la misma frialdad.
+
+**Cómo se corre:**
+
+```
+python -m mercados medir su_historico.csv --sesiones 5
+python -m mercados vela   su_historico.csv --fecha 2026-08-28
+python -m mercados exportar su_historico.csv --titulo "EUR/USD"
+```
+
+Guía completa: `docs/GUIA_ANALISIS_VELAS.md`.
+
+---
+
+### 04-09-2026 — El curso de noruego no sonaba: los doce botones estaban rotos
+
+**Lo que se vio.** «Ahora sí lo dice al principio, pero cuando le doy en "toca
+para oír" no sale nada».
+
+**La causa, que estuvo escondida más de lo debido.** Cada botón de bocina se
+armaba metiendo la palabra noruega dentro de la orden, y la palabra venía con
+sus propias comillas. Al juntarlas, **la orden quedaba partida por la mitad** y
+el navegador la descartaba sin avisar nada en pantalla. Los **doce** botones de
+bocina de la aplicación estaban muertos desde el primer día. Se corrigió la
+forma de armarla y se abrió el curso en un navegador de verdad para confirmar
+que ahora sí suenan.
+
+**De paso, otras dos cosas del sonido:**
+
+- **Las voces del navegador llegan con retraso.** La pantalla las consultaba
+  una sola vez, al abrir; si la voz noruega no había cargado todavía, decía «no
+  hay voz» para siempre — incluso en un celular que sí la tiene. Ahora la
+  pantalla se entera cuando llegan y se vuelve a dibujar sola.
+- **El audio automático estaba escrito pero desconectado.** La pantalla buscaba
+  una marca que nada ponía. Ya se pone: al pasar de tarjeta, la palabra se
+  pronuncia sola.
+
+**Corrijo una indicación mía sobre la voz de Windows.** Le dije que marcara
+«Voz» en las características opcionales. Esa ruta además ofrece **«Establecer
+como mi idioma de presentación de Windows»**, que le dejaría **todo el
+computador del hospital en noruego**. La ruta correcta es *Configuración › Hora
+e idioma › Voz › Administrar voces › Agregar voces*. En el PC del hospital el
+paquete no bajó de todos modos (el servidor de actualizaciones del dominio lo
+bloquea); **en el celular no hace falta instalar nada.**
+
+**Lección para mí, anotada porque costó tiempo suyo:** ante un «no suena», lo
+primero es abrir la consola del navegador. El error estaba a la vista desde el
+primer reporte, y se dieron varias vueltas antes de mirar donde había que
+mirar.
+
+---
+
+### 04-09-2026 — Arranca la V3: el motor empieza a radicar solo (Pilar 1)
+
+**Qué se busca.** Que las respuestas que un auditor ya aprobó se suban solas
+al portal de la EPS, y que el comprobante quede guardado. Hoy queda listo el
+**circuito de atrás** (la parte que decide y lleva la cuenta); el robot que
+abre el navegador entra como prueba de concepto con COOSALUD.
+
+**Lo primero que se hizo fue mirar lo que ya había.** Media automatización
+estaba construida desde antes: los bots de portal ya usan el navegador
+escondido, ya existe una cola de trabajos para el PC del hospital y su agente.
+Se reutilizó todo. Lo único nuevo es un **libro de radicación**: una fila por
+glosa, con su estado y su comprobante.
+
+**Las tres reglas que gobiernan el circuito:**
+
+1. **La cola dice QUÉ radicar, nunca CÓMO entrar.** Las claves de los portales
+   siguen en el PC del auditor. El motor no las ve ni las guarda.
+2. **Ante la duda, no se actúa.** Si el robot pulsa «Terminar respuesta» y no
+   alcanza a ver el cartel de confirmación, esa factura **no se reintenta
+   sola**: queda para que una persona mire el portal. Radicar dos veces la
+   misma respuesta le hace daño real al hospital ante la EPS.
+3. **Los doce escudos de la V2 siguen intactos.** Nada se radica sin
+   aprobación humana: si la propuso el piloto automático, se exige su
+   liberación en la bitácora. Se suma un escudo nuevo: **no radicar un
+   dictamen viejo** si después se cargaron tarifas o contratos.
+
+**Qué portales entran** (decisión del auditor): COOSALUD, SIMED y Mutual Ser
+se automatizan. FOMAG, DGH y NUEVA EPS tienen captcha o clave dinámica, así
+que sus filas **nacen marcadas para hacerse a mano** — no se promete
+autonomía donde no la hay.
+
+**El reloj cambia.** Cuando una glosa queda radicada en el portal, sale del
+semáforo de urgencia (ya no aparece en rojo ni ámbar): la pelota pasa a ser
+del pagador.
+
+**El piloto es obligatorio y ahora lo vigila el robot.** Por defecto radica
+UNA sola factura y se detiene. Para ir por más hay que revisar esa primera en
+el portal y decirlo expresamente. Ya no depende de que alguien se acuerde.
+
+Con 29 pruebas nuevas. Arquitectura completa en
+`docs/ARQUITECTURA_V3_PILAR1_RPA.md`.
+
+**PENDIENTE del Pilar 1:** SIMED y Mutual Ser, la pantalla de la bandeja «En
+espera de EPS», y la pasada que resuelve las radicaciones dudosas.
+### 03-09-2026 (cierre) — Regla de runbook: los permisos van en la instrucción
+
+Al cerrar la V2 le indiqué «doble clic» sobre
+`tools\ARRANQUE_AUTOMATICO_MOTOR.cmd`, y el bot abortó pidiendo permisos de
+administrador. El bot hizo lo correcto —comprueba los permisos y explica en
+pantalla qué hacer—; la instrucción incompleta fue mía.
+
+**Queda como regla del proyecto** (anotada también en `CLAUDE.md`): toda
+indicación de despliegue dice con qué permisos se corre.
+
+- `ARRANQUE_AUTOMATICO_MOTOR.cmd` → **siempre** clic derecho »
+  «Ejecutar como administrador». Registra la tarea de Windows y guarda la
+  contraseña en la bóveda del sistema. Y dentro de esa ventana elevada, la
+  cuenta que se escribe para la tarea es **la del motor**, no la del
+  administrador (el bot lo advierte, pero conviene decirlo antes).
+- El resto de bots del auditor (incluido `servidor_motor_local.cmd`) corren
+  con la sesión normal.
+
+
+### 03-09-2026 — Una sola puerta para arrancar el motor (el 8080 a medias)
+
+**Lo que se vio.** La pantalla de Diagnóstico mostraba en rojo la carpeta de
+soportes («/data/soportes no existe») y el piloto automático apagado, aunque el
+código estaba desplegado y `config\soportes_root.txt` intacto. Y al correr
+`servidor_motor_local.cmd` a mano solo salía un error de Windows: «el proceso no
+tiene acceso al archivo porque está siendo utilizado por otro proceso».
+
+**Lo que en realidad pasaba.** No se había cambiado ninguna ruta. El motor que
+estaba atendiendo **no lo arrancó el programa oficial de arranque**, sino una de
+las dos rutas de emergencia (la del autodespliegue y la de ACTUALIZAR_PAGINA),
+que prendían el motor «a lo bruto»: sin la carpeta de soportes, sin el piloto
+automático y sin releer las claves del día. Ese motor a medias se quedaba con el
+puerto ocupado y el vigilante de verdad se quedaba **parqueado esperando** — así
+que el motor mal configurado no se iba nunca. Y como esa emergencia además se
+quedaba con el archivo de registro tomado, el vigilante ni siquiera podía dejar
+escrito por qué se apartaba: por eso el auditor solo veía el error críptico.
+
+**Lo que se arregló.**
+
+1. **Una sola puerta.** Toda emergencia o despliegue arranca ahora llamando al
+   programa oficial (`servidor_motor_local.cmd`), que prepara el entorno
+   completo —carpeta de soportes, piloto automático, claves del día— y además
+   queda de vigilante. Ya no queda ni un arranque «a lo bruto» del motor de la
+   página. Si ya había un vigilante, el nuevo se cierra solo, como siempre.
+2. **El vigilante habla por pantalla.** Cuando se aparta porque ya hay otro, lo
+   dice en la ventana con todas sus letras y explica qué hacer. Antes eso vivía
+   solo dentro del registro, y el día que el registro estaba tomado el auditor
+   se quedó sin ninguna explicación.
+3. **El registro ya no manda.** Si el archivo de registro está bloqueado, el
+   motor arranca igual: escribe en un registro alterno y lo avisa. Antes, un
+   archivo tomado podía dejar la página caída en silencio.
+4. **El motor de pruebas del auditor** (el del puerto 8000, `REINICIAR_MOTOR`)
+   sigue siendo el mismo, con su ventana y su puerto —no se convirtió en el de
+   la página—, pero ahora prepara el mismo entorno: se acabó que las pruebas
+   locales mostraran los soportes en rojo y el piloto apagado.
+
+Todo con 19 pruebas nuevas y respetando los finales de línea de Windows. De
+paso, las pruebas que ya existían cazaron un defecto real del arreglo: un
+comentario con paréntesis dentro de un bloque, que en Windows corta el bloque a
+la mitad y deja el bot haciendo menos de lo que dice, en silencio.
+
+### 03-09-2026 — Tres candados tras el caso TA0301 (dictamen a ciegas)
+
+Probando la glosa TA0301 en producción, el auditor encontró que el motor
+redactó un dictamen «sin contrato» cuando en realidad el índice de soportes
+estaba a medio reconstruirse — el motor no veía el expediente, no es que no
+existiera. Tres candados (rama `hotfix/analisis-rag-ceguera`):
+
+1. **Candado por ceguera temporal (HTTP 423).** Si el índice de soportes
+   está reconstruyéndose, el botón Analizar responde de una: «el índice se
+   está reconstruyendo, espere un momento» — SIN llamar a la IA y sin
+   guardar nada. Cero dictámenes a ciegas. Ojo operativo: mientras el
+   índice se reconstruye (por ejemplo, tras un «Reindexar soportes»), los
+   análisis mostrarán ese aviso; es lo ordenado y es lo correcto.
+2. **El botón «Marcar como RESPONDIDA» se apaga solo.** Si el control de
+   calidad encuentra hallazgos graves, el puntaje está en zona roja, o la
+   confianza de la IA no supera el umbral del 85 %, el botón de estado
+   final sale GRIS (deshabilitado) con la lista de motivos — ya no existe
+   el «marcar de todos modos» en esos casos. El camino es corregir primero.
+3. **Prohibido citar artículos de memoria.** El modelo citó el «Art. 20 del
+   Decreto 4747» cuando el correcto era el 23 — el número salió de su
+   memoria, no del expediente. El prompt del analizador ahora prohíbe
+   escribir números de artículo, inciso, numeral o parágrafo que no estén
+   textualmente en el contexto que se le inyectó; si el número no está,
+   cita la norma sin número y describe el mandato por su contenido.
+
+Con sus 9 pruebas nuevas y la suite completa en verde.
+
+### 03-09-2026 — La pantalla se vuelve clínica: pantalla dividida, tablero y semáforo
+
+Rediseño visual ordenado por el auditor, montado SOBRE el sistema de diseño
+propio (sin librerías nuevas de internet — el PC del hospital no puede
+depender de eso). Cuatro piezas:
+
+1. **Pantalla dividida (adiós a las ventanas emergentes).** Al abrir una
+   glosa ya no se abre otra ventana: la mitad izquierda es un visor de los
+   soportes de la factura (factura electrónica, historia clínica, RIPS, con
+   zoom − / + / 100 %), y la derecha es el panel de decisión: dictamen,
+   confianza, regla aplicada, riesgo, modelo que decidió, y los dos botones
+   — **✔ Liberar** (esmeralda) y **✖ Devolver a revisión manual** (carmesí,
+   nuevo: la glosa vuelve a la bandeja normal y la devolución queda en la
+   bitácora con su motivo). Los dos lados cargan POR SEPARADO: un PDF de
+   20 MB o un enlace roto en el visor no congela los botones de decisión.
+   El visor solo puede abrir archivos que el índice de soportes ya conoce —
+   nunca rutas que mande el navegador (y cada apertura queda en la
+   auditoría PHI).
+2. **Bandeja Auto-Pilot en tablero.** La tabla plana de borradores ahora es
+   un tablero de tarjetas: «En cuarentena», «Detenidas por OCR» y
+   «Liberadas recientes». Cada tarjeta trae el % de confianza, el modelo
+   que escribió el dictamen y su barra de vencimiento; clic en la tarjeta =
+   pantalla dividida.
+3. **Semáforo de vencimientos.** Donde había fechas en texto ahora hay una
+   barra que se va consumiendo: rojo estricto a ≤ 3 días hábiles (incluye
+   «Vence HOY» y las vencidas, que laten en rojo), ámbar de 4 a 7, verde
+   tenue con más de 7. La barra aguanta 0 días, días negativos o datos
+   basura sin romperse (el ancho siempre queda entre 0 y 100).
+4. **Modo oscuro grafito por defecto + números tabulares.** El tema oscuro
+   (azul grafito) pasa a ser el arranque estándar para reducir fatiga
+   visual; quien prefiera claro, su elección guardada se respeta. Valores,
+   facturas y códigos CUPS quedan en tipografía tabular: las cifras se
+   alinean en columna perfecta.
+
+**Se validó primero contra escenarios extremos** (con un navegador real,
+Chromium): PDF de 20 MB lento y enlace 404 sin congelar el panel de
+decisión; tarjeta con modelo de nombre kilométrico y valor de
+$999.999.999,99 sin desbordes; barras con 0, 3 y −5 días. El arnés cazó un
+defecto real (la barra pintaba vacía por un detalle de CSS) que quedó
+corregido y con su prueba de regresión. 25/25 escenarios en verde y
+17 pruebas nuevas de pytest.
+
+### 03-09-2026 — El Auto-Pilot queda ENCENDIDO y con su prueba en vivo
+
+Con los tres escudos en verde, el auditor dio la orden: encender el
+interruptor. Quedó así:
+
+- **El arranque enciende el interruptor.** `AUTO_PILOT_ENABLED` queda en
+  `true` en los dos arranques oficiales: el de Docker (`docker-compose.yml`,
+  que además ahora sí le pasa la variable al contenedor — tenía el mismo
+  defecto silencioso del incidente del agente de lotes de julio) y el del PC
+  con Windows (`tools/servidor_motor_local.cmd`). El `.env` local sigue
+  mandando: con `AUTO_PILOT_ENABLED=0` ahí, se apaga sin tocar el código.
+- **Encendido no significa suelto.** El worker corre solo cuando un
+  coordinador lo dispara; lo que pasa las reglas queda en cuarentena
+  (bandeja 📤 Borradores) y libera una persona con su clic. Las cuatro
+  salvaguardas y los tres escudos siguen intactos.
+- **Nuevo bot de prueba en vivo:** `tools\probar_auto_pilot.py`. Corre un
+  ciclo del worker sobre las glosas recientes y muestra las tres evidencias:
+  el conteo del ciclo, los borradores en cuarentena y la bitácora con
+  confianza, riesgo y el modelo que escribió cada dictamen
+  (`modelo_utilizado`). Se probó primero en una base de demostración: la
+  candidata de $180.000 con confianza 95 % quedó en cuarentena, y la de
+  $2.300.000, la abstención y la de confianza 50 % quedaron rechazadas con
+  su porqué escrito.
+
+**PARA CORRER LA PRUEBA EN VIVO (en el PC del servidor):** `git pull`,
+reiniciar el motor, y `venv\Scripts\python.exe tools\probar_auto_pilot.py
+--limite 5` (piloto corto primero, como siempre). Pegar la salida en el chat
+para dejar constancia.
+
+### 03-09-2026 — Tres escudos de resiliencia antes de encender el Auto-Pilot
+
+El auditor revisó el piloto automático y puso una condición para encenderlo:
+tres protecciones contra fallas de infraestructura (rama
+`hotfix/autopilot-resiliencia`). Quedaron así:
+
+1. **La bitácora dice qué modelo decidió.** Cada fila de la bitácora del
+   Auto-Pilot ahora guarda la columna nueva `modelo_utilizado`: el nombre del
+   modelo de IA que produjo el dictamen sobre el que se decidió — el principal
+   (Claude, de Anthropic) o el de respaldo (Groq). Así, si un día el respaldo
+   escribe algo flojo, se sabe exactamente en cuáles glosas trabajó. La tabla
+   vieja se actualiza sola al arrancar el motor (migración automática).
+2. **Con el índice de soportes a medio armar, la máquina no decide.** Antes de
+   evaluar una sola glosa, el ciclo del Auto-Pilot le pregunta al indexador de
+   soportes si está reconstruyéndose («construyendo: true»). Si es así — o si
+   ni siquiera se puede leer su estado —, el ciclo entero se cancela sin tocar
+   nada y lo reintenta el siguiente. La razón: un índice incompleto hace ver
+   «sin soportes» facturas que sí tienen su expediente completo, y sobre esa
+   mentira no se puede calcular confianza ni riesgo.
+3. **Si el OCR se corta, la glosa se frena — no sale un dictamen a ciegas.**
+   Cuando la lectura de PDFs escaneados con Gemini se corta por red (se venció
+   el tiempo o se cayó la conexión, el clásico «WinError» de Windows), el
+   análisis de esa glosa se detiene en el acto: queda en
+   **PENDIENTE_APROBACION_HUMANA** con la marca **ERROR_OCR** en la nota (y un
+   aviso rojo ⛔ en la bandeja de Borradores), sin dictamen. Antes ese corte se
+   ignoraba en silencio y el dictamen salía argumentado sobre soportes que
+   nadie leyó. Un error de la API con respuesta (cuota agotada, clave mala)
+   sigue el camino de siempre; solo el corte de red frena.
+
+Todo con sus pruebas (21 nuevas) y la suite completa en verde.
+
+**PENDIENTE (resuelto el mismo día — ver la entrada de arriba).** Encender
+`AUTO_PILOT_ENABLED` era decisión del auditor; la dio ese mismo día y el
+interruptor quedó encendido desde el arranque.
+
+### 03-09-2026 — V2, Pilar 2: el piloto automático, con la máquina a raya
+
+**Cierra la V2.** El piloto automático quedó construido, pero con las cuatro
+rejas que se ordenaron antes de dejar que la máquina toque una glosa:
+
+1. **Interruptor general.** Todo vive detrás de `AUTO_PILOT_ENABLED`, que
+   viene APAGADO. Apagado, el proceso aborta en su primera línea: no consulta,
+   no escribe, no registra. Encenderlo es una decisión humana en el servidor.
+2. **Cuarentena, nunca radicación.** La máquina tiene prohibido marcar
+   «RESPONDIDA» o «ENVIADA». Lo que pasa sus reglas queda en
+   **PENDIENTE_APROBACION_HUMANA**, en una bandeja de «Borradores del
+   Auto-Pilot» nueva en la pantalla (botón 📤). Nada sale de ahí sin el clic
+   de una persona, y la liberación queda a nombre de quien la dio.
+3. **Bitácora que no se puede tocar.** Cada decisión —candidata, rechazada o
+   liberada— es una fila nueva en una tabla propia, con la regla aplicada, la
+   confianza matemática, el riesgo y los soportes que la evaluación tuvo a la
+   vista. No se edita ni se borra: solo se agrega.
+4. **Reglas estrictas.** Candidata solo con confianza mayor al 92 %, valor
+   objetado menor a $500.000 y riesgo BAJO. Y nunca: una abstención (el caso
+   «sin nada» se rechaza), una aceptación parcial (repartir plata la aprueba
+   una persona) o una glosa sin dictamen.
+
+**Se validó primero contra las pruebas de estrés, no contra casos felices:**
+el caso 03 (cláusula que no existe) se rechaza con fallo controlado —hasta si
+el evaluador revienta, el rechazo queda registrado con su causa—; el caso 04
+(soporte que dice lo contrario) se resuelve con la partición exacta de dosis y
+AUN ASÍ pasa por humano por ser parcial; y el caso 05 (sin nada) se rechaza de
+plano.
+
+**Con esto, la V2 queda completa:** lotes (1), folios forenses (3),
+vencimientos dinámicos (4), acta de desacuerdo (5) y piloto automático (2).
+
+### 03-09-2026 — V2, Pilar 5: el acta de desacuerdo se arma sola
+
+**Qué es.** Cuando la entidad ratifica su glosa y el hospital sostiene su
+respuesta, el camino legal es la mesa de conciliación y, si no hay acuerdo, la
+Superintendencia Nacional de Salud (Arts. 57 y 126 de la Ley 1438 de 2011).
+Para ese escalamiento hay que dejar por escrito la constancia del desacuerdo —
+un formato que hasta hoy se armaba a mano.
+
+**Qué se hizo.** El motor ahora estructura y exporta el **Acta de Desacuerdo**
+en PDF con los datos reales del expediente: factura, entidad, código de glosa,
+valores, radicado y fechas; la constancia de que la entidad ratificó y el HUS
+sostiene su respuesta; la solicitud expresa de la mesa de conciliación de
+auditoría médica; y el anuncio de escalamiento a la Supersalud. Se descarga
+desde la API por glosa.
+
+**Las reglas de siempre.**
+- No se inventa nada: lo que no está en el registro queda en blanco con línea
+  para diligenciar, y una nota interna dice qué faltó.
+- Solo aplica a glosas en etapa de ratificación o conciliación (usa el mismo
+  detector de etapa del motor): a una glosa inicial no se le fabrica un
+  desacuerdo que todavía no existe.
+- Las firmas quedan vacías: el acta la firman personas.
+- Las actas que ya existían (acta SINAC y acta-Excel de la mesa) no se
+  tocaron: esas son el resultado DE la mesa; esta es la constancia que la exige.
+
+**Con esto queda un solo pilar pendiente de la V2:** el 2 (piloto automático,
+que irá con la bandeja de salida apagada por defecto y liberación humana).
+
+### 03-09-2026 — V2, Pilar 4 (corregido): los días restantes se calculan al leer, no se guardan
+
+**Corrección sobre la entrada de abajo.** El primer arreglo refrescaba el
+número con un barrido cada 30 minutos que lo reescribía en la base. Se
+descartó por orden del auditor: el tiempo es continuo y no se persiste. Ahora
+los días restantes se calculan EN EL MOMENTO de cada consulta, cruzando la
+fecha de radicación de la factura contra la fecha de hoy, descontando fines de
+semana y los festivos colombianos del calendario del motor (FERIADOS_CO). La
+columna guardada queda solo de respaldo para glosas sin fechas. El aviso rojo
+a 3 días hábiles o menos queda igual, pero ahora sobre el valor real de hoy.
+
+### 03-09-2026 — V2, Pilar 4: el reloj del vencimiento vuelve a correr
+
+**El problema, que no era el que parecía.** El sistema ya sabía avisar: había
+motor de vencimientos (clasifica urgencia) y servicio de correo, y los dos
+funcionaban. Lo que estaba roto era el NÚMERO que leían. Los «días restantes»
+se calculaban UNA sola vez, el día que se analizaba la glosa, y quedaban
+guardados en la tabla para siempre. Una glosa que entró con 18 días de margen
+seguía diciendo 18 un mes después. El semáforo nunca se ponía rojo solo.
+
+Eso es exactamente lo que costó las tres facturas de junio, halladas 45 días
+tarde: nadie se equivocó, el reloj simplemente no avanzaba.
+
+**Qué se hizo.** Un proceso que corre solo en el servidor y cada media hora
+repasa las glosas que siguen abiertas, vuelve a contar los días hábiles que
+quedan del plazo de ley (20 días, Art. 57 de la Ley 1438) contra la fecha de
+HOY, y deja el número al día en la base. Con eso, el tablero, los correos y la
+pantalla por fin ven la verdad.
+
+**El aviso rojo.** A **3 días hábiles o menos** de vencerse, la glosa queda
+marcada como crítica y la pantalla lo muestra en rojo — antes solo se avisaba
+de lo YA vencido, que es cuando ya no hay nada que hacer. Ahora avisa cuando
+todavía se alcanza a responder.
+
+**Lo que no toca.** Las glosas ya cerradas (levantadas, aceptadas, conciliadas)
+no se tocan: no compiten contra el reloj y alertar sobre ellas es ruido. Y una
+glosa sin fecha de recepción se deja como está: sin fecha no hay plazo que
+calcular, y no se inventa.
+
+**Pendiente:** los pilares 2 (piloto automático, con la bandeja de salida
+apagada por defecto) y 5 (acta de desacuerdo).
+
+### 03-09-2026 — V2, Pilar 3: el dictamen dice en qué folio está el soporte
+
+**El problema.** El escrito podía decir «la epicrisis está adjunta». Para el
+auditor de la EPS eso no prueba nada: le toca ponerse a buscarla entre las
+páginas del expediente, y si no la encuentra rápido, ratifica la glosa.
+
+**Qué se hizo.** Ahora el motor abre los PDF que usted adjunta, busca dentro el
+documento que la entidad echa de menos y escribe la ubicación REAL:
+
+    «EL SOPORTE REQUERIDO SE ENCUENTRA ÍNTEGRAMENTE VISIBLE EN EL EXPEDIENTE
+     REMITIDO: LA EPICRISIS EN EL FOLIO 3 DEL ARCHIVO ADJUNTO soportes.pdf»
+
+Busca epicrisis, MIPRES, historia clínica, nota operatoria, récord de anestesia,
+kardex, RIPS, orden médica, consentimiento informado, certificado de agotamiento
+del SOAT y factura. Solo busca lo que la glosa reclama: si le piden la
+epicrisis, ubica la epicrisis, no todo el expediente.
+
+**La regla de siempre.** Si el documento NO aparece en ningún folio, no se cita
+ninguna ubicación. El folio no se inventa: lo encuentra Python leyendo el PDF,
+no lo redacta la IA. Y si el PDF viene escaneado sin texto, corrupto o
+protegido, sencillamente no se cita folio — nunca se cae el dictamen.
+
+**Nota técnica.** La librería que lee los PDF (PyMuPDF) estaba solo en las
+dependencias de desarrollo; se subió a las de producción para que esto funcione
+en el servidor.
+
+**Pendiente:** los pilares 2 (piloto automático, con la bandeja de salida
+apagada por defecto), 4 (demonio de vencimientos) y 5 (acta de desacuerdo).
+
+### 02-09-2026 (noche, sexta tanda) — V2, Pilar 1: análisis masivo por lotes (CSV + ZIP)
+
+**Qué pasó.** Con el motor ya estable en producción, arrancó la V2
+(«Automatización total y procesamiento a escala»), cinco pilares. Este es el
+primero: procesar muchas glosas de una sola vez.
+
+**Qué se hizo.** Un endpoint nuevo, `/analizar/masivo`, que recibe un **CSV**
+con hasta 500 glosas y un **ZIP** con sus PDF de soporte. El motor las encola y
+las procesa **en el fondo, varias a la vez** (con `concurrent.futures`), sin
+bloquear la pantalla, y al terminar deja **un solo Excel** con todos los
+dictámenes: factura, código de glosa, valor objetado, código de respuesta,
+etapa procesal, acción de la IA, estado y el dictamen en texto.
+
+- Cada glosa del lote corre por **exactamente la misma lógica** del análisis
+  de una sola glosa (la que ya blindamos con los casos 1–6 y F–Q). Cero
+  retroceso: no hay un «motor de lotes» aparte que pueda desalinearse.
+- El CSV es tolerante: acepta los encabezados con o sin tilde, en mayúscula o
+  minúscula, con coma o punto y coma. Columnas: `eps`, `etapa`, `factura`,
+  `texto` (la glosa), `valor aceptado` y `pdfs` (nombres dentro del ZIP,
+  opcional; si no viene, empareja los PDF por el número de factura).
+- Una fila con problema (sin texto, o que cae) queda marcada como **error** en
+  el Excel y **no tumba el lote**.
+- El avance se consulta con `/analizar/masivo/{job_id}` y el Excel se descarga
+  con `/analizar/masivo/{job_id}/resultado`. Cada glosa queda además guardada
+  en el historial, como siempre.
+
+**Ojo con el costo.** Un lote de 500 son 500 llamadas a la IA: el paralelismo
+va acotado (por defecto 4 a la vez, máximo 8) precisamente para no reventar ni
+la cuota ni la caché.
+
+**Pendiente (los otros 4 pilares de la V2):** piloto automático con bandeja de
+salida (apagado por defecto, con bitácora, liberado por un humano), folios
+forenses en los PDF (PyMuPDF), el demonio de vencimientos (alerta roja a 3 días
+hábiles del tope de 20) y el acta de desacuerdo para Supersalud. Y siguen los
+dos operativos: contratos AURORA/ARL vencidos el 31-08 y el cruce de CUPS del
+paquete 31078 (script entregado, falta el resumen de la corrida).
+
+### 02-09-2026 (noche, quinta tanda) — Regresión del Caso Q: «MANTIENE GLOSA» sí es ratificación
+
+**Qué pasó.** En la prueba de producción, el Caso Q (`SO0601 | SANITAS. MANTIENE
+GLOSA. EL HOSPITAL RESPONDIÓ LA GLOSA INICIAL FUERA DE LOS TÉRMINOS DE LEY.`)
+falló en los dos frentes: no salió el badge de etapa y el dictamen respondió
+como si faltaran fotocopias («los documentos están presentes en el
+expediente»), cuando el reclamo era de TIEMPOS: que el hospital respondió tarde.
+Tener los papeles no borra que se entregaron tarde.
+
+**La causa.** El clasificador de etapa sí veía «MANTIENE GLOSA» como
+ratificación, pero solo alimentaba el badge; el RUTEO (lo que decide la vía de
+respuesta) era estrecho y solo reaccionaba a la palabra «conciliación». Así que
+el Caso Q no se enrutaba como ratificación: caía en el camino común y se
+respondía como una glosa de soportes.
+
+**Qué se hizo.**
+- El ruteo ahora sí manda las ratificaciones («mantiene glosa», «se ratifica»,
+  «segunda instancia», «respuesta a conciliación») por la vía de ratificada:
+  sostener la respuesta inicial y exigir la mesa de conciliación / Supersalud,
+  SIN argumentar soportes.
+- La ÚNICA excepción: una ratificación EXTEMPORÁNEA DE LA ENTIDAD (cuando las
+  fechas radicación → recepción de la ratificación prueban que la EPS ratificó
+  tarde) sigue yendo al motor con su defensa de tiempo, que es la más fuerte.
+  Sin fechas que lo prueben, una ratificación es una ratificación.
+- El prompt de segunda instancia recibió, además, la distinción entre «faltan
+  papeles» (soportes) y «se venció el tiempo de ley»: prohíbe refutar un
+  vencimiento diciendo que los documentos están presentes.
+
+**Pendiente:** correr de nuevo el Caso Q en la pantalla tras desplegar con
+reinicio (debe salir el badge de ratificación, el dictamen debe exigir
+conciliación y NO argumentar soportes); y siguen los dos operativos: contratos
+AURORA/ARL vencidos el 31-08 y confirmar las glosas de agosto con
+`tools/verificar_glosas.py`.
+
+### 02-09-2026 (noche, cuarta tanda) — El motor ya sabe en qué etapa va la glosa (ratificación / conciliación)
+
+**Qué pasó.** El Caso J dejó al descubierto una ceguera procesal: el motor
+respondía CUALQUIER texto como si fuera una glosa inicial. Cuando la entidad
+mandaba una ratificación o una respuesta de conciliación («se ratifica la
+glosa», «respuesta a conciliación»), el dictamen pedía el «levantamiento» como
+el día uno. Si eso se radica en segunda instancia, la EPS cierra el caso por
+un error de forma y se pierde la plata.
+
+**Qué se hizo.**
+- **Detector de etapa.** El motor ahora lee el texto y lo clasifica en tres
+  etapas: INICIAL, RATIFICACIÓN o CONCILIACIÓN. Los marcadores: «ratifica»,
+  «mantiene la glosa», «segunda instancia», «respuesta a conciliación», «mesa
+  de conciliación», «acta de conciliación».
+- **Cambio de vía.** Si el caso va al motor de IA, el prompt le PROHÍBE
+  redactar como respuesta inicial: le ordena sostener la defensa ya presentada
+  y exigir la mesa de conciliación de auditoría médica y, si no hay acuerdo,
+  escalar a la Superintendencia Nacional de Salud (Ley 1438 de 2011). Cuando el
+  caso ya tiene texto fijo de ratificada, ese texto ya decía exactamente eso.
+- **Aviso en pantalla.** El gestor ve un badge «⚠️ ETAPA: RATIFICACIÓN
+  DETECTADA» (o CONCILIACIÓN) para saber que el motor ajustó la defensa
+  procesal y que NO es un caso nuevo.
+
+**Lo que NO se tocó.** Una ratificación que llega TARDE (extemporánea) sigue
+yendo al motor con su defensa de tiempo, que es la más fuerte; el badge la
+marca, pero no se la lleva el texto fijo. Y el ruteo al texto fijo de ratificada
+no cambió: sigue decidiéndose con los marcadores claros de conciliación.
+
+**Pendiente:** correr en la pantalla, tras desplegar con reinicio, una
+ratificación y una respuesta de conciliación; y siguen los dos operativos:
+contratos AURORA/ARL vencidos el 31-08 y confirmar las glosas de agosto con
+`tools/verificar_glosas.py`.
+
+### 02-09-2026 (noche, tercera tanda) — Diez contradicciones que el modelo no puede razonar solo (casos F a O)
+
+**Qué pasó.** Se corrieron diez ejemplos nuevos en la pantalla y en todos el
+dictamen falló por la misma raíz: el modelo se dejó llevar por el código de la
+glosa, se inventó una ley, capturó mal los números o se puso a defender un
+imposible. La respuesta a esto no es pedirle al modelo que «razone mejor»: es
+que **Python decida** los hechos y el modelo solo redacte.
+
+**Los diez casos y qué se hizo.** Todo vive en un archivo nuevo,
+`app/services/reglas_casos_fno.py`, con una regla por caso y su prueba:
+
+- **F. Código de tarifa, texto de soportes.** La glosa decía «TARIFA» pero el
+  motivo real era que no se adjuntó la nota quirúrgica ni el récord de
+  anestesia. Ahora, cuando el texto de una glosa de tarifa reclama un soporte
+  clínico, se responde como documental (se aportan los soportes), no con SOAT
+  y UVB.
+- **G. Ley inventada.** La EPS citó el «Artículo 99 de la Resolución 8888 de
+  2025», que no existe. El dictamen se ponía a discutir si «aplicaba». Ahora,
+  si la norma que cita la entidad no está en el corpus, no se debate: se deja
+  constancia de que no existe y se defiende con normas vigentes.
+- **H. Porcentaje.** «Se glosa el 25 % del valor total» de una factura de
+  $10.000.000 son $2.500.000, y el motor tomaba los $10.000.000. Ahora hace la
+  cuenta.
+- **I. Imposible clínico.** Un parto facturado a un paciente hombre de 65 años.
+  El dictamen lo defendía con «autonomía del médico tratante». Ahora reconoce
+  el error de facturación y anuncia la nota crédito.
+- **J. Ratificación camuflada.** El texto decía «respuesta a conciliación / se
+  ratifica la glosa» pero se redactó una respuesta inicial. Ahora se detecta en
+  el texto y se va por el camino de ratificada (mantener respuesta, conciliar).
+- **K. Texto basura.** Una glosa llena de símbolos (`&&& /// _ ::: $$$`) hacía
+  que el código saliera «N/A». Ahora se limpia el ruido antes de leer y el
+  código, el CUPS y el valor salen bien. El encabezado normal no se toca.
+- **L. Fechas invertidas.** Ingreso 25/08 y alta 20/08: imposible. El modelo se
+  inventó un «cierre administrativo» para defenderlo. Ahora reconoce el error y
+  manda a corregir la factura.
+- **M. Doble pagador (espejo del Caso 6).** Acá la EPS SÍ tenía razón: mostró
+  con números que el tope del SOAT no se había agotado (quedaban $24.600.000 de
+  $34.600.000). El motor se abstenía. Ahora acepta y ordena cobrar primero a la
+  aseguradora del SOAT, no a la EPS (Decreto 780 de 2016).
+- **N. Alto costo sin MIPRES.** Rituximab sin el formato MIPRES. El motor
+  devolvía «no identifica el servicio» —falso: el medicamento estaba
+  nombrado—. La causa: una glosa de un solo renglón se borraba entera al quitar
+  el encabezado y quedaba «vacía». Se corrigió ese recorte y ahora se exige el
+  formato MIPRES como anexo obligatorio.
+- **O. Glosado $0.** Una glosa informativa («glosado $0, aceptado $500.000»)
+  tomaba los $500.000 como objetados y pedía pruebas. Ahora se lee que lo
+  glosado es $0, se marca como informativa y no se arma defensa jurídica.
+
+**Cómo quedó.** La IA redacta; Python decide. Cada regla tiene prueba de que
+funciona y —igual de importante— de que NO se dispara de más (un parto en mujer
+no salta, una tarifa de verdad no se reclasifica, una norma real no se marca
+como inventada, el Caso 6 sigue defendiéndose). El caso 6 y la abstención de la
+prueba 5 siguen intactos.
+
+**Pendiente:** correr estos diez en la pantalla tras desplegar con reinicio; y
+siguen los dos operativos de siempre: contratos AURORA/ARL vencidos el 31-08 y
+confirmar las glosas de agosto con `tools/verificar_glosas.py`.
+
+### 02-09-2026 (noche, segunda tanda) — Caso 6: quién paga primero en accidente de tránsito, y quién lo prueba
+
+**Qué pasó.** Se corrió en la pantalla real un caso nuevo, distinto a los cinco
+del paquete: COOSALUD glosa toda una factura de accidente de tránsito (causal
+CO4601) porque el hospital «no acredita el agotamiento de la cobertura del
+SOAT». Sin ningún PDF adjunto, el dictamen dijo tres cosas falsas: que probar
+el agotamiento le tocaba a la EPS «por carga dinámica de la prueba»; que la
+Resolución 2284 de 2023 «confirma que esos servicios deben reconocerse»; y no
+citó el Decreto 780 de 2016, que es la norma del orden de cobertura. Además el
+número de la póliza (7745120-3) terminó pegado al nombre del servicio.
+
+**La regla, en plata blanca.** En accidente de tránsito paga primero la póliza
+SOAT hasta su tope, después el ADRES y solo al final la EPS (Decreto 780 de
+2016). Y **es el hospital** quien factura al SOAT y quien pide y aporta el
+certificado de agotamiento de la aseguradora. Trasladarle esa carga a la EPS
+es una excusa que la EPS tumba en una línea.
+
+**Qué se hizo.**
+- El propio prompt enseñaba la «carga dinámica» como arma general y con la
+  norma equivocada (Art. 57 de la Ley 1438, que es el trámite de glosas). Se
+  corrigió a su fuente (Art. 167 del Código General del Proceso) y se acotó:
+  solo para soportes que la entidad produce o custodia, nunca para lo propio
+  del hospital ni para el agotamiento del SOAT.
+- Quedó escrito que la Resolución 2284 es el manual de códigos y no dice nada
+  de pagos ni de topes.
+- El módulo de cobertura del prompt tiene ahora la regla SOAT → ADRES → EPS.
+- Por código: si la glosa es de cobertura SOAT/ADRES y no hay certificado de
+  agotamiento entre los PDF, el motor **borra** del escrito cualquier frase que
+  afirme que el tope se agotó, que el certificado se aportó, o que le toca a la
+  EPS probarlo; y **agrega** el párrafo con el orden de cobertura y la
+  constancia de que el certificado se aportará. Con certificado entre los
+  soportes, sí lo dice y lo señala.
+- Los números de póliza, autorización, radicado y similares se resguardan
+  antes de que corran las limpiezas de números y vuelven intactos. Y un
+  «CUPS» con guion o de siete dígitos ya no se rotula «código»: se retira,
+  porque por su sola forma no es un CUPS.
+
+**Verificado en producción antes de esto:** las pruebas 1, 2 y 3 del ciclo de
+estrés, ya con el camino asíncrono (la pantalla aguantó la glosa pesada sin
+cortarse a los 100 segundos).
+
+**Pendiente:** correr este caso 6 de nuevo tras desplegar; después las
+pruebas 4 y 5; y siguen los dos operativos: contratos AURORA/ARL vencidos el
+31-08 y confirmar las 148 glosas de agosto con `tools/verificar_glosas.py`.
+
+### 02-09-2026 (noche) — El PDF de evidencia ya no se cae, y salen todos de una en un ZIP
+
+**Lo que reportó Yesid.** En la factura HUS414206, el botón «PDF de evidencia»
+respondió **«No se pudo generar el PDF · HTTP 502»**. Y pidió además poder
+bajarlos **todos de una vez, en un ZIP, un PDF por factura**.
+
+**Sobre el 502, con honestidad.** No se pudo reproducir con los datos de esa
+factura: se probó el armado del PDF con 5 glosas, con respuestas larguísimas,
+con textos sin espacios, sin glosas, y con la misma versión de la librería que
+corre en producción. Todos salieron bien. Un «502» lo devuelve el servidor de
+entrada, no el programa, así que puede haber sido un corte momentáneo.
+
+Lo que sí se encontró y se corrigió son **dos fallas reales** de las que nadie
+se había dado cuenta: si la plata llegaba como **texto** (por ejemplo
+«678.700», como la escribe Excel) en vez de como número, el PDF **reventaba
+entero**. Ahora se lee bien venga como venga.
+
+Además, para que esto no vuelva a quedar en un error mudo:
+
+- **El PDF siempre sale.** Si la tabla no cabe en la hoja, el documento se
+  rehace en texto corrido, con la misma información y diciendo arriba por qué
+  salió así. Antes, ahí el gestor se quedaba sin papel.
+- **El error dejó de ser mudo.** Si algo falla, la pantalla dice **de qué
+  factura** y **qué pasó**, y queda anotado en el registro del servidor. Ya no
+  hay un «502» pelado sin pista.
+
+**Lo nuevo: bajar todos los PDF de una.** En la barra de Glosas ADRES hay un
+botón **«📦 PDF de todas (ZIP)»**. Baja un ZIP con **un PDF por factura** del
+paquete escogido. Probado con las 81 facturas del 31078: salió en **menos de un
+segundo**. Si alguna factura no se puede armar, **el ZIP igual sale** y esa
+queda anotada en un `NOVEDADES.txt` adentro: un error en una no deja sin
+evidencia a las otras ochenta.
+
+El ZIP se arma con **tres consultas** a la base, no con una por factura.
+
+### 02-09-2026 (tarde) — Ya se puede subir el reparto: quién audita cada factura
+
+**Lo que pasó.** En la mañana quedó listo que el informe deduzca el gestor de
+la huella del sistema (quién cerró la factura, quién decidió sus glosas). Yesid
+mandó después **la tabla con la que el área repartió de verdad** el paquete
+31078: `FACTURA · PROFESIONAL · TECNICO`, donde el técnico es el gestor de
+cuentas y el profesional la médica auditora.
+
+Ese reparto existía en un Excel del área, pero **no había por dónde subirlo**:
+por eso las 81 facturas salían «(sin gestor asignado)».
+
+**Qué se hizo.** En la ventana **«Cargar paquete»** hay un campo nuevo,
+*Reparto del área*, donde se sube esa misma tabla (Excel o CSV). Al subirla:
+
+- cada factura queda con su **gestor** y su **médica**;
+- los renglones del paquete llevan el mismo reparto, así la hoja **POR GESTOR**
+  del informe reparte de verdad;
+- la ventana avisa cuántas facturas se asignaron, para quién, y **si alguna
+  factura del paquete quedó sin asignar**.
+
+Detalles que importan: una celda vacía **no borra** lo que ya estaba; volver a
+subir el mismo archivo no cambia nada; corregir el reparto sí lo pisa; y
+«SIN PERTINENCIA» se guarda tal cual está escrito —es la anotación del área
+para decir que esa factura no lleva médica— pero no se cuenta como profesional.
+
+**Comprobación de la tabla del 31078:** 81 facturas, sin repetidas, y calza
+exacto con el paquete (81 = 81, ninguna de más ni de menos). Las 73 que tienen
+detallado están todas; las 8 que faltan son justo las que ya se sabía que no
+traen detallado (HUS406456, HUS406911, HUS407660, HUS407662, HUS407666,
+HUS407676, HUS407819 y HUS455655). El reparto quedó: **OSCAR 41 facturas,
+CAROLINA 40**; JEFE LEYDY 19, DRA ZULAY 19, JEFE LAURA 17 y 26 sin pertinencia.
+
+Se le entregó por chat el archivo `REPARTO_31078.xlsx` listo para subir. El bot
+`preauditar_glosas_adres.py` también aprendió a reconocer la columna TECNICO.
+
+### 02-09-2026 — El Excel de Glosas ADRES ya dice quién trabaja cada factura
+
+**Lo que pidió Yesid**, con los archivos `RTA_GLOSA_ADRES_PAQ_31078` y `…31073`
+en la mano: «la celda GESTOR no me dice qué gestor la está trabajando para esas
+que están EN PROCESO o CERRADA; este dato se puede sacar por el correo de las
+celdas Cerrada por».
+
+**Qué pasaba.** La columna Gestor sale de la macro que importa el paquete, y en
+estos paquetes viene vacía: las 84 facturas del 31078 decían «(sin gestor
+asignado)», aunque 16 estaban cerradas (con el correo de quien las cerró al
+lado) y 41 en proceso con glosas ya decididas. La hoja POR GESTOR quedaba con
+una sola fila inútil.
+
+**Qué se arregló.** El sistema sí sabe quién trabaja cada factura, porque
+guarda el correo de quien la cierra y de quien decide cada glosa. Ahora la
+columna Gestor se llena con esa huella, en este orden y sin inventar:
+
+1. si la macro trae gestor, manda la macro;
+2. si la factura está **CERRADA**, es quien la cerró;
+3. si está **EN PROCESO**, es quien ha decidido sus glosas (la persona con más
+   glosas decididas va primero; si son varias, se nombran todas);
+4. si la reabrieron y nadie ha decidido nada desde entonces, quien la reabrió;
+5. solo queda «(sin gestor asignado)» cuando nadie la ha tocado.
+
+Los correos se cambian por el **nombre** de la tabla de usuarios; si el correo
+no tiene usuario creado, se deja el correo tal cual (no se inventa un nombre).
+La hoja FACTURAS trae una columna nueva, **«De dónde sale el gestor»**, para
+que cada dato sea rastreable; la columna «Cerrada por» sigue igual. Los
+renglones de Hoja1 llevan el mismo gestor de su factura, así que la hoja
+**POR GESTOR** por fin reparte entre personas. Las 26 columnas de la macro no
+se movieron: cambia lo que dice la columna GESTOR, no dónde está.
+
+Con 28 pruebas nuevas (la regla sola, y el libro completo generado sobre una
+base de mentira) y los 88 tests del API de Glosas ADRES en verde.
+
+### 02-09-2026 — El túnel ya no decide si el dictamen llega, y tres arreglos de las corridas reales
+
+**Prueba 2 (CL4506) «no pasó el sistema».** Se vio la causa: el túnel que da salida
+al motor corta cualquier respuesta a los 100 segundos, y la glosa más pesada de
+las cinco tarda más que eso. El motor terminaba el dictamen y lo guardaba en el
+historial, pero la respuesta nunca llegaba a la pantalla: «Error de conexión».
+Para el auditor eso es una caída, y con razón. Se cambió la forma de trabajar:
+la pantalla ahora **lanza** el análisis y recibe de inmediato un número de
+seguimiento; el motor trabaja aparte; y la pantalla **pregunta** por el resultado
+con consultas cortas cada pocos segundos, que el túnel no alcanza a cortar. La
+narración en vivo sigue igual. El camino de siempre queda intacto para el agente
+de lotes y las herramientas.
+
+**Prueba 3 (AU0201).** El auditor leyó «TRIAGE II Y DOLOR TORÁCICO» en el dictamen
+y lo tomó por inventado, porque abajo salía «el índice de soportes se está
+reconstruyendo». No era inventado: el PDF adjunto lo dice con esas palabras. El
+aviso es del expediente del servidor, no del archivo adjunto — y ahora el dictamen
+lo aclara antes del aviso: «los archivos anexos sí se leyeron». De paso quedó la
+regla que el auditor pidió, que sí hacía falta: el prompt prohíbe describir
+triage, diagnóstico, síntomas o fechas que no estén escritos en un PDF aportado,
+y una revisión coteja triage, códigos CIE-10 y fechas del escrito contra los PDF
+y le nombra al gestor lo que no encuentra.
+
+**Prueba 1 (TA0301).** El aviso de «cifras que nadie calculó» marcó «SOAT PLENA» y
+«UVB» en un dictamen que salió por la plantilla fija, no por la IA; la ficha de
+La Previsora dice exactamente eso. Era un falso positivo del propio motor y se
+corrigió. Pero el auditor tenía razón en el fondo: la plantilla afirmaba «UVB
+2026: $12.110» sin conocer la fecha del servicio. Ahora, sin fecha, dice que la
+UVB es la vigente a la fecha de prestación y pide confirmarla; con fecha, nombra
+el año que corresponde.
+
+**Pendiente:** correr en la pantalla real, después de desplegar con reinicio, la
+prueba 2 (que ahora debe terminar sin desconectarse) y luego las pruebas 4 y 5.
+Y siguen abiertos los dos de siempre: contratos AURORA/ARL vencidos el 31-08 y
+confirmar las 148 glosas de agosto con `tools/verificar_glosas.py`.
+
+
+### 01-09-2026 — Se cerró el ciclo de las cinco pruebas de estrés
+
+**En una frase:** el motor ya no le cree a la IA en lo que no es redacción.
+Lo que es un dato —qué servicio se facturó, qué contrato rige, cuánta plata
+se defiende y cuánta se acepta, y si hay o no con qué responder— lo decide el
+programa con números, y la IA solo escribe el argumento.
+
+**Lo que se hizo hoy, prueba por prueba.**
+
+- **Prueba 3 (AU0201, «la cláusula que no existe»).** FAMISANAR glosó
+  invocando el contrato 440-DIGSA. Ese contrato existe, pero es del
+  Dispensario Médico del Ejército, no de FAMISANAR. Ahora el dictamen abre
+  diciendo eso, con el nombre del verdadero dueño del contrato y el número
+  del que sí nos vincula, y pide que la entidad precise la cláusula en la
+  que se apoya. Se arreglaron además dos cosas que hacían que ese párrafo no
+  llegara al dictamen (el «refinar con IA» lo borraba) y que la IA pudiera
+  transcribir cláusulas que nadie le mostró.
+
+- **Prueba 4 (SO0102, «el soporte que dice lo contrario»).** La entidad dijo
+  que no había registro de las 18 dosis de meropenem; el kardex sí lo tenía,
+  pero de 15. La IA lo leyó bien y aun así recomendó defender todo. Ahora el
+  programa hace la cuenta: $110.000 por dosis, se objetan $1.650.000 (las 15
+  probadas) y se aceptan $330.000 (las 3 sin registro), con código de
+  aceptación parcial. Y si el escrito enumera un documento que no se
+  adjuntó, se lo quita de la lista.
+
+- **Prueba 5 (FA0205, «sin nada»).** Una glosa que no dice qué servicio, ni
+  qué cantidades, sin fechas ni soportes. La IA inventó una consulta, una
+  historia clínica y dos cláusulas para defenderla. Ahora, cuando no hay ni
+  soportes ni elementos en el texto, el programa **no llama a la IA**:
+  responde que no existe evidencia suficiente y le pide a la entidad precisar
+  qué objeta. No pide levantamiento, porque no hay fondo que defender.
+
+- **Lo que quedó en el camino (se probó y se retiró):** la salida en formato
+  JSON. La corrida de prueba no mejoró nada y no valía la pena seguir
+  peleando con el formato. Se volvió al camino de siempre.
+
+**Algo que aprendimos a la fuerza.** Varias veces hoy el código correcto no
+se veía en pantalla porque el programa del servidor seguía cargado en
+memoria con la versión vieja. Un `git pull` no basta: hay que reiniciar
+uvicorn. Y hay una huella para comprobarlo en la propia pantalla: el bloque de
+anexos debe decir «la hace el índice del servidor de radicación, aparte».
+
+**PENDIENTE (no es de programación).**
+- Los contratos de AURORA/ARL vencieron el 31 de agosto. Hay que avisar en
+  Cartera y cargar la prórroga si existe; mientras tanto esas glosas salen
+  con la advertencia de vigencia terminada.
+- Confirmar con `tools\verificar_glosas.py` que las 148 glosas de agosto
+  siguen en la base (el contador del encabezado se reinicia cada mes; no se
+  perdió nada).
+
+**PARA MAÑANA.**
+- Desplegar la PR de cierre (pull + reiniciar uvicorn) y correr de nuevo las
+  pruebas 3, 4 y 5 en la pantalla real para verlas con todo puesto.
+- Sacar la matriz de resultados final de las cinco pruebas.
+
 ### 01-09-2026 — Guardar una glosa ya no lo devuelve al inicio de la página (y la base maestra de servicios)
 
 **Lo que reportó Yesid.** En Glosas ADRES, cada vez que marcaba una decisión
@@ -337,6 +1688,86 @@ Son nombres parecidos y entidades distintas; el motor ya las separa.
 **Falta:** correr las pruebas 3, 4 y 5 (AU0201, SO0102, FA0205) y repetir la
 prueba 2 **adjuntando los PDF de soportes**, porque sin ellos no se pudo
 comprobar si el dictamen cita la nota operatoria.
+
+### 31-08-2026 (cierre) — Análisis de velas japonesas (carpeta `mercados/`)
+
+**Qué se pidió.** A partir de un libro de patrones de velas japonesas, un
+programa que analice mercados bursátiles.
+
+**Lo primero, porque es lo que decide todo lo demás.** El pedido tenía dos
+mitades y solo una se podía hacer con honestidad:
+
+- **Detectar los patrones sí se puede.** «Martillo = cuerpo pequeño, mecha
+  inferior de al menos el doble del cuerpo, sin mecha arriba, después de una
+  bajada» es aritmética sobre cuatro precios. Se programa y se comprueba.
+- **Predecir el precio no.** Ni el libro ni la evidencia pública sostienen que
+  un patrón por sí solo lo permita. Hacer un programa que diga «compre ahora»
+  habría sido inventar —lo que las reglas de este repositorio prohíben— y con
+  la plata de usted detrás.
+
+**Entonces se hizo la tercera cosa, que es la que de verdad vale: MEDIRLO.**
+
+El libro afirma que «la probabilidad de que el precio vaya en la dirección que
+esperas es al menos por encima de un 50 %», y a cada patrón le pone una
+etiqueta —«fiabilidad muy alta», «baja»— **sin publicar un solo número que lo
+respalde**. En vez de repetírselo, el programa lo comprueba contra su propio
+histórico: busca cada aparición del patrón y cuenta qué pasó de verdad en las
+sesiones siguientes.
+
+**Lo que quedó hecho:**
+
+1. **Los 28 patrones del libro** programados uno por uno, cada uno con su
+   caso de prueba construido a mano.
+2. **El catálogo**: qué dice el libro de cada patrón, con la página, para poder
+   volver a la fuente.
+3. **Lector de CSV** que traga lo que exporte cualquier plataforma: cabecera en
+   español o en inglés, separador de coma o de punto y coma, decimales con coma
+   o con punto, y el orden al derecho o al revés. Si falta una columna, dice
+   cuál.
+4. **La medición**, con tres cuidados que la hacen creíble:
+   - **el número de casos** — por debajo de 30 apariciones no se concluye nada,
+     y lo dice;
+   - **la tasa base** — cuántas veces el precio fue en esa dirección *en todas
+     las sesiones*. Si un patrón no le gana a su base, no está diciendo nada:
+     en un mercado que sube, cualquier señal alcista «acierta»;
+   - **la corrección por preguntar 112 cosas a la vez** (ver abajo).
+5. **Aplicación para el celular** con cuatro pantallas, instalable y sin
+   internet.
+
+**El hallazgo falso que se cazó a tiempo.** Al probar con datos **totalmente
+inventados al azar** —donde por construcción no puede haber ningún patrón que
+sirva— salió uno acertando 19 puntos por encima de su base sobre 37 casos. No
+era un hallazgo: es que se hacen 112 preguntas de una sentada (28 patrones × 4
+horizontes) y, con el margen de error de siempre, **una de cada veinte parece
+buena por pura casualidad**. Se aplicó la corrección estadística que reparte el
+margen entre todas las preguntas, y los hallazgos falsos desaparecieron: con
+datos al azar, ninguno. Los márgenes salen más anchos, y eso es exactamente lo
+honesto.
+
+**Dos cosas que el programa dice de frente:**
+
+- **No predice.** En la consola y en las cuatro pantallas: «esto mide lo que ya
+  pasó; ningún patrón por sí solo es una razón para comprar o vender».
+- **Una definición del libro está incompleta.** La «Cubierta de la Nube Oscura»
+  no exige, en este libro, que la segunda vela cierre por debajo de la mitad de
+  la primera, condición que sí pide la literatura clásica. Se programó lo que
+  dice el libro y el aviso queda marcado en pantalla, en vez de arreglarlo por
+  detrás.
+
+**El color no lleva el significado.** El verde y el rojo de las velas fallan la
+prueba de daltonismo (la misma que ya había hecho cambiar el semáforo del
+ICFES). Por eso la sesión que sube se dibuja **hueca** y la que baja **llena**,
+y toda etiqueta de dirección lleva ▲ o ▼ junto a la palabra. Es además la forma
+original japonesa, así que lo correcto y lo tradicional coinciden.
+
+**Lo que se probó:** 112 pruebas automáticas y la aplicación recorrida completa
+en un navegador de celular (las cuatro pantallas, 28 fichas desplegables, 120
+velas dibujadas, sin errores y sin salirse del ancho).
+
+**Cómo se usa:** `python -m mercados medir su_historico.csv`.
+Guía completa: `docs/GUIA_ANALISIS_VELAS.md`.
+
+---
 
 ### 31-08-2026 (noche) — Curso de noruego para el celular (carpeta `noruego/`)
 
@@ -9163,6 +10594,30 @@ desgloses por EPS de lo respondido (51.381 por $2.284 millones, 99% SANITAS)
 y de lo pendiente; y la **landing page del servicio** (borrador «Glosa Cero»,
 artefacto privado con los números anonimizados) con su análisis de precios.
 
+### 03-09-2026 — Subsanar repitiendo la respuesta que ya se radicó
+
+El auditor fijó el criterio para la etapa 4: **ante la glosa ratificada, la
+subsanación repite la MISMA respuesta que el prestador ya había radicado**,
+con su mismo texto y su mismo código. Antes el armador sólo sabía redactar
+un escrito nuevo o poner la plantilla institucional del HUS.
+
+Ahora `siifa_armar_subsanacion.py` acepta `--repetir-respuesta`. Si una línea
+no trae respuesta anterior en el informe, sale **sin código y marcada** en vez
+de inventarle texto —el bot de cargue la deja fuera—, y la opción no se
+combina con `--texto` (las dos escriben el mismo campo).
+
+**Lo que mostró el semáforo del 03-09:**
+
+- **Girón:** 89 glosas levantadas (**$4.978.757 recuperados**), y **5 glosas
+  ratificadas por $212.000 ya vencidas hace 7 días hábiles** — son glosas, así
+  que se subsanan por el robot.
+- **HUS:** las 4 devoluciones ratificadas de SANITAS ($14.049.088) llevan **14
+  días hábiles vencidas** y siguen siendo trámite manual; además subió a 90 lo
+  sin responder ($47.686.929).
+- **Guane:** la EPS decidió 22 y las levantó todas ($475.656); 1.508 en mora de
+  la EPS y ninguna ratificada. Las 30 pendientes se armaron reusando los
+  textos de agosto por causal.
+
 ---
 
 ### 31-08 (tarde) — «La glosan dos veces y acá me aparece una sola vez»
@@ -9292,6 +10747,140 @@ siguen escondidas para el gestor, como estaban.
 
 ---
 
+### 02-09 — «Yo no veo que se vean todos esos botones»: el menú del gestor, completo
+
+Yesid volvió con sus capturas del menú: a los gestores les seguían faltando
+botones. Se abrió el resto de lo que aparece en ellas — **Mi día,
+Vencimientos, el «Contratos» de ANÁLISIS (la malla contractual),
+Automatización, Tarifas y Soportes** — después de verificar, guard por guard,
+que el servidor ya les permite consultar cada una de esas pantallas con rol
+AUDITOR.
+
+El menú del gestor queda entonces con: Analizar glosa, Mi día, Mi desempeño,
+Mis glosas, Historial, Vencimientos, Contratos (malla), Automatización,
+Alertas · Contratos, Tarifas, Conciliación, Papelera · Glosas ADRES ·
+Consulta Normativa, Salud Total, Validador ADRES, Soportes, Importación
+masiva y Pre-auditoría.
+
+**Lo que sigue escondido**, por la directiva del propio Yesid del 21-08:
+Inteligencia, Expediente, Plata recuperada, Usuarios, Mando ejecutivo,
+Importar recepción y el Diagnóstico del sistema. Si algún día las quiere
+abrir, es agregar una línea a la misma lista.
+
+La prueba que deja esto escrito creció a 8 pestañas vigiladas: si un cambio
+futuro le vuelve a esconder cualquiera de estos botones al gestor, se pone
+roja.
+
+6 pruebas nuevas.
+
+---
+
+### 02-09 (tarde) — «La causal 4302 es tarifas»: el catálogo aprende y lo cargado se arregla con un comando
+
+Venía pendiente del paquete 31073: sus glosas con causal 4302 salían **«sin
+clasificar»**, porque esa causal no apareció en el paquete 31068, que fue de
+donde se aprendió la tabla de clasificación — y el sistema, antes que
+inventar, las dejó en blanco. Ya el 05-08 el análisis del 31078 había
+apuntado a que la 4302 (mayor valor en consulta) era de tarifas; hoy **Yesid
+lo confirmó** y quedó en firme:
+
+- **La 4302 entra a la tabla como TARIFAS**, junto a sus vecinas 4303–4309.
+  Todo paquete que se cargue de aquí en adelante la clasifica solo.
+- Como la clasificación se guarda **al cargar** el paquete, lo ya cargado no
+  se arregla solo. Nace el comando **`glosas_adres_reclasificar.py`**: le pone
+  la clasificación que falta a las glosas en blanco cuya causal ya está en la
+  tabla (y a las que siguen sin decidir les deja también la sugerencia de la
+  familia — TARIFAS propone SE OBJETA). **No toca** nada ya clasificado, ni
+  lo decidido por el equipo, ni la 4506 que reparte un SUPER ADMIN; y si
+  encuentra causales que siguen por fuera de la tabla, las canta para
+  agregarlas. Primero corre en **ensayo** (solo mira, con la base abierta en
+  solo lectura) y solo escribe si se le agrega la palabra `aplicar`.
+
+9 pruebas nuevas (las del comando y la que deja escrito que la 4302 es
+TARIFAS).
+
+### 03/04-09-2026 — Dispensario: directriz nueva (las CL médicas no las toca el bot) y lote 04-sep
+
+**Directriz de negocio nueva, pedida por el auditor y ya montada en el
+generador oficial (`tools/glosas_dispensario/gen_lote.py`, con su prueba):**
+las objeciones con causal **CL** de glosas **Médica o Mixta** ya NO se
+responden con el robot. Quedan aisladas en una hoja aparte del mismo Excel
+(**"PARA GESTION MEDICA"**, encabezado rojo) para que las trabaje el equipo
+médico a mano. La razón: cuando el equipo médico acepta una de esas glosas
+debe cruzar una nota crédito, y una respuesta genérica ya cargada por el bot
+impide ese cruce y daña la conciliación. Las objeciones excluidas conservan
+su número de la grilla del portal, así el robot responde las demás sin
+correrse de fila. La regla quedó también en
+`docs/CONTEXTO_DISPENSARIO_GLOSAS.md` (punto 9).
+
+**Lote GLOSAS_04_SEPTIEMBRE:** 94 objeciones de 64 facturas del Dispensario.
+Con la directriz aplicada: **88 respuestas para el robot ($17.060.666)** y
+**6 objeciones CL médicas/mixtas apartadas para el equipo médico
+($19.066.935)** — son 2 facturas: HUS0000545263 (osteotomía, tendón de
+Aquiles y anclaje PEEK) y HUS0000545286 (resección de colon, anastomosis y
+linfadenectomía). Cuadre al peso contra la hoja INICIAL (respondidas +
+apartadas = valor total). Vencimientos: 45 facturas el 16-09 y 19 el 18-09
+(las 45 son las mismas que el cruce de GI detectó como "glosas nuevas").
+
+**Otros cierres de estos días que faltaban por anotar:** el cruce de GI por
+factura que pidió el auditor quedó completo (227 facturas: 24 del
+GI-33-5369-2026, 128 del lote 31-ago, 20 del GI-33-5335-2026, 3 del
+GI-33-5251-2026, 1 respondida por otra vía y **6 que se saltaron entre
+lotes** — de esas 6 aún falta el export DGH para responderlas, vencían 4 y
+7-09); el cargue de notas de septiembre (acta 1121/1122) avanzó hasta dejar
+solo 3 notas rechazadas por CUV en la grilla (332871, 332846, 332847, a la
+espera de SISTEMAS) más la nota nueva 332519 con su triada armada; y el acta
+863 de FAMISANAR quedó armada desde el detalle 7883 de la EPS (586 facturas,
+$987 millones conciliados al peso, en xlsm y xlsx).
+
+### 04-09-2026 (tarde) — Nace el BOT RPA del paquete GI (Dispensario de punta a punta)
+
+El auditor amplió las instrucciones y quedó construido el **bot que arma el
+paquete completo en un solo comando**
+(`tools/glosas_dispensario/bot_lote_dispensario.py`): pide el código GI,
+crea la carpeta del paquete con su subcarpeta `soportes`, genera las
+respuestas (heredando la directriz CL: las médicas/mixtas con causal CL van
+a la hoja "PARA GESTION MEDICA" y el bot no las toca), **busca el PDF de
+cada factura en las carpetas de radicación de la unidad Y:** y lo copia al
+paquete, **lee cada PDF con lectura en cascada** (pdfplumber → PyPDF2 → OCR
+con Tesseract para escaneadas, `extraer_factura_pdf.py`) y ancla a la
+respuesta SOLO lo que de verdad se leyó (paciente y valor total — lo
+ilegible no se inventa), **cruza cada glosa de tarifas con el tarifario del
+contrato 440** que entregó Contratación (`tarifario_440.py`: anexo 6.2 por
+CUPS/código IPS y anexos de medicamentos por CUM, 12.128 códigos indexados)
+citando la tarifa pactada exacta, corre el robot del portal (piloto primero)
+y deja las evidencias en el PDF del paquete. Todo con sus pruebas (9 en
+total con las de la directriz).
+
+**Probado con datos reales:** en el lote del 04-09, 59 de las 80 objeciones
+de tarifas encontraron su tarifa pactada en el anexo y la citan con código,
+descripción y valor (las 21 sin pacto son códigos FMO de farmacia — a esas
+no se les cita nada, regla de no invención). Quedó entregada la **versión
+CON TARIFAS** del Excel del lote 04-sep.
+
+**Ajuste del mismo dia — el constructor de respuestas con TRAZABILIDAD:** el
+auditor pidio eliminar las aperturas genericas y que cada respuesta se
+redacte sobre la evidencia leida. Ahora el bot arma un **parrafo de
+evidencia** que entra justo despues del encabezado de la respuesta: abre
+citando el PDF fuente ("AL REVISAR EL DOCUMENTO DE SOPORTE <archivo>..."),
+nombra al paciente extraido, cita el servicio y el valor leidos del PDF, y
+cruza con la tarifa pactada del contrato 440. Regla dura de honestidad:
+**"CORRESPONDE EXACTAMENTE" solo se afirma cuando los numeros de verdad
+coinciden**; si no coinciden o no se leyo el dato, se cita la tarifa pactada
+sin afirmar coincidencias (y lo ilegible no se menciona). 6 pruebas nuevas
+(15 en el modulo).
+
+**Y la leccion del caso HUS0000542497 (hallada por el auditor):** la
+respuesta citaba la tarifa del anexo ($180.000) sin cotejarla con lo
+facturado, mientras el argumento decia "el valor facturado ES la tarifa
+pactada" — una contradiccion que la EPS podia usar para ratificar con el
+propio soporte del hospital. Regla nueva del constructor: **sin cotejo
+verificado no se proclama cifra** — se cita que el codigo esta pactado y se
+remite la fila, sin valor; la cifra solo aparece cuando coincide con el
+valor leido del PDF o con el objetado.
+
+---
+
 ## 3) PENDIENTE
 
 ### Cuidados médicos de la familiar — EPS Sura (07-09)
@@ -9325,6 +10914,24 @@ siguen escondidas para el gestor, como estaban.
 - **HUS0000543238 es la pesada:** 155 objeciones y 70 en revisión. Casi todas
   son dispositivos con nomenclatura IUM; si el maestro de equivalencias
   FAMISANAR→HUS aparece, se cargan con `--mapa-servicios` y quedan en ALTA.
+
+### Análisis de velas (actualizado 04-09)
+- **~~Probarlo con un histórico de verdad~~ — YA HECHO (04-09).** Se midió con
+  16 años de EUR/USD diario (4.336 sesiones): **ningún patrón le ganó a su tasa
+  base**. Ver la entrada del 04-09 (cierre).
+- **Lo confirmado sobre el número de casos:** con 16 años de sesiones diarias
+  solo **4 patrones de 28** llegaron a las 30 apariciones. Con dos o tres años
+  no llega ninguno. Si un día quiere medir un patrón raro (Bebé Abandonado,
+  Triple Formación), hará falta histórico de varias décadas o marco intradía.
+- **Probar en otro mercado.** El resultado es del EUR/USD diario, no de «las
+  velas japonesas» en general. Falta correr lo mismo sobre una acción
+  colombiana, un índice o una cripto, y sobre otro marco de tiempo (semanal,
+  4 horas). Es el mismo comando; solo cambia el CSV.
+- **La «Cubierta de la Nube Oscura» sigue marcada para revisión.** Si algún día
+  se decide usar la definición clásica —que exige que la segunda vela cierre
+  por debajo de la mitad de la primera—, hay que añadir la condición a mano y
+  volver a medir.
+
 
 ### Curso de noruego (31-08, noche)
 - **Probarlo en SU celular.** Aquí se probó en un navegador de celular
@@ -9377,6 +10984,12 @@ siguen escondidas para el gestor, como estaban.
 - **La pronunciación escrita es aproximada.** Cuando haya con quién
   confirmarla (un hablante o un curso formal), conviene repasarla.
 
+
+### Validador de archivos planos ADRES (04-09)
+- **Cargar las mallas de FURTRAN, FUCTAS y FURCEN (Tablas 3, 4 y 5):** volver
+  a subir al chat la Circular 022 de 2023 (el Word que se subió en julio ya
+  no está en el entorno) para copiar los campos exactos SIN inventar. Hoy el
+  bot ya valida su nomenclatura y las reglas generales.
 
 ### Objeciones del ADRES en DGH (28-08, al cierre)
 - **~~Cargar las 40 facturas que faltan~~ — HECHO en su mayor parte.** Al cierre
@@ -9980,6 +11593,21 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     al tórax se le descontaron $7.800 cuando se aceptó por $758.700.
 
 ### Dispensario — respuesta de glosas SIMED y conciliación
+0. **(04-09, lo primero de mañana) Correr el lote del 04 de septiembre.** El
+   Excel ya está entregado (`respuestas_glosa_DISPENSARIO_04SEP_FINAL.xlsx`,
+   88 respuestas / 63 facturas / $17.060.666). Dos pasos, en el equipo de
+   cartera y no en el chat, porque allá sí se ven los soportes de la `Y:`:
+   primero **volver a generarlo con el bot** para que las columnas del cotejo
+   salgan llenas (el que se entregó salió sin el valor facturado), y después
+   el cargue: piloto con HUS0000542497 y luego `--todas --reporte`. Falta el
+   **código GI** del paquete para la carpeta y el PDF de evidencias. Las 6
+   objeciones CL de la hoja "PARA GESTION MEDICA" no las sube el bot: van al
+   equipo médico.
+0-bis. **Pedirle a Contratación el modificatorio de tarifas 2026 y la
+   resolución del hospital.** Es el documento que tumba de una sola vez las
+   43 glosas del lote 04-sep que vienen con el aumento del año (24 al 7% y 19
+   al 31,25% por encima del anexo). El bot ya las tiene marcadas una por una
+   en la hoja «COTEJO DE COBRO».
 10. **Las 3 facturas de junio** (518186 / 515107 / 515773): en el pantallazo
     de pendientes del 05-08 **ya no figuran por cargar**. Verificar en el
     portal cómo quedaron radicadas (¿respuesta cargada o cerradas por
@@ -10142,6 +11770,28 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 1. Revisar la hoja **REVISAR** de los dos cruces (1 y 2 de septiembre) y hacer
    el **piloto de una factura** en DGH. Si el piloto entra bien, cargar el
    resto de los dos lotes.
+
+### Análisis de velas — lo primero
+1. **Armar la aplicación con su histórico** y abrirla en el celular. En el PC
+   de cartera, el CSV está en Descargas, no en la carpeta del repositorio:
+
+   ```powershell
+   cd C:\motor-glosas\repo
+   $csv = (Get-ChildItem "$env:USERPROFILE\Downloads" -Filter "*EUR_USD*.csv" | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+   echo $csv
+   python -m mercados exportar "$csv" --titulo "EUR/USD"
+   ```
+
+   Después se abre desde el celular en
+   `https://iaglosassinac.help/static/mercados/index.html`.
+2. **Probar otro mercado.** Exportar el CSV de una acción colombiana, un índice
+   o una cripto y correr `python -m mercados medir ese_archivo.csv --sesiones 5`.
+   El EUR/USD ya dio su respuesta; falta ver si en otro lado hay algo.
+3. **Leer la columna «ventaja», no la de «acierta».** Un 60 % no dice nada si
+   la base también es 60 %.
+4. **Desconfiar de todo lo que tenga menos de 30 casos**, por bonito que se
+   vea el porcentaje. El programa lo avisa, pero conviene tenerlo en la cabeza.
+
 
 ### Curso de noruego — lo primero
 1. **Bajar los cambios y armar la aplicación:** `git pull` y doble clic en

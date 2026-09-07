@@ -150,3 +150,61 @@ class TestElPromptTambienLoProhibe:
     def test_el_gestor_se_entera_cuando_pasa(self):
         motor = io.open("app/services/glosa_service.py", encoding="utf-8").read()
         assert "Inventar la redacción de una cláusula" in motor
+
+
+class TestSegundaCorridaDeLaPrueba3:
+    """Lo que la corrida GL-1 dejó ver: dos redes que no llegaban a actuar.
+
+    01-09-2026, ya con la #578 desplegada.
+
+    1. El panel de correcciones decía «Agregué de entrada la refutación» y la
+       ARGUMENTACIÓN no la traía. El dictamen decía una cosa y el panel otra.
+       Causa: la inyección iba justo después de leer el <argumento>, y más
+       abajo el pase de refinamiento hace `arg_ia = _arg_refinado` —vuelve a
+       pedirle el argumento a la IA y reemplaza el string entero—, así que se
+       llevaba el párrafo por delante.
+
+    2. La IA volvió a transcribir la cláusula sexta, ahora con «DISPONE:», y la
+       red la dejó pasar. Dos causas: perseguía verbos, y su guarda buscaba la
+       palabra «contrato» en el TEXTO COMPLETO de los PDF — una historia clínica
+       la menciona sin ser un contrato, y con eso la red se desactivaba siempre.
+    """
+
+    HC_SOLA = (
+        "═══ DOCUMENTO: historia_clinica_urgencias.pdf ═══\n"
+        "INGRESO POR URGENCIAS 04/04/2026. contrato de prestacion de servicios."
+    )
+
+    def test_la_historia_clinica_ya_no_desactiva_la_red(self):
+        """Menciona «contrato» en su texto y NO es un contrato aportado."""
+        d = "LA CLAUSULA SEXTA DEL CONTRATO X DISPONE: «TEXTO INVENTADO DE LA CLAUSULA AQUI»."
+        _, borrados = _clausulas_transcritas_sin_respaldo(d, self.HC_SOLA)
+        assert borrados, "la palabra «contrato» dentro del PDF volvió a apagar la red"
+
+    def test_el_nombre_del_archivo_si_la_desactiva(self):
+        d = "LA CLAUSULA SEXTA DEL CONTRATO X DISPONE: «TEXTO INVENTADO DE LA CLAUSULA AQUI»."
+        ctx = "═══ DOCUMENTO: contrato_famisanar.pdf ═══\ncualquier cosa"
+        assert _clausulas_transcritas_sin_respaldo(d, ctx)[1] == []
+
+    @pytest.mark.parametrize(
+        "conector",
+        ["DISPONE:", "DISPONE QUE", "ESTABLECE:", "REZA ASI:", "EN LOS SIGUIENTES TERMINOS:", ":"],
+    )
+    def test_ya_no_depende_de_ningun_verbo(self, conector: str):
+        """Perseguir verbos es perseguir sinónimos: siempre hay uno más."""
+        d = f"LA CLAUSULA SEXTA DEL CONTRATO X {conector} «TEXTO INVENTADO DE LA CLAUSULA AQUI»."
+        _, borrados = _clausulas_transcritas_sin_respaldo(d, self.HC_SOLA)
+        assert borrados, conector
+
+    def test_la_refutacion_se_inyecta_despues_del_refinamiento(self):
+        motor = io.open("app/services/glosa_service.py", encoding="utf-8").read()
+        i_iny = motor.index("[CONTRATO-AJENO] refutación inyectada al inicio")
+        i_ref = motor.index("arg_ia = _arg_refinado")
+        assert i_ref < i_iny, (
+            "la inyección volvió a quedar ANTES del refinamiento: el pase de "
+            "refinamiento reemplaza arg_ia entero y se la lleva por delante"
+        )
+
+    def test_no_se_duplica_si_ya_estaba(self):
+        motor = io.open("app/services/glosa_service.py", encoding="utf-8").read()
+        assert '"RELATIVIDAD DE LOS CONTRATOS" not in arg_ia.upper()' in motor

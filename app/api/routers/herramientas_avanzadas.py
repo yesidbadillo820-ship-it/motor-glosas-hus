@@ -304,7 +304,7 @@ async def extraer_factura_endpoint(
     los campos + confianza + campos_faltantes para que el frontend sepa
     qué preguntar al usuario solo cuando falta algo.
     """
-    from app.services.pdf_service import PdfService
+    from app.services.pdf_service import ETIQUETA_ERROR_OCR, ErrorOCR, PdfService
     from app.services.extractor_factura import extraer_de_texto
     from app.core.config import get_settings
 
@@ -316,11 +316,15 @@ async def extraer_factura_endpoint(
         raise HTTPException(400, "PDF muy grande (>20 MB)")
 
     pdf_svc = PdfService()
-    texto, metodo = await pdf_svc.extraer_con_ocr(
-        contenido,
-        anthropic_api_key=cfg.anthropic_api_key,
-        anthropic_model=cfg.anthropic_model,
-    )
+    try:
+        texto, metodo = await pdf_svc.extraer_con_ocr(
+            contenido,
+            anthropic_api_key=cfg.anthropic_api_key,
+            anthropic_model=cfg.anthropic_model,
+        )
+    except ErrorOCR as e:
+        # Cortacircuito OCR (03-09-2026): corte de red = error visible.
+        raise HTTPException(503, f"{ETIQUETA_ERROR_OCR}: {str(e)[:300]}")
     campos = extraer_de_texto(texto or "")
     campos["_metodo_extraccion"] = metodo
     campos["_texto_chars"] = len(texto or "")

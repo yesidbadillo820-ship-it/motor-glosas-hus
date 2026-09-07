@@ -1,0 +1,370 @@
+"""Lo que comparten los radicadores de portal (V3, Pilar 1).
+
+Cada portal tiene sus pantallas y sus mañas, pero la conversación con el motor
+es SIEMPRE la misma: pedir una glosa, avisar antes de pulsar, y reportar qué
+pasó. Eso vive aquí, una sola vez, para que un arreglo valga para los tres.
+
+Lo que cada bot pone de su parte son dos funciones:
+
+    abrir_sesion(playwright, args) -> (page, cerrar)
+        Deja el navegador dentro del portal, como sea que ese portal entre.
+
+    radicar(page, fila) -> (radicado, ruta_comprobante)
+        Radica UNA glosa y devuelve la evidencia. Si no puede, levanta.
+        Si levanta DESPUÉS de haber enviado, el motor la manda a
+        verificación humana — nunca se reintenta a ciegas.
+
+Arquitectura: docs/ARQUITECTURA_V3_PILAR1_RPA.md
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import logging
+import os
+import socket
+import sys
+from contextlib import ExitStack
+from pathlib import Path
+from typing import Any, Callable, Optional
+
+logger = logging.getLogger("radicador")
+
+MOTOR_POR_DEFECTO = "http://127.0.0.1:8080"
+
+
+# ─── La regla del piloto ────────────────────────────────────────────────
+
+
+class PilotoNoConfirmado(RuntimeError):
+    """Se pidió un masivo sin haber confirmado el piloto de 1 factura."""
+
+
+class SesionNoDisponible(RuntimeError):
+    """El portal no dejó entrar sin una persona (captcha, token, 2FA).
+
+    No es un fallo del bot: es un portal que no se puede automatizar en frío.
+    Las glosas de esa corrida se marcan HUMANO_REQUERIDO con su motivo.
+    """
+
+
+def limite_efectivo(limite: int, piloto_ok: bool) -> int:
+    """Cuántas facturas se pueden radicar en esta corrida.
+
+    La regla del hospital se ganó a golpes: antes de un cargue masivo se corre
+    UNA factura y se mira en el portal. Aquí no se confía en que el auditor se
+    acuerde — el bot no deja pasar de una hasta que alguien diga,
+    explícitamente, que revisó la primera.
+    """
+    if limite <= 1:
+        return 1
+    if not piloto_ok:
+        raise PilotoNoConfirmado(
+            f"Pidió radicar {limite} facturas de una. Primero corra el piloto de 1, "
+            "mírela en el portal y, si quedó bien, repita agregando --piloto-ok. "
+            "(Regla del hospital: piloto antes de cualquier masivo.)"
+        )
+    return limite
+
+
+def sha256_de(ruta: Path) -> str:
+    """Huella del comprobante. Peso probatorio (engancha con el Pilar 6)."""
+    h = hashlib.sha256()
+    with open(ruta, "rb") as f:
+        for bloque in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(bloque)
+    return h.hexdigest()
+
+
+# ─── La conversación con el motor ───────────────────────────────────────
+
+
+class ColaMotor:
+    """Solo transporta QUÉ radicar y qué pasó. Nunca credenciales."""
+
+    def __init__(self, base_url: str, token: str, portal: str, equipo: str, timeout: float = 30.0):
+        import httpx
+
+        self.base = base_url.rstrip("/")
+        self.portal = portal
+        self.equipo = equipo
+        self._c = httpx.Client(
+            timeout=timeout, headers={"X-Agente-Token": token}, follow_redirects=True
+        )
+
+    def reclamar(self) -> Optional[dict]:
+        r = self._c.post(
+            f"{self.base}/radicacion/reclamar",
+            json={"portal": self.portal, "equipo": self.equipo},
+        )
+        if r.status_code == 204:
+            return None
+        r.raise_for_status()
+        return r.json()
+
+    def en_portal(self, rid: int) -> None:
+        self._c.post(f"{self.base}/radicacion/{rid}/en-portal").raise_for_status()
+
+    def radicada(self, rid: int, radicado: str, ruta: str = "", sha: str = "") -> dict:
+        r = self._c.post(
+            f"{self.base}/radicacion/{rid}/radicada",
+            json={
+                "radicado_numero": radicado,
+                "comprobante_ruta": ruta,
+                "comprobante_sha256": sha,
+            },
+        )
+        r.raise_for_status()
+        return r.json()
+
+    def fallida(self, rid: int, error: str) -> None:
+        self._c.post(f"{self.base}/radicacion/{rid}/fallida", json={"error": error[:4000]})
+
+    def humano_requerido(self, rid: int, motivo: str) -> None:
+        self._c.post(
+            f"{self.base}/radicacion/{rid}/humano-requerido", json={"error": motivo[:4000]}
+        )
+
+    def rescatar(self, rid: int, error: str) -> None:
+        """«Me caí con esta fila en la mano»: que vuelva a la cola.
+
+        Se traga cualquier fallo de red a propósito. Esto se llama JUSTO
+        cuando el bot ya se está muriendo; si además reventara acá, el
+        auditor vería una traza en vez del motivo real de la caída.
+        """
+        try:
+            self._c.post(f"{self.base}/radicacion/{rid}/rescatar", json={"error": error[:4000]})
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"No se pudo devolver la fila {rid} a la cola: {e}")
+
+    def cerrar(self) -> None:
+        try:
+            self._c.close()
+        except Exception:
+            pass
+
+
+# ─── Engancharse al Chrome del auditor (CDP) ────────────────────────────
+
+
+def conectar_cdp(pw, url: str):
+    """Se conecta al Chrome NORMAL del auditor, ya autenticado.
+
+    Por qué existe: hay portales —Mutual Ser -- que ponen reCAPTCHA. Un
+    navegador lanzado por Playwright se detecta como automatizado y el captcha
+    se NIEGA a validar, por bien que se disfrace. La salida que ya usaba el bot
+    de respuestas es no pelear: el auditor abre SU Chrome, entra a mano
+    (resolviendo el captcha como una persona), y el bot se engancha a esa
+    pestaña. reCAPTCHA nunca ve un robot porque nunca lo hubo en el login.
+
+    El auditor abre su Chrome así, una vez:
+
+        chrome.exe --remote-debugging-port=9222 ^
+                   --user-data-dir="C:\\temp-notas\\zonaser-chrome"
+
+    Devuelve (browser, page). NO cierra ese Chrome: es del auditor.
+    """
+    # En Windows «localhost» suele resolver a IPv6 (::1) y Chrome escucha en
+    # IPv4 (127.0.0.1) -> ECONNREFUSED. Se prueban las variantes solas: es un
+    # tropiezo que ya costó tiempo una vez y no tiene por qué costarlo otra.
+    candidatos = [url]
+    for alias in ("localhost", "::1", "0.0.0.0"):
+        if alias in url:
+            candidatos.append(url.replace(alias, "127.0.0.1"))
+
+    browser = None
+    ultimo_error: Optional[Exception] = None
+    for u in dict.fromkeys(candidatos):  # sin repetidos, en orden
+        try:
+            browser = pw.chromium.connect_over_cdp(u)
+            if u != url:
+                logger.info(f"Conectado usando {u} (fallback IPv4).")
+            break
+        except Exception as e:  # noqa: BLE001
+            ultimo_error = e
+
+    if browser is None:
+        raise SesionNoDisponible(
+            f"No pude conectarme a su Chrome en {url} (ni por 127.0.0.1).\n"
+            "Ábralo así y deje la sesión del portal iniciada:\n"
+            "    chrome.exe --remote-debugging-port=9222 "
+            '--user-data-dir="C:\\temp-notas\\zonaser-chrome"\n'
+            f"Compruebe http://127.0.0.1:9222/json/version y reintente. Detalle: {ultimo_error}"
+        )
+    return browser
+
+
+def pagina_del_portal(browser, marca_url: str):
+    """De todas las pestañas abiertas, la que ya está en el portal.
+
+    El auditor puede tener el correo, el Excel y media internet abiertos: se
+    busca la pestaña del portal, y si no hay ninguna se usa la primera.
+    """
+    ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+    page = next(
+        (pg for pg in ctx.pages if marca_url in pg.url),
+        ctx.pages[0] if ctx.pages else ctx.new_page(),
+    )
+    page.set_default_navigation_timeout(120000)
+    page.set_default_timeout(30000)
+    page.on("dialog", lambda d: d.accept())
+    return page
+
+
+# ─── El molde de la línea de órdenes ────────────────────────────────────
+
+
+def parser_comun(descripcion: str, evidencias_por_defecto: str) -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(description=descripcion)
+    p.add_argument("--motor", default=os.environ.get("MOTOR_URL", MOTOR_POR_DEFECTO))
+    p.add_argument("--limite", type=int, default=1, help="Cuántas radicar (por defecto 1).")
+    p.add_argument(
+        "--piloto-ok",
+        action="store_true",
+        help="Confirma que ya revisó la primera factura en el portal.",
+    )
+    p.add_argument("--con-cabeza", action="store_true", help="Mostrar el navegador.")
+    p.add_argument("--lento", action="store_true", help="Ir despacio (para mirar).")
+    p.add_argument("--evidencias", default=evidencias_por_defecto)
+    return p
+
+
+# ─── El motor del bot: igual para los tres portales ─────────────────────
+
+
+def _soltar_la_fila(cola: ColaMotor, rid: int, contexto: str, error: Exception) -> int:
+    """El bot se cayó con la fila en la mano. Se devuelve y se explica.
+
+    Sin esto, la fila se quedaba RECLAMADA para siempre: invisible para los
+    demás equipos —que solo ven las PENDIENTE— e invisible para las personas
+    —que miran las atoradas—. La glosa desaparecía sin que nadie se enterara.
+    """
+    detalle = f"{contexto}: {type(error).__name__}: {error}"
+    cola.rescatar(rid, detalle)
+    sys.stderr.write(
+        f"\n  [!] {detalle}\n"
+        "      La glosa volvió a la cola: otro equipo la puede tomar.\n"
+        "      A los 3 intentos deja de rebotar y la revisa una persona.\n\n"
+    )
+    return 2
+
+
+def correr(
+    portal: str,
+    args: Any,
+    abrir_sesion: Callable[[Any, Any], tuple],
+    radicar: Callable[[Any, dict], tuple[str, str]],
+) -> int:
+    """El ciclo completo. `abrir_sesion` y `radicar` los pone cada portal.
+
+    El orden de las dos llamadas del medio no es casual: se avisa al motor
+    ANTES de pulsar. Si el PC se apaga en ese instante, la fila ya quedó
+    marcada como dudosa y nadie la va a reintentar a ciegas.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    try:
+        tope = limite_efectivo(args.limite, args.piloto_ok)
+    except PilotoNoConfirmado as e:
+        sys.stderr.write(f"\n  [!] {e}\n\n")
+        return 2
+
+    token = os.environ.get("AGENTE_LOTES_TOKEN", "").strip()
+    if not token:
+        sys.stderr.write(
+            "\n  [!] Falta AGENTE_LOTES_TOKEN: es la llave con la que este bot\n"
+            "      habla con el motor. Es la MISMA del .env del servidor.\n\n"
+        )
+        return 2
+
+    cola = ColaMotor(args.motor, token, portal=portal, equipo=socket.gethostname())
+    parte = {"ok": 0, "dudosas": 0, "fallidas": 0, "humano": 0}
+
+    try:
+        primera = cola.reclamar()
+        if primera is None:
+            logger.info(f"No hay nada pendiente de radicar en {portal}.")
+            return 0
+
+        # Desde acá el bot tiene una fila EN LA MANO: está RECLAMADA y ningún
+        # otro equipo la ve. Todo lo que pueda fallar de aquí a que el bucle
+        # tome el control tiene que devolverla a la cola.
+        rid_en_mano = int(primera["radicacion_id"])
+
+        try:
+            from playwright.sync_api import sync_playwright
+        except Exception as e:  # noqa: BLE001
+            # Falta la librería, o está rota. El mensaje de la excepción dice
+            # cuál de las dos, y el auditor necesita saberlo para arreglarlo.
+            return _soltar_la_fila(cola, rid_en_mano, "este PC no pudo cargar playwright", e)
+
+        # `ExitStack` para entrar al gestor DENTRO del try y dejar el cuerpo
+        # fuera: con un `with` normal, un fallo al arrancar el navegador se
+        # llevaría la fila puesta.
+        pila = ExitStack()
+        try:
+            pw = pila.enter_context(sync_playwright())
+        except Exception as e:  # noqa: BLE001
+            # El navegador no arrancó (falta `playwright install chromium`,
+            # no hay permisos, el driver murió). La fila no puede quedarse acá.
+            return _soltar_la_fila(cola, rid_en_mano, "no arrancó el navegador", e)
+
+        with pila:
+            try:
+                page, cerrar = abrir_sesion(pw, args)
+            except SesionNoDisponible as e:
+                # El portal exige una persona. Se devuelve la fila reclamada
+                # al lugar correcto y se dice por qué, sin fingir autonomía.
+                cola.humano_requerido(rid_en_mano, str(e))
+                sys.stderr.write(f"\n  [!] {e}\n\n")
+                return 3
+            except Exception as e:  # noqa: BLE001
+                # Cualquier otra caída abriendo el portal: no es que el portal
+                # pida una persona, es que ESTE equipo no pudo. Otro sí podrá.
+                return _soltar_la_fila(cola, rid_en_mano, "no se pudo abrir el portal", e)
+
+            # De acá en adelante manda el bucle, y ahí cada fila llega sola a
+            # un estado propio: radicada, dudosa o fallida. Ninguna se queda
+            # RECLAMADA, así que el rescate ya no hace falta.
+            try:
+                fila = primera
+                while fila is not None and sum(parte.values()) < tope:
+                    rid = int(fila["radicacion_id"])
+                    factura = str(fila.get("factura") or "")
+                    logger.info(f"→ Factura {factura} (radicación {rid})")
+                    try:
+                        cola.en_portal(rid)
+                        radicado, comprobante = radicar(page, fila)
+                    except Exception as e:  # noqa: BLE001
+                        # Se pulsó y no sabemos si quedó: el motor la manda a
+                        # verificación humana, NO de vuelta a la cola.
+                        cola.fallida(rid, f"Se envió y no se pudo confirmar: {e}")
+                        logger.warning(f"  ⚠ quedó DUDOSA, la revisa una persona: {e}")
+                        parte["dudosas"] += 1
+                    else:
+                        ruta, sha = "", ""
+                        if comprobante and Path(comprobante).is_file():
+                            ruta = str(comprobante)
+                            sha = sha256_de(Path(comprobante))
+                        cola.radicada(rid, radicado=radicado, ruta=ruta, sha=sha)
+                        logger.info(f"  ✓ radicada · {radicado}")
+                        parte["ok"] += 1
+                    if sum(parte.values()) >= tope:
+                        break
+                    fila = cola.reclamar()
+            finally:
+                cerrar()
+    finally:
+        cola.cerrar()
+
+    logger.info(
+        f"\nListo. Radicadas: {parte['ok']} · dudosas (las mira una persona): "
+        f"{parte['dudosas']} · fallidas: {parte['fallidas']}"
+    )
+    if tope == 1 and parte["ok"] == 1:
+        logger.info(
+            f"Era el PILOTO: abra {portal} y confirme que esa factura quedó bien.\n"
+            "Si quedó, repita con  --limite N --piloto-ok"
+        )
+    return 0 if not parte["fallidas"] else 1

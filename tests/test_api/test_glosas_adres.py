@@ -887,6 +887,30 @@ class TestRepartoDeAreas:
         finally:
             app.dependency_overrides.clear()
 
+    def test_se_puede_reasignar_una_glosa_ya_repartida(self, client, paquete):
+        """El caso de Yesid (04-09-2026): «si por error coloco PERTINENCIA y
+        eran FACTURACIÓN ya no puedo volver a reasignar». Reasignar tiene que
+        poder deshacerlo — un error humano no puede quedar en piedra."""
+        gid = next(
+            g["id"]
+            for g in client.get("/glosas-adres/factura/HUS0000352890").json()["glosas"]
+            if g["codigo"] == "INS-100"  # el bot sugiere FACTURACION para este
+        )
+        # 1) Error humano: queda en PERTINENCIA.
+        d1 = client.post(f"/glosas-adres/glosa/{gid}/area", json={"area": "PERTINENCIA"}).json()
+        assert d1["clasificacion"] == "PERTINENCIA"
+        assert d1["requiere_asignacion"] is False
+        # 2) Reasignar a FACTURACIÓN corrige el error, sin volver a «POR ASIGNAR».
+        r2 = client.post(f"/glosas-adres/glosa/{gid}/area", json={"area": "FACTURACION"})
+        assert r2.status_code == 200, r2.text
+        d2 = r2.json()
+        assert d2["clasificacion"] == "FACTURACION"
+        assert d2["requiere_asignacion"] is False
+        assert d2["area_asignada_por"] == "coordinador@hus.gov.co"
+        # 3) Sigue siendo de doble área: se puede volver a cambiar cuantas veces
+        #    haga falta — es lo que la pantalla necesita para el botón «reasignar».
+        assert set(d2["areas_posibles"]) == {"FACTURACION", "PERTINENCIA"}
+
 
 class TestCentrosDeCostos:
     def test_el_catalogo_oficial_llega_a_la_pantalla(self, client, paquete):

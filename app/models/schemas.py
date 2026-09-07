@@ -152,6 +152,11 @@ class GlosaResult(BaseModel):
     paciente: str
     mensaje_tiempo: str
     color_tiempo: str
+    # Etapa del ciclo de vida de la glosa (Caso J, 02-09-2026): "INICIAL",
+    # "RATIFICACION" o "CONCILIACION". La pantalla muestra un badge cuando no
+    # es inicial, para que el gestor sepa que el motor ajustó la defensa
+    # procesal (no responde una segunda instancia como si fuera el día uno).
+    etapa_procesal: Optional[str] = "INICIAL"
     factura: Optional[str] = "N/A"
     autorizacion: Optional[str] = "N/A"
     # CORRECCIÓN: era int, pero _calcular_score retorna float

@@ -20,7 +20,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_usuario_actual, get_coordinador_o_admin
+from app.api.deps import get_usuario_actual, get_coordinador_o_admin, get_auditor_o_superior
 from app.database import get_db
 from app.models.db import GlosaRecord, UsuarioRecord, ROL_COORDINADOR, ROL_SUPER_ADMIN
 from pydantic import BaseModel, Field
@@ -37,6 +37,28 @@ class BatchAprobarBody(BaseModel):
     ids: list[int] = Field(..., description="IDs de glosas a marcar respondidas")
     confianza_minima: float = Field(0.85, ge=0.0, le=1.0)
     dry_run: bool = False
+
+
+class BitacoraDecisionDTO(BaseModel):
+    """Una fila de la bitácora inmutable del Auto-Pilot (hotfix 03-09-2026:
+    incluye `modelo_utilizado` para la trazabilidad del fallback de modelos —
+    si el dictamen decidido lo produjo Anthropic o el fallback de Groq)."""
+
+    id: int
+    creado_en: Optional[str] = None
+    glosa_id: Optional[int] = None
+    decision: str = ""
+    regla_aplicada: str = ""
+    confianza: Optional[float] = None
+    riesgo: str = ""
+    soportes_analizados: list[str] = Field(default_factory=list)
+    actor: str = ""
+    modelo_utilizado: str = ""
+
+
+class BitacoraRespuestaDTO(BaseModel):
+    total: int
+    decisiones: list[BitacoraDecisionDTO]
 
 
 from app.services.texto_fijo_detector import (
@@ -411,3 +433,176 @@ def aplicar_texto_fijo(
         }
     db.commit()
     return {"glosa_id": glosa_id, "aplicado": True, **clase}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  ZERO-TOUCH GOBERNADO (V2, Pilar 2, 03-09-2026) — worker, borradores y
+#  liberación humana. Las cuatro salvaguardas viven en auto_pilot_worker:
+#  flag apagado por defecto, cuarentena PENDIENTE_APROBACION_HUMANA (la IA
+#  jamás escribe RESPONDIDA), bitácora inmutable y reglas estrictas.
+# ══════════════════════════════════════════════════════════════════════════
+
+
+@router.post("/procesar", summary="Correr el worker Zero-Touch (gobernado por AUTO_PILOT_ENABLED)")
+def procesar_zero_touch(
+    limite: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Con el flag apagado (el defecto) devuelve `deshabilitado` sin tocar
+    nada. Con el flag activo, evalúa y manda las candidatas a la bandeja de
+    borradores — nunca a RESPONDIDA."""
+    from app.services.auto_pilot_worker import procesar
+
+    return procesar(db, limite=limite)
+
+
+@router.get("/borradores", summary="Bandeja de Salida / Borradores del Auto-Pilot")
+def borradores_auto_pilot(
+    limite: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    from app.models.db import AutoPilotBitacoraRecord
+    from app.services import vencimiento_dinamico
+    from app.services.auto_pilot_worker import ESTADO_CUARENTENA
+
+    filas = (
+        db.query(GlosaRecord)
+        .filter(GlosaRecord.workflow_state == ESTADO_CUARENTENA)
+        .order_by(GlosaRecord.id.desc())
+        .limit(limite)
+        .all()
+    )
+
+    # Tablero Kanban (03-09-2026): cada tarjeta muestra la confianza, el
+    # riesgo y el modelo que decidió — vienen de la ÚLTIMA fila CANDIDATA
+    # de la bitácora, en una sola consulta (nada de N+1).
+    ultima_candidata: dict[int, AutoPilotBitacoraRecord] = {}
+    ids = [g.id for g in filas]
+    if ids:
+        for f in (
+            db.query(AutoPilotBitacoraRecord)
+            .filter(AutoPilotBitacoraRecord.glosa_id.in_(ids))
+            .filter(AutoPilotBitacoraRecord.decision == "CANDIDATA")
+            .order_by(AutoPilotBitacoraRecord.id.asc())
+            .all()
+        ):
+            ultima_candidata[f.glosa_id] = f  # orden ascendente: la última gana
+
+    def _dias(g) -> Optional[int]:
+        try:
+            return vencimiento_dinamico.dias_restantes_de(g)
+        except Exception:
+            return getattr(g, "dias_restantes", None)
+
+    def _fila(g) -> dict:
+        b = ultima_candidata.get(g.id)
+        return {
+            "glosa_id": g.id,
+            "factura": g.factura,
+            "eps": g.eps,
+            "codigo_glosa": g.codigo_glosa,
+            "valor_objetado": g.valor_objetado,
+            "workflow_state": g.workflow_state,
+            # Hotfix 03-09-2026: la nota distingue un borrador normal de
+            # una glosa detenida por el cortacircuito OCR (ERROR_OCR).
+            "nota_workflow": g.nota_workflow,
+            "modelo_ia": g.modelo_ia,
+            # Enriquecido para el Kanban (03-09-2026):
+            "confianza": b.confianza if b else None,
+            "riesgo": (b.riesgo or "") if b else "",
+            "modelo_utilizado": (b.modelo_utilizado or "") if b else (g.modelo_ia or ""),
+            "regla_aplicada": (b.regla_aplicada or "") if b else "",
+            "dias_restantes": _dias(g),
+        }
+
+    return {"total": len(filas), "borradores": [_fila(g) for g in filas]}
+
+
+@router.post("/liberar/{glosa_id}", summary="Clic humano afirmativo: liberar un borrador")
+def liberar_borrador(
+    glosa_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    from app.services.auto_pilot_worker import liberar
+
+    resultado = liberar(db, glosa_id, str(getattr(current_user, "email", "") or "humano"))
+    if resultado["estado"] == "no_existe":
+        raise HTTPException(status_code=404, detail="No existe una glosa con ese id.")
+    if resultado["estado"] == "no_esta_en_borradores":
+        raise HTTPException(
+            status_code=409,
+            detail=f"La glosa no está en borradores (estado: {resultado['workflow_state']}).",
+        )
+    return resultado
+
+
+@router.post("/devolver/{glosa_id}", summary="Clic humano: devolver un borrador a revisión manual")
+def devolver_borrador(
+    glosa_id: int,
+    motivo: str = Query("", max_length=300),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """El botón carmesí del panel de decisión (03-09-2026): la glosa sale de
+    la bandeja de borradores SIN radicarse — vuelve a RADICADA para revisión
+    manual, con el motivo en la nota y la devolución en la bitácora."""
+    from app.services.auto_pilot_worker import devolver
+
+    resultado = devolver(db, glosa_id, str(getattr(current_user, "email", "") or "humano"), motivo)
+    if resultado["estado"] == "no_existe":
+        raise HTTPException(status_code=404, detail="No existe una glosa con ese id.")
+    if resultado["estado"] == "no_esta_en_borradores":
+        raise HTTPException(
+            status_code=409,
+            detail=f"La glosa no está en borradores (estado: {resultado['workflow_state']}).",
+        )
+    return resultado
+
+
+@router.get(
+    "/bitacora",
+    summary="Bitácora inmutable de decisiones del Auto-Pilot",
+    response_model=BitacoraRespuestaDTO,
+)
+def bitacora_auto_pilot(
+    glosa_id: Optional[int] = Query(None),
+    limite: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    import json as _json
+
+    from app.models.db import AutoPilotBitacoraRecord
+
+    q = db.query(AutoPilotBitacoraRecord).order_by(AutoPilotBitacoraRecord.id.desc())
+    if glosa_id is not None:
+        q = q.filter(AutoPilotBitacoraRecord.glosa_id == glosa_id)
+    filas = q.limit(limite).all()
+
+    def _soportes(s):
+        try:
+            return _json.loads(s or "[]")
+        except Exception:
+            return []
+
+    return BitacoraRespuestaDTO(
+        total=len(filas),
+        decisiones=[
+            BitacoraDecisionDTO(
+                id=f.id,
+                creado_en=f.creado_en.isoformat() if f.creado_en else None,
+                glosa_id=f.glosa_id,
+                decision=f.decision or "",
+                regla_aplicada=f.regla_aplicada or "",
+                confianza=f.confianza,
+                riesgo=f.riesgo or "",
+                soportes_analizados=_soportes(f.soportes_analizados),
+                actor=f.actor or "",
+                modelo_utilizado=f.modelo_utilizado or "",
+            )
+            for f in filas
+        ],
+    )
