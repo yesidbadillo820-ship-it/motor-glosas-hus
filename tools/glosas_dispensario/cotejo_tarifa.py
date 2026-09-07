@@ -186,6 +186,10 @@ def cotejar(
         # el cotejo y no la redacción, para que el texto de la respuesta y las
         # columnas del Excel no puedan decir cifras distintas.
         resto=0,
+        objetado=objetado or None,
+        reconocido=None,
+        sin_sustento=0,
+        del_ajuste=0,
         respuesta=f"SIN COTEJO: {falta}. Revisar a mano antes de decidir.",
     )
     if not valor_facturado or not precio:
@@ -194,6 +198,21 @@ def cotejar(
     diferencia = valor_facturado - precio
     f = factor(valor_facturado, precio)
     base.update(diferencia=diferencia, porcentaje=round((f - 1) * 100, 1) if f else None)
+
+    # Cómo se reparte la glosa. Es lo que vuelve concreta la respuesta: de lo
+    # que la EPS descuenta, una parte choca contra el anexo firmado (y esa no
+    # admite discusión) y otra es el ajuste del año (que sí hay que sustentar).
+    #
+    #     facturado 192.600 − glosa 113.500 = 79.100 que la EPS reconoce
+    #     anexo 180.000 − 79.100            = 100.900 sin sustento contractual
+    #     facturado 192.600 − anexo 180.000 =  12.600 del ajuste de vigencia
+    if objetado:
+        reconocido = valor_facturado - objetado
+        base.update(
+            reconocido=reconocido,
+            sin_sustento=max(precio - reconocido, 0),
+            del_ajuste=max(valor_facturado - precio, 0),
+        )
 
     if abs(diferencia) <= TOLERANCIA_PESOS:
         base.update(

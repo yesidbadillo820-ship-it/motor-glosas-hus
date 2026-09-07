@@ -139,10 +139,13 @@ def test_escenario_1_cobro_a_tarifa_declara_causal_infundada():
         "CONSULTA DE PRIMERA VEZ POR NEUROLOGIA",
     )
     assert p.startswith("AL REVISAR EL SOPORTE FEV_900006037_HUS542497.PDF")
-    assert "SE EVIDENCIA LA ATENCION DEL USUARIO RODRIGUEZ GOMEZ MARIA" in p
-    assert "EL VALOR FACTURADO DE $180.000" in p
-    assert "TARIFA PACTADA EXACTA EN EL CONTRATO 440-DIGSA-DMBUG-2025" in p
-    assert "CAUSAL DE GLOSA ES INFUNDADA" in p
+    assert "DEL USUARIO RODRIGUEZ GOMEZ MARIA" in p
+    assert "SE FACTURO POR $180.000" in p
+    assert "EXACTAMENTE LA TARIFA QUE EL ANEXO 6.2 DEL CONTRATO 440-DIGSA-DMBUG-2025 PACTA" in p
+    assert "NO EXISTE MAYOR VALOR COBRADO" in p
+    # y el reparto de la glosa: facturado a tarifa, todo el descuento se aparta
+    assert "RECONOCE UNICAMENTE $66.500 Y DESCUENTA $113.500" in p
+    assert "$113.500 DEL DESCUENTO SE APARTAN DE LA TARIFA PACTADA" in p
     # el servicio se nombra como lo conoce la EPS, sin la fila cruda del PDF
     assert "890275H CONSULTA DE PRIMERA VEZ POR NEUROLOGIA" in p
     assert "1 180.000 180.000" not in p
@@ -154,12 +157,18 @@ def test_escenario_2_vigencia_2026_defiende_el_mayor_valor():
     factores = factores_repetidos([(192600, 180000), (247765, 231556), (114236, 106762)])
     cot = cotejar(192600, _tarifa(180000), 113500, "890275H", factores)
     p = parrafo_por_escenario(cot, _pdf(), None, "890275H", "CONSULTA NEUROLOGIA")
-    assert "EL VALOR COBRADO DE $192.600" in p
-    assert "ACTUALIZACION DE TARIFAS DE LA VIGENCIA 2026" in p
-    assert "PARAGRAFOS 3 Y 4 DEL CONTRATO 440-DIGSA-DMBUG-2025" in p
-    assert "EL COBRO ES CONTRACTUALMENTE VALIDO" in p
+    assert "SE FACTURO POR $192.600" in p
+    # la tesis principal es el ANEXO, no el ajuste del año
+    assert "PACTA PARA ESE CODIGO UNA TARIFA PROPIA DE LA ESE DE $180.000" in p
+    assert "NO LA REFERENCIA SOAT QUE EL PAGADOR APLICA DE MANERA UNILATERAL" in p
+    # la glosa queda repartida: qué parte choca contra el anexo firmado
+    assert "RECONOCE UNICAMENTE $79.100 Y DESCUENTA $113.500" in p
+    assert "$100.900 DEL DESCUENTO SE APARTAN" in p
+    assert "AJUSTE DE LA VIGENCIA 2026 QUE EL PARAGRAFO 4" in p
     # defiende, no acepta
     assert "SE ACEPTA" not in p
+    # y no anuncia documentos que el bot no adjunta
+    assert "SE REMITEN CON LA PRESENTE RESPUESTA" not in p and "SE APORTA" not in p
 
 
 def test_escenario_3_sobrecobro_real_redacta_la_aceptacion_parcial():
@@ -168,7 +177,8 @@ def test_escenario_3_sobrecobro_real_redacta_la_aceptacion_parcial():
     cot = cotejar(192600, _tarifa(180000), 113500, "890275H")  # caso aislado
     p = parrafo_por_escenario(cot, _pdf(), None, "890275H")
     assert p.startswith("VALIDADO EL SOPORTE FEV_900006037_HUS542497.PDF")
-    assert "LA TARIFA PACTADA PARA EL CODIGO 890275H ES DE $180.000 Y SE FACTURO $192.600" in p
+    assert "LA TARIFA PACTADA EN EL ANEXO 6.2 PARA EL CODIGO 890275H ES DE $180.000" in p
+    assert "SE FACTURO $192.600" in p
     assert "SE ACEPTA LA GLOSA POR EL MAYOR VALOR COBRADO DE $12.600" in p
     assert "LEVANTAMIENTO DE LOS $100.900 RESTANTES" in p
 
@@ -343,3 +353,56 @@ def test_el_valor_del_dgh_solo_se_usa_cuando_encaja_con_un_patron():
     assert valor is None and "hace falta el PDF" in motivo
     # sin tarifa pactada no hay con qué comparar
     assert valor_desde_dgh(192600, None, 1, {1.07})[0] is None
+
+
+def test_el_argumento_del_cotejo_reemplaza_el_cuerpo_generico(tmp_path):
+    """Dos tesis en la misma respuesta la pierden: si el texto dice que el
+    mayor valor es el ajuste del año y tres líneas después dice que no hay
+    mayor valor, a la EPS le basta con quedarse con la primera."""
+    from bot_lote_dispensario import enriquecer_excel
+
+    ruta = tmp_path / "resp.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Respuestas Glosa"
+    ws.append(
+        [
+            "Factura",
+            "# Objeción",
+            "Cód.",
+            "Servicio",
+            "Valor Objetado",
+            "Valor Aceptado",
+            "Cod Respuesta",
+            "Detalle Respuesta",
+        ]
+    )
+    detalle = (
+        "ESE HUS NO ACEPTA LA GLOSA APLICADA A LA FACTURA HUS0000500001. FRENTE AL CARGO "
+        "OBJETADO BAJO EL CONCEPTO TA0201: EL VALOR FACTURADO ES LA TARIFA PACTADA Y NO UN "
+        "MAYOR VALOR COBRADO. POR LO EXPUESTO, SE SOLICITA EL LEVANTAMIENTO TOTAL."
+    )
+    ws.append(["HUS0000500001", 1, "TA0201", "890275H - CONSULTA", 113500, 0, "RE9901", detalle])
+    ws.append(["HUS0000500002", 1, "TA0201", "890275H - CONSULTA", 113500, 0, "RE9901", detalle])
+    wb.save(ruta)
+
+    enriquecer_excel(
+        ruta,
+        apertura_por_linea={
+            ("HUS0000500001", 1): "EL ANEXO PACTA $180.000.",
+            ("HUS0000500002", 1): "EL ANEXO PACTA $180.000.",
+        },
+        sustituir_cuerpo={("HUS0000500001", 1)},  # solo la primera
+    )
+    filas = list(load_workbook(ruta)["Respuestas Glosa"].iter_rows(min_row=2, values_only=True))
+
+    # la que tiene escenario: el cuerpo genérico desapareció, encabezado y
+    # cierre institucional siguen ahí
+    con = filas[0][7]
+    assert "EL VALOR FACTURADO ES LA TARIFA PACTADA" not in con
+    assert "BAJO EL CONCEPTO TA0201:" in con and "POR LO EXPUESTO" in con
+    assert con.index("EL ANEXO PACTA $180.000.") < con.index("POR LO EXPUESTO")
+
+    # la que no: se conserva el comportamiento de siempre (se suma, no sustituye)
+    sin = filas[1][7]
+    assert "EL VALOR FACTURADO ES LA TARIFA PACTADA" in sin and "EL ANEXO PACTA" in sin

@@ -241,6 +241,25 @@ def _quien(datos_pdf: dict | None) -> str:
     return f" DEL USUARIO {paciente}" if paciente else ""
 
 
+def _reparto(cotejo: dict) -> str:
+    """La glosa, repartida: qué parte choca contra el anexo firmado.
+
+    Es lo que vuelve concreta la respuesta. Si la EPS descuenta $113.500 de una
+    factura de $192.600, está reconociendo $79.100 por un servicio que el
+    propio anexo pacta en $180.000: esos $100.900 no admiten discusión, y se
+    dicen con nombre propio en vez de pedir el levantamiento en abstracto.
+    """
+    reconocido = cotejo.get("reconocido")
+    sin_sustento = cotejo.get("sin_sustento") or 0
+    if reconocido is None or sin_sustento <= 0:
+        return ""
+    return (
+        f" EL PAGADOR RECONOCE UNICAMENTE {_plata(reconocido)} Y DESCUENTA "
+        f"{_plata(cotejo.get('objetado') or 0)}, DE MODO QUE {_plata(sin_sustento)} DEL "
+        "DESCUENTO SE APARTAN DE LA TARIFA PACTADA EN EL ANEXO SUSCRITO POR LAS PARTES."
+    )
+
+
 def parrafo_por_escenario(
     cotejo: dict,
     datos_pdf: dict | None,
@@ -296,25 +315,32 @@ def parrafo_por_escenario(
 
     if veredicto == cotejo_tarifa.A_TARIFA:
         return (
-            f"{visto}, SE EVIDENCIA LA ATENCION{_quien(datos_pdf)}. "
-            f"EL VALOR FACTURADO DE {_plata(facturado)} POR EL SERVICIO {etiqueta} "
-            "CORRESPONDE A LA TARIFA PACTADA EXACTA EN EL CONTRATO 440-DIGSA-DMBUG-2025, "
-            "POR LO QUE LA CAUSAL DE GLOSA ES INFUNDADA."
+            f"{visto}{_quien(datos_pdf)}, EL SERVICIO {etiqueta} SE FACTURO POR "
+            f"{_plata(facturado)}, QUE ES EXACTAMENTE LA TARIFA QUE EL ANEXO 6.2 DEL "
+            "CONTRATO 440-DIGSA-DMBUG-2025 PACTA PARA ESE CODIGO. NO EXISTE MAYOR VALOR "
+            "COBRADO: EL DESCUENTO CARECE DE SUSTENTO CONTRACTUAL." + _reparto(cotejo)
         )
 
     if veredicto == cotejo_tarifa.POR_VIGENCIA:
+        # La tesis principal es el ANEXO, no el ajuste del año: lo que el
+        # pagador reconoce está por debajo de la tarifa pactada, y esa parte
+        # de la glosa cae sola. El ajuste se explica aparte, sin anunciar
+        # ningún documento que no vaya efectivamente adjunto.
         return (
-            f"{verificado}{_quien(datos_pdf)}, EL VALOR COBRADO DE "
-            f"{_plata(facturado)} POR EL SERVICIO {etiqueta} REFLEJA LA ACTUALIZACION DE "
-            "TARIFAS DE LA VIGENCIA 2026 CONTEMPLADA EN LOS PARAGRAFOS 3 Y 4 DEL CONTRATO "
-            "440-DIGSA-DMBUG-2025 (MODIFICATORIO CONTRACTUAL Y RESOLUCION TARIFARIA DE LA "
-            "ESE HOSPITAL UNIVERSITARIO DE SANTANDER), DOCUMENTOS QUE SE REMITEN CON LA "
-            "PRESENTE RESPUESTA. EL COBRO ES CONTRACTUALMENTE VALIDO."
+            f"{verificado}{_quien(datos_pdf)}, EL SERVICIO {etiqueta} SE FACTURO POR "
+            f"{_plata(facturado)}. EL ANEXO 6.2 DEL CONTRATO 440-DIGSA-DMBUG-2025 PACTA "
+            f"PARA ESE CODIGO UNA TARIFA PROPIA DE LA ESE DE {_plata(pactada)}, QUE ES LA "
+            "QUE OBLIGA A LAS PARTES Y NO LA REFERENCIA SOAT QUE EL PAGADOR APLICA DE "
+            "MANERA UNILATERAL." + _reparto(cotejo) + " LA DIFERENCIA RESTANTE CORRESPONDE "
+            "AL AJUSTE DE LA VIGENCIA 2026 QUE EL PARAGRAFO 4 DEL MISMO CONTRATO PREVE "
+            "PARA LAS TARIFAS PROPIAS DE LAS ESE, SOPORTADO EN EL ACTO ADMINISTRATIVO "
+            "TARIFARIO DE LA ESE HOSPITAL UNIVERSITARIO DE SANTANDER VIGENTE A LA FECHA "
+            "DE LA PRESTACION."
         )
 
     if veredicto == cotejo_tarifa.SOBRECOBRO:
         return (
-            f"{validado}{_quien(datos_pdf)}, LA TARIFA PACTADA PARA EL "
+            f"{validado}{_quien(datos_pdf)}, LA TARIFA PACTADA EN EL ANEXO 6.2 PARA EL "
             f"CODIGO {cups} ES DE {_plata(pactada)} Y SE FACTURO {_plata(facturado)}. "
             f"SE ACEPTA LA GLOSA POR EL MAYOR VALOR COBRADO DE {_plata(cotejo['aceptar'])}"
             + (
@@ -515,6 +541,7 @@ def enriquecer_excel(
     por_factura: dict[str, str] | None = None,
     por_linea: dict[tuple[str, int], str] | None = None,
     apertura_por_linea: dict[tuple[str, int], str] | None = None,
+    sustituir_cuerpo: set[tuple[str, int]] | None = None,
 ) -> int:
     """Arma la respuesta final de cada línea. `apertura_por_linea` es el
     párrafo de evidencia con trazabilidad: entra JUSTO DESPUES del encabezado
@@ -542,7 +569,17 @@ def enriquecer_excel(
         apertura = apertura_por_linea.get((fac, num))
         if apertura and apertura not in detalle:
             m = RE_ENCABEZADO.search(detalle)
-            if m:
+            k = detalle.find(MARCA)
+            if m and k > m.end() and (fac, num) in (sustituir_cuerpo or set()):
+                # El argumento del cotejo REEMPLAZA el cuerpo genérico del
+                # motor, no se suma a él. Sumarlos dejaba dos tesis en la misma
+                # respuesta —"el mayor valor es el ajuste del año" junto a "no
+                # hay mayor valor"—, y a la EPS le basta con quedarse con la
+                # primera para ratificar. El encabezado y el cierre
+                # institucional (normas, mesa de conciliación, correos) se
+                # conservan intactos.
+                detalle = detalle[: m.end()] + " " + apertura + " " + detalle[k:]
+            elif m:
                 detalle = detalle[: m.end()] + " " + apertura + " " + detalle[m.end() :].lstrip()
             else:
                 detalle = apertura + " " + detalle
@@ -830,6 +867,7 @@ def main() -> int:
     # manda la redacción prudente, que no proclama cifras sin cotejo.
     aperturas: dict[tuple[str, int], str] = {}
     por_escenario = Counter()
+    con_escenario: set[tuple[str, int]] = set()
     con_pdf = 0
     for d in lineas:
         clave = (d["factura"], d["num"])
@@ -849,6 +887,7 @@ def main() -> int:
             parrafo = None
         if parrafo:
             por_escenario[cot["veredicto"]] += 1
+            con_escenario.add(clave)  # su argumento reemplaza el cuerpo genérico
         else:
             parrafo = parrafo_evidencia(
                 datos,
@@ -861,7 +900,9 @@ def main() -> int:
             aperturas[clave] = parrafo
             con_pdf += 1 if datos else 0
     if aperturas:
-        n = enriquecer_excel(excel_resp, apertura_por_linea=aperturas)
+        n = enriquecer_excel(
+            excel_resp, apertura_por_linea=aperturas, sustituir_cuerpo=con_escenario
+        )
         print(
             f"[5/7] Respuestas redactadas: {n} líneas ({con_pdf} citan el PDF leído). "
             f"Por escenario: {por_escenario[cotejo_tarifa.A_TARIFA]} a tarifa exacta, "
