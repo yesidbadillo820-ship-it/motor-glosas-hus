@@ -100,9 +100,7 @@ def test_sin_valor_de_servicio_no_se_capa(coo):
     s["valor_servicio"] = None
     s["copago"] = None
 
-    filas, _no_cruzados, ajustados = coo.generar_objeciones(
-        [s], datetime(2026, 9, 7), cruces=None
-    )
+    filas, _no_cruzados, ajustados = coo.generar_objeciones([s], datetime(2026, 9, 7), cruces=None)
 
     assert _valores(filas) == [97_671]
     assert ajustados == []
