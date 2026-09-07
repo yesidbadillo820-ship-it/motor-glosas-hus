@@ -4377,10 +4377,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           </div>
 
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.5rem;margin-top:.7rem">
-            <div class="field"><label>NIT de la entidad</label><input type="text" id="armar-nit" placeholder="901541137"></div>
-            <div class="field"><label>Razón social</label><input type="text" id="armar-razon" placeholder="DISPENSARIO MEDICO"></div>
-            <div class="field"><label>Número de acta</label><input type="text" id="armar-acta" placeholder="710"></div>
-            <div class="field"><label>Periodo</label><input type="text" id="armar-periodo" placeholder="SEP 2026"></div>
+            <div class="field"><label>NIT de la entidad</label><input type="text" id="armar-nit" placeholder="ej: 901541137"></div>
+            <div class="field"><label>Razón social</label><input type="text" id="armar-razon" placeholder="ej: DISPENSARIO MEDICO"></div>
+            <div class="field"><label>Número de acta</label><input type="text" id="armar-acta" placeholder="ej: 710"></div>
+            <div class="field"><label>Periodo</label><input type="text" id="armar-periodo" placeholder="ej: SEP 2026"></div>
             <div class="field"><label>Fecha conciliación</label><input type="date" id="armar-fecha"></div>
           </div>
 
@@ -24703,7 +24703,8 @@ async function mesaCargar(id){
   mesaEstado('Trayendo la mesa…','auto-corriendo');
   try{
     var r = await fetch('/conciliaciones/mesa/' + id, {headers: authH()});
-    if(!r.ok){ mesaEstado('No se pudo abrir esa mesa.','auto-error'); return; }
+    if(!r.ok){ var e0 = await r.json().catch(function(){return {}});
+      mesaEstado('No se pudo abrir esa mesa: ' + escHtml(e0.detail || ('HTTP ' + r.status)),'auto-error'); return; }
     MESA = await r.json();
     mesaPintar();
     mesaEstado('','');
@@ -24809,7 +24810,8 @@ async function mesaDescargar(){
   mesaEstado('Armando el acta…','auto-corriendo');
   try{
     var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/acta.xlsm', {headers: authH()});
-    if(!r.ok){ mesaEstado('No se pudo generar el acta.','auto-error'); return; }
+    if(!r.ok){ var e1 = await r.json().catch(function(){return {}});
+      mesaEstado('No se pudo generar el acta: ' + escHtml(e1.detail || ('HTTP ' + r.status)),'auto-error'); return; }
     var blob = await r.blob(), url = URL.createObjectURL(blob), a = document.createElement('a');
     a.href = url; a.download = 'ACTA_SINAC_' + (MESA.numero_acta || MESA.id) + '.xlsm';
     document.body.appendChild(a); a.click(); a.remove();
@@ -24828,12 +24830,15 @@ async function mesaCerrar(){
   mesaEstado('Cerrando…','auto-corriendo');
   try{
     var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/cerrar', {method:'POST', headers: authH()});
-    if(!r.ok){ mesaEstado('No se pudo cerrar.','auto-error'); return; }
+    if(!r.ok){ var e2 = await r.json().catch(function(){return {}});
+      mesaEstado('No se pudo cerrar: ' + escHtml(e2.detail || ('HTTP ' + r.status)),'auto-error'); return; }
     var d = await r.json();
     MESA.estado = 'CERRADA';
     mesaPintar(); mesaListar();
-    mesaEstado('Mesa cerrada. Se guardaron ' + (d.aprendido ? d.aprendido.nuevas : 0)
-      + ' tipificación(es) para la próxima.','auto-ok');
+    var msg = 'Mesa cerrada. Se guardaron ' + (d.aprendido ? d.aprendido.nuevas : 0)
+      + ' tipificación(es) para la próxima.';
+    if(d.aviso_memoria) msg = escHtml(d.aviso_memoria);
+    mesaEstado(msg, d.aviso_memoria ? 'auto-error' : 'auto-ok');
   }catch(e){ mesaEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
 }
 

@@ -311,15 +311,40 @@ def cerrar(db: Any, mesa_id: int, usuario: str = "") -> dict:
         return {"estado": "ya_cerrada"}
 
     cifras = resumen(db, mesa_id)
-    aprendido = armador.aprender(
-        db, a_acta(db, mesa).lineas, numero_acta=mesa.numero_acta or "", usuario=usuario
-    )
+
+    # Aprender es un extra; cerrar es lo que el auditor vino a hacer. Si la
+    # memoria falla —una tabla que no está, un choque de llave— la mesa se
+    # cierra igual y se dice qué pasó. Al revés, el auditor termina la
+    # audiencia y no puede cerrar el acta por un accesorio.
+    aprendido: dict = {"nuevas": 0, "actualizadas": 0, "sin_dato": 0}
+    error_memoria = ""
+    try:
+        aprendido = armador.aprender(
+            db, a_acta(db, mesa).lineas, numero_acta=mesa.numero_acta or "", usuario=usuario
+        )
+    except Exception as e:  # noqa: BLE001
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        error_memoria = f"{type(e).__name__}: {e}"
+        logger.error(f"[MESA] no se pudo aprender al cerrar {mesa_id}: {error_memoria}")
+        mesa = db.query(MesaConciliacionRecord).filter(MesaConciliacionRecord.id == mesa_id).first()
+        if mesa is None:
+            return {"estado": "no_existe"}
+
     mesa.estado = MESA_CERRADA
     mesa.cerrado_en = datetime.now(timezone.utc)
     mesa.cerrado_por = (usuario or "")[:200]
     db.commit()
     logger.info(f"[MESA] cerrada id={mesa_id} por={usuario} aprendido={aprendido}")
-    return {"estado": MESA_CERRADA, "resumen": cifras, "aprendido": aprendido}
+    salida = {"estado": MESA_CERRADA, "resumen": cifras, "aprendido": aprendido}
+    if error_memoria:
+        salida["aviso_memoria"] = (
+            "La mesa quedó cerrada, pero no se pudo guardar la tipificación para "
+            f"la próxima vez ({error_memoria})."
+        )
+    return salida
 
 
 def reabrir(db: Any, mesa_id: int, usuario: str = "") -> dict:

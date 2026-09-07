@@ -297,6 +297,43 @@ class TestCerrarYReabrir:
         r = cliente.post(f"/conciliaciones/mesa/{mid}/cerrar")
         assert r.json()["resumen"]["sin_repartir"] == 1
 
+    def test_si_la_memoria_falla_la_mesa_SE_CIERRA_IGUAL(self, cliente, monkeypatch):
+        """Aprender es un extra; cerrar es lo que el auditor vino a hacer.
+
+        Caso real (07-09-2026): en el PC del hospital cerrar contestó «no se
+        pudo» sobre una mesa de 146 renglones ya trabajada. La audiencia
+        terminada y el acta sin cerrar por un accesorio.
+        """
+        from app.services import acta_conciliacion_armar as armador
+
+        mid, _ = self._una(cliente)
+
+        def revienta(*a, **kw):
+            raise RuntimeError("no such table: conciliacion_tipificacion")
+
+        monkeypatch.setattr(armador, "aprender", revienta)
+        r = cliente.post(f"/conciliaciones/mesa/{mid}/cerrar")
+        assert r.status_code == 200
+        assert r.json()["estado"] == "CERRADA"
+        # Y se dice qué pasó, en vez de fingir que se guardó.
+        assert "no se pudo guardar la tipificación" in r.json()["aviso_memoria"]
+        assert "conciliacion_tipificacion" in r.json()["aviso_memoria"]
+
+    def test_y_queda_cerrada_de_verdad(self, cliente, monkeypatch):
+        from app.services import acta_conciliacion_armar as armador
+
+        mid, lid = self._una(cliente)
+        monkeypatch.setattr(
+            armador, "aprender", lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("x"))
+        )
+        cliente.post(f"/conciliaciones/mesa/{mid}/cerrar")
+        assert (
+            cliente.patch(
+                f"/conciliaciones/mesa/{mid}/linea/{lid}", json={"acepta_ips": 1}
+            ).status_code
+            == 409
+        )
+
     def test_reabrir_devuelve_la_mesa_al_trabajo(self, cliente):
         mid, lid = self._una(cliente)
         cliente.post(f"/conciliaciones/mesa/{mid}/cerrar")
