@@ -1,5 +1,24 @@
 # Registro de cambios
 
+## Sesión 07-sep-2026 (hotfix) — El acta generada abría «[Reparado]»
+
+- **`_reponer_lo_que_openpyxl_se_lleva()`** — openpyxl no edita el `.xlsm`, lo
+  reconstruye, y descarta 3 de los 5 `definedNames` del modelo (los
+  `_FilterDatabase` de ACTA, GLOSAS y TRAMITES), dejando el superviviente
+  reasignado a `Hoja3`. También pierde `printerSettings` y las rels de una
+  hoja. Se repone todo desde el original tras guardar. `calcChain.xml` y
+  `sharedStrings.xml` se dejan fuera a propósito: son cachés, y un calcChain
+  previo a la escritura es en sí mismo un disparador de reparación.
+- **`_borrar_renglones_sobrantes()`** — el modelo trae 260 filas prebordeadas;
+  un acta de 3 líneas salía con 257 de cuadrícula vacía. Se les quita borde y
+  relleno en vez de borrar las filas: `delete_rows` correría el pie del acta
+  (bloque de observaciones y firmas, en celdas combinadas) y lo rompería. El
+  fin de la banda de datos se detecta por la primera combinación bajo el
+  encabezado, no por un número fijo.
+- **11 pruebas nuevas**: los 5 nombres sobreviven y cada autofiltro sigue en
+  su hoja, no falta ninguna parte salvo las dos cachés, las líneas reales
+  conservan su formato y el pie no se movió.
+
 ## Sesión 07-sep-2026 (tarde) — Armar el ACTA SINAC desde la lista y el archivo de la EPS
 
 Faltaba el paso de **aguas arriba** del módulo de conciliación: ya se sabía

@@ -517,6 +517,87 @@ def _fila_encabezado_tabla(ws) -> tuple[int, dict[str, int]]:
     return 0, {}
 
 
+def _fin_de_la_banda_de_datos(ws, fila_encabezado: int) -> int:
+    """Hasta qué fila llegan los renglones de datos del modelo.
+
+    El pie del acta (el bloque de observaciones y las firmas) vive en celdas
+    COMBINADAS debajo de la tabla. Esa es la señal más confiable de dónde
+    termina la banda de datos: la primera combinación que empieza por debajo
+    del encabezado marca el arranque del pie.
+    """
+    inicios = [r.min_row for r in ws.merged_cells.ranges if r.min_row > fila_encabezado + 1]
+    return (min(inicios) - 1) if inicios else fila_encabezado + 260
+
+
+def _borrar_renglones_sobrantes(ws, primera_libre: int, fin_banda: int) -> int:
+    """Le quita el formato a los renglones de la tabla que no se usaron.
+
+    El modelo trae 260 renglones con bordes ya puestos, y un acta de tres
+    líneas salía con 257 filas de cuadrícula vacía debajo. NO se borran las
+    filas: borrarlas correría el pie del acta hacia arriba y rompería sus
+    celdas combinadas. Se les quita el borde y el relleno, que es lo que se
+    ve, y la fila queda invisible sin mover nada.
+    """
+    from openpyxl.styles import Border, PatternFill
+
+    sin_borde, sin_relleno = Border(), PatternFill()
+    limpiadas = 0
+    for fila in range(primera_libre, fin_banda + 1):
+        for col in range(1, ws.max_column + 1):
+            celda = ws.cell(fila, col)
+            celda.value = None
+            celda.border = sin_borde
+            celda.fill = sin_relleno
+        limpiadas += 1
+    return limpiadas
+
+
+def _reponer_lo_que_openpyxl_se_lleva(guardado: bytes, original: bytes) -> bytes:
+    """Devuelve al libro las partes que openpyxl descarta al guardar un .xlsm.
+
+    EL PROBLEMA QUE ARREGLA. Excel abría el acta generada diciendo
+    «[Reparado]». La causa: openpyxl no edita el archivo, lo RECONSTRUYE, y
+    en el camino se lleva por delante **3 de los 5 nombres definidos** del
+    modelo —los autofiltros de ACTA, GLOSAS y TRAMITES— dejando el único que
+    sobrevive apuntando a otra hoja. También pierde la configuración de
+    impresora y las relaciones de una hoja.
+
+    Un acta que Excel tiene que reparar es un acta que el auditor no sabe si
+    puede firmar. Acá se toma el libro que armó openpyxl y se le reponen,
+    tal cual venían del modelo, las partes que faltan.
+
+    Las dos que NO se reponen son a propósito: `calcChain.xml` y
+    `sharedStrings.xml` son cachés que Excel reconstruye solo, y un
+    `calcChain` viejo —de antes de escribir los datos— es justamente otra de
+    las cosas que disparan la reparación.
+    """
+    import zipfile
+
+    caches = ("xl/calcChain.xml", "xl/sharedStrings.xml")
+    zo = zipfile.ZipFile(BytesIO(original))
+    zg = zipfile.ZipFile(BytesIO(guardado))
+    presentes = set(zg.namelist())
+
+    libro = zg.read("xl/workbook.xml").decode("utf-8")
+    bloque = re.search(
+        r"<definedNames>.*?</definedNames>", zo.read("xl/workbook.xml").decode("utf-8"), re.S
+    )
+    if bloque:
+        libro = re.sub(r"<definedNames>.*?</definedNames>", "", libro, flags=re.S)
+        libro = libro.replace("<calcPr", bloque.group(0) + "<calcPr", 1)
+
+    salida = BytesIO()
+    with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as z:
+        for nombre in zg.namelist():
+            z.writestr(
+                nombre, libro.encode("utf-8") if nombre == "xl/workbook.xml" else zg.read(nombre)
+            )
+        for nombre in zo.namelist():
+            if nombre not in presentes and nombre not in caches:
+                z.writestr(nombre, zo.read(nombre))
+    return salida.getvalue()
+
+
 def escribir_en_modelo(
     resultado: Resultado,
     modelo: bytes,
@@ -592,10 +673,19 @@ def escribir_en_modelo(
                     continue
             destino.value = valor if valor != "" else None
 
+    # Los renglones del modelo que no se usaron: se les quita el formato para
+    # que el acta no salga con cientos de filas de cuadrícula vacía debajo.
+    primera_libre = fila_enc + 1 + len(acta.lineas)
+    fin_banda = _fin_de_la_banda_de_datos(ws, fila_enc)
+    if primera_libre <= fin_banda:
+        _borrar_renglones_sobrantes(ws, primera_libre, fin_banda)
+
     salida = BytesIO()
     wb.save(salida)
     wb.close()
-    return salida.getvalue()
+    # Y se le repone lo que openpyxl se llevó, o Excel abre el acta diciendo
+    # «[Reparado]» y el auditor no sabe si puede firmarla.
+    return _reponer_lo_que_openpyxl_se_lleva(salida.getvalue(), modelo)
 
 
 # ═══════════════════════════════════════════════════════════════════════

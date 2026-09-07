@@ -91,6 +91,39 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 07-09-2026 (tarde, 3) — El acta ya no sale «[Reparado]» ni con cuadrícula de sobra
+
+**Lo que reportó Yesid.** Al abrir el acta que arma el motor, Excel decía
+**«[Reparado]»** — o sea que había encontrado algo dañado y lo había
+arreglado por su cuenta. Y debajo de los renglones con datos quedaban
+cientos de filas de cuadrícula vacía.
+
+**Por qué pasaba lo del reparado.** La librería que escribe el Excel **no
+edita el archivo: lo vuelve a construir entero**, y en el camino se llevaba
+por delante tres de los cinco «nombres definidos» del modelo — los filtros
+automáticos de las hojas ACTA, GLOSAS y TRAMITES. Peor: el único que
+sobrevivía quedaba apuntando a la hoja equivocada.
+
+Un acta que Excel tiene que reparar es un acta que uno no sabe si puede
+firmar. Y esa sale de una mesa con una EPS.
+
+**Lo que se hizo.** Ahora, después de escribir, se le repone al archivo todo
+lo que la librería se llevó, tal cual venía del modelo. Los cinco nombres
+vuelven, cada uno a su hoja, junto con la configuración de impresión — que
+no es un detalle, porque el acta se imprime para firmarla.
+
+**Lo de la cuadrícula.** El modelo trae 260 renglones con los bordes ya
+puestos, listos para llenar. Un acta de tres líneas salía con 257 filas
+vacías dibujadas debajo. Ahora se les quita el borde y desaparecen.
+
+**No se borran las filas, se les quita el formato**, y la diferencia importa:
+borrarlas correría hacia arriba el pie del acta —el bloque de observaciones y
+las firmas, que está en celdas combinadas— y lo rompería.
+
+11 pruebas nuevas que impiden que las dos cosas vuelvan.
+
+---
+
 ### 07-09-2026 (tarde, 3) — «Plata recuperada» se resistía a irse del menú
 
 Al aplicar lo del día anterior (ocultar cuatro botones), **tres se fueron**
