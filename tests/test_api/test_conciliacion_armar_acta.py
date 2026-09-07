@@ -147,6 +147,37 @@ class TestVerQueSaleAntesDeGenerar:
         assert "MIXTA" in d["avisos"][0]["motivo"]
         assert d["avisos"][0]["factura"] == "HUS0000542497"
 
+    def test_el_mismo_aviso_de_la_misma_factura_no_se_repite(self, cliente):
+        """Caso real (07-09-2026): HUS0000453962 tenía tres glosas CO4601 y
+        la lista mostró tres veces la misma frase, tapando los avisos
+        distintos que venían detrás. Cada renglón sigue teniendo su aviso —
+        la mesa los marca uno por uno—; lo que se agrupa es el resumen."""
+        r = _armar(
+            cliente,
+            _lista("542497"),
+            _eps(("542497", "CO4601", 100), ("542497", "CO4601", 200), ("542497", "CO4601", 300)),
+            solo_revisar="true",
+        )
+        d = r.json()
+        assert len(d["avisos"]) == 1, "el resumen repitió el mismo aviso"
+        assert d["avisos"][0]["renglones"] == 3, "no dice cuántos renglones son"
+        # El total NO se agrupa: es el trabajo que hay por delante.
+        assert d["total_avisos"] == 3
+
+    def test_avisos_distintos_de_la_misma_factura_se_muestran_todos(self):
+        """Agrupar no puede esconder un motivo diferente."""
+        from app.api.routers.conciliacion import _avisos_agrupados
+        from app.services.acta_conciliacion_armar import Aviso
+
+        agrupados = _avisos_agrupados([
+            Aviso("HUS1", "falta el tipo", 2),
+            Aviso("HUS1", "falta el tipo", 3),
+            Aviso("HUS1", "familia CO sin tipificación", 4),
+            Aviso("HUS2", "falta el tipo", 5),
+        ])
+        assert len(agrupados) == 3
+        assert [a["renglones"] for a in agrupados] == [2, 1, 1]
+
     def test_lo_que_venia_en_la_eps_y_no_en_la_lista_se_dice(self, cliente):
         r = _armar(cliente, _lista("542497"), _eps(("999999", "TA0201", 10)), solo_revisar="true")
         assert r.json()["fuera_de_lista"] == ["999999"]

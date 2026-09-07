@@ -685,6 +685,37 @@ def _acta_o_400(contenido: bytes):
         raise HTTPException(400, "No se pudo leer el Excel: ¿es el formato del acta de la mesa?")
 
 
+def _avisos_agrupados(avisos) -> list[dict]:
+    """La lista de avisos SIN repetir el mismo mensaje de la misma factura.
+
+    Cada renglón que necesita a una persona genera su aviso, y eso está bien
+    por dentro: la mesa marca cada renglón. Pero al leer el resumen, una
+    factura con tres glosas CO4601 mostraba tres veces la misma frase y
+    parecía un error del sistema.
+
+    Caso real (07-09-2026): en la primera corrida con archivos de verdad,
+    HUS0000453962 apareció tres veces seguidas con el mismo texto y ocupó la
+    mitad de la lista, tapando los avisos distintos que venían detrás.
+
+    Se agrupa por factura y motivo, y se dice cuántos renglones son. El
+    conteo total NO cambia: sigue siendo el de renglones, que es el trabajo
+    que hay por delante.
+    """
+    vistos: dict[tuple[str, str], dict] = {}
+    for a in avisos:
+        clave = (a.factura, a.motivo)
+        if clave in vistos:
+            vistos[clave]["renglones"] += 1
+            continue
+        vistos[clave] = {
+            "factura": a.factura,
+            "motivo": a.motivo,
+            "fila_eps": a.fila_excel,
+            "renglones": 1,
+        }
+    return list(vistos.values())
+
+
 async def _leer_los_dos_archivos(facturas, archivo_eps) -> tuple[list[str], list[dict]]:
     """La lista de facturas y el consolidado de la EPS, ya leídos y validados.
 
@@ -1025,10 +1056,7 @@ async def acta_excel_armar(
         "facturas_en_lista": len(lista),
         "sin_glosas": resultado.sin_glosas[:100],
         "fuera_de_lista": resultado.fuera_de_lista[:100],
-        "avisos": [
-            {"factura": a.factura, "motivo": a.motivo, "fila_eps": a.fila_excel}
-            for a in resultado.avisos[:100]
-        ],
+        "avisos": _avisos_agrupados(resultado.avisos)[:100],
         "total_avisos": len(resultado.avisos),
     }
     if solo_revisar:
