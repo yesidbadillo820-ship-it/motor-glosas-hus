@@ -169,7 +169,6 @@ def test_el_texto_de_topes_queda_guardado_pero_no_se_aplica_solo(coo):
 def _cruces_con(descripciones: dict[str, str]) -> dict:
     """cruces minimos con solo el indice de descripciones de una factura."""
     import sys
-    from pathlib import Path
 
     sys.path.insert(0, str(_TOOLS))
     try:
