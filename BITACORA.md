@@ -91,6 +91,23 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 07-09-2026 — Clasificador por régimen para re-radicar COOSALUD (Excel «PARA BRAYAN»)
+
+Llegó un Excel con **356 facturas** que hay que volver a radicar a COOSALUD,
+separadas por régimen. Nació el bot **`tools/clasificar_regimen_coosalud.py`**
+(con su doble clic `CLASIFICAR_REGIMEN_COOSALUD.cmd`): busca cada factura en
+el share de facturación electrónica (`\\172.16.32.83\...\AAAAMM\FACTURAS_SALUD\`),
+lee el **RIPS** para saber si el paciente es **Subsidiado o Contributivo**
+(entiende el RIPS JSON nuevo y los TXT viejos), copia la carpeta completa de
+soportes (XML, PDF, RIPS, CUV) a la carpeta maestra de su régimen y deja un
+**Excel de auditoría** que cruza las fechas de atención/egreso del RIPS contra
+las de ingreso/egreso del XML de la factura, con la columna
+**Alerta_Diferencia (SI/NO)** pintada en rojo/verde. Lo que no se puede
+clasificar queda en `SIN_CLASIFICAR\` con la razón anotada — nada se inventa.
+Con 7 pruebas de pytest (share simulado con los dos formatos de RIPS).
+**Pendiente:** correr el piloto de 5 facturas en el PC del hospital y revisar
+que las fechas del XML salgan de donde esperamos.
+
 ### 07-09-2026 — Tres cosas que iban a fallar en producción, y ninguna prueba las veía
 
 No las destapó un error del auditor ni una prueba: salieron de revisar el
