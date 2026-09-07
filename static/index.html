@@ -2381,7 +2381,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           <span class="sn-item-label">Expediente</span>
         </button>
-        <button class="sn-item" data-solo-coordinacion="1" data-tip="Plata recuperada" onclick="sidebarTab(this,'plata')" id="sn-plata">
+        <!-- 04-09-2026: Yesid pidió quitarlos del menú («nunca tendrán utilidad»).
+             Se ocultan (como «Plantillas Gold»), no se borran: reversible quitando
+             el display:none, y sin tocar el panel ni el backend. -->
+        <button class="sn-item" data-solo-coordinacion="1" data-tip="Plata recuperada" onclick="sidebarTab(this,'plata')" id="sn-plata" style="display:none">
           <svg class="i i-md" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           <span class="sn-item-label">Plata recuperada</span>
         </button>
@@ -2399,7 +2402,8 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3"/></svg>
           <span class="sn-item-label">Automatización</span>
         </button>
-        <button class="sn-item" data-tip="Alertas" onclick="sidebarTab(this,'alertas')">
+        <!-- 04-09-2026: oculto a pedido de Yesid (ver nota arriba). Reversible. -->
+        <button class="sn-item" data-tip="Alertas" onclick="sidebarTab(this,'alertas')" style="display:none">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M6 8A6 6 0 0 1 18 8C18 15 21 17 21 17H3S6 15 6 8"/><path d="M10.3 21A1.94 1.94 0 0 0 13.7 21"/></svg>
           <span class="sn-item-label">Alertas</span>
           <span class="sn-badge" id="alert-badge-side" style="display:none">0</span>
@@ -2454,7 +2458,9 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 22S20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
           <span class="sn-item-label">Pre-Auditoría</span>
         </button>
-        <button class="sn-item" data-tip="Resumen mensual ejecutivo" onclick="sidebarTab(this,'resumen-mes')">
+        <!-- 04-09-2026: oculto a pedido de Yesid (ver nota arriba). Reversible.
+             También se quita de la barra consolidada de Reportes (pintarRepTabbars). -->
+        <button class="sn-item" data-tip="Resumen mensual ejecutivo" onclick="sidebarTab(this,'resumen-mes')" style="display:none">
           <svg class="i i-md" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <span class="sn-item-label">Resumen del mes</span>
         </button>
@@ -2462,7 +2468,8 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 22S20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z"/><path d="M9 12L11 14L15 10"/></svg>
           <span class="sn-item-label">Auditoría</span>
         </button>
-        <button class="sn-item" data-tip="Gobierno de IA (coordinación)" onclick="sidebarTab(this,'gobierno-ia')" id="sn-gobierno-ia">
+        <!-- 04-09-2026: oculto a pedido de Yesid (ver nota arriba). Reversible. -->
+        <button class="sn-item" data-tip="Gobierno de IA (coordinación)" onclick="sidebarTab(this,'gobierno-ia')" id="sn-gobierno-ia" style="display:none">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M12 8v4M12 16h.01"/></svg>
           <span class="sn-item-label">Gobierno IA</span>
         </button>
@@ -13982,7 +13989,8 @@ function pintarRepTabbars(){
   if(verMando) tabs.push(['mando', '⚡ Mando']);
   tabs.push(['dashboard', '📊 Dashboard']);
   tabs.push(['glosas-adres', '📄 Glosas ADRES']);
-  tabs.push(['resumen-mes', '📅 Resumen del mes']);
+  // 04-09-2026: «Resumen del mes» salía dos veces (menú lateral y esta barra).
+  // Yesid pidió quitarlo: se saca también de acá. El panel sigue existiendo.
   document.querySelectorAll('.rep-tabbar-host').forEach(function(host){
     var activo = host.getAttribute('data-activo');
     host.innerHTML = '<div class="rep-tabbar">' + tabs.map(function(t){
@@ -25446,10 +25454,10 @@ function _spotComandos(query){
     'analizar':'analizar','analiz':'analizar',
     'mis glosas':'mis-glosas','pendientes':'mis-glosas',
     'historial':'historial',
-    'alertas':'alertas','vencidas':'alertas',
+    // 04-09-2026: «Alertas» y «Resumen del mes» se ocultaron del menú a pedido
+    // de Yesid; se quitan también de los atajos de Ctrl+K para no reabrirlos.
     'dashboard':'dashboard','tablero':'dashboard',
     'adres':'glosas-adres','glosas adres':'glosas-adres','paquete':'glosas-adres',
-    'resumen del mes':'resumen-mes','resumen mes':'resumen-mes','resumen':'resumen-mes',
     'auditoria':'audit','auditoría':'audit','audit log':'audit',
     'usuarios':'usuarios','equipo':'usuarios',
     'contratos':'contratos',
