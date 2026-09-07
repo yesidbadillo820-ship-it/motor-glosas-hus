@@ -239,14 +239,26 @@ class RipsRecienNacido(_Base):
         return "" if v is None else str(v).strip()
 
 
+# Techos de cordura. No están para acotar una factura de verdad —la más
+# grande que hemos visto, HUS559077, ronda los 700 servicios— sino para que
+# un archivo equivocado (un RIPS de cápita, un mes entero en un solo envío)
+# se rechace ANTES de convertirse en objetos. Sin ellos, Pydantic construye
+# el cuerpo completo en memoria antes de que nada lo revise, y el motor es
+# UN SOLO PROCESO para todo el hospital: lo que lo tumba, lo tumba para todos.
+MAX_POR_FAMILIA = 20000
+MAX_USUARIOS = 5000
+
+
 class RipsServicios(_Base):
-    consultas: list[RipsConsulta] = Field(default_factory=list)
-    procedimientos: list[RipsProcedimiento] = Field(default_factory=list)
-    urgencias: list[RipsEpisodio] = Field(default_factory=list)
-    hospitalizacion: list[RipsEpisodio] = Field(default_factory=list)
-    recienNacidos: list[RipsRecienNacido] = Field(default_factory=list)
-    medicamentos: list[RipsMedicamento] = Field(default_factory=list)
-    otrosServicios: list[RipsOtroServicio] = Field(default_factory=list)
+    consultas: list[RipsConsulta] = Field(default_factory=list, max_length=MAX_POR_FAMILIA)
+    procedimientos: list[RipsProcedimiento] = Field(
+        default_factory=list, max_length=MAX_POR_FAMILIA
+    )
+    urgencias: list[RipsEpisodio] = Field(default_factory=list, max_length=MAX_POR_FAMILIA)
+    hospitalizacion: list[RipsEpisodio] = Field(default_factory=list, max_length=MAX_POR_FAMILIA)
+    recienNacidos: list[RipsRecienNacido] = Field(default_factory=list, max_length=MAX_POR_FAMILIA)
+    medicamentos: list[RipsMedicamento] = Field(default_factory=list, max_length=MAX_POR_FAMILIA)
+    otrosServicios: list[RipsOtroServicio] = Field(default_factory=list, max_length=MAX_POR_FAMILIA)
 
     @field_validator(
         "consultas",
@@ -297,7 +309,7 @@ class RipsFactura(_Base):
     numFactura: str = Field(..., min_length=1, max_length=50)
     tipoNota: Optional[str] = None
     numNota: Optional[str] = None
-    usuarios: list[RipsUsuario] = Field(..., min_length=1)
+    usuarios: list[RipsUsuario] = Field(..., min_length=1, max_length=MAX_USUARIOS)
 
     # ── Acompañantes fuera de la norma RIPS. Opcionales. ──
     eps: str = Field(default="", max_length=200)

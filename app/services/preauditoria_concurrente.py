@@ -29,7 +29,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -66,7 +66,7 @@ RESERVA_ESCRITURA_S = 0.5
 ESTADOS_QUE_PASAN = (PA_APROBADO, PA_ADVERTENCIA)
 
 
-def resumen(db: Session, limite_facturas: int = 5000) -> dict:
+def resumen(db: Session, dias: int = 90) -> dict:
     """Las cifras del tablero de pre-auditoría.
 
     **Dinero salvado** es la suma del `valor_en_riesgo` de las facturas que
@@ -81,7 +81,19 @@ def resumen(db: Session, limite_facturas: int = 5000) -> dict:
 
     Una sola consulta ordenada y un recorrido en memoria: nada de una
     consulta por factura.
+
+    LA VENTANA ES POR FECHA, NO POR NÚMERO DE FILAS. Antes había un
+    `limit(5000)` sobre un orden ASCENDENTE, o sea que se quedaba con los
+    5.000 eventos MÁS VIEJOS: a unas 200 facturas diarias, al mes el tablero
+    congelaba las cifras del primer mes y la plata salvada dejaba de crecer
+    sin que nadie se enterara. Para una cifra que mira gerencia, fallar en
+    silencio y a la baja es el peor modo de falla que hay.
+
+    El orden ascendente SÍ se queda: «la bloquearon y después pasó» solo se
+    puede leer recorriendo el tiempo hacia adelante. Lo que se fue es el tope
+    por filas. El índice `ix_pre_auditoria_estado_creado` cubre el filtro.
     """
+    desde = datetime.now(timezone.utc) - timedelta(days=dias)
     filas = (
         db.query(
             PreAuditoriaEventoRecord.factura,
@@ -89,8 +101,8 @@ def resumen(db: Session, limite_facturas: int = 5000) -> dict:
             PreAuditoriaEventoRecord.valor_en_riesgo,
             PreAuditoriaEventoRecord.creado_en,
         )
+        .filter(PreAuditoriaEventoRecord.creado_en >= desde)
         .order_by(PreAuditoriaEventoRecord.id.asc())
-        .limit(limite_facturas)
         .all()
     )
 
@@ -121,6 +133,8 @@ def resumen(db: Session, limite_facturas: int = 5000) -> dict:
         "facturas_corregidas": sum(1 for k in bloqueado if paso_despues.get(k)),
         "dinero_salvado": salvado,
         "riesgo_sin_resolver": sin_resolver,
+        # El periodo va en la respuesta: «desde siempre» sería mentira.
+        "dias": dias,
     }
 
 

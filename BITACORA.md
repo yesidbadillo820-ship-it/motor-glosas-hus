@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 04-09-2026 (noche)
+**Última actualización:** 07-09-2026
 
 ---
 
@@ -89,6 +89,52 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 07-09-2026 — Tres cosas que iban a fallar en producción, y ninguna prueba las veía
+
+No las destapó un error del auditor ni una prueba: salieron de revisar el
+código a conciencia buscando qué se puede romper cuando el uso crezca. Las
+tres viven en la letra chica y solo aparecen **con volumen o con el paso del
+tiempo**, que es justamente cuando ya hay gente dependiendo del sistema.
+
+**1. Una factura grande tumbaba la respuesta.** Pasando los 2.000 renglones,
+la Pre-Auditoría contestaba con un error de servidor en vez de un dictamen.
+Una estancia larga de UCI llega a esa cifra **solo en medicamentos e insumos
+del día a día**, así que no es un caso raro: es la factura cara, la que más
+importa revisar. El facturador quedaba sin respuesta y sin saber si timbrar.
+
+Ahora aguanta hasta 20.000 renglones. Y si de verdad llega un archivo
+equivocado —un envío de cápita, un mes entero en un solo archivo— lo rechaza
+**diciendo qué pasó y qué hacer**, en vez de morirse. Importa que rechace y no
+que recorte: descartar renglones en silencio dentro de una auditoría de plata
+es peor que decir «esto no lo puedo revisar así».
+
+**2. La pantalla del tablero se traía media base de datos para no mostrarla.**
+Cada evaluación guarda el archivo del HIS tal como llegó, y el de una factura
+grande pesa medio megabyte. La lista del tablero los cargaba **todos** —hasta
+500 de una— para pintar una tabla que no muestra ni una letra de ese archivo.
+Son unos 265 MB por cada vez que alguien abría la pantalla. Con dos personas
+mirando al tiempo, se caía el motor entero, no solo el tablero.
+
+Ahora la lista pide únicamente las columnas que se ven. El archivo completo se
+sigue leyendo cuando uno abre **una** factura, que es donde hace falta.
+
+**3. «Dinero salvado» se iba a congelar al mes, sin avisar.** La cifra se
+calculaba sobre las primeras 5.000 evaluaciones. A unas 200 facturas diarias
+eso es un mes: de ahí en adelante el tablero habría seguido mostrando los
+números del primer mes, la plata salvada habría dejado de crecer y **nadie se
+habría dado cuenta**. Para el número que va a mirar gerencia, equivocarse en
+silencio y hacia abajo es lo peor que puede pasar.
+
+Ahora la cifra cubre **los últimos 90 días**, sin tope de filas, y el tablero
+dice el periodo que está mostrando — «desde siempre» era mentira.
+
+12 pruebas nuevas. Cuatro existen por el riesgo del propio arreglo: que al
+acotar la consulta no se hubiera vaciado la pantalla, que el detalle de una
+factura siga trayendo sus reparos, que la definición estricta de dinero
+salvado no se haya aflojado, y que nadie vuelva a poner el tope viejo.
+
+---
 
 ### 04-09-2026 (noche, 5) — La primera factura de verdad destapó dos falsos positivos
 

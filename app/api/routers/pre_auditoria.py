@@ -27,7 +27,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, ValidationError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from app.api.deps import get_auditor_o_superior, oauth2_scheme
 from app.core.config import get_settings
@@ -81,7 +81,20 @@ def _leer_cuerpo(cuerpo: dict) -> tuple[PayloadFactura, list[str]]:
             rips = RipsFactura.model_validate(cuerpo)
         except ValidationError as e:
             raise HTTPException(422, f"El RIPS no se pudo leer: {e.errors()[:3]}") from e
-        return traducir(rips)
+        try:
+            return traducir(rips)
+        except ValidationError as e:
+            # `traducir` arma un PayloadFactura, que tiene su propio tope de
+            # ítems. Sin este atajo el ValidationError salía crudo como HTTP
+            # 500 —justo lo que el docstring de abajo promete que no pasa— y
+            # el facturador quedaba sin dictamen y sin saber si timbrar.
+            raise HTTPException(
+                422,
+                "El RIPS es demasiado grande para pre-auditar en una sola llamada "
+                f"({len(e.errors())} problema(s) de tamaño). Divídalo por usuario, o "
+                "suba el tope de `items` en preauditoria_contrato.py si esta factura "
+                "es legítima.",
+            ) from e
 
     try:
         payload = PayloadFactura.model_validate(cuerpo)
@@ -179,7 +192,30 @@ def listar_eventos(
     _: UsuarioRecord = Depends(get_auditor_o_superior),
 ) -> list[EventoDTO]:
     """Lo que se ha pre-auditado, de lo más nuevo a lo más viejo."""
-    consulta = db.query(PreAuditoriaEventoRecord)
+    # Solo las columnas que la tabla pinta. Sin esto, SQLAlchemy trae la
+    # entidad entera —incluido `payload_base`, que guarda el RIPS tal como
+    # llegó: 531 KB en la factura HUS559077— y con `limite=500` son ~265 MB
+    # en memoria para dibujar una tabla que no muestra ni un byte de ese
+    # campo. Dos auditores refrescando a la vez y se muere el proceso, y con
+    # él todo el motor. El payload completo se sigue leyendo en
+    # /eventos/{id}, que es donde hace falta y es UNA fila.
+    consulta = db.query(PreAuditoriaEventoRecord).options(
+        load_only(
+            PreAuditoriaEventoRecord.id,
+            PreAuditoriaEventoRecord.creado_en,
+            PreAuditoriaEventoRecord.factura,
+            PreAuditoriaEventoRecord.eps,
+            PreAuditoriaEventoRecord.estado,
+            PreAuditoriaEventoRecord.recomendacion_accion,
+            PreAuditoriaEventoRecord.valor_en_riesgo,
+            PreAuditoriaEventoRecord.valor_factura,
+            PreAuditoriaEventoRecord.total_alertas,
+            PreAuditoriaEventoRecord.cruce_clinico_estado,
+            PreAuditoriaEventoRecord.modelo_utilizado,
+            PreAuditoriaEventoRecord.duracion_ms,
+            PreAuditoriaEventoRecord.actor,
+        )
+    )
     if factura:
         consulta = consulta.filter(PreAuditoriaEventoRecord.factura == factura.strip())
     if estado:
