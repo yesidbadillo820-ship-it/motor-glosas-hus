@@ -140,6 +140,44 @@ la lee y la cuadra el mismo revisor que ya existía, sin un solo hallazgo.
 
 ---
 
+### 07-09-2026 — COOSALUD: paquete de 560 facturas y el copago que tumbaba el cargue
+
+Llegó el paquete **COOSALUD_07092026** (GI-33-5434-2026): **560 facturas,
+66.388 glosas, $5.841.913.158**. Radicadas entre el 31/07 y el 13/08, glosadas
+el 07/09 — o sea que el **62% llegó extemporáneo** (40.986 glosas por
+$3.653.206.514 van con la aceptación tácita del artículo 57 de la Ley 1438).
+La respuesta en el portal vence el **14/09/2026**.
+
+Quedó organizado, consolidado y con los dos archivos de OBJECIONES (300 y 260
+facturas, que es el tope de DGH), las 4 listas para correr el portal en
+paralelo y el Excel de control con el GI ya escrito.
+
+**El copago ya no tumba el cargue.** El bot solo capaba las objeciones cuando
+se le pasaba la base de servicios de DGH. Pero el dato para capar **no es de
+DGH**: el valor del servicio y la cuota moderadora vienen del propio DETALLE de
+COOSALUD. Con la base sin bajar, las 11 facturas con copago salían objetando el
+valor completo del servicio y DGH las rechaza con *«El VALOR OBJECION no puede
+ser mayor al valor del servicio»* — y como el cargue es todo o nada, se caía el
+archivo entero.
+
+Ahora el guardián de valor corre **siempre**. Sin base DGH el tope sale del
+detalle de COOSALUD: por cada (factura, servicio), la **suma** del valor de sus
+líneas menos la suma de sus copagos — la misma regla de capacidad que enseñaron
+las 8 estancias. En este lote capó **167 objeciones** (136 por copago), sin
+perder ni una línea, y la revisión de las 62.130 filas contra el tope da **cero
+servicios por encima**. Son $500.534 menos objetados: justo la parte que paga
+el paciente. Cada ajuste queda en la hoja `VALOR_AJUSTADO` del archivo
+`REVISAR (no van en el cargue)`. 4 pruebas nuevas.
+
+**Las doctoras solo contestan CALIDAD.** El bot venía metiendo COBERTURA en el
+mismo saco y sacaba la factura completa a esperar auditoría médica. Cobertura
+la contesta cartera. Ahora se reportan aparte: 783 glosas de CALIDAD en 36
+facturas esperan a las doctoras, y 281 de COBERTURA en **una sola** factura
+(HUS545379, $47.882.455) esperan a que el área defina el texto — son CO4601,
+accidente de tránsito, la EPS pide agotar primero los topes del SOAT.
+
+---
+
 ### 07-09-2026 — Tres cosas que iban a fallar en producción, y ninguna prueba las veía
 
 No las destapó un error del auditor ni una prueba: salieron de revisar el
@@ -187,6 +225,44 @@ salvado no se haya aflojado, y que nadie vuelva a poner el tope viejo.
 ---
 
 ---
+
+### 07-09-2026 (noche) — «Cuidados Inteligentes»: la app del expediente médico
+
+**Lo que se pidió.** Que el tablero del frente personal (proyecto 12) dejara de
+parecer una página y se comportara como un programa de verdad: que responda
+«¿qué tengo que hacer hoy?», que uno le suba cualquier documento y ella sola lo
+lea y lo archive donde va, y que avise cuando dos papeles se contradicen.
+
+**Lo que se entregó (página privada + archivo, nada de datos al repositorio).**
+- **Cinco pantallas** con barra de navegación abajo (como una app de celular):
+  Inicio, Servicios, Documentos, Agenda y Más.
+- **Inicio** abre con lo urgente numerado y el botón para llamar al prestador;
+  debajo, el resumen, los vencimientos de los próximos 30 días, las
+  contradicciones y «¿qué cambió?».
+- **Analizar documento**: acepta PDF y **fotos tomadas con el celular**. Lee,
+  dice qué encontró («He detectado»), señala de qué página salió cada dato,
+  busca si el servicio ya existe y **actualiza sin duplicar**, diciendo
+  exactamente qué cambió.
+- **Expediente por servicio** con su trayecto (orden → solicitud →
+  autorización → inicio → seguimiento → vencimiento → renovación) y cada hito
+  enlazado a su documento.
+- **Ocho contradicciones** encontradas entre los propios documentos, todas con
+  su cita y su página. Dos ejemplos: la fórmula ordena un medicamento por sonda
+  de gastrostomía cuando la historia registra sonda nasogástrica; y dos
+  medicamentos del plan no aparecen en la fórmula del mismo día.
+- **Agenda** en calendario, lista y línea de tiempo; **módulo de medicamentos**
+  con fechas de renovación; **ficha de la paciente**; y todo lo anterior
+  (directorio, borradores, filtros, buscador) conservado.
+- **Accesibilidad y seguridad**: modo claro, oscuro y alto contraste; letra
+  A− / A / A+; el documento y el teléfono salen tapados por defecto; y **PIN
+  opcional** que se guarda cifrado (nunca el número en claro) con bloqueo
+  automático por inactividad.
+
+**Cómo se probó.** 42 pruebas automáticas en el navegador (Chromium), en 320,
+375, 390, 414, 768, 1024 y 1280 píxeles: navegación, carga de dos PDF reales,
+cruce sin duplicados, calendario, buscador, temas, PIN y desbordes. Las 42 en
+verde. De paso, la prueba destapó un error grave: al elegir un tema, el
+programa dejaba de responder a casi todos los botones. Ya quedó corregido.
 
 ### 07-09-2026 (tarde) — La app «Cuidados de Emely» ahora lee los PDF sola
 
@@ -11004,6 +11080,20 @@ valor leido del PDF o con el objetado.
 
 ## 3) PENDIENTE
 
+### COOSALUD — paquete del 07-09 (GI-33-5434-2026)
+- **DECISIÓN SUYA: el texto de COBERTURA.** Son 281 glosas CO4601 en la factura
+  HUS545379 ($47.882.455). Apenas el área dicte el texto, se deja fijo en
+  `consolidar_coosalud.py` junto a los de TARIFAS, AUTORIZACIÓN, FACTURACIÓN y
+  SOPORTES, y esa factura queda lista. No se inventa.
+- **Falta la base de servicios de DGH.** Bajar el export SERVICIOS FACTURADOS de
+  COOSALUD con facturación del **26/06/2026 al 02/08/2026** y recortarlo con
+  FILTRAR BASE DGH usando el TXT de las 560. Sin ella, SLNSERPRO lleva el CUPS
+  de COOSALUD y CTNCENCOS e IDRIPS van vacías. El tope de valor ya quedó
+  resuelto sin la base, pero el código y el centro de costos no.
+- **36 facturas esperan auditoría médica** (783 glosas de CALIDAD). Las gruesas:
+  HUS543423 ($46,9 mill), HUS543160 ($20,9 mill), HUS541431 ($17,2 mill),
+  HUS543764 ($15,8 mill).
+- **Responder el portal antes del 14/09/2026.** Eso sí se puede hacer ya.
 ### Cuidados médicos de la familiar — EPS Sura (07-09)
 - **Radicar el memorial de impulso** al proceso de la Supersalud (el plazo de
   respuesta ya se venció) y **la queja a Sura** por lo que sigue sin
@@ -11878,6 +11968,11 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
   son para que el área los mire, no se unieron por parecido.
 
 ## 4) PARA MAÑANA
+
+**COOSALUD 07-09 — lo primero.** Correr el portal con las 4 listas (vence el
+14/09) y, en paralelo, bajar de DGH la base de servicios del 26/06 al 02/08
+para poder regenerar los dos OBJECIONES con los códigos de DGH. Si el área ya
+dictó el texto de cobertura, se deja fijo en el bot y se cierra HUS545379.
 
 ### Cuidados médicos de la familiar — lo primero
 1. Radicar el **Borrador A** (impulso a la Supersalud) por el correo oficial
