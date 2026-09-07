@@ -581,7 +581,11 @@ ENCABEZADOS = (
 )
 
 
-def escribir_auditoria(resultados: list[Resultado], salida: Path) -> None:
+def escribir_auditoria(resultados: list[Resultado], salida: Path) -> Path:
+    """Guarda el Excel y devuelve la ruta real donde quedo.
+
+    Si `salida` esta abierta en Excel (PermissionError de Windows), NO se
+    pierde la corrida: se guarda con un sufijo de hora junto al original."""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
 
@@ -627,7 +631,17 @@ def escribir_auditoria(resultados: list[Resultado], salida: Path) -> None:
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = f"A1:{ws.cell(row=1, column=len(ENCABEZADOS)).column_letter}{ws.max_row}"
     salida.parent.mkdir(parents=True, exist_ok=True)
-    wb.save(salida)
+    try:
+        wb.save(salida)
+        return salida
+    except PermissionError:
+        alterna = salida.with_name(f"{salida.stem}_{datetime.now():%H%M%S}{salida.suffix}")
+        logger.warning(
+            f"'{salida.name}' esta abierto en Excel y Windows lo bloquea: "
+            f"guardo el informe como '{alterna.name}' para no perder la corrida."
+        )
+        wb.save(alterna)
+        return alterna
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -713,7 +727,7 @@ def main() -> int:
             f"[{i}/{len(facturas)}] {fac} → {r.regimen or '?'} | RIPS {rango_rips} | FE {rango_fe} | alerta {r.alerta}"
         )
 
-    escribir_auditoria(resultados, salida)
+    salida_real = escribir_auditoria(resultados, salida)
 
     conteo = Counter(r.regimen for r in resultados)
     alertas = sum(1 for r in resultados if r.alerta == "SI")
@@ -722,7 +736,7 @@ def main() -> int:
     for regimen, n in conteo.most_common():
         logger.info(f"  {regimen}: {n}")
     logger.info(f"  Con diferencia de fechas (Alerta SI): {alertas}")
-    logger.info(f"  Excel de auditoria: {salida}")
+    logger.info(f"  Excel de auditoria: {salida_real}")
     if not args.sin_copiar:
         logger.info(f"  Carpetas copiadas bajo: {args.destino}")
     return 0

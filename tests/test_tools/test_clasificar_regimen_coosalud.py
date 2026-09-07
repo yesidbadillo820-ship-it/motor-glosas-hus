@@ -188,6 +188,28 @@ class TestClasificacionYFechas:
         assert not (destino / "Subsidiado").exists()
         assert not (destino / "Contributivo").exists()
 
+    def test_excel_abierto_no_pierde_la_corrida(self, tmp_path, monkeypatch):
+        """Si el Excel de auditoria esta abierto (PermissionError de Windows),
+        el informe se guarda con sufijo de hora en vez de reventar al final."""
+        import openpyxl
+
+        original = openpyxl.Workbook.save
+        bloqueado = {"ya": False}
+
+        def save_con_bloqueo(self, filename):
+            if str(filename).endswith("AUDITORIA_FECHAS_REGIMEN.xlsx") and not bloqueado["ya"]:
+                bloqueado["ya"] = True
+                raise PermissionError(13, "Permission denied", str(filename))
+            return original(self, filename)
+
+        monkeypatch.setattr(openpyxl.Workbook, "save", save_con_bloqueo)
+        destino = _correr(tmp_path, "--sin-copiar")
+        assert not (destino / "AUDITORIA_FECHAS_REGIMEN.xlsx").exists()
+        respaldos = list(destino.glob("AUDITORIA_FECHAS_REGIMEN_*.xlsx"))
+        assert len(respaldos) == 1
+        ws = load_workbook(respaldos[0])["AUDITORIA"]
+        assert ws.max_row == 4  # encabezado + 3 facturas: no se perdio nada
+
 
 class TestPiezas:
     def test_norm_factura(self):
