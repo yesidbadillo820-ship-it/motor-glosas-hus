@@ -30,6 +30,7 @@
 | 9 | **Informes de cartera y conciliaciones** | Consolidados de estado de cartera por entidad (formato FAMISANAR), análisis de actas (ej. PROTEGER EPS) e informes en Word para la mesa. | Usted sube el Excel de la entidad al chat; Claude entrega el informe verificado al centavo. |
 | 10 | **Caja de bots del PC del auditor** | Bots de doble clic entregados POR CHAT (no van al repo porque procesan datos reales): ORGANIZAR ARCHIVOS, BAJAR PESO EXCEL, PARTIR/UNIR archivos grandes, OCR a PDF (PC y celular), UNIR EXCELES, CORREOS DE PAGOS, AUTORIZACIONES RIPS, DE1601 (NUEVA EPS), HERRAMIENTAS DE IMÁGENES. | Se piden por chat, llegan en ZIP, se descomprimen y doble clic al `.bat`. Si uno falla, pegue la pantalla del error en el chat. |
 | 11 | **Módulos personales de estudio** | Tres programas aparte, que no tocan el motor: **ICFES** (`icfes/`, preparación para el Saber 11), **noruego** (`noruego/`, curso de idioma para el celular) y **velas japonesas** (`mercados/`, detecta los 28 patrones en su histórico y mide si de verdad cumplen). Cada uno con su aplicación web que funciona sin internet. | Doble clic en `tools\ICFES.cmd` o `tools\NORUEGO.cmd`; el de velas se corre con `python -m mercados`. Guías: `docs/GUIA_SISTEMA_ICFES.md`, `docs/GUIA_CURSO_NORUEGO.md` y `docs/GUIA_ANALISIS_VELAS.md`. |
+| 12 | **Cuidados médicos de la familiar (personal)** | Seguimiento de las autorizaciones, citas, medicamentos e insumos de EPS Sura de una familiar del auditor (paciente en casa), con su tablero HTML y los borradores de quejas/memoriales. | Se trabaja POR CHAT: usted sube los PDF/pantallazos de Sura y Claude entrega el tablero actualizado. Nada de datos de la paciente se guarda en este repositorio. |
 
 **Regla de oro:** no importa en qué chat esté — todo lo trabajado se anota en
 esta bitácora al terminar, y por eso cualquier chat nuevo "se acuerda" de todo.
@@ -135,6 +136,154 @@ factura siga trayendo sus reparos, que la definición estricta de dinero
 salvado no se haya aflojado, y que nadie vuelva a poner el tope viejo.
 
 ---
+
+---
+
+### 07-09-2026 — Nace el frente personal «Cuidados médicos de la familiar» (EPS Sura)
+
+**Lo que se pidió.** Organizar en un tablero los documentos de EPS Sura de la
+familiar del auditor que está en cuidado en casa (autorizaciones, citas,
+medicamentos, insumos y el proceso que ya está en la Supersalud), y avisar qué
+está urgente, qué está pendiente y qué quejas conviene radicar.
+
+**Lo que se entregó (todo POR CHAT, nada al repositorio).**
+- El **tablero «Cuidados de Emely»** en HTML (se abre en el navegador del
+  celular o del PC): semáforo de urgente/pendiente/al día, la tabla completa
+  de las 24 gestiones con sus números de autorización y vigencias, el
+  directorio de teléfonos para agendar y **dos borradores listos para
+  radicar** (memorial de impulso a la Supersalud y queja a Sura) con botón
+  de copiar.
+- El análisis en el chat: 16 autorizaciones de Sura leídas una a una, más la
+  historia clínica, la epicrisis, el escrito de la Supersalud y 13
+  pantallazos. Los PDF de resultados de Sura que piden clave se abren con la
+  cédula de la paciente.
+- Regla que quedó fija: los datos de la paciente **no** se suben al
+  repositorio; este frente vive en el chat y en los archivos que se
+  entregan.
+
+**Para la próxima vez.** Subir los documentos nuevos de Sura al chat y pedir
+«actualizar el tablero de cuidados»; Claude entrega el HTML al día.
+
+### 04-09-2026 (tarde) — FAMISANAR 2 de septiembre: 104 de 105 al primer intento
+
+Segundo lote de FAMISANAR con el mismo procedimiento del de la mañana: el
+listado de objeciones (105 renglones, 6 facturas, **$9.158.433**) cruzado
+contra el export de servicios del DGH (197 renglones de esas mismas 6
+facturas).
+
+**Resultado: 104 objeciones con el servicio identificado en confianza ALTA y
+1 sin cruce.** Salió mucho más limpio que el del 1 de septiembre porque esta
+vez FAMISANAR escribió los códigos **del hospital** (FMQ0112, FMQ0178-3…) y no
+los de su catálogo IUM. Las 104 quedaron con un código que el DGH reconoce;
+`CTNCENCOS` vacía en las 105 y `CROTIPOBJ` en 0 (las 6 facturas son
+administrativas: ninguna trae códigos CL).
+
+**La que quedó sin cruce:** la SO0101 de HUS0000544976 por **$1.500.000**
+(epicrisis que soporta la estancia). El texto de FAMISANAR viene cortado —
+«…se realiza objeción por falta o inconsistencia en el» — y no nombra ningún
+servicio, así que el bot no lo inventa. De los renglones de estancia de esa
+factura, el único que cuadra con el valor es **`120B01` SALA ESPECIAL
+(INCUBADORA III NIVEL)**: 3 unidades × $500.000 = $1.500.000 exactos (la
+factura trae 4 unidades por $2.000.000). Se le dejó al auditor para que
+confirme, como se hizo con la SO0101 del lote anterior.
+
+**Un arreglo que destapó este lote.** El export del DGH traía la columna del
+código escrita **`SERVICOS DGH`** (sin la «I»). El lector no la reconocía y la
+habría dejado pasar en silencio: el archivo habría salido con `SLNSERPRO`
+vacío en todo, aunque el cruce sí encontrara el renglón. Se agregó el alias, y
+además ahora el lector **falla con mensaje claro** si el export no trae
+ninguna columna de código, en vez de seguir de largo; si falta la de servicio
+pero está el CUPS o el código de medicamento, los usa y avisa.
+
+**Archivos entregados:** `OBJECIONES_FAMISANAR_02092026.xlsx` (el que se sube)
+y `CRUCE_FAMISANAR_02-09-2026.xlsx` (el respaldo, 1 renglón en REVISAR).
+
+### 04-09-2026 — Las objeciones de FAMISANAR: el código que FAMISANAR escribe no es el que DGH entiende
+
+**Lo que se pidió.** Armar el archivo de objeciones de FAMISANAR (1 de
+septiembre) para subirlo a Dinámica Gerencial, como el de COOSALUD o el del
+ADRES. Llegaron dos archivos: las **398 objeciones** de FAMISANAR (14 facturas,
+$31.439.029) y el **export de servicios facturados del DGH** (831 renglones de
+esas mismas 14 facturas).
+
+**El problema, que ya no es nuevo.** Es el mismo del ADRES en agosto: FAMISANAR
+y el hospital hablan idiomas distintos. FAMISANAR nombra los dispositivos con
+su propio catálogo IUM —`91022534`, «LINEA INFUSION E INYECCION - JERINGA 1ML
+25G x 16 mm»— y el DGH los tiene como `FMQ3616-1`, «JERINGA 1ML + TAPON PARA
+DOSIS UNITARIA». Con los medicamentos pasa algo más fino: FAMISANAR escribe
+`P32606-02` donde el HUS tiene `32606-2` (la letra de adelante y un cero de
+relleno). Si el archivo se sube así, DGH no reconoce el renglón.
+
+**Qué tan grave era.** Se midió sobre el archivo real, corriendo el bot como
+estaba:
+
+| | Como estaba | Con el cruce |
+|---|---|---|
+| Renglones con un código que DGH reconoce | **184 de 398 (46 %)** | **395 de 398 (99 %)** |
+| Renglones con un código que NO existe en el DGH | 191 | **0** |
+| Renglones sin código | 23 | 3 |
+| Centro de costo (`CTNCENCOS`) lleno | **0** | **395** |
+
+**Lo que se hizo.** `tools/organizar_objeciones_famisanar.py` aprendió a leer el
+export de servicios del DGH (`--servicios-dgh`) y a buscar, **dentro de esa
+misma factura**, de qué servicio habla cada objeción: por código (tolerando las
+tres formas de escribirlo), por nombre (separando número y unidad, `1ML` = `1
+ML`, y probando lo que va después del guion, porque FAMISANAR antepone la
+categoría) y por valor. Cuando en toda la factura un valor lo tiene un solo
+servicio, eso identifica el renglón aunque el código y el nombre sean de otro
+catálogo; cuando lo comparten varios, desempata el nombre. Cada renglón queda
+marcado con su confianza (ALTA / MEDIA / BAJA / SIN CRUCE) y hay un reporte
+aparte (`--reporte-cruce`) con las hojas CRUCE, REVISAR y RESUMEN.
+
+**La regla que no se rompió:** si el cruce no es confiable **no se inventa un
+servicio** — queda lo que decía el texto y el renglón se manda a REVISAR. De
+las 398: 263 ALTA, 46 MEDIA, 86 BAJA y **3 sin cruce** (las 3 son objeciones
+donde FAMISANAR no nombró ningún servicio: una SO0101 de epicrisis con el texto
+cortado, una CO0601 que sólo trae el texto de la norma y una FA0502 «incluido
+en derechos de sala»).
+
+**Dos cosas que aparecieron por el camino.**
+
+1. **La palabra «VALOR» se estaba yendo a `SLNSERPRO`.** Cuando FAMISANAR deja
+   la etiqueta CÓDIGO vacía —«… FMQ0113 CATETER INTRAVENOSO 20 CÓDIGO   VALOR
+   UNITARIO FACTURADO…»— el bot tomaba la palabra siguiente como si fuera el
+   código. Ahora se exige que el código traiga al menos un dígito y, cuando la
+   etiqueta va vacía, se recupera el código que está **pegado adelante del
+   nombre** (que es donde FAMISANAR lo pone en esos casos).
+
+2. **FAMISANAR busca algunos códigos en el catálogo CUPS y no en el del
+   hospital.** Las 4 objeciones AU5802 de HUS0000549272 dicen «BIOPSIA DE
+   MUSCULO O TENDON EXTRAOCULAR, código 150101»; en el DGH el `150101` es
+   **ENSURE CLINICAL** (fórmula enteral), y el valor, la cantidad y el número
+   de renglones cuadran exacto con esa línea. El cruce las deja amarradas al
+   servicio correcto pero con el aviso «el nombre del servicio no coincide»,
+   para que el auditor lo confirme. Son 11 renglones con ese aviso.
+
+**Corrección del mismo día (la pidió Yesid).** Dos reglas del formato que ya
+venían de chats anteriores y que yo no respeté:
+
+1. **`CTNCENCOS` va SIEMPRE vacía** en el archivo de FAMISANAR. Yo la había
+   llenado con el centro de costo que traía el cruce, creyendo que ayudaba
+   (venía del arreglo del ADRES del 28-08, donde sí se pedía llenarla). No es
+   lo mismo: el export del DGH sólo trae el **nombre** del centro
+   («URGENCIAS ADULTOS») y esa columna es de código. Corregido en el bot, con
+   prueba que lo fija, y las 395 celdas borradas del archivo del auditor. El
+   nombre del centro sigue apareciendo en el reporte de cruce, como pista.
+2. **`CROTIPOBJ` = 0 ADMINISTRATIVA / 1 MEDICA / 2 MIXTA**, por factura. Se
+   revisó el archivo entregado: las 14 facturas estaban bien clasificadas (13
+   en 0 y HUS0000542699 en 2, porque mezcla CL0601 con cobertura). Quedó
+   escrito así en el código y en la guía para que no se vuelva a interpretar.
+
+El auditor completó a mano las 3 objeciones que quedaron sin cruce:
+HUS0000549506 (SO0101, estancia) → `105M01`; HUS0000546202 (CO0601) →
+`FMQ0952` y (FA0502) → `FMQ3605`. Con eso el archivo quedó con los 398
+renglones identificados.
+
+**Archivos entregados:** `OBJECIONES_FAMISANAR_01-09-2026.xlsx` (el que se
+sube, 398 renglones en las 16 columnas de siempre) y
+`CRUCE_FAMISANAR_01-09-2026.xlsx` (el respaldo del auditor, 100 renglones en
+REVISAR). Guía actualizada en `tools/README_organizar_objeciones_famisanar.md`;
+67 tests en `tests/test_tools/test_organizar_objeciones_famisanar.py`.
 
 ### 04-09-2026 (noche, 5) — La primera factura de verdad destapó dos falsos positivos
 
@@ -10782,6 +10931,38 @@ valor leido del PDF o con el objetado.
 
 ## 3) PENDIENTE
 
+### Cuidados médicos de la familiar — EPS Sura (07-09)
+- **Radicar el memorial de impulso** al proceso de la Supersalud (el plazo de
+  respuesta ya se venció) y **la queja a Sura** por lo que sigue sin
+  autorizar (oxígeno de respaldo, renovación del aspirador, terapias física y
+  ocupacional, pañales, ambulancia). Los dos borradores están en el tablero
+  HTML entregado el 07-09.
+- **Agendar esta semana la visita del médico domiciliario** (autorizada el
+  01-09): ahí se renuevan la fórmula del mes (vence hacia el 14-09) y el
+  MIPRES de los pañales (la última entrega se acaba hacia el 16-09).
+- **Agendar** geriatría, nefrología, fisiatría y los laboratorios a domicilio
+  (con ayuno de 8–10 horas, menos la creatinina), y **confirmar el inicio**
+  de las terapias de deglución y respiratoria ya autorizadas.
+
+### FAMISANAR — objeciones del 2 de septiembre (04-09)
+- **Completar la SO0101 de HUS0000544976** ($1.500.000). Candidato con el valor
+  exacto: `120B01` SALA ESPECIAL (INCUBADORA III NIVEL), 3 × $500.000. Falta
+  que el auditor lo confirme antes de subir.
+- **Piloto de una factura** también en este lote. La más pequeña es
+  HUS0000548590 (5 objeciones) y la más grande HUS0000549340 (40).
+
+### FAMISANAR — objeciones del 1 de septiembre (04-09)
+- **Revisar los 100 renglones de la hoja REVISAR** de
+  `CRUCE_FAMISANAR_01-09-2026.xlsx`: 86 de confianza BAJA (se ubicaron por
+  valor, hay que confirmar que sea ese servicio), 11 con el aviso de que el
+  nombre no coincide y 3 sin cruce (esas se completan a mano).
+- **Piloto de una factura en DGH** antes del cargue completo (regla del repo).
+  La más limpia para el piloto es HUS0000549272 (68 objeciones, todas ALTA o
+  MEDIA) o HUS0000548556 (3 objeciones, las tres ALTA).
+- **HUS0000543238 es la pesada:** 155 objeciones y 70 en revisión. Casi todas
+  son dispositivos con nomenclatura IUM; si el maestro de equivalencias
+  FAMISANAR→HUS aparece, se cargan con `--mapa-servicios` y quedan en ALTA.
+
 ### Análisis de velas (actualizado 04-09)
 - **~~Probarlo con un histórico de verdad~~ — YA HECHO (04-09).** Se midió con
   16 años de EUR/USD diario (4.336 sesiones): **ningún patrón le ganó a su tasa
@@ -11624,6 +11805,19 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
   son para que el área los mire, no se unieron por parecido.
 
 ## 4) PARA MAÑANA
+
+### Cuidados médicos de la familiar — lo primero
+1. Radicar el **Borrador A** (impulso a la Supersalud) por el correo oficial
+   que la misma Supersalud indicó, y el **Borrador B** (queja) en la oficina
+   de Sura pidiendo radicado escrito. Ambos están en el tablero HTML del
+   07-09 con botón de copiar.
+2. Llamar a la IPS del programa domiciliario para **agendar la visita del
+   médico** antes de que se venza la fórmula del mes.
+
+### FAMISANAR — lo primero
+1. Revisar la hoja **REVISAR** de los dos cruces (1 y 2 de septiembre) y hacer
+   el **piloto de una factura** en DGH. Si el piloto entra bien, cargar el
+   resto de los dos lotes.
 
 ### Análisis de velas — lo primero
 1. **Armar la aplicación con su histórico** y abrirla en el celular. En el PC
