@@ -145,6 +145,58 @@ console.log(JSON.stringify(_marcados.map(function(x){{
         assert "Inteligencia" in v and "Usuarios" in v
 
 
+class TestUnBotonOcultoSeQuedaOculto:
+    """07-09-2026. «Plata recuperada» tenía data-solo-coordinacion, así que
+    aplicarPermisosDelMenu la volvía a MOSTRAR a la coordinación: le ganaba a
+    su display:none y el botón reaparecía (Yesid: «aún se ve»). Un botón
+    marcado data-oculto se queda oculto para todos, sin romper lo demás."""
+
+    def _correr_coordinacion(self) -> dict:
+        t = _html()
+        guion = f"""
+var _marcados = [
+  {{tip:'Plata recuperada', style:{{display:'none'}},
+    classList:{{contains:function(){{return false}}}},
+    getAttribute:function(a){{ return a === 'data-oculto' ? '1' : null; }}}},
+  {{tip:'Inteligencia', style:{{display:''}},
+    classList:{{contains:function(){{return false}}}},
+    getAttribute:function(){{ return null; }}}}
+];
+var window = {{USER_ROL: 'COORDINADOR'}};
+var localStorage = {{getItem:function(){{return null}}}};
+var document = {{
+  querySelectorAll: function(sel){{
+    if(sel.indexOf('data-solo-coordinacion') >= 0) return _marcados;
+    return [];
+  }}
+}};
+{_fuente_de("esDeCoordinacion", t)}
+{_fuente_de("aplicarPermisosDelMenu", t)}
+aplicarPermisosDelMenu();
+console.log(JSON.stringify(_marcados.map(function(x){{
+  return {{tip:x.tip, visible: x.style.display !== 'none'}};
+}})));
+"""
+        import json
+
+        return {x["tip"]: x["visible"] for x in json.loads(_correr(guion))}
+
+    def test_plata_no_reaparece_pero_inteligencia_si(self):
+        r = self._correr_coordinacion()
+        # La marcada data-oculto se queda oculta aunque sea de coordinación…
+        assert r["Plata recuperada"] is False
+        # …y las demás de coordinación se siguen viendo (no se rompió lo otro).
+        assert r["Inteligencia"] is True
+
+    def test_el_boton_de_plata_lleva_la_marca(self):
+        t = _html()
+        i = t.find('id="sn-plata"')
+        assert i > 0
+        boton = t[max(0, i - 400) : i + 80]
+        assert 'data-oculto="1"' in boton
+        assert 'style="display:none"' in boton
+
+
 class TestElBuscadorRespetaLoMismo:
     def test_no_ofrece_lo_que_el_menu_esconde(self):
         """Esconder el botón no sirve de nada si ⌘K sigue ofreciendo la misma
