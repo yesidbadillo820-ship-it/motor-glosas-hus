@@ -1,5 +1,26 @@
 # Registro de cambios
 
+## Sesión 04-sep-2026 (hotfix) — Falsos positivos de la Pre-Auditoría
+
+Primera prueba contra una factura real del share (`Rips_HUS559077.json`,
+531 KB, $141.720.044): respondió en **32 ms** pero con 63 alertas, dos
+fuentes de ruido propias.
+
+- **`regla_topes_tarifarios` calla sin EPS.** El RIPS de la Res. 2275 no trae
+  pagador; sin él `tarifa_pactada_de` caía al catálogo oficial del HUS y
+  comparaba contra el precio propio del hospital — 48 BLOQUEOS irresolubles,
+  mientras `omisiones` afirmaba que la tarifa no se había cruzado. Ahora la
+  guarda es `ctx.db is None or not payload.eps.strip()`, y el mensaje de
+  omisión dice la verdad. Con EPS la regla opera sin cambios.
+- **`regla_cruce_edad` ignora DISPOSITIVO y MEDICAMENTO.** En un artículo,
+  «neonatal / pediátrico / adulto» es talla o dosis, no paciente: el insumo
+  `FMQ0098` salía BLOQUEADO como servicio pediátrico en adulto. La regla
+  sigue firme en estancias, consultas y procedimientos.
+- **9 pruebas nuevas** (`tests/test_services/test_preauditoria_falsos_positivos.py`),
+  la mitad de ellas comprobando que el arreglo NO debilitó las reglas: UCI
+  pediátrica en adulto y procedimiento neonatal en adulto siguen bloqueando,
+  y con EPS los topes siguen disparando con el mismo valor en riesgo.
+
 ## Sesión 04-sep-2026 — V3 Pilar 2: mapeo RIPS real + tablero
 
 Con el primer archivo real del HIS (`Rips_HUS558039.json`) se ajusta el

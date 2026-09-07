@@ -206,8 +206,16 @@ def regla_topes_tarifarios(payload: PayloadFactura, ctx: Contexto) -> list[Alert
     CUPS no hay con qué comparar, y estimarla sería inventar. La consulta se
     hace UNA VEZ por CUPS (una factura repite el mismo código en varias
     líneas y no vamos a golpear la base una vez por línea).
+
+    SIN EPS TAMPOCO SE OPINA (04-09-2026). El RIPS de la Resolución 2275 no
+    dice quién paga, y sin pagador no existe «tarifa pactada»: la búsqueda
+    caía al catálogo oficial del HUS y comparaba la factura contra el precio
+    propio del hospital. En la primera factura real de verdad —HUS559077—
+    eso produjo 48 BLOQUEOS que el facturador no podía resolver, y encima la
+    respuesta decía en `omisiones` que la tarifa NO se había cruzado. Un
+    tablero que se contradice a sí mismo deja de leerse a la semana.
     """
-    if ctx.db is None:
+    if ctx.db is None or not (payload.eps or "").strip():
         return []
     from app.services.tarifa_lookup_service import tarifa_pactada_de
 
@@ -316,8 +324,21 @@ _RE_ADULTO = re.compile(r"\bADULTO", re.IGNORECASE)
 _RE_OBSTETRICO = re.compile(r"PARTO|CESAREA|OBSTETRIC|GESTACION|PRENATAL", re.IGNORECASE)
 
 
+# En estos tipos de línea las palabras «neonatal», «pediátrico» y «adulto»
+# describen el TAMAÑO del artículo, no la edad de quien lo recibe: una sonda
+# pediátrica o un catéter neonatal se le ponen a un adulto todos los días, y
+# la dosis pediátrica de un medicamento también se usa fuera de pediatría.
+# Caso real (HUS559077, 04-09-2026): el insumo FMQ0098 salió BLOQUEADO como
+# «servicio pediátrico en un paciente adulto». Era un calibre.
+_TIPOS_DONDE_LA_EDAD_ES_TAMANO = {"DISPOSITIVO", "MEDICAMENTO"}
+
+
 def regla_cruce_edad(payload: PayloadFactura, ctx: Contexto) -> list[Alerta]:
-    """Servicio marcado para una edad que no es la del paciente."""
+    """Servicio marcado para una edad que no es la del paciente.
+
+    Mira SERVICIOS, no artículos: en un insumo o un medicamento la palabra
+    que nombra una edad es una talla o una dosis (ver la constante de arriba).
+    """
     dias = payload.paciente.edad_en_dias(payload.atencion.fecha_ingreso or ctx.ahora)
     if dias is None:
         return []
@@ -336,6 +357,8 @@ def regla_cruce_edad(payload: PayloadFactura, ctx: Contexto) -> list[Alerta]:
         )
 
     for item in payload.items:
+        if tipo_de(item) in _TIPOS_DONDE_LA_EDAD_ES_TAMANO:
+            continue
         texto = _sin_tildes(_texto_del_item(item))
         if _RE_NEONATAL.search(texto) and dias > DIAS_NEONATO:
             alertas.append(
