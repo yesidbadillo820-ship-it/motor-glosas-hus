@@ -141,3 +141,23 @@ def test_cobertura_la_responde_cartera_y_tiene_texto(coo):
     assert "68001S00060339-24" in texto and "68001C00060340-24" in texto
     assert "DECRETO 441 DE 2022" in texto
     assert "CALIDAD" not in coo.OBS_POR_TIPO, "CALIDAD sí la responden las doctoras"
+
+
+def test_autorizacion_no_nombra_a_otro_pagador(coo):
+    # El área entregó el texto nombrando a NUEVA EPS (venía de ese flujo).
+    # Mandarle a COOSALUD una respuesta que nombra a otro pagador es regalarle
+    # la glosa.
+    texto = coo.OBS_POR_TIPO["AUTORIZACION"]
+
+    assert "NUEVA EPS" not in texto
+    assert "COOSALUD" in texto
+    assert "DECRETO 4747 DE 2007" in texto
+
+
+def test_el_texto_de_topes_queda_guardado_pero_no_se_aplica_solo(coo):
+    # Decisión del área (07-09-2026): las glosas de cobertura salen con RE9901 y
+    # el texto de COBERTURA. El RE9602 queda disponible para cuando el área diga
+    # en qué lote usarlo, pero el bot no lo pone por su cuenta.
+    assert coo.COD_RTA_TOPES == "RE9602"
+    assert "EXCEDE TOPES AUTORIZADOS" in coo.OBS_TOPES_AUTORIZADOS
+    assert coo.OBS_TOPES_AUTORIZADOS not in coo.OBS_POR_TIPO.values()
