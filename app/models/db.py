@@ -1736,3 +1736,107 @@ class ConciliacionTipificacionRecord(Base):
     __table_args__ = (
         Index("ix_conciliacion_tipif_llave", "factura_clave", "cod_glosa", unique=True),
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  LA MESA DE CONCILIACIÓN: EL ACTA VIVE EN EL MOTOR MIENTRAS SE TRABAJA
+# ══════════════════════════════════════════════════════════════════════════
+
+MESA_ABIERTA = "ABIERTA"
+MESA_CERRADA = "CERRADA"
+
+
+class MesaConciliacionRecord(Base):
+    """Un acta de conciliación en curso.
+
+    POR QUÉ EXISTE. Una audiencia con la EPS dura horas y se trabaja renglón
+    por renglón. Antes el acta se bajaba en Excel y se llenaba por fuera: si
+    se cerraba el archivo sin guardar, o dos personas lo abrían a la vez, el
+    trabajo de la mesa se perdía o se pisaba.
+
+    Ahora el acta se arma y **se queda acá**. Se trabaja en pantalla, cada
+    cambio queda escrito, y el Excel se genera al final, con lo conciliado.
+    Si se cierra el navegador o se va la luz, la mesa está donde se dejó.
+    """
+
+    __tablename__ = "mesas_conciliacion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    actualizado_en = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # ── El encabezado del acta, que escribe el auditor ──
+    nit = Column(String(30))
+    razon_social = Column(String(300))
+    numero_acta = Column(String(60), index=True)
+    periodo = Column(String(60))
+    fecha_conciliacion = Column(DateTime(timezone=True))
+
+    estado = Column(String(20), default=MESA_ABIERTA, index=True)
+    creado_por = Column(String(200), index=True)
+    cerrado_en = Column(DateTime(timezone=True))
+    cerrado_por = Column(String(200))
+
+    # Cuántas facturas traía la lista, para poder decir «de 63 facturas, 50
+    # tenían glosas» sin recalcularlo cada vez.
+    facturas_en_lista = Column(Integer, default=0)
+
+
+class MesaLineaRecord(Base):
+    """Un renglón del acta: una glosa de una factura.
+
+    Guarda las tres cosas que conviven en una línea y que tienen dueños
+    distintos: lo que trajo el archivo de la EPS (no se toca), lo que se
+    decide en la mesa (los valores y el texto) y lo contable (centro de
+    costo, cuenta y concepto de la nota crédito).
+    """
+
+    __tablename__ = "mesa_conciliacion_lineas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    mesa_id = Column(Integer, index=True, nullable=False)
+    orden = Column(Integer, default=0)
+
+    # ── Lo que vino del archivo de la EPS ──
+    item = Column(String(10))
+    radicado = Column(String(60))
+    factura = Column(String(50), index=True)
+    factura_clave = Column(String(30), index=True)
+    fecha_factura = Column(String(20))
+    cod_glosa = Column(String(12), index=True)
+    descripcion = Column(Text)
+    valor_factura = Column(Float, default=0.0)
+    glosa_inicial = Column(Float, default=0.0)
+
+    # ── Lo que se deduce, y lo que decide una persona ──
+    tipificacion = Column(String(30))
+    tipo_glosa = Column(String(30))
+    # Por qué esta línea necesita a alguien. Vacío si salió completa.
+    aviso = Column(Text)
+
+    # ── Lo que se escribe EN la mesa ──
+    acepta_ips = Column(Float, default=0.0)
+    levanta_entidad = Column(Float, default=0.0)
+    ratificado = Column(Float, default=0.0)
+    texto_conciliacion = Column(Text)
+
+    # ── Lo contable, para la nota crédito ──
+    centro_costo = Column(String(200))
+    cuenta_contable = Column(String(30))
+    concepto_nota = Column(String(10))
+
+    actualizado_en = Column(DateTime(timezone=True), onupdate=func.now())
+    actualizado_por = Column(String(200))
+
+    __table_args__ = (Index("ix_mesa_lineas_mesa_orden", "mesa_id", "orden"),)
+
+    @property
+    def pendiente(self) -> float:
+        """Lo que queda por repartir en la mesa."""
+        return round(
+            (self.glosa_inicial or 0.0)
+            - (self.acepta_ips or 0.0)
+            - (self.levanta_entidad or 0.0)
+            - (self.ratificado or 0.0),
+            2,
+        )
