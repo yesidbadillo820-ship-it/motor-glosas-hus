@@ -91,6 +91,51 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 07-09-2026 (noche) — La conciliación se trabaja en la pantalla, no en un Excel suelto
+
+**El problema de fondo.** Una audiencia con la EPS dura horas. Hasta ahora el
+acta se bajaba en Excel y se llenaba por fuera del sistema: si alguien cerraba
+el archivo sin guardar, o dos personas lo abrían a la vez, el trabajo de la
+mesa se perdía o se pisaba. Y al final había que volver a subirlo.
+
+**Cómo queda.** El acta se arma y **se queda en el motor**. Se trabaja en la
+pantalla, renglón por renglón, y cada cosa que se escribe se guarda sola. Si
+se cierra el navegador o se va la luz, la mesa está donde se dejó. El Excel se
+baja **al final**, ya con todo lo conciliado.
+
+**Lo que se ve en la mesa.** Una tabla con los renglones y, arriba, las cifras
+que se van moviendo: glosado, lo que acepta el hospital, lo que levanta la EPS,
+lo ratificado, y cuántos renglones quedan sin repartir.
+
+Cada renglón tiene tres botones de un clic —**todo A**, **todo L**, **todo
+R**— que mandan la glosa completa a aceptada, levantada o ratificada. En un
+acta de cien renglones eso es la diferencia entre una hora y una tarde.
+
+Los renglones que **necesitan que alguien decida** salen en ámbar, con el
+motivo al pasar el mouse. Son los de pertinencia, donde hay que decir si la
+glosa es mixta o médica: eso lo define un médico auditor, no un código.
+
+**La nota crédito, puesta sola.** Cada renglón muestra la cuenta contable y el
+concepto de nota que le corresponde. Sale del centro de costo que el DGH ya
+tiene guardado, cruzado con el catálogo de contabilidad. Y usa siempre el
+concepto de **actas**, que no es el mismo que el de glosa inicial: en UCI, la
+glosa inicial es 004 y por acta es 020. Cuando el centro de costo no está en
+el catálogo, se muestra el centro pero **no se inventa la cuenta** — un
+asiento mal hecho lo corrige contabilidad meses después.
+
+**Y aprende.** Al cerrar la mesa, lo que decidió el médico auditor queda
+guardado por factura y código. La próxima vez que esa glosa aparezca, ya sale
+llena. Se puede reabrir una mesa cerrada, porque las audiencias se reanudan.
+
+**Lo que la EPS mandó no se puede tocar**: el valor objetado, el código y la
+factura vienen de su archivo y son de solo lectura. Si se pudieran cambiar, el
+acta dejaría de cuadrar con lo que ella radicó y la mesa se discutiría sobre
+cifras distintas.
+
+58 pruebas nuevas.
+
+---
+
 ### 07-09-2026 (tarde, 3) — El acta ya no sale «[Reparado]» ni con cuadrícula de sobra
 
 **Lo que reportó Yesid.** Al abrir el acta que arma el motor, Excel decía

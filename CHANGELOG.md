@@ -1,5 +1,28 @@
 # Registro de cambios
 
+## Sesión 07-sep-2026 (noche) — La mesa de conciliación vive en el motor
+
+El acta se arma, se guarda y se trabaja en pantalla; el Excel sale al final.
+
+- **`MesaConciliacionRecord` + `MesaLineaRecord`** — el acta en curso y sus
+  renglones. Tres dueños por renglón que no se mezclan: lo que trajo la EPS
+  (solo lectura), lo que decide la mesa y lo contable.
+- **`app/services/mesa_conciliacion.py`** — `abrir()`, `guardar_linea()`,
+  `resumen()`, `cerrar()`, `reabrir()` y `a_excel()`. Solo los campos de
+  `CAMPOS_EDITABLES` se tocan: el valor objetado y el código son de la EPS.
+  Guardar NO impide repartir de más —en una mesa se tantea— pero devuelve el
+  pendiente al instante y el `revisar()` lo atrapa al cerrar.
+- **`app/services/conceptos_nota_hus.py`** — el catálogo de contabilidad, 234
+  combinaciones. El centro de costo sale de `conceptos_glosa` (DGH) y se
+  consulta con vía ACTAS. Sin centro en el catálogo devuelve None: no se
+  aproxima una cuenta contable.
+- **Siete rutas** bajo `/conciliaciones/mesa`. Reabrir exige coordinador.
+- **Pantalla**: tabla con encabezado fijo, guardado automático, botones
+  «todo A/L/R» por renglón, renglones en ámbar cuando falta decidir, y la
+  tabla ancha recorriéndose en su propia caja.
+- **58 pruebas nuevas** (20 de ruta, 19 de pantalla, 19 de servicio y
+  catálogo).
+
 ## Sesión 07-sep-2026 (hotfix) — El acta generada abría «[Reparado]»
 
 - **`_reponer_lo_que_openpyxl_se_lleva()`** — openpyxl no edita el `.xlsm`, lo

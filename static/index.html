@@ -1069,6 +1069,27 @@ input::placeholder,textarea::placeholder{color:var(--text4);font-weight:400}
 
 /* ─── CONCILIACIÓN ─────────────────────────── */
 .concil-area{flex:1;overflow-y:auto;padding:1.5rem;min-height:0}
+/* La mesa de conciliación: una tabla ancha que se recorre dentro de su
+   propia caja, para que el cuerpo de la página nunca se desborde. */
+.mesa-cifras{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.7rem}
+.mesa-cifras .c{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:.4rem .7rem;font-size:.78rem}
+.mesa-cifras .c b{display:block;font-size:.95rem;margin-top:.1rem}
+.mesa-tabla-wrap{overflow:auto;max-height:58vh;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-card)}
+.mesa-tabla{width:100%;border-collapse:collapse;font-size:.76rem}
+.mesa-tabla th{position:sticky;top:0;z-index:1;background:var(--bg);text-align:left;padding:.45rem .5rem;border-bottom:1px solid var(--border);white-space:nowrap;font-weight:600}
+.mesa-tabla td{padding:.3rem .5rem;border-bottom:1px solid var(--border)}
+.mesa-tabla th.num,.mesa-tabla td.num{text-align:right}
+.mesa-tabla tr.falta{background:color-mix(in srgb,var(--c-amber,#d97706) 8%,transparent)}
+.mesa-tabla input,.mesa-tabla select{width:100%;min-width:80px;border:1px solid var(--border);border-radius:var(--r-sm,6px);padding:.2rem .35rem;font-size:.76rem;background:var(--bg-card);color:var(--text)}
+.mesa-tabla input.num{text-align:right}
+.mesa-tabla .serv{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.mesa-tabla .txt input{min-width:190px}
+.mesa-pend-0{color:var(--c-verde,#16a34a);font-weight:600}
+.mesa-pend-x{color:var(--c-red,#dc2626);font-weight:600}
+.mesa-todo{display:flex;gap:.15rem;margin-top:.15rem}
+.mesa-todo button{border:1px solid var(--border);background:var(--bg);border-radius:4px;font-size:.62rem;padding:.05rem .3rem;cursor:pointer;color:var(--text3)}
+.mesa-todo button:hover{border-color:var(--c-teal2);color:var(--text)}
+.mesa-nc{font-size:.68rem;color:var(--text3);white-space:nowrap}
 .concil-grid{display:grid;grid-template-columns:340px 1fr;gap:1.5rem;margin-top:1rem}
 .stat-row{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
 .stat-mini{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:.8rem 1.2rem;min-width:110px}
@@ -4366,9 +4387,47 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <div id="armar-resumen" style="display:none;margin-top:.6rem"></div>
           <div class="auto-acciones" style="margin-top:.6rem">
             <button class="btn btn-ghost btn-sm" id="armar-btn-ver" onclick="armarVer()">Ver qué sale</button>
+            <button class="btn btn-sm" style="background:#7c3aed;color:#fff" id="armar-btn-mesa" onclick="mesaAbrir()">Abrir mesa en pantalla</button>
             <button class="btn btn-primary btn-sm" id="armar-btn-bajar" onclick="armarDescargar()">Armar y descargar acta</button>
           </div>
           <div class="auto-estado" id="armar-estado" style="margin-top:.4rem"></div>
+        </div>
+
+        <!-- LA MESA: el acta vive en el motor y se trabaja acá, renglón por
+             renglón. Cada cambio se guarda solo; el Excel sale al final. -->
+        <div class="form-card" style="margin-bottom:1rem" id="mesa-card">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+            <div>
+              <h3 style="margin:0 0 .3rem">🤝 Mesa de conciliación <span id="mesa-titulo" style="font-weight:400;color:var(--text3)"></span></h3>
+              <p style="margin:0;font-size:.8rem;color:var(--text3)" id="mesa-sub">Abrí una mesa desde el cuadro de arriba, o retomá una que dejaste a medias.</p>
+            </div>
+            <div class="auto-acciones" style="margin:0">
+              <select id="mesa-abiertas" onchange="mesaCargar(this.value)" style="max-width:280px">
+                <option value="">Retomar una mesa…</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" onclick="mesaListar()">Actualizar</button>
+            </div>
+          </div>
+
+          <div id="mesa-cuerpo" style="display:none;margin-top:.8rem">
+            <div id="mesa-cifras" class="mesa-cifras"></div>
+            <div class="mesa-tabla-wrap">
+              <table class="mesa-tabla" id="mesa-tabla">
+                <thead><tr>
+                  <th>#</th><th>Factura</th><th>Código</th><th>Servicio</th>
+                  <th class="num">Glosado</th><th>Tipo</th>
+                  <th class="num">Acepta IPS</th><th class="num">Levanta EPS</th><th class="num">Ratifica</th>
+                  <th class="num">Pendiente</th><th>Texto de la conciliación</th><th>Nota crédito</th>
+                </tr></thead>
+                <tbody id="mesa-filas"></tbody>
+              </table>
+            </div>
+            <div class="auto-acciones" style="margin-top:.7rem">
+              <button class="btn btn-primary btn-sm" onclick="mesaDescargar()">Descargar acta completa</button>
+              <button class="btn btn-sm" style="background:#059669;color:#fff" onclick="mesaCerrar()">Cerrar la mesa</button>
+              <span id="mesa-estado" class="auto-estado" style="align-self:center"></span>
+            </div>
+          </div>
         </div>
 
         <!-- El acta que se trabaja en Excel en la audiencia: se cuadra sola,
@@ -24598,6 +24657,183 @@ async function armarDescargar(){
       : ' · todo tipificado';
     armarEstado('Acta descargada: ' + (parte.lineas||0) + ' líneas' + aviso + '.','auto-ok');
   }catch(e){ armarEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+
+// ── La mesa de conciliación: el acta se trabaja acá, guardada en el motor ──
+var MESA = null;
+
+function mesaEstado(msg, clase){
+  var e = document.getElementById('mesa-estado');
+  if(!e) return;
+  e.className = 'auto-estado ' + (clase||'');
+  e.innerHTML = msg;
+}
+
+async function mesaAbrir(){
+  var fd = armarDatos(); if(!fd) return;
+  armarEstado('Armando la mesa…','auto-corriendo');
+  try{
+    var r = await fetch('/conciliaciones/mesa/abrir', {method:'POST', headers: authH(), body: fd});
+    if(!r.ok){ var e = await r.json().catch(function(){return {}}); armarEstado(escHtml(e.detail||('HTTP '+r.status)),'auto-error'); return; }
+    MESA = await r.json();
+    armarEstado('Mesa abierta: ' + MESA.resumen.lineas + ' renglones. Se trabaja abajo.','auto-ok');
+    mesaPintar();
+    mesaListar();
+    document.getElementById('mesa-card').scrollIntoView({behavior:'smooth', block:'start'});
+  }catch(e){ armarEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+
+async function mesaListar(){
+  try{
+    var r = await fetch('/conciliaciones/mesa?limite=50', {headers: authH()});
+    if(!r.ok) return;
+    var ms = await r.json();
+    var sel = document.getElementById('mesa-abiertas');
+    sel.innerHTML = '<option value="">Retomar una mesa…</option>' + ms.map(function(m){
+      return '<option value="' + m.id + '">' + escHtml('#' + m.id + ' · acta ' + (m.numero_acta||'—')
+        + ' · ' + (m.razon_social||'').slice(0,28) + ' · ' + m.resumen.lineas + ' renglones'
+        + (m.estado === 'CERRADA' ? ' (cerrada)' : '')) + '</option>';
+    }).join('');
+  }catch(e){ /* la lista es una ayuda, no un bloqueo */ }
+}
+
+async function mesaCargar(id){
+  if(!id) return;
+  mesaEstado('Trayendo la mesa…','auto-corriendo');
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + id, {headers: authH()});
+    if(!r.ok){ mesaEstado('No se pudo abrir esa mesa.','auto-error'); return; }
+    MESA = await r.json();
+    mesaPintar();
+    mesaEstado('','');
+  }catch(e){ mesaEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+
+function mesaPintar(){
+  if(!MESA) return;
+  var cerrada = MESA.estado === 'CERRADA';
+  document.getElementById('mesa-cuerpo').style.display = 'block';
+  document.getElementById('mesa-titulo').textContent =
+    '· acta ' + (MESA.numero_acta || '—') + ' · ' + (MESA.razon_social || '') + (cerrada ? ' · CERRADA' : '');
+  document.getElementById('mesa-sub').textContent = cerrada
+    ? 'Esta mesa está cerrada: se puede descargar el acta, pero no cambiar renglones.'
+    : 'Cada cambio se guarda solo. Los renglones en ámbar necesitan que una persona decida.';
+  mesaCifras();
+
+  var filas = MESA.lineas.map(function(l){
+    var falta = l.aviso ? ' class="falta"' : '';
+    var ro = cerrada ? ' disabled' : '';
+    var nc = l.cuenta_contable
+      ? escHtml(l.cuenta_contable + ' · ' + l.concepto_nota)
+      : (l.centro_costo ? '<span title="' + escHtml(l.centro_costo) + '">centro sin catálogo</span>' : '—');
+    return '<tr' + falta + ' data-id="' + l.id + '" title="' + escHtml(l.aviso || '') + '">'
+      + '<td>' + escHtml(l.item) + '</td>'
+      + '<td>' + escHtml(l.factura) + '</td>'
+      + '<td>' + escHtml(l.cod_glosa) + '<br><small style="color:var(--text3)">' + escHtml(l.tipificacion) + '</small></td>'
+      + '<td><span class="serv" title="' + escHtml(l.descripcion) + '">' + escHtml(l.descripcion) + '</span></td>'
+      + '<td class="num">' + fmtCOP(l.glosa_inicial) + '</td>'
+      + '<td><select onchange="mesaGuardar(' + l.id + ', {tipo_glosa: this.value})"' + ro + '>'
+        + ['','ADMINISTRATIVA','MIXTA','MEDICO'].map(function(t){
+            return '<option value="' + t + '"' + (t === l.tipo_glosa ? ' selected' : '') + '>' + (t||'— definir —') + '</option>';
+          }).join('')
+        + '</select></td>'
+      + ['acepta_ips','levanta_entidad','ratificado'].map(function(campo, i){
+          var letra = ['A','L','R'][i];
+          return '<td class="num"><input type="number" min="0" step="1" class="num" value="' + (l[campo]||0) + '"'
+            + ' onchange="mesaGuardar(' + l.id + ', {' + campo + ': parseFloat(this.value)||0})"' + ro + '>'
+            + (cerrada ? '' : '<div class="mesa-todo"><button type="button" title="Poner toda la glosa acá"'
+                + ' onclick="mesaTodo(' + l.id + ', \'' + campo + '\')">todo ' + letra + '</button></div>')
+            + '</td>';
+        }).join('')
+      + '<td class="num"><span class="mesa-pend-' + (Math.abs(l.pendiente) < 0.01 ? '0' : 'x') + '" data-pend="' + l.id + '">'
+        + fmtCOP(l.pendiente) + '</span></td>'
+      + '<td class="txt"><input type="text" value="' + escHtml(l.texto_conciliacion) + '"'
+        + ' onchange="mesaGuardar(' + l.id + ', {texto_conciliacion: this.value})"' + ro + '></td>'
+      + '<td class="mesa-nc">' + nc + '</td>'
+      + '</tr>';
+  }).join('');
+  document.getElementById('mesa-filas').innerHTML = filas;
+}
+
+function mesaCifras(){
+  var r = MESA.resumen;
+  var c = [
+    ['Renglones', r.lineas], ['Facturas', r.facturas],
+    ['Glosado', fmtCOP(r.glosado)], ['Acepta IPS', fmtCOP(r.acepta_ips)],
+    ['Levanta EPS', fmtCOP(r.levanta_entidad)], ['Ratificado', fmtCOP(r.ratificado)],
+    ['Sin repartir', r.sin_repartir + ' renglón(es)'],
+    ['Falta decidir', r.con_aviso + ' renglón(es)']
+  ];
+  document.getElementById('mesa-cifras').innerHTML = c.map(function(x){
+    return '<div class="c">' + escHtml(x[0]) + '<b>' + x[1] + '</b></div>';
+  }).join('');
+}
+
+async function mesaGuardar(lineaId, cambios){
+  if(!MESA) return;
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/linea/' + lineaId, {
+      method:'PATCH', headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify(cambios)
+    });
+    if(!r.ok){
+      var e = await r.json().catch(function(){return {}});
+      mesaEstado('No se guardó: ' + escHtml(e.detail||('HTTP '+r.status)),'auto-error');
+      return;
+    }
+    var d = await r.json();
+    var linea = MESA.lineas.filter(function(l){ return l.id === lineaId; })[0];
+    if(linea){ Object.assign(linea, cambios); linea.pendiente = d.pendiente; }
+    MESA.resumen = d.resumen;
+    var celda = document.querySelector('[data-pend="' + lineaId + '"]');
+    if(celda){
+      celda.textContent = fmtCOP(d.pendiente);
+      celda.className = 'mesa-pend-' + (Math.abs(d.pendiente) < 0.01 ? '0' : 'x');
+    }
+    mesaCifras();
+    mesaEstado('Guardado.','auto-ok');
+  }catch(e){ mesaEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+
+function mesaTodo(lineaId, campo){
+  var l = MESA.lineas.filter(function(x){ return x.id === lineaId; })[0];
+  if(!l) return;
+  var cambios = {acepta_ips:0, levanta_entidad:0, ratificado:0};
+  cambios[campo] = l.glosa_inicial;
+  mesaGuardar(lineaId, cambios).then(function(){ mesaPintar(); });
+}
+
+async function mesaDescargar(){
+  if(!MESA) return;
+  mesaEstado('Armando el acta…','auto-corriendo');
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/acta.xlsm', {headers: authH()});
+    if(!r.ok){ mesaEstado('No se pudo generar el acta.','auto-error'); return; }
+    var blob = await r.blob(), url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = 'ACTA_SINAC_' + (MESA.numero_acta || MESA.id) + '.xlsm';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    mesaEstado('Acta descargada.','auto-ok');
+  }catch(e){ mesaEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+
+async function mesaCerrar(){
+  if(!MESA) return;
+  var r0 = MESA.resumen;
+  var aviso = r0.sin_repartir
+    ? 'Quedan ' + r0.sin_repartir + ' renglón(es) sin repartir. '
+    : '';
+  if(!confirm(aviso + '¿Cerrar la mesa? Después no se pueden cambiar los renglones.')) return;
+  mesaEstado('Cerrando…','auto-corriendo');
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/cerrar', {method:'POST', headers: authH()});
+    if(!r.ok){ mesaEstado('No se pudo cerrar.','auto-error'); return; }
+    var d = await r.json();
+    MESA.estado = 'CERRADA';
+    mesaPintar(); mesaListar();
+    mesaEstado('Mesa cerrada. Se guardaron ' + (d.aprendido ? d.aprendido.nuevas : 0)
+      + ' tipificación(es) para la próxima.','auto-ok');
+  }catch(e){ mesaEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
 }
 
 // ── Acta de la mesa (Excel): revisar cuadre, optimizar e imprimir ──
