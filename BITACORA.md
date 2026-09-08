@@ -91,27 +91,50 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
-### 08-09-2026 (noche, 2) — La primera cuenta prescrita que pilló el sistema, y de dónde salen las fechas de la factura
+### 08-09-2026 (noche, 2) — La HUS559324: el sistema se equivocó, por qué, y qué quedó arreglado
 
 **Lo que pasó.** Yesid abrió la factura **HUS0000559324** (ADRES, $670.000,
 envío 234449) y la pantalla la marcó en rojo: *cuenta prescrita*. Pasó el
 archivo para comprobar si el sistema estaba en lo cierto.
 
-**Estaba en lo cierto, y hay tres pruebas.** Las tres fuentes del propio
-servidor dicen exactamente lo mismo:
+**El sistema se equivocó, y la cuenta NO estaba prescrita.** Al principio
+pareció que sí: tres fuentes decían lo mismo. Pero al mirar el PDF de la
+factura apareció que las tres beben del mismo dato malo:
 
-| De dónde | Qué dice de la atención |
-|---|---|
-| El RIPS | 13/02/2025 |
-| El XML de la factura electrónica | 13/02/2025 |
-| El validador del Ministerio (el del CUV) | 13/02/2025 |
+| De dónde | Ingreso | Egreso |
+|---|---|---|
+| **La factura impresa (PDF)** | 13/02/2025 | **14/03/2025** ← el bueno |
+| El RIPS | 13/02/2025 | 13/02/2025 |
+| El XML que va a la DIAN y al ADRES | 13/02/2025 | 13/02/2025 |
+| El validador del Ministerio | 13/02/2025 | 13/02/2025 |
 
-Y la **factura se emitió el 04/09/2026**. Entre la atención y la factura
-pasaron **18 meses y 22 días**: el plazo se había vencido el 13/08/2026,
-26 días antes. La cuenta llegó a pre-auditoría ya prescrita. Es justo lo que
-se quería detectar.
+Eran **20 sesiones de terapia física** del 13 de febrero al 14 de marzo. El
+RIPS trae UNA sola línea con la fecha de la primera sesión, y el XML copió
+esa misma fecha como si fuera la salida. Con el egreso bueno la cuenta
+**vencía el 14/09/2026**: le quedaban seis días, no estaba prescrita.
 
-**Lo que se arregló de paso — y era la pieza que faltaba.** El aviso decía
+Un falso «prescrita» es **peor que no tener la alerta**: manda a soltar una
+cuenta que todavía se podía cobrar.
+
+**Lo que quedó arreglado.**
+
+- Cuando el RIPS **no trae fecha de salida** y el sistema la deduce de la
+  última atención, ahora **lo dice** y avisa que si la cuenta son varias
+  sesiones el egreso real puede ser posterior.
+- El sistema **lee el PDF de la factura**, que es el único documento que
+  imprime el día en que el paciente salió, y **cuenta el plazo con ese**.
+- Si el PDF y el XML **se contradicen**, sale un reparo grave: el XML es el
+  que viaja al ADRES, así que hay que corregirlo en facturación.
+- En pantalla queda escrito **con qué egreso se contó el plazo**, que es lo
+  primero que hay que mirar cuando el dictamen no cuadra.
+
+**Un problema del hospital, aparte del sistema.** El XML que se le manda a
+la DIAN y al ADRES dice que esa atención empezó y terminó el mismo minuto
+(13/02/2025 06:54 → 06:55), cuando fueron 20 sesiones en un mes. Eso el
+ADRES lo puede glosar, y si viene del sistema de facturación no es solo esta
+factura. Vale la pena revisar otras cuentas de sesiones.
+
+**Lo que también quedó — y era la pieza que faltaba.** El aviso decía
 «el sistema no tiene fechas de ingreso y egreso declaradas por el hospital».
 Resulta que **sí las hay**, y en la misma carpeta del servidor:
 
@@ -128,7 +151,8 @@ queda escrito de dónde salió el dato, para poder rastrearlo.
 **No hizo falta el detallado de DGH** que se había pensado usar: la
 información estaba más cerca y es más confiable.
 
-39 pruebas nuevas, incluida una que reproduce la HUS559324 completa.
+51 pruebas nuevas, incluidas las que reproducen la HUS559324 completa y
+fijan que ya no salga como prescrita.
 
 ---
 

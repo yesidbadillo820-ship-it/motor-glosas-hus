@@ -40,6 +40,29 @@ from app.services.rips_localizador import SUBCARPETAS, carpetas_candidatas
 _RE_XML_FACTURA = re.compile(r"^(fv|ad)[^/\\]*\.xml$", re.IGNORECASE)
 # El resultado del validador del Ministerio que expide el CUV.
 _RE_RESULTADO = re.compile(r"^resultados(msps|doker)[^/\\]*\.json$", re.IGNORECASE)
+# El PDF impreso de la factura: es el ÚNICO documento que trae la fecha de
+# egreso de verdad cuando la atención fueron varias sesiones (caso HUS559324).
+_RE_PDF_FACTURA = re.compile(r"^(fv|fev)[^/\\]*\.pdf$", re.IGNORECASE)
+
+# «Fec Ingreso 13 feb. 2025 06:54 a. m.  Fec Egreso 14 mar. 2025 05:29 p. m.»
+_MESES = {
+    "ene": 1,
+    "feb": 2,
+    "mar": 3,
+    "abr": 4,
+    "may": 5,
+    "jun": 6,
+    "jul": 7,
+    "ago": 8,
+    "sep": 9,
+    "set": 9,
+    "oct": 10,
+    "nov": 11,
+    "dic": 12,
+}
+_RE_FEC = r"(\d{{1,2}})\s+([a-zA-Záéíóú]{{3,10}})\.?\s+(\d{{4}})"
+_RE_PDF_INGRESO = re.compile(r"Fec\.?\s*Ingreso\s+" + _RE_FEC.format(), re.IGNORECASE)
+_RE_PDF_EGRESO = re.compile(r"Fec\.?\s*Egreso\s+" + _RE_FEC.format(), re.IGNORECASE)
 
 # El período de atención dentro del XML (UBL). El `ad….xml` trae la factura
 # embebida, así que el mismo patrón sirve para los dos archivos.
@@ -153,6 +176,50 @@ def fechas_de_resultado_validador(ruta: str | Path) -> FechasDeclaradas:
     )
 
 
+def _fecha_larga(dia: str, mes: str, anio: str) -> Optional[datetime]:
+    """«14 mar. 2025» → datetime(2025, 3, 14). Devuelve None si no cuadra."""
+    numero = _MESES.get(mes[:3].lower())
+    if not numero:
+        return None
+    try:
+        return datetime(int(anio), numero, int(dia))
+    except ValueError:
+        return None
+
+
+def fechas_de_pdf(ruta: str | Path) -> FechasDeclaradas:
+    """El «Fec Ingreso / Fec Egreso» impreso en la factura del hospital.
+
+    Es la fuente que hay que creerle cuando la atención fueron varias
+    sesiones: el RIPS trae solo la primera y el XML copia esa misma, pero el
+    PDF sí imprime el día en que el paciente salió.
+    """
+    p = Path(ruta)
+    try:
+        if not p.is_file():
+            return FechasDeclaradas(archivo=p.name, problema=f"no se encontró el archivo: {p.name}")
+        from PyPDF2 import PdfReader
+
+        texto = "".join(pag.extract_text() or "" for pag in PdfReader(str(p)).pages)
+    except Exception as e:  # PDF cifrado, roto, o sin la librería
+        return FechasDeclaradas(
+            archivo=p.name, problema=f"no se pudo leer {p.name}: {str(e)[:150]}"
+        )
+
+    texto = re.sub(r"[ \t]+", " ", texto)
+    ing, egr = _RE_PDF_INGRESO.search(texto), _RE_PDF_EGRESO.search(texto)
+    if not (ing and egr):
+        return FechasDeclaradas(
+            archivo=p.name, problema=f"{p.name} no imprime «Fec Ingreso» y «Fec Egreso»"
+        )
+    return FechasDeclaradas(
+        fecha_ingreso=_fecha_larga(*ing.groups()),
+        fecha_egreso=_fecha_larga(*egr.groups()),
+        origen="factura impresa",
+        archivo=p.name,
+    )
+
+
 def _archivos_en(carpeta: Path, patron: re.Pattern) -> list[Path]:
     hallados: list[Path] = []
     for sub in SUBCARPETAS:
@@ -176,8 +243,20 @@ def buscar(
 ) -> FechasDeclaradas:
     """Las fechas declaradas de una factura, buscándolas en su carpeta.
 
-    Prefiere el XML de la factura; si no lo encuentra o no trae el período,
-    cae al resultado del validador del Ministerio.
+    ORDEN DE CONFIANZA, y el porqué de cada puesto:
+
+      1. **La factura impresa (PDF)**. Es la única que trae el día en que el
+         paciente salió cuando la atención fueron varias sesiones.
+      2. **El XML de la factura electrónica**. Es el documento legal, pero su
+         `InvoicePeriod` copia la fecha de la primera atención: en la
+         HUS559324 decía que la atención empezó y terminó el mismo minuto,
+         cuando fueron 20 sesiones en un mes.
+      3. **El resultado del validador del Ministerio**, que lee del XML y por
+         tanto arrastra el mismo error.
+
+    Si el PDF y el XML se contradicen, se devuelve el PDF y la contradicción
+    queda escrita en `problema`: es un reparo que hay que corregir en
+    facturación antes de que lo glose el ADRES.
     """
     carpetas, periodos, problema = carpetas_candidatas(
         factura, fecha_factura, raiz, meses_alrededor
@@ -185,22 +264,45 @@ def buscar(
     if problema:
         return FechasDeclaradas(problema=problema)
 
-    respaldo: Optional[FechasDeclaradas] = None
+    del_pdf = del_xml = del_validador = None
     for carpeta in carpetas:
+        for ruta in _archivos_en(carpeta, _RE_PDF_FACTURA):
+            leidas = fechas_de_pdf(ruta)
+            if leidas.completas and del_pdf is None:
+                del_pdf = leidas
         for ruta in _archivos_en(carpeta, _RE_XML_FACTURA):
             leidas = fechas_de_xml(ruta)
-            if leidas.completas:
-                return leidas
+            if leidas.completas and del_xml is None:
+                del_xml = leidas
         for ruta in _archivos_en(carpeta, _RE_RESULTADO):
             leidas = fechas_de_resultado_validador(ruta)
-            if leidas.completas and respaldo is None:
-                respaldo = leidas
-    if respaldo is not None:
-        return respaldo
+            if leidas.completas and del_validador is None:
+                del_validador = leidas
+        if del_pdf and del_xml:
+            break
 
-    return FechasDeclaradas(
-        problema=(
-            f"No se encontró el XML de la factura {factura} en el servidor "
-            f"(se miraron los períodos {', '.join(periodos)})."
+    mejor = del_pdf or del_xml or del_validador
+    if mejor is None:
+        return FechasDeclaradas(
+            problema=(
+                f"No se encontró la factura {factura} en el servidor "
+                f"(se miraron los períodos {', '.join(periodos)})."
+            )
         )
-    )
+
+    # La contradicción que hay que ver: el XML dice una fecha de salida y la
+    # factura impresa otra. Se reporta sobre la del PDF, que es la buena.
+    if del_pdf and del_xml and del_pdf.fecha_egreso != del_xml.fecha_egreso:
+        return FechasDeclaradas(
+            fecha_ingreso=del_pdf.fecha_ingreso,
+            fecha_egreso=del_pdf.fecha_egreso,
+            origen=del_pdf.origen,
+            archivo=del_pdf.archivo,
+            problema=(
+                "La factura impresa y el XML no dicen lo mismo del egreso: "
+                f"el PDF dice {del_pdf.fecha_egreso:%d/%m/%Y} y el XML "
+                f"{del_xml.fecha_egreso:%d/%m/%Y}. El XML es el que viaja al "
+                "ADRES: hay que corregirlo en facturación."
+            ),
+        )
+    return mejor

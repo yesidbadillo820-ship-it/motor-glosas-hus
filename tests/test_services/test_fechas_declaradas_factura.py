@@ -235,3 +235,83 @@ class TestElCasoRealCompleto:
         assert p.prescrita
         assert p.fecha_corte == date(2026, 8, 13)
         assert p.dias_vencida == 26
+
+
+class TestElEgresoQueSoloTraeElPdf:
+    """08-09-2026. El defecto que casi cuesta una cuenta.
+
+    La HUS559324 son 20 sesiones de terapia del 13-feb al 14-mar de 2025. El
+    RIPS trae UNA línea con la fecha de la primera sesión, y el XML copió esa
+    misma fecha como egreso. Solo la factura impresa dice cuándo salió el
+    paciente de verdad. Con el egreso malo la cuenta salía «prescrita»; con
+    el bueno le quedaban seis días.
+    """
+
+    def _pdf_falso(self, tmp_path, texto):
+        """Un PDF de una página con el texto de la carátula del HUS."""
+        from reportlab.lib.pagesizes import letter
+        from reportlab.pdfgen import canvas
+
+        ruta = tmp_path / "fv09000060370002600587045.pdf"
+        c = canvas.Canvas(str(ruta), pagesize=letter)
+        y = 700
+        for linea in texto.splitlines():
+            c.drawString(40, y, linea)
+            y -= 14
+        c.save()
+        return ruta
+
+    CARATULA = (
+        "FACTURA ELECTRONICA DE VENTA HUS559324\n"
+        "Fec Ingreso 13 feb. 2025 06:54 a. m. Fec Egreso 14 mar. 2025 05:29 p. m.\n"
+        "29112 TERAPIA FISICA SESION 20,00"
+    )
+
+    def test_el_pdf_da_el_egreso_de_verdad(self, tmp_path):
+        from app.services.fechas_declaradas_factura import fechas_de_pdf
+
+        f = fechas_de_pdf(self._pdf_falso(tmp_path, self.CARATULA))
+        assert f.fecha_ingreso == datetime(2025, 2, 13)
+        assert f.fecha_egreso == datetime(2025, 3, 14)
+        assert f.origen == "factura impresa"
+
+    def test_el_pdf_le_gana_al_xml_y_la_contradiccion_se_reporta(self, tmp_path):
+        c = tmp_path / "202609" / "FACTURAS_SALUD" / "HUS559324"
+        c.mkdir(parents=True)
+        self._pdf_falso(c, self.CARATULA)
+        (c / "ad1.xml").write_text(XML_REAL, encoding="utf-8")  # dice 13/02
+
+        f = buscar("HUS559324", date(2026, 9, 4), raiz=str(tmp_path))
+        assert f.fecha_egreso == datetime(2025, 3, 14)  # manda el PDF
+        assert "no dicen lo mismo del egreso" in f.problema
+        assert "14/03/2025" in f.problema and "13/02/2025" in f.problema
+        assert "corregirlo en facturación" in f.problema
+
+    def test_si_coinciden_no_se_inventa_una_contradiccion(self, tmp_path):
+        c = tmp_path / "202609" / "FACTURAS_SALUD" / "HUS559324"
+        c.mkdir(parents=True)
+        self._pdf_falso(c, "Fec Ingreso 13 feb. 2025 Fec Egreso 13 feb. 2025")
+        (c / "ad1.xml").write_text(XML_REAL, encoding="utf-8")
+        assert not buscar("HUS559324", date(2026, 9, 4), raiz=str(tmp_path)).problema
+
+    def test_un_pdf_sin_las_etiquetas_lo_dice(self, tmp_path):
+        from app.services.fechas_declaradas_factura import fechas_de_pdf
+
+        f = fechas_de_pdf(self._pdf_falso(tmp_path, "FACTURA SIN FECHAS"))
+        assert not f.completas
+        assert "Fec Ingreso" in f.problema
+
+    def test_un_pdf_roto_no_revienta(self, tmp_path):
+        from app.services.fechas_declaradas_factura import fechas_de_pdf
+
+        p = tmp_path / "fv_roto.pdf"
+        p.write_text("no soy un pdf", encoding="utf-8")
+        assert "no se pudo leer" in fechas_de_pdf(p).problema
+
+    def test_un_mes_que_no_existe_no_se_adivina(self, tmp_path):
+        from app.services.fechas_declaradas_factura import fechas_de_pdf
+
+        f = fechas_de_pdf(
+            self._pdf_falso(tmp_path, "Fec Ingreso 13 xxx. 2025 Fec Egreso 14 mar. 2025")
+        )
+        assert f.fecha_ingreso is None
