@@ -91,8 +91,12 @@ class TestElAvisoEstaEnchufado:
         from app.services.glosa_service import GlosaService
 
         src = inspect.getsource(GlosaService.analizar)
-        assert "_afirma_hechos_clinicos_sin_soporte(dictamen, tiene_pdf)" in src
-        i = src.index("_afirma_hechos_clinicos_sin_soporte(dictamen, tiene_pdf)")
-        bloque = src[max(0, i - 600) : i + 1800]
+        # 08-09-2026: la decisión de CUÁL aviso va se toma una sola vez en
+        # `_avisos_de_soportes_no_leidos` (para que nunca salgan los dos), y
+        # este bloque solo pinta el de cero soportes cuando le tocó.
+        assert "_avisos_de_soportes_no_leidos(" in src
+        i = src.index("_avisos_de_soportes_no_leidos(")
+        bloque = src[max(0, i - 600) : i + 2600]
+        assert "if _aviso_cero_soportes:" in bloque
         assert "NO SE ADJUNTARON" in bloque
         assert "CLINICA-SIN-SOPORTE" in bloque, "un fallo no puede tumbar el dictamen"

@@ -2829,6 +2829,138 @@ def _sustituir_eps_generica_en_dictamen(
     return nuevo
 
 
+# ── 08-09-2026 — Cuatro señales que se contradecían en la misma pantalla ──
+# Prueba de cinco casos (TA0701, SO3401, CL0101, FA1605, CO4601). En ninguno
+# fallaba la IA de fondo; lo que fallaba era lo que el motor DECÍA de sí
+# mismo: sello verde junto a «⛔ NO RADICAR», «OTRA / SIN DEFINIR» escrito en
+# el texto radicable como si fuera el nombre de la EPS, «PACIENTE IDENTIFICADO
+# EN EXPEDIENTE» sobre una factura sin expediente, y dos avisos de soportes que
+# se desmentían entre sí. Las cuatro piezas van juntas porque son la misma
+# falla: contar una cosa y mostrar otra.
+
+_EPS_GENERICAS = frozenset(
+    {"", "OTRA", "SIN DEFINIR", "OTRA / SIN DEFINIR", "OTRA/SIN DEFINIR", "OTRA - SIN DEFINIR"}
+)
+
+
+def _es_eps_generica(eps) -> bool:
+    """¿La EPS es el marcador del desplegable y no una entidad?"""
+    return " ".join(str(eps or "").upper().split()) in _EPS_GENERICAS
+
+
+# Cómo se le habla a la entidad cuando no se sabe cuál es. Es una frase de
+# escrito jurídico, no un marcador de pantalla.
+ENTIDAD_SIN_IDENTIFICAR = "LA ENTIDAD RESPONSABLE DE PAGO"
+
+# Solo la forma «suelta». La que va entre comillas angulares es la del aviso
+# «⚠ REVISAR ANTES DE RADICAR: … (quedó como «OTRA / SIN DEFINIR»)», que
+# tiene que seguir diciendo exactamente eso: es la nota al gestor, no el
+# escrito a la EPS.
+_PAT_EPS_GENERICA_EN_TEXTO = re.compile(
+    r"(?<!«)\bOTRA\s*[/\-]\s*SIN\s+DEFINIR\b(?!»)", re.IGNORECASE
+)
+
+
+def _neutralizar_eps_generica_en_dictamen(dictamen: str, eps) -> str:
+    """Si nunca se supo la EPS, el marcador no puede quedar en el escrito.
+
+    Casos 4 y 5 de la prueba: «INTERPUESTA POR OTRA / SIN DEFINIR» y «SE
+    SOLICITA A OTRA / SIN DEFINIR PRECISAR EL TOPE». Eso es el texto del
+    desplegable de la pantalla metido en un documento que se radica ante la
+    EPS. `_sustituir_eps_generica_en_dictamen` ya cubre el caso en que la
+    EPS real se detectó en el texto; este cubre el otro: no se detectó nada y
+    aun así el escrito tiene que leerse como escrito.
+    """
+    if not dictamen or not _es_eps_generica(eps):
+        return dictamen
+    nuevo, n = _PAT_EPS_GENERICA_EN_TEXTO.subn(ENTIDAD_SIN_IDENTIFICAR, dictamen)
+    if n:
+        logger.warning(
+            f"[EPS-GENERICA-EN-TEXTO] {n} mención(es) del marcador «OTRA / SIN "
+            f"DEFINIR» sustituida(s) por «{ENTIDAD_SIN_IDENTIFICAR}» en el escrito"
+        )
+    return nuevo
+
+
+# Lo que se dice del paciente cuando no se sabe quién es. Antes el prompt
+# ponía por defecto «PACIENTE IDENTIFICADO EN EXPEDIENTE», y la pantalla lo
+# mostraba como cabecera —«DEFENSA TÉCNICA: PACIENTE IDENTIFICADO EN
+# EXPEDIENTE»— justo encima de «No se encontró el expediente de la factura».
+PACIENTE_SIN_IDENTIFICAR = "PACIENTE NO IDENTIFICADO EN LOS SOPORTES"
+
+_ETIQUETAS_DE_PACIENTE_VACIO = frozenset(
+    {
+        "",
+        "N/A",
+        "NA",
+        "NO IDENTIFICADO",
+        "PACIENTE",
+        "SIN NOMBRE",
+        "NO APARECE",
+        "NOMBRE SI APARECE",
+        "PACIENTE IDENTIFICADO EN EXPEDIENTE",
+        "PACIENTE IDENTIFICADO EN EL EXPEDIENTE",
+    }
+)
+
+
+def _paciente_honesto(pac) -> str:
+    """Un nombre de verdad se conserva; cualquier relleno se dice como lo que es."""
+    p = " ".join(str(pac or "").split()).strip()
+    llave = p.upper().strip(" .\"'«»")
+    if llave in _ETIQUETAS_DE_PACIENTE_VACIO or llave.startswith("PACIENTE IDENTIFICADO EN"):
+        return PACIENTE_SIN_IDENTIFICAR
+    return p
+
+
+# Las marcas que el propio motor deja en el texto cuando decide que el
+# dictamen NO está listo para radicar, y el motivo en una línea. La pantalla
+# las usa para no estampar el sello verde encima.
+_MARCAS_DE_BLOQUEO = (
+    ("NO RADICAR TODAVÍA", "Falta el soporte de la causal en el expediente"),
+    ("NO SE IDENTIFICÓ LA ENTIDAD PAGADORA", "No se sabe a qué entidad se le responde"),
+    (
+        "AFIRMA CONTENIDO DE DOCUMENTOS QUE NO SE ADJUNTARON",
+        "Afirma lo que dice un documento que no se adjuntó",
+    ),
+    (
+        "DICE QUÉ CONTIENE UN DOCUMENTO QUE NO SE APORTÓ",
+        "Afirma lo que dice un documento que no se aportó",
+    ),
+)
+
+
+def _bloqueos_para_radicar(dictamen: str) -> list[str]:
+    """Los motivos por los que el motor marcó el dictamen como no radicable.
+
+    Lista vacía = el motor no lo bloqueó. No juzga la calidad del argumento:
+    solo lee lo que el motor ya escribió.
+    """
+    if not dictamen:
+        return []
+    up = dictamen.upper()
+    return [motivo for marca, motivo in _MARCAS_DE_BLOQUEO if marca in up]
+
+
+def _avisos_de_soportes_no_leidos(
+    dictamen: str, tiene_soportes: bool, texto_soportes: str
+) -> tuple[bool, list[str]]:
+    """Cuál de los dos avisos de soportes va. UNO, nunca los dos.
+
+    Devuelve `(aviso_de_cero_soportes, documentos_afirmados_sin_respaldo)`.
+
+    Casos 2, 3 y 5 de la prueba: sin un solo PDF adjunto salían a la vez «no
+    se le adjuntó ningún soporte» y, dos renglones abajo, «SÍ se adjuntaron
+    soportes, pero ninguno de ese tipo». El segundo se calculaba contra un
+    texto de soportes vacío, así que TODO le parecía faltante. Con cero
+    soportes, el aviso es el de cero soportes; la revisión por tipo de
+    documento solo tiene sentido cuando hubo algo que leer.
+    """
+    if not tiene_soportes:
+        return _afirma_hechos_clinicos_sin_soporte(dictamen, False), []
+    return False, _familias_afirmadas_sin_respaldo(dictamen, texto_soportes or "")
+
+
 # ── Ronda 14 (Bug L): normalizar dictamen "TODO EN MAYÚSCULAS" ──
 # Yesid lo señaló múltiples veces como antitécnico: dictámenes oficiales
 # salen 100% en mayúsculas, lo que le saca pinta jurídica y comunica
@@ -5119,7 +5251,10 @@ def _parrafo_cobertura_soat(eps: str, con_certificado: bool) -> str:
     el tope que considera no agotado. NO afirma que el tope se agotó: eso solo
     lo prueba el certificado de la aseguradora, que obtiene y aporta la IPS.
     """
-    ent = (eps or "LA ENTIDAD").upper().strip()
+    # 08-09-2026: con la EPS en «OTRA / SIN DEFINIR» salía «SE SOLICITA A
+    # OTRA / SIN DEFINIR PRECISAR EL TOPE» — el marcador de la pantalla en el
+    # texto radicable, como si fuera el nombre de la entidad.
+    ent = ENTIDAD_SIN_IDENTIFICAR if _es_eps_generica(eps) else str(eps).upper().strip()
     base = (
         "EN CUANTO A LA OBJECIÓN POR TOPES DEL SOAT Y DEL ADRES: EL ORDEN DE "
         "COBERTURA EN ACCIDENTES DE TRÁNSITO ES EL QUE FIJA EL DECRETO 780 DE 2016 "
@@ -9986,7 +10121,11 @@ class GlosaService:
             if razonamiento:
                 logger.info(f"IA razonamiento: {razonamiento[:200]}")
 
-            pac_ia = self._xml("paciente", res_ia, "NO IDENTIFICADO")
+            # 08-09-2026: la IA devolvía «PACIENTE IDENTIFICADO EN EXPEDIENTE» —el
+            # texto por defecto que le daba el prompt— sobre facturas SIN
+            # expediente, y la cabecera lo mostraba como si se hubiera
+            # identificado a alguien. Si no hay nombre, se dice que no lo hay.
+            pac_ia = _paciente_honesto(self._xml("paciente", res_ia, "NO IDENTIFICADO"))
             servicio_ia = self._xml("servicio", res_ia, "")
             # Ronda 19 (Bug DD, 30-jun-2026): limpiar el placeholder neutro
             # "el procedimiento/medicamento facturado según historia clínica"
@@ -12159,12 +12298,22 @@ class GlosaService:
         except Exception as _e_ct:
             logger.debug(f"[GLOSA-CONTRADICTORIA] aviso no agregado: {_e_ct}")
 
+        # 08-09-2026 — UN AVISO O EL OTRO, NUNCA LOS DOS. Se decide una sola
+        # vez, acá, y los dos bloques de abajo solo pintan lo que se decidió.
+        try:
+            _aviso_cero_soportes, _faltantes_por_tipo = _avisos_de_soportes_no_leidos(
+                dictamen, tiene_pdf, contexto_pdf or ""
+            )
+        except Exception as _e_asnl:
+            logger.debug(f"[AVISOS-SOPORTES] no se pudo decidir: {_e_asnl}")
+            _aviso_cero_soportes, _faltantes_por_tipo = False, []
+
         # ── Hechos clínicos sin un solo soporte adjunto (05-08-2026, OT-005) ──
         # Prueba real, glosa AU0401 de COMPENSAR sin PDF: "EL HISTORIAL MÉDICO
         # DETALLA SÍNTOMAS DE DOLOR ABDOMINAL AGUDO... EL INFORME DE RADIOLOGÍA
         # INDICA LA NECESIDAD DE CONTRASTE". Nadie subió esos documentos.
         try:
-            if _afirma_hechos_clinicos_sin_soporte(dictamen, tiene_pdf):
+            if _aviso_cero_soportes:
                 dictamen = dictamen + (
                     '<div style="background:#fee2e2;border-left:4px solid #dc2626;'
                     'padding:16px;margin:15px 0;border-radius:8px;">'
@@ -12194,7 +12343,7 @@ class GlosaService:
         # Este mira POR TIPO: si afirma contenido de una historia clínica,
         # tiene que haber una historia clínica entre lo que se leyó.
         try:
-            _faltantes = _familias_afirmadas_sin_respaldo(dictamen, contexto_pdf or "")
+            _faltantes = _faltantes_por_tipo
             if _faltantes:
                 _lista = (
                     _faltantes[0]
@@ -12298,6 +12447,17 @@ class GlosaService:
         except Exception as _e_dev:
             logger.debug(f"[DEVOLUCION] aviso no agregado: {_e_dev}")
 
+        # 08-09-2026 — Lo último que se le hace al texto antes de entregarlo.
+        # (1) Si nunca se supo la EPS, «OTRA / SIN DEFINIR» no puede quedar en
+        #     el escrito radicable como si fuera su nombre.
+        # (2) Si el propio motor marcó el dictamen como no listo para radicar,
+        #     la pantalla tiene que saberlo para NO estamparle el sello verde.
+        try:
+            dictamen = _neutralizar_eps_generica_en_dictamen(dictamen, getattr(data, "eps", ""))
+        except Exception as _e_neg:
+            logger.debug(f"[EPS-GENERICA-EN-TEXTO] no aplicada: {_e_neg}")
+        _motivos_bloqueo = _bloqueos_para_radicar(dictamen)
+
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
             resumen=f"DEFENSA TÉCNICA: {pac_ia}",
@@ -12326,6 +12486,8 @@ class GlosaService:
             # la IA no emitió el bloque). locals().get evita NameError si el
             # flujo no pasó por el bloque de extracción (p.ej. early-return).
             campos_estructurados=locals().get("_campos_finales"),
+            bloqueado_para_radicar=bool(_motivos_bloqueo),
+            motivos_bloqueo=(_motivos_bloqueo or None),
         )
         # Memoria (Render Free 512 MB): el análisis dejó en memoria PDFs
         # decodificados, prompts grandes, y caché de respuestas IA. Si no

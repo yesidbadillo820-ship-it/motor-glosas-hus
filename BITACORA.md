@@ -91,6 +91,55 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (noche, 2) — Cinco casos por el botón Analizar: el motor se contradecía a sí mismo
+
+**Lo que se hizo.** Se probaron cinco glosas inventadas para eso —tarifas,
+soportes, pertinencia, una extemporánea y una con el valor en cero— y se
+leyeron los cinco dictámenes de punta a punta.
+
+**Lo que funcionó bien:** el detector de extemporaneidad contó los 31 días
+hábiles solo, con el argumento del Art. 57 puesto como defensa adicional; el
+caso del valor en cero no inventó ninguna cifra; y en los cinco, la relación
+de soportes dijo la verdad («no se encontró el expediente») en vez de listar
+documentos que no existen.
+
+**Lo que falló, y quedó corregido en esta tanda (cuatro cosas):**
+
+1. **El sello verde salía junto al «⛔ NO RADICAR».** Cuatro de los cinco
+   dictámenes tenían arriba «VALIDADO POR QUALITY GATE» y abajo «NO RADICAR
+   TODAVÍA». Un sello junto a una prohibición no significa nada y enseña a
+   ignorar los dos. Ahora, cuando el motor bloquea, el sello es **rojo** y
+   dice «NO LISTO PARA RADICAR», con el motivo al pasar el mouse. El verde
+   solo sale cuando de verdad no hay nada que lo impida.
+2. **«OTRA / SIN DEFINIR» escrito en el dictamen como si fuera la EPS.** «La
+   glosa interpuesta por OTRA / SIN DEFINIR», «se solicita a OTRA / SIN
+   DEFINIR precisar el tope». Eso es el texto del desplegable de la pantalla
+   metido en el escrito que se radica. Ahora, si no se supo la entidad, el
+   escrito dice «la entidad responsable de pago» — y el aviso al gestor de que
+   falta identificarla se conserva.
+3. **«DEFENSA TÉCNICA: PACIENTE IDENTIFICADO EN EXPEDIENTE»** en cuatro casos
+   que decían, dos renglones abajo, «no se encontró el expediente». Era el
+   texto por defecto que el prompt le daba a la IA. Ahora, si no hay nombre,
+   dice «paciente no identificado en los soportes».
+4. **Dos avisos que se desmentían entre sí:** «no se adjuntó ningún soporte»
+   y, debajo, «SÍ se adjuntaron soportes, pero ninguno de ese tipo», con la
+   casilla de PDF vacía. Ahora se decide una sola vez cuál de los dos va.
+
+**Lo que se vio y queda para la siguiente tanda** (está en PENDIENTE): el
+caso de tarifas contradice el contrato que el motor tiene guardado; la
+ratificación «mantiene» una respuesta inicial que no existe; una corrección
+automática dejó una frase rota; las citas mal usadas pasan el verificador; y
+los indicadores de riesgo se contradicen entre sí.
+
+**Además:** SURA, SALUD TOTAL y MUTUAL SER no aparecen en la lista de
+entidades del botón Analizar. Se anota aparte.
+
+63 pruebas nuevas y un chequeo en navegador del sello con un resultado
+simulado (bloqueado, limpio y respuesta vieja sin el dato).
+
+---
+
+
 ### 08-09-2026 (noche, 2) — La HUS559324: el sistema se equivocó, por qué, y qué quedó arreglado
 
 **Lo que pasó.** Yesid abrió la factura **HUS0000559324** (ADRES, $670.000,
@@ -11600,6 +11649,36 @@ valor leido del PDF o con el objetado.
 ---
 
 ## 3) PENDIENTE
+
+### Motor de Glosas — lo que destapó la prueba de cinco casos (08-09)
+- **Tarifas: el dictamen contradice el contrato del propio motor.** Con
+  COOSALUD en SOAT -15 % guardado, el escrito dijo «SOAT PLENO» y que la EPS
+  «no ha aportado prueba de tarifa pactada distinta». Cuando el motor TIENE
+  la tarifa pactada, el texto la tiene que usar, y el Quality Gate tiene que
+  **bloquear** —no avisar— si el texto la contradice. También trató un
+  medicamento (CUM) como procedimiento (CUPS).
+- **Ratificación sin respuesta inicial.** El texto fijo dice «se mantiene la
+  respuesta dada en la glosa inicial» aunque la factura no tenga ninguna
+  respuesta previa registrada. Hay que detectarlo y avisar. Y no mostrar
+  «la IA recomienda» cuando la IA no corrió.
+- **Una corrección automática dejó una frase rota** («…LEY 1438 DE 2011 ART.
+  EL DECRETO 780…») y una nota de corrección con basura. Revisar el corte.
+- **Citas mal usadas pasan el verificador:** el Art. 5 de la Res. 2284/2023
+  salió explicado de dos formas distintas en dos dictámenes. El verificador
+  comprueba que la norma existe, no que diga lo que se le atribuye.
+- **Indicadores que se contradicen:** «riesgo BAJO» junto a «NO RADICAR»;
+  «DEFENDER 100 %» junto a «riesgo ALTO, preparar conciliación».
+- **SURA, SALUD TOTAL y MUTUAL SER no están en la lista de entidades** del
+  botón Analizar. Ya se sabe por qué: el desplegable se llena con las EPS que
+  tienen **contrato cargado** en la pantalla Contratos — es a propósito, sin
+  contrato el motor no puede citar tarifas. Para que aparezcan hay que cargar
+  su contrato ahí. Mientras tanto, si se analiza una glosa de esas EPS con
+  «OTRA / SIN DEFINIR», el dictamen sale sin contrato ni tarifa y con el
+  aviso de entidad sin identificar.
+- **Volver a correr el caso 3 (pertinencia) en etapa Inicial:** en
+  Ratificación no usa la IA, así que la prueba de si inventa hallazgos
+  clínicos quedó sin hacer.
+
 
 ### Lo que quedó de la revisión del 08-09
 - **Las 22 vulnerabilidades de las librerías.** Están anotadas en
