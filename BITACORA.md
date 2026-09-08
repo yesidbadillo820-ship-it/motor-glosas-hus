@@ -91,6 +91,47 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (noche, 2) — La primera cuenta prescrita que pilló el sistema, y de dónde salen las fechas de la factura
+
+**Lo que pasó.** Yesid abrió la factura **HUS0000559324** (ADRES, $670.000,
+envío 234449) y la pantalla la marcó en rojo: *cuenta prescrita*. Pasó el
+archivo para comprobar si el sistema estaba en lo cierto.
+
+**Estaba en lo cierto, y hay tres pruebas.** Las tres fuentes del propio
+servidor dicen exactamente lo mismo:
+
+| De dónde | Qué dice de la atención |
+|---|---|
+| El RIPS | 13/02/2025 |
+| El XML de la factura electrónica | 13/02/2025 |
+| El validador del Ministerio (el del CUV) | 13/02/2025 |
+
+Y la **factura se emitió el 04/09/2026**. Entre la atención y la factura
+pasaron **18 meses y 22 días**: el plazo se había vencido el 13/08/2026,
+26 días antes. La cuenta llegó a pre-auditoría ya prescrita. Es justo lo que
+se quería detectar.
+
+**Lo que se arregló de paso — y era la pieza que faltaba.** El aviso decía
+«el sistema no tiene fechas de ingreso y egreso declaradas por el hospital».
+Resulta que **sí las hay**, y en la misma carpeta del servidor:
+
+- el **XML de la factura electrónica** trae el período de la atención (es lo
+  que el hospital le declara a la DIAN), y
+- el **resultado del validador del Ministerio** lo trae también, ya validado
+  para expedir el CUV.
+
+Ahora el sistema las lee solo y **contrasta de verdad** el RIPS contra lo que
+declaró el hospital: si no coinciden, lo dice con los días de diferencia.
+Prefiere el XML de la factura, y si no está usa el del validador. En pantalla
+queda escrito de dónde salió el dato, para poder rastrearlo.
+
+**No hizo falta el detallado de DGH** que se había pensado usar: la
+información estaba más cerca y es más confiable.
+
+39 pruebas nuevas, incluida una que reproduce la HUS559324 completa.
+
+---
+
 ### 08-09-2026 (noche) — El tope de los soportes, y algo peor que encontré al subirlo
 
 **Lo que se pidió.** Usted probó y dijo que sus escaneos pesan entre 25 y

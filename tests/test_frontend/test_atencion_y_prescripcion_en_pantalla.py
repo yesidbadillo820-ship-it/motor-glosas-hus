@@ -224,3 +224,43 @@ class TestElEnganche:
             archivo.write_text(cuerpo, encoding="utf-8")
             r = subprocess.run(["node", "--check", str(archivo)], capture_output=True, text=True)
             assert r.returncode == 0, f"el bloque {i} no compila:\n{r.stderr}"
+
+
+class TestLasFechasDeclaradas:
+    """08-09-2026, con la HUS559324: ya hay con qué contrastar el RIPS."""
+
+    def test_se_muestra_de_donde_salieron_las_fechas_declaradas(self):
+        html = _pintar(
+            _dictamen(
+                declaradas={
+                    "fecha_ingreso": "2025-02-13T00:00:00",
+                    "fecha_egreso": "2025-02-13T00:00:00",
+                    "origen": "factura electrónica",
+                    "completas": True,
+                }
+            )
+        )
+        assert "factura electrónica" in html
+        assert "13/02/2025" in html
+
+    def test_sin_declaradas_no_se_inventa_la_linea(self):
+        assert "declara" not in _pintar(_dictamen())
+
+    def test_unas_declaradas_incompletas_no_se_muestran(self):
+        html = _pintar(
+            _dictamen(declaradas={"fecha_ingreso": "2025-02-13T00:00:00", "completas": False})
+        )
+        assert "declara" not in html
+
+    def test_el_origen_va_escapado(self):
+        html = _pintar(
+            _dictamen(
+                declaradas={
+                    "fecha_ingreso": "2025-02-13T00:00:00",
+                    "fecha_egreso": "2025-02-13T00:00:00",
+                    "origen": "<b>mala</b>",
+                    "completas": True,
+                }
+            )
+        )
+        assert "<b>mala" not in html and "&lt;b&gt;" in html

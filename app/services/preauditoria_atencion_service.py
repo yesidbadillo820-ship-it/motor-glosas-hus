@@ -34,6 +34,7 @@ from typing import Any, Optional
 from sqlalchemy.orm import Session
 
 from app.services.cotejo_fechas_atencion import cotejar, hay_reparos_graves
+from app.services.fechas_declaradas_factura import buscar as buscar_declaradas
 from app.services.prescripcion_adres import MESES_PLAZO_ADRES, evaluar
 from app.services.rips_fechas_atencion import fechas_de_archivo
 from app.services.rips_localizador import localizar
@@ -74,6 +75,16 @@ def revisar(
     ubicado = localizar(factura, fuente.get("f_factura"))
     fechas = fechas_de_archivo(ubicado.ruta) if ubicado.encontrado else None
 
+    # Las fechas que el hospital DECLARÓ: salen del XML de la factura
+    # electrónica (o del resultado del validador), que están en la misma
+    # carpeta del servidor. Solo se buscan si no vinieron dadas.
+    declaradas = None
+    if ingreso_declarado is None and egreso_declarado is None:
+        declaradas = buscar_declaradas(factura, fuente.get("f_factura"))
+        if declaradas.completas:
+            ingreso_declarado = declaradas.fecha_ingreso
+            egreso_declarado = declaradas.fecha_egreso
+
     hallazgos = cotejar(
         fechas,
         ingreso_declarado=ingreso_declarado,
@@ -103,6 +114,7 @@ def revisar(
         "entidad": fuente.get("entidad"),
         "archivo_rips": ubicado.ruta,
         "fechas": fechas.a_dict() if fechas is not None else None,
+        "declaradas": declaradas.a_dict() if declaradas is not None else None,
         "prescripcion": prescripcion.a_dict() if prescripcion is not None else None,
         "hallazgos": [h.a_dict() for h in hallazgos],
         "hay_reparos_graves": hay_reparos_graves(hallazgos),

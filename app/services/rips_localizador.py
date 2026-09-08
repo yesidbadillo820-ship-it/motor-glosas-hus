@@ -166,6 +166,60 @@ def _rips_en(carpeta: Path) -> Optional[Path]:
     return None
 
 
+def carpetas_candidatas(
+    factura: str,
+    fecha_factura: Any = None,
+    raiz: Optional[str] = None,
+    meses_alrededor: int = 1,
+) -> tuple[list[Path], list[str], str]:
+    """Las carpetas donde puede estar la factura, en orden.
+
+    Devuelve `(carpetas, periodos_mirados, problema)`. Si `problema` no está
+    vacío, no hay dónde buscar y el motivo ya viene escrito para la pantalla.
+    Lo usan por igual el RIPS y el XML de la factura electrónica: la carpeta
+    es la misma, y buscarla dos veces con reglas distintas es cómo aparecen
+    los defectos que nadie entiende.
+    """
+    base_txt = raiz if raiz is not None else raiz_facturacion_electronica()
+    if not base_txt:
+        return (
+            [],
+            [],
+            (
+                "No está configurado el servidor de facturación electrónica. "
+                "Escriba la ruta en config/facturacion_electronica_root.txt."
+            ),
+        )
+    base = Path(base_txt)
+    try:
+        if not base.is_dir():
+            return [], [], f"No se puede llegar al servidor: {base_txt}"
+    except OSError as e:
+        return [], [], f"No se puede llegar al servidor ({e}): {base_txt}"
+
+    periodo = periodo_de(fecha_factura)
+    if not periodo:
+        return (
+            [],
+            [],
+            ("La factura no tiene fecha, así que no se sabe en qué período del servidor buscarla."),
+        )
+
+    periodos = [periodo]
+    for salto in range(1, max(0, meses_alrededor) + 1):
+        for vecino in (periodo_vecino(periodo, salto), periodo_vecino(periodo, -salto)):
+            if vecino and vecino not in periodos:
+                periodos.append(vecino)
+
+    carpetas = [
+        base / per / tipo / nombre
+        for per in periodos
+        for tipo in CARPETAS_TIPO
+        for nombre in _nombres_de_carpeta(factura)
+    ]
+    return carpetas, periodos, ""
+
+
 def localizar(
     factura: str,
     fecha_factura: Any = None,
@@ -177,43 +231,16 @@ def localizar(
     `fecha_factura` decide por cuál período se empieza. Sin ella no se puede
     ir directo, y se dice — antes que recorrer el servidor entero.
     """
-    base_txt = raiz if raiz is not None else raiz_facturacion_electronica()
-    if not base_txt:
-        return RipsUbicado(
-            problema=(
-                "No está configurado el servidor de facturación electrónica. "
-                "Escriba la ruta en config/facturacion_electronica_root.txt."
-            )
-        )
-    base = Path(base_txt)
-    try:
-        if not base.is_dir():
-            return RipsUbicado(problema=f"No se puede llegar al servidor: {base_txt}")
-    except OSError as e:
-        return RipsUbicado(problema=f"No se puede llegar al servidor ({e}): {base_txt}")
+    carpetas, periodos, problema = carpetas_candidatas(
+        factura, fecha_factura, raiz, meses_alrededor
+    )
+    if problema:
+        return RipsUbicado(problema=problema)
 
-    periodo = periodo_de(fecha_factura)
-    if not periodo:
-        return RipsUbicado(
-            problema=(
-                "La factura no tiene fecha, así que no se sabe en qué período "
-                "del servidor buscarla."
-            )
-        )
-
-    periodos = [periodo]
-    for salto in range(1, max(0, meses_alrededor) + 1):
-        for vecino in (periodo_vecino(periodo, salto), periodo_vecino(periodo, -salto)):
-            if vecino and vecino not in periodos:
-                periodos.append(vecino)
-
-    for per in periodos:
-        for tipo in CARPETAS_TIPO:
-            for nombre in _nombres_de_carpeta(factura):
-                carpeta = base / per / tipo / nombre
-                hallado = _rips_en(carpeta)
-                if hallado is not None:
-                    return RipsUbicado(ruta=str(hallado), carpeta_factura=str(carpeta))
+    for carpeta in carpetas:
+        hallado = _rips_en(carpeta)
+        if hallado is not None:
+            return RipsUbicado(ruta=str(hallado), carpeta_factura=str(carpeta))
 
     return RipsUbicado(
         problema=(
