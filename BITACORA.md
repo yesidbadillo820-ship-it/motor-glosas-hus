@@ -91,6 +91,43 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (cierre) — El cruce de objeciones entró al Motor: botón «Objeciones DGH»
+
+Hasta hoy, armar el archivo de objeciones era pedírselo al chat. Ahora es una
+pantalla del Motor: **barra lateral → Objeciones DGH**, se suben los dos Excel
+—las glosas de la entidad y el export de servicios facturados del DGH— y salen
+los dos archivos de siempre.
+
+**Lo que se ve antes de descargar.** El resumen del cruce (cuántas quedaron en
+ALTA, MEDIA, BAJA y sin cruce), la tabla de lo que hay que revisar con el
+motivo de cada una, y el detalle por factura con su tipo de objeción. Y arriba,
+el veredicto de las reglas: si `CTNCENCOS` quedó vacía, si algún código no
+existe en el DGH y si `CROTIPOBJ` está bien. **Si eso sale en rojo, no se
+sube.**
+
+**Reconoce sola de quién es el archivo:** FAMISANAR, Dispensario o SANITAS. Y
+si no lo reconoce, **no procesa a ciegas**: avisa qué encabezados leyó y deja
+elegir la entidad a mano. Es la misma defensa que salvó el lote de SANITAS.
+
+**Lo importante: no se copió ni una regla.** La pantalla llama a los mismos
+bots de `tools/` que se usan por consola, así que lo que baja el auditor es
+**idéntico** a lo que se venía entregando por chat — se comprobó con los tres
+lotes reales (FAMISANAR 3-sep, Dispensario 3-sep y SANITAS 4-sep): mismos
+números, mismos archivos. Si mañana cambia una regla, se cambia en el bot y la
+pantalla la hereda sola.
+
+**Cuidado con los datos.** Los archivos armados esperan media hora en memoria a
+que el auditor los baje, sólo los ve quien los armó, y después se sueltan
+solos. Los Excel del auditor se procesan en una carpeta temporal que se borra
+sola: no quedan datos de pacientes tirados en el servidor.
+
+**Una aclaración de alcance:** el Motor no puede entrar al DGH por su cuenta.
+El export de servicios facturados lo sigue sacando el auditor; «subir y que
+salga todo» funciona con esos dos Excel.
+
+Guía: `docs/OBJECIONES_DGH_WEB.md`. 38 pruebas nuevas entre el servicio y las
+rutas.
+
 ### 08-09-2026 (noche) — SANITAS entra al circuito, y su archivo traía una trampa
 
 Primer lote de **SANITAS**: 113 objeciones de **una sola factura**
@@ -11246,6 +11283,13 @@ valor leido del PDF o con el objetado.
 - **Agendar** geriatría, nefrología, fisiatría y los laboratorios a domicilio
   (con ayuno de 8–10 horas, menos la creatinina), y **confirmar el inicio**
   de las terapias de deglución y respiratoria ya autorizadas.
+
+### Objeciones DGH en la pantalla (08-09)
+- **Estrenarla con un lote real**: subir los dos Excel del próximo lote por la
+  pantalla en vez de pedirlo por chat, y comparar que el archivo sea el mismo.
+- **Faltan entidades**: hoy reconoce FAMISANAR, Dispensario y SANITAS. SAVIA,
+  VCO y EMSSANAR ya tienen bot pero todavía no están en esta pantalla (siguen
+  en el Centro de Automatización, que recibe un solo archivo).
 
 ### SANITAS — objeciones del 4 de septiembre (08-09)
 - **Piloto en DGH** con la factura HUS0000548650 antes de dar por bueno el
