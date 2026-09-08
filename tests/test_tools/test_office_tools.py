@@ -26,9 +26,13 @@ fitz = pytest.importorskip("fitz")
 
 from nucleo import office_tools  # noqa: E402
 
-sin_libreoffice = pytest.mark.skipif(
-    not office_tools.hay_libreoffice(), reason="LibreOffice no está instalado"
-)
+from ._entorno import SIN_LIBREOFFICE  # noqa: E402
+
+# No basta con que exista el ejecutable. `libreoffice-core` se instala solo,
+# deja un `soffice` que arranca, y la conversión falla con «source file could
+# not be loaded» — que parece un archivo dañado y en realidad es LibreOffice
+# sin Writer, sin Calc y sin Draw. El marcador mira los módulos, no el binario.
+sin_libreoffice = SIN_LIBREOFFICE
 
 
 def _silencio(_):

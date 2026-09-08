@@ -1,0 +1,47 @@
+# Vulnerabilidades ya conocidas y pendientes de arreglar
+#
+# Este archivo NO es una lista de perdones: es la deuda de seguridad del
+# motor, a la vista. El gate del CI (scripts/revisar_vulnerabilidades.py)
+# deja pasar SOLO lo que está acá; cualquier vulnerabilidad nueva lo tumba.
+#
+# Antes de este archivo, el paso de seguridad del CI terminaba en `|| true`:
+# encontraba todo esto y decía que todo estaba bien. Un escáner que nunca
+# falla no protege de nada.
+#
+# Cómo se quita un renglón: se sube la versión del paquete en
+# requirements.txt, se corre `python scripts/revisar_vulnerabilidades.py`
+# y, si ya no aparece, se borra la línea.
+#
+# Cómo se agrega uno: SOLO después de mirar el impacto real en el motor, con
+# la fecha y el motivo. Anotar sin mirar es lo mismo que no tener gate.
+#
+# Levantado el 08-09-2026 con el estado de ese día. Ninguno de estos se ha
+# revisado uno por uno todavía: son la foto de lo que el `|| true` venía
+# tapando. Subirlos de versión es trabajo aparte —starlette, jinja2 y
+# python-jose son el corazón de la aplicación que corre en el hospital y no
+# se cambian de afán— y queda anotado en PENDIENTE de la bitácora.
+#
+# formato:  IDENTIFICADOR   # paquete versión → versión que lo corrige
+
+PYSEC-2026-1325      # ecdsa 0.19.2 → sin versión corregida
+PYSEC-2026-1471      # jinja2 3.1.5 → 3.1.6
+PYSEC-2026-1761      # pdfminer-six 20231228 → 20251230
+PYSEC-2026-1762      # pdfminer-six 20231228 → 20251107
+PYSEC-2026-1835      # pypdf2 3.0.1 → 3.9.0
+PYSEC-2026-2270      # python-dotenv 1.0.1 → 1.2.2
+PYSEC-2024-232       # python-jose 3.3.0 → 3.4.0
+PYSEC-2024-233       # python-jose 3.3.0 → 3.4.0
+PYSEC-2025-185       # python-jose 3.3.0 → sin versión corregida
+PYSEC-2026-1852      # python-multipart 0.0.20 → 0.0.22
+PYSEC-2026-3036      # python-multipart 0.0.20 → 0.0.30
+PYSEC-2026-3037      # python-multipart 0.0.20 → 0.0.30
+PYSEC-2026-3038      # python-multipart 0.0.20 → 0.0.26
+PYSEC-2026-3039      # python-multipart 0.0.20 → 0.0.27
+PYSEC-2026-3040      # python-multipart 0.0.20 → 0.0.31
+PYSEC-2026-161       # starlette 0.41.3 → 1.0.1
+PYSEC-2026-1941      # starlette 0.41.3 → 0.47.2
+PYSEC-2026-1942      # starlette 0.41.3 → 0.49.1
+PYSEC-2026-2280      # starlette 0.41.3 → 1.1.0
+PYSEC-2026-2281      # starlette 0.41.3 → 1.1.0
+PYSEC-2026-248       # starlette 0.41.3 → 1.3.0
+PYSEC-2026-249       # starlette 0.41.3 → 1.3.1

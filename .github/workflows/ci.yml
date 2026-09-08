@@ -48,6 +48,11 @@ jobs:
       # Salta schedulers en background — sin esto, los TestClient acumulan
       # asyncio tasks hasta agotar memoria del runner.
       DISABLE_SCHEDULERS: "1"
+      # En el CI, una prueba que se salta porque «falta LibreOffice» es un
+      # fallo, no un aviso: el runner SÍ tiene que tenerlo. Sin esto, el día
+      # que la instalación se rompa la suite seguiría dando verde con doce
+      # pruebas saltadas y nadie lo notaría.
+      EXIGIR_HERRAMIENTAS_DE_PRUEBA: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -68,13 +73,14 @@ jobs:
           # pytest no está en requirements.txt; el runner lo necesita para correr
           # la suite. pytest-asyncio para los tests async (@pytest.mark.asyncio).
           pip install pytest pytest-asyncio
-          # extract-msg (tests/test_tools/test_msg_tools.py) declara como
-          # dependencia obligatoria "red-black-tree-mod", cuyo instalador
-          # legado (setup.py install) es incompatible con setuptools moderno.
-          # Esa pieza solo hace falta para RE-ESCRIBIR .msg; nucleo/msg_tools.py
-          # solo los LEE, así que se instala sin esa dependencia rota.
-          pip install --no-deps extract-msg
-          pip install olefile beautifulsoup4 compressed-rtf ebcdic RTFDE tzlocal
+
+      # LibreOffice completo (Writer/Calc/Draw/Impress) y extract-msg. El
+      # mismo script sirve en un contenedor de desarrollo, para que la suite
+      # dé el mismo resultado en el PC del que trabaja y en el CI. Antes esta
+      # instalación vivía solo acá y en local fallaban doce pruebas por
+      # razones que no tenían nada que ver con el código.
+      - name: Preparar herramientas de prueba (LibreOffice, extract-msg)
+        run: bash scripts/preparar_entorno_pruebas.sh
 
       - name: Run tests
         run: |
@@ -117,4 +123,34 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install pip-audit
-      - run: pip-audit -r requirements.txt --ignore-vuln GHSA-h75v-3vvj-5mfj || true
+      # Antes esto terminaba en `|| true`: encontraba las 22 vulnerabilidades
+      # que arrastran las dependencias fijadas y decía que todo estaba bien.
+      # Un escáner que nunca falla no es un gate.
+      #
+      # Ahora falla ante cualquier vulnerabilidad NUEVA. Las ya conocidas
+      # están anotadas en seguridad/vulnerabilidades_conocidas.txt, a la
+      # vista, en vez de escondidas. Poner el gate en cero de una vez
+      # dejaría el CI rojo permanentemente y bloquearía hasta los arreglos.
+      - run: python scripts/revisar_vulnerabilidades.py
+
+  # Una sola casilla para exigir en la protección de la rama. Sin esto hay
+  # que marcar los tres jobs a mano, y el día que se agregue un cuarto queda
+  # fuera del gate sin que nadie lo note.
+  ci-ok:
+    name: CI OK
+    runs-on: ubuntu-latest
+    needs: [lint, test, security]
+    if: always()
+    steps:
+      - name: Comprobar que los tres pasaron
+        run: |
+          echo "lint     = ${{ needs.lint.result }}"
+          echo "test     = ${{ needs.test.result }}"
+          echo "security = ${{ needs.security.result }}"
+          if [ "${{ needs.lint.result }}" != "success" ] \
+             || [ "${{ needs.test.result }}" != "success" ] \
+             || [ "${{ needs.security.result }}" != "success" ]; then
+            echo "::error::Alguno de los tres pasos no terminó bien. No se puede fusionar."
+            exit 1
+          fi
+          echo "Los tres en verde."

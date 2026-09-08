@@ -275,6 +275,40 @@ class ComentarioGlosaRecord(Base):
     __table_args__ = (Index("ix_comentarios_glosa", "glosa_id", "creado_en"),)
 
 
+class SoporteMesaRecord(Base):
+    """Un soporte que el auditor sube DESDE la mesa, en plena audiencia.
+
+    Va aparte del indexador del hospital a propósito. Aquel recorre el share
+    y solo LEE lo que ya estaba archivado; su índice se reconstruye entero
+    cada tantas horas, así que un archivo que se meta ahí a mano puede
+    desaparecer en la siguiente pasada. Lo que se sube en una mesa es
+    evidencia de esa mesa y no se puede perder: se guarda en la base, con
+    quién lo subió y cuándo, que es lo que después se cita en el acta.
+
+    Se guarda por FACTURA, no por renglón: una factura con doce glosas
+    comparte sus soportes, y obligar a subir el mismo PDF doce veces en una
+    audiencia es tiempo que no hay.
+    """
+
+    __tablename__ = "soportes_mesa"
+
+    id = Column(Integer, primary_key=True, index=True)
+    mesa_id = Column(Integer, ForeignKey("mesas_conciliacion.id", ondelete="CASCADE"), index=True)
+    # Sin `index=True` acá: el índice compuesto de abajo ya cubre la búsqueda
+    # que de verdad se hace (los soportes de UNA factura de UNA mesa), y dos
+    # índices sobre lo mismo solo cuestan escrituras.
+    factura = Column(String(50))
+    nombre = Column(String(300))
+    mime_type = Column(String(100))
+    tamano_bytes = Column(Integer)
+    contenido_b64 = Column(Text, nullable=False)
+    nota = Column(String(500))  # para qué sirve este soporte, en la mesa
+    subido_por = Column(String(200))
+    subido_en = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("ix_soportes_mesa_por_factura", "mesa_id", "factura"),)
+
+
 class PlantillaGoldRecord(Base):
     """Argumentos técnico-jurídicos que ganaron (EPS levantó la glosa).
 
