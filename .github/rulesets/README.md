@@ -16,6 +16,16 @@ permisos de dueño y Claude no los tiene.
 2. **New ruleset → Import a ruleset**
 3. Suba el archivo `motor-glosas-protegida.json` de esta carpeta
 4. **Create**
+5. **IMPORTANTE — este paso no lo hace la importación.** Abra la regla
+   «Require status checks to pass»: la lista de chequeos llega **vacía**.
+   Hay que agregar los cuatro a mano, buscándolos por su nombre exacto:
+   `Lint (ruff)`, `Tests (pytest)`, `Security scan (pip-audit)` y `CI OK`.
+   Sin esto la regla queda puesta pero no exige nada — que es peor que no
+   tenerla, porque uno cree que está protegido y no lo está.
+   (Ya pasó el 08-09-2026, al aplicarla por primera vez.)
+
+**Aplicada el 08-09-2026.** Estas instrucciones quedan por si hay que
+rehacerla o replicarla en otro repositorio.
 
 ## Qué queda exigido
 
