@@ -96,8 +96,19 @@ jobs:
         if: failure()
         run: tail -100 /tmp/pytest-output.log || echo "no log file"
 
+      # `continue-on-error` en los dos: estos archivos son para MIRAR qué pasó
+      # cuando algo falla, no son el resultado de las pruebas. El 08-09-2026
+      # el almacenamiento de artefactos de GitHub contestó 403 al guardar el
+      # log, y eso tumbó un job donde la suite había pasado entera. Un
+      # tropiezo del sitio donde se guarda el diagnóstico no dice NADA del
+      # código, y no puede bloquear una fusión.
+      #
+      # Si algo falla de verdad, el paso «Show last 100 lines on failure» ya
+      # deja el error en el propio log del job: el artefacto es comodidad,
+      # no la única copia.
       - name: Upload pytest log
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: pytest-output-log
@@ -107,6 +118,7 @@ jobs:
 
       - name: Upload test results
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: junit-results
