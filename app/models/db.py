@@ -282,8 +282,17 @@ class SoporteMesaRecord(Base):
     y solo LEE lo que ya estaba archivado; su índice se reconstruye entero
     cada tantas horas, así que un archivo que se meta ahí a mano puede
     desaparecer en la siguiente pasada. Lo que se sube en una mesa es
-    evidencia de esa mesa y no se puede perder: se guarda en la base, con
-    quién lo subió y cuándo, que es lo que después se cita en el acta.
+    evidencia de esa mesa y no se puede perder: queda registrada con quién la
+    subió y cuándo, que es lo que después se cita en el acta.
+
+    EL ARCHIVO VA A DISCO, NO A LA BASE. Los escaneos que maneja cartera
+    pesan entre 25 y 40 MB. Guardarlos como base64 en SQLite los inflaba un
+    33% y, peor, obligaba a cargarlos enteros en memoria para cualquier cosa
+    —hasta para LISTARLOS—. El contenedor del hospital corre con 640 MB de
+    tope y el compose ya documenta que el OOM killer mató procesos antes:
+    listar diez soportes de 40 MB lo habría tumbado en plena audiencia.
+    Ahora solo se guardan los datos del archivo, y el archivo vive en
+    `/data/soportes_mesa/`, en el mismo volumen persistente que la base.
 
     Se guarda por FACTURA, no por renglón: una factura con doce glosas
     comparte sus soportes, y obligar a subir el mismo PDF doce veces en una
@@ -301,7 +310,15 @@ class SoporteMesaRecord(Base):
     nombre = Column(String(300))
     mime_type = Column(String(100))
     tamano_bytes = Column(Integer)
-    contenido_b64 = Column(Text, nullable=False)
+    # Dónde quedó el archivo, relativo a la carpeta de soportes de mesa.
+    ruta_relativa = Column(String(400))
+    # Para saber si el archivo se dañó o alguien lo cambió por fuera. Un
+    # soporte alterado no sirve como evidencia, y peor: engaña.
+    sha256 = Column(String(64))
+    # Los soportes subidos ANTES de pasar a disco (08-09-2026) viven acá.
+    # Se siguen leyendo para no perder nada de lo ya cargado; los nuevos
+    # nunca lo usan.
+    contenido_b64 = Column(Text)
     nota = Column(String(500))  # para qué sirve este soporte, en la mesa
     subido_por = Column(String(200))
     subido_en = Column(DateTime(timezone=True), server_default=func.now())

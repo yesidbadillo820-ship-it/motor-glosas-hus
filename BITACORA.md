@@ -91,6 +91,47 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (noche) — El tope de los soportes, y algo peor que encontré al subirlo
+
+**Lo que se pidió.** Usted probó y dijo que sus escaneos pesan entre 25 y
+40 MB. El tope que yo había puesto era de 15 MB — un número que me inventé,
+sin preguntar. Los dejaba a **todos** afuera. Ya está en **50 MB**.
+
+**Lo que apareció al ir a cambiarlo.** El número era lo de menos. La forma en
+que estaba guardando los archivos habría **tumbado el motor** con archivos de
+ese tamaño:
+
+- Los guardaba dentro de la base de datos, convertidos a texto. Eso los
+  engorda un 33%: un escaneo de 40 MB ocupaba 53.
+- Peor: para **cualquier cosa** —hasta para mostrar la lista de lo ya
+  subido— había que cargarlos enteros en memoria. Listar diez soportes eran
+  500 MB de golpe.
+- El motor del hospital corre con **640 MB** de tope de memoria, y el propio
+  archivo de configuración deja escrito que cuando se pasa de ahí el sistema
+  operativo empieza a matar programas al azar. Ya pasó antes.
+
+O sea: con el tope en 15 MB casi nadie podía subir nada, y **el día que
+alguien lo subiera a 50 sin mirar el resto, el motor se caía en plena
+audiencia**.
+
+**Cómo quedó.** Los archivos ya no van a la base: van a la carpeta `/data`,
+la misma donde vive la base y que sobrevive a las actualizaciones (el motor
+se actualiza solo cada cinco minutos; si hubieran quedado en otro lado, la
+evidencia de una audiencia habría durado minutos). Se escriben **de a un
+mega por vez**, así que da igual que el archivo pese 5 MB o 50: la memoria
+que se usa es la misma. La lista ya no lee los archivos, solo sus datos.
+
+Además, de cada soporte se guarda una **huella** para saber si se dañó o si
+alguien lo cambió por fuera — un soporte alterado no sirve de evidencia, y
+peor, engaña.
+
+**Nada de lo ya subido se pierde:** los soportes que se cargaron esta tarde,
+antes del cambio, se siguen pudiendo bajar igual.
+
+Probado con un PDF de 30 MB, del tamaño de los suyos. 15 pruebas nuevas.
+
+---
+
 ### 08-09-2026 (tarde, 3) — Las cuentas del ADRES ya avisan cuándo se están venciendo
 
 **Lo que pidió Yesid.** Que el sistema mire, para las facturas que van al
@@ -313,7 +354,6 @@ y agregarle evidencia después la descuadraría.
 
 ---
 
-
 ### 07-09-2026 (noche, 2) — En la mesa se ve por qué se glosó y con qué refutarlo
 
 **El problema.** La tabla de la mesa mostraba el motivo de la glosa cortado a
@@ -357,7 +397,6 @@ pidió «cargar/descargar»; quedó la mitad. Queda anotado en PENDIENTE.
 30 pruebas nuevas y una revisión en navegador de toda la pantalla.
 
 ---
-
 
 ### 07-09-2026 (noche) — La conciliación se trabaja en la pantalla, no en un Excel suelto
 
@@ -6321,7 +6360,6 @@ bitácora sigue siendo la memoria (qué pasó y cuándo); `PROYECTO.md` es el
 tablero (dónde estamos hoy).
 
 ---
-
 
 ### 06-08 — 22 correcciones al motor, con las glosas de trampa como guía
 
