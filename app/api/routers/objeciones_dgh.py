@@ -50,6 +50,7 @@ class EntidadFicha(BaseModel):
 
     id: str
     nombre: str
+    corto: str
     columnas: int
     ayuda: str
 

@@ -15,6 +15,7 @@ Entidades que sabe leer hoy:
     FAMISANAR    4 columnas; el servicio va escondido en el texto de la glosa
     DISPENSARIO  5 columnas; trae el nombre del servicio en columna propia
     SAVIA SALUD  8 columnas; trae código y nombre del servicio
+    SALUD TOTAL  6 columnas; sólo el nombre del servicio, sin código
     SANITAS      7 columnas; ojo, la 2ª se llama «NUMERO DE FACTURA» pero trae
                  el código de glosa
 
@@ -68,6 +69,9 @@ class Entidad:
 
     id: str
     nombre: str
+    # Nombre corto para los archivos, el mismo que usa el bot por consola
+    # (OBJECIONES_SALUDTOTAL_…, no OBJECIONES_SALUD_…).
+    corto: str
     modulo: str
     # Cómo se reconoce su archivo: encabezados que deben estar (normalizados).
     senas: tuple[str, ...]
@@ -78,6 +82,7 @@ class Entidad:
         return {
             "id": self.id,
             "nombre": self.nombre,
+            "corto": self.corto,
             "columnas": self.columnas,
             "ayuda": self.ayuda,
         }
@@ -87,6 +92,7 @@ ENTIDADES: tuple[Entidad, ...] = (
     Entidad(
         id="famisanar",
         nombre="FAMISANAR",
+        corto="FAMISANAR",
         modulo="organizar_objeciones_famisanar",
         senas=("NRO_FACTURA", "CODIGO_DEVOLUCION", "VALOR DEVOLUCION", "OBSERVACION"),
         columnas=4,
@@ -95,6 +101,7 @@ ENTIDADES: tuple[Entidad, ...] = (
     Entidad(
         id="dispensario",
         nombre="Dispensario Médico",
+        corto="DISPENSARIO",
         modulo="organizar_objeciones_dispensario",
         senas=("FACTURA", "VALOR GLOSA INICIAL", "SERVICIO OBJETADO", "CODIGO GLOSA INICIAL"),
         columnas=5,
@@ -103,14 +110,25 @@ ENTIDADES: tuple[Entidad, ...] = (
     Entidad(
         id="savia",
         nombre="SAVIA SALUD",
+        corto="SAVIA",
         modulo="organizar_objeciones_savia",
         senas=("NUMERO_FACTURA", "COD_SERVICIO", "VALOR_GLOSA", "MOTIVO_ESP_GLOSA_VALOR_A"),
         columnas=8,
         ayuda="Export de 8 columnas, con el código y el nombre del servicio en columnas propias.",
     ),
     Entidad(
+        id="saludtotal",
+        nombre="SALUD TOTAL",
+        corto="SALUDTOTAL",
+        modulo="organizar_objeciones_saludtotal",
+        senas=("NUMEROFAC_", "NOMBRESERVICIO", "VALORGLOSATOTALXSERV", "CODMOTVGLOSAESPC"),
+        columnas=6,
+        ayuda="Export NotificacionGLS. No manda código de servicio: se ubica por nombre y valor.",
+    ),
+    Entidad(
         id="sanitas",
         nombre="SANITAS",
+        corto="SANITAS",
         modulo="organizar_objeciones_sanitas",
         senas=("NUMERO DE FACTURA", "VALOR REAL GLOSA", "CODIGO PROCEDIMIENTO"),
         columnas=7,
@@ -285,6 +303,12 @@ def _filas_savia(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[di
     )
 
 
+def _filas_saludtotal(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[dict]:
+    return bot.construir_registros(
+        ruta, fecha=fecha, consecutivo=1, servicios_dgh=servicios, trazas=trazas
+    )
+
+
 def _filas_sanitas(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[dict]:
     return bot.construir_filas(bot.leer_sanitas(ruta), fecha, servicios, trazas)
 
@@ -293,6 +317,7 @@ _ARMADORES = {
     "famisanar": _filas_famisanar,
     "dispensario": _filas_dispensario,
     "savia": _filas_savia,
+    "saludtotal": _filas_saludtotal,
     "sanitas": _filas_sanitas,
 }
 
@@ -364,7 +389,7 @@ def procesar(
         cruce.escribir_reporte_cruce(trazas, salida_cruce, entidad=entidad.nombre)
 
         sufijo = momento.strftime("%d%m%Y")
-        corto = entidad.nombre.split()[0].upper()
+        corto = entidad.corto
         facturas = sorted({f["CRNCXC"] for f in filas})
         return Resultado(
             entidad=entidad.nombre,
@@ -388,7 +413,9 @@ def procesar(
 
 def _escribir_objeciones(bot, entidad_id: str, filas: list[dict], salida: Path) -> None:
     """Cada bot escribe su Excel; el formato de celdas es el suyo."""
-    if entidad_id == "dispensario":
+    if entidad_id == "saludtotal":
+        bot.escribir_consolidado(filas, salida)
+    elif entidad_id == "dispensario":
         bot.escribir_excel([[f[c] for c in bot.ENCABEZADOS] for f in filas], salida)
     elif entidad_id == "sanitas":
         bot.escribir_objeciones(filas, salida)

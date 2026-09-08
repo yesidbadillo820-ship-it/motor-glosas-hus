@@ -114,6 +114,21 @@ def _savia() -> bytes:
     )  # fmt: skip
 
 
+def _saludtotal() -> bytes:
+    return _excel(
+        "Hoja1",
+        [
+            "NumeroFac_",
+            "NombreServicio",
+            "CantidadFac",
+            "ValorGlosaTotalxServ",
+            "Observaciones",
+            "CodMotvGlosaEspc",
+        ],
+        [[548556, "CATETER INTRAVENOSO 20", 1, 5800, "sin cobertura", "CO0601"]],
+    )
+
+
 def _sanitas() -> bytes:
     return _excel(
         "Glosa",
@@ -153,6 +168,9 @@ class TestDetectarEntidad:
     def test_savia(self):
         assert svc.detectar_entidad(_savia()).id == "savia"
 
+    def test_saludtotal(self):
+        assert svc.detectar_entidad(_saludtotal()).id == "saludtotal"
+
     def test_sanitas(self):
         assert svc.detectar_entidad(_sanitas()).id == "sanitas"
 
@@ -172,7 +190,7 @@ class TestDetectarEntidad:
 
     def test_catalogo(self):
         ids = {e["id"] for e in svc.catalogo_entidades()}
-        assert {"famisanar", "dispensario", "savia", "sanitas"} <= ids
+        assert {"famisanar", "dispensario", "savia", "saludtotal", "sanitas"} <= ids
 
 
 # ─── El armado ──────────────────────────────────────────────────────────────
@@ -204,6 +222,23 @@ class TestProcesar:
         assert r.reglas_ok
         # El nombre del archivo usa la primera palabra: SAVIA SALUD → SAVIA.
         assert r.nombre_objeciones == "OBJECIONES_SAVIA_04092026.xlsx"
+
+    def test_saludtotal_de_punta_a_punta(self):
+        """SALUD TOTAL no manda código: el servicio se ubica por nombre y valor."""
+        r = svc.procesar(_saludtotal(), _dgh(), fecha="2026-09-04")
+        assert r.entidad_id == "saludtotal"
+        assert r.objeciones == 1
+        assert r.confianza["ALTA"] == 1
+        assert r.reglas_ok
+        # La factura viene pelada (548556) y se completa a HUS0000548556.
+        assert r.por_factura[0]["factura"] == "HUS0000548556"
+        assert r.nombre_objeciones == "OBJECIONES_SALUDTOTAL_04092026.xlsx"
+
+    def test_cada_entidad_nombra_sus_archivos_como_su_bot(self):
+        """El nombre corto es el del bot, no la primera palabra del nombre."""
+        cortos = {e["id"]: e["corto"] for e in svc.catalogo_entidades()}
+        assert cortos["saludtotal"] == "SALUDTOTAL"  # no "SALUD"
+        assert cortos["savia"] == "SAVIA"
 
     def test_sanitas_de_punta_a_punta(self):
         r = svc.procesar(_sanitas(), _dgh(), fecha="2026-09-04")
