@@ -929,9 +929,33 @@ class TestQueCodigoVaEnSlnserpro:
     def test_en_modo_adres_va_el_codigo_de_la_factura(self):
         assert self._armar(org.CODIGO_ADRES)["SLNSERPRO"] == "21705"
 
-    def test_el_centro_de_costo_sigue_saliendo_de_dgh(self):
+    def test_ctncencos_va_vacia_aunque_el_cruce_sepa_el_centro(self):
+        """Regla fija de Cartera: CTNCENCOS sale vacía SIEMPRE, sin excepciones.
+
+        El cruce sí sabe el centro de costo (734103) y por eso queda en la
+        resolución, para el reporte de revisión; al archivo no baja.
+        """
         for modo in (org.CODIGO_DGH, org.CODIGO_ADRES):
-            assert self._armar(modo)["CTNCENCOS"] == "734103"
+            assert self._armar(modo)["CTNCENCOS"] is None
+
+    def test_el_centro_de_costo_queda_en_la_resolucion(self):
+        fila = org.FilaAdres(
+            factura="HUS0000356290",
+            cod_elemento="21705",
+            codigo_glosa="TA0801",
+            valor_glosado=100.0,
+        )
+        conversion = org.construir_registros(
+            [fila],
+            {
+                "HUS0000356290": [
+                    org.LineaDgh(slnserpro="879122", valor=100.0, centro_costo="734103")
+                ]
+            },
+            {"21705": {"879122"}},
+            _dt.datetime(2026, 8, 28),
+        )
+        assert conversion.resoluciones[0].centro_costo == "734103"
 
     def test_sin_codigo_del_adres_no_deja_el_renglon_vacio(self):
         """DGH rechaza la fila sin servicio: mejor el código de DGH que nada."""

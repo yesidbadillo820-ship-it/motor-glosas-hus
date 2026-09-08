@@ -479,7 +479,10 @@ def verificar_reglas(
        2 = MIXTA (CL junto con administrativas).
 
     Cada renglón es un dict con: factura, slnserpro, ctncencos, crotipobj y
-    codigo_glosa.
+    codigo_glosa. Puede traer además `grupos` (los grupos TA/CL/FA… que el
+    propio bot usó para decidir el tipo) para las entidades cuyo código de
+    glosa no dice el grupo: el ADRES usa códigos de cuatro dígitos (3106,
+    3209…) y el grupo sale de su columna de clasificación.
     """
     fallas: list[str] = []
 
@@ -510,7 +513,11 @@ def verificar_reglas(
     tipos: dict[str, set] = defaultdict(set)
     for r in renglones:
         factura = r.get("factura", "")
-        grupos[factura].add(str(r.get("codigo_glosa") or "")[:2].upper())
+        propios = r.get("grupos")
+        if propios:
+            grupos[factura].update(str(g)[:2].upper() for g in propios)
+        else:
+            grupos[factura].add(str(r.get("codigo_glosa") or "")[:2].upper())
         tipos[factura].add(r.get("crotipobj"))
     for factura, gs in grupos.items():
         tiene_cl = "CL" in gs

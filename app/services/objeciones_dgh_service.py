@@ -22,6 +22,9 @@ Entidades que sabe leer hoy:
                  SAVIA…): 10 columnas, con el acta en la primera
     EMSSANAR     no manda Excel: son los PDF de objeción de ripslink, uno por
                  factura. Se pueden subir varios de una vez.
+    ADRES        Excel de glosas del ADRES. Tiene motor propio (homologación
+                 SOAT↔CUPS, topes de valor); acepta el homologador Gold
+                 Standard como segundo archivo.
 
 Las reglas fijas del formato (CTNCENCOS vacía, CROTIPOBJ por factura,
 SLNSERPRO sin códigos inventados, el 100% de los renglones) están en CLAUDE.md
@@ -46,6 +49,9 @@ _TOOLS = Path(__file__).resolve().parent.parent.parent / "tools"
 MAX_BYTES = 25 * 1024 * 1024
 
 CONFIANZAS = ("ALTA", "MEDIA", "BAJA", "SIN CRUCE")
+
+# Tope del DGH: no recibe más de 300 facturas en un archivo de cargue.
+MAX_FACTURAS_DGH = 300
 
 
 class ErrorObjeciones(RuntimeError):
@@ -161,6 +167,18 @@ ENTIDADES: tuple[Entidad, ...] = (
         columnas=0,
         ayuda="PDF de objeción de ripslink («Objeción a Factura N° HUS…»), uno por factura.",
         formato="pdf",
+    ),
+    Entidad(
+        id="adres",
+        nombre="ADRES",
+        corto="ADRES",
+        modulo="organizar_objeciones_adres",
+        senas=("COD ELEMENTO", "VALOR GLOSADO", "VALOR ACEPTADO", "CODIGO NUMERICO"),
+        columnas=0,
+        ayuda=(
+            "Excel de glosas del ADRES. Se puede subir además el Homologador "
+            "Gold Standard CUPS↔SOAT como segundo archivo."
+        ),
     ),
 )
 
@@ -322,7 +340,9 @@ def _uno(rutas: list[Path]) -> Path:
     return rutas[0]
 
 
-def _filas_famisanar(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+def _filas_famisanar(
+    bot, rutas: list[Path], ruta_dgh: Path, fecha: datetime, servicios, trazas
+) -> list[dict]:
     ruta = _uno(rutas)
     return bot.construir_registros(
         ruta,
@@ -335,7 +355,9 @@ def _filas_famisanar(bot, rutas: list[Path], fecha: datetime, servicios, trazas)
     )
 
 
-def _filas_dispensario(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+def _filas_dispensario(
+    bot, rutas: list[Path], ruta_dgh: Path, fecha: datetime, servicios, trazas
+) -> list[dict]:
     ruta = _uno(rutas)
     objeciones = bot.leer_excel_glosa_inicial(ruta)
     filas = bot.filas_desde_excel(objeciones, fecha, servicios, trazas)
@@ -343,7 +365,9 @@ def _filas_dispensario(bot, rutas: list[Path], fecha: datetime, servicios, traza
     return [dict(zip(bot.ENCABEZADOS, f, strict=True)) for f in filas]
 
 
-def _filas_savia(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+def _filas_savia(
+    bot, rutas: list[Path], ruta_dgh: Path, fecha: datetime, servicios, trazas
+) -> list[dict]:
     ruta = _uno(rutas)
     return bot.construir_registros(
         ruta,
@@ -356,14 +380,18 @@ def _filas_savia(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> 
     )
 
 
-def _filas_saludtotal(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+def _filas_saludtotal(
+    bot, rutas: list[Path], ruta_dgh: Path, fecha: datetime, servicios, trazas
+) -> list[dict]:
     ruta = _uno(rutas)
     return bot.construir_registros(
         ruta, fecha=fecha, consecutivo=1, servicios_dgh=servicios, trazas=trazas
     )
 
 
-def _filas_sanitas(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+def _filas_sanitas(
+    bot, rutas: list[Path], ruta_dgh: Path, fecha: datetime, servicios, trazas
+) -> list[dict]:
     ruta = _uno(rutas)
     return bot.construir_filas(bot.leer_sanitas(ruta), fecha, servicios, trazas)
 
@@ -388,7 +416,9 @@ class _ConfigVco:
     detalle_servicio: bool = False
 
 
-def _filas_vco(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+def _filas_vco(
+    bot, rutas: list[Path], ruta_dgh: Path, fecha: datetime, servicios, trazas
+) -> list[dict]:
     ruta = _uno(rutas)
     formato, filas, idx = bot.leer_entrada(ruta, None)
     if formato != "consolidado":
@@ -401,7 +431,9 @@ def _filas_vco(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> li
     return bot.consolidado_a_registros(filas, idx, cfg, servicios_dgh=servicios, trazas=trazas)
 
 
-def _filas_emssanar(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+def _filas_emssanar(
+    bot, rutas: list[Path], ruta_dgh: Path, fecha: datetime, servicios, trazas
+) -> list[dict]:
     """EMSSANAR manda un PDF por factura; se procesan todos de una vez."""
     filas: list[dict] = []
     vistas: set[str] = set()
@@ -435,6 +467,77 @@ def _filas_emssanar(bot, rutas: list[Path], fecha: datetime, servicios, trazas) 
     return bot.aplicar_crotipobj_por_factura(filas)
 
 
+# El ADRES tiene su propio motor de homologación (SOAT↔CUPS, topes de valor,
+# lotes de 300 facturas), así que no usa el cruce de `_cruce_dgh`. Para que la
+# pantalla muestre el mismo resumen, sus métodos se traducen a confianzas.
+_CONFIANZA_ADRES = {
+    "codigo directo": "ALTA",
+    "homologado SOAT→CUPS": "ALTA",
+    "descripcion igual": "ALTA",
+    "descripcion empieza igual": "MEDIA",
+    "valor + palabras en comun": "MEDIA",
+    "descripcion parecida": "MEDIA",
+}
+
+
+def _filas_adres(bot, rutas: list[Path], ruta_dgh: Path, fecha: datetime, servicios, trazas):
+    """El Excel de glosas del ADRES, más el homologador CUPS↔SOAT si lo suben.
+
+    El segundo archivo (opcional) es el Homologador Gold Standard: sin él, los
+    códigos SOAT del ADRES sólo cruzan por nombre y valor.
+    """
+    glosas = rutas[0]
+    homologador = rutas[1] if len(rutas) > 1 else None
+    if len(rutas) > 2:
+        raise ValueError(
+            "Para el ADRES se suben uno o dos archivos: el Excel de glosas y, "
+            f"si lo tenés, el homologador CUPS↔SOAT. Subiste {len(rutas)}."
+        )
+
+    filas_adres = bot.leer_adres(glosas)
+    if not filas_adres:
+        raise ValueError(
+            "No encontré ninguna glosa en ese archivo. ¿Es el Excel de glosas "
+            "del ADRES, el que arma el auditor con la clasificación y el valor "
+            "aceptado de cada renglón?"
+        )
+    soat_a_cups = bot.leer_homologador(homologador) if homologador else {}
+    conversion = bot.construir_registros(
+        filas_adres,
+        bot.leer_dgh(ruta_dgh),
+        soat_a_cups,
+        fecha=fecha,
+    )
+
+    for registro, resolucion in zip(conversion.registros, conversion.resoluciones, strict=True):
+        factura = str(registro["CRNCXC"])
+        # El grupo no sale del código (el ADRES usa 3106, 3209…): lo dice la
+        # clasificación, que el bot ya resumió por factura.
+        registro["_grupos"] = sorted(conversion.grupos.get(factura, set()))
+        trazas.append(
+            {
+                "factura": factura,
+                "codigo_objecion": registro["CRNCONOBJ"] or "",
+                "valor": int(registro["CROVALOBJ"] or 0),
+                "cod_entidad": "",
+                "desc_entidad": "",
+                "unitario_entidad": 0,
+                "observacion": registro["CRDOBSERV"] or "",
+                "servicio_dgh": resolucion.candidato_desc or "",
+                "cod_dgh": registro["SLNSERPRO"] or "",
+                "unitario_dgh": int(resolucion.tope_servicio or 0),
+                "centro_costo": resolucion.centro_costo or "",
+                "confianza": _CONFIANZA_ADRES.get(resolucion.metodo, "SIN CRUCE")
+                if registro["SLNSERPRO"]
+                else "SIN CRUCE",
+                "motivos": resolucion.metodo or "",
+                "puntaje": 0,
+                "aviso": "" if registro["SLNSERPRO"] else _cargar("_cruce_dgh").AVISO_SIN_CRUCE,
+            }
+        )
+    return conversion.registros
+
+
 _ARMADORES = {
     "famisanar": _filas_famisanar,
     "dispensario": _filas_dispensario,
@@ -443,6 +546,7 @@ _ARMADORES = {
     "sanitas": _filas_sanitas,
     "vco": _filas_vco,
     "emssanar": _filas_emssanar,
+    "adres": _filas_adres,
 }
 
 
@@ -503,7 +607,7 @@ def procesar(
 
         trazas: list[dict] = []
         try:
-            filas = _ARMADORES[entidad.id](bot, rutas_entidad, momento, servicios, trazas)
+            filas = _ARMADORES[entidad.id](bot, rutas_entidad, ruta_dgh, momento, servicios, trazas)
         except ValueError as exc:
             raise ErrorObjeciones(str(exc)) from exc
         if not filas:
@@ -518,6 +622,8 @@ def procesar(
                     "ctncencos": f["CTNCENCOS"],
                     "crotipobj": f["CROTIPOBJ"],
                     "codigo_glosa": f["CRNCONOBJ"],
+                    # El ADRES no dice el grupo en el código: lo trae aparte.
+                    "grupos": f.get("_grupos"),
                 }
                 for f in filas
             ],
@@ -530,6 +636,11 @@ def procesar(
         sufijo = momento.strftime("%d%m%Y")
         corto = entidad.corto
         facturas = sorted({f["CRNCXC"] for f in filas})
+        if len(facturas) > MAX_FACTURAS_DGH:
+            avisos.append(
+                f"El lote trae {len(facturas)} facturas y el DGH no recibe más de "
+                f"{MAX_FACTURAS_DGH} por archivo: hay que partirlo antes de subirlo."
+            )
         return Resultado(
             entidad=entidad.nombre,
             entidad_id=entidad.id,
@@ -562,6 +673,8 @@ def _escribir_objeciones(bot, entidad_id: str, filas: list[dict], salida: Path) 
         bot.escribir_cargue([[f[c] for c in bot.COLUMNAS_CARGUE] for f in filas], salida)
     elif entidad_id == "emssanar":
         bot.escribir_excel(filas, salida)
+    elif entidad_id == "adres":
+        bot.escribir_objeciones(filas, salida)
     else:
         bot.escribir_consolidado(filas, salida)
 

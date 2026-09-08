@@ -253,6 +253,59 @@ def _pdf_emssanar(ruta, factura: str, renglones: list[tuple], valor_obj: int) ->
     return Path(ruta).read_bytes()
 
 
+def _adres() -> bytes:
+    """Excel de glosas del ADRES: códigos SOAT y causales de cuatro dígitos."""
+    return _excel(
+        "GLOSAS",
+        [
+            "FACTURA",
+            "COD ELEMENTO",
+            "TIPO ELEMENTO",
+            "DESCRIPCION ELEMENTO",
+            "CANTIDAD",
+            "VALOR RECLAMADO",
+            "VALOR GLOSADO",
+            "VALOR ACEPTADO",
+            "CODIGO NUMERICO",
+            "DESCRIPCION GLOSA",
+            "CLASIFICACION DE LA GLOSA",
+        ],
+        [
+            [
+                "HUS0000548556",
+                "21705",
+                "Procedimientos",
+                "CATETER INTRAVENOSO 20",
+                1,
+                90000,
+                5800,
+                84200,
+                "3202",
+                "21705-Procedimientos-3202- No pertinente",
+                "PERTINENCIA",
+            ],
+            [
+                "HUS0000548556",
+                "29117",
+                "Procedimientos",
+                "GLUCOMETRIA GLUCOSA SEMIAUTOMATIZADA",
+                1,
+                90000,
+                4700,
+                85300,
+                "3106",
+                "29117-Procedimientos-3106- Falta soporte",
+                "SOPORTES",
+            ],
+        ],
+    )
+
+
+def _homologador() -> bytes:
+    """Homologador Gold Standard: código SOAT → CUPS."""
+    return _excel("CUPS", ["CUPS", "SOAT"], [["903883", "29117"], ["FMQ0113", "21705"]])
+
+
 # ─── De quién es el archivo ─────────────────────────────────────────────────
 
 
@@ -274,6 +327,9 @@ class TestDetectarEntidad:
 
     def test_vco(self):
         assert svc.detectar_entidad(_vco()).id == "vco"
+
+    def test_adres(self):
+        assert svc.detectar_entidad(_adres()).id == "adres"
 
     def test_un_pdf_es_de_emssanar(self, tmp_path):
         """Es la única entidad que no manda Excel."""
@@ -310,6 +366,7 @@ class TestDetectarEntidad:
             "sanitas",
             "vco",
             "emssanar",
+            "adres",
         } <= ids
 
 
@@ -424,6 +481,48 @@ class TestProcesar:
         assert r.objeciones == 1  # el renglón NO se borra
         assert r.pendientes == 1  # pero queda en REVISAR
         assert r.reglas_ok
+
+    def test_adres_de_punta_a_punta(self):
+        """El ADRES tiene motor propio (SOAT↔CUPS, topes, lotes de 300)."""
+        r = svc.procesar(_adres(), _dgh(), fecha="2026-09-04")
+        assert r.entidad_id == "adres"
+        assert r.objeciones == 2 and r.facturas == 1
+        assert r.valor_total == 10500
+        assert r.reglas_ok and not r.fallas_reglas
+        assert r.nombre_objeciones == "OBJECIONES_ADRES_04092026.xlsx"
+
+    def test_adres_es_mixta_por_la_clasificacion_no_por_el_codigo(self):
+        """Sus códigos (3202, 3106) no dicen el grupo: lo dice la columna
+        CLASIFICACION. Pertinencia + soportes = mixta."""
+        r = svc.procesar(_adres(), _dgh(), fecha="2026-09-04")
+        assert r.por_factura[0]["tipo"] == 2
+
+    def test_adres_deja_ctncencos_vacia_aunque_el_dgh_sepa_el_centro(self):
+        import io
+
+        r = svc.procesar(_adres(), _dgh(), fecha="2026-09-04")
+        ws = openpyxl.load_workbook(io.BytesIO(r.objeciones_xlsx)).active
+        cols = [c.value for c in ws[1]]
+        assert "_grupos" not in cols  # el dato interno no baja al archivo
+        for fila in ws.iter_rows(min_row=2, values_only=True):
+            assert dict(zip(cols, fila))["CTNCENCOS"] is None
+
+    def test_adres_acepta_el_homologador_como_segundo_archivo(self):
+        r = svc.procesar([_adres(), _homologador()], _dgh(), fecha="2026-09-04")
+        assert r.objeciones == 2 and r.reglas_ok
+
+    def test_adres_no_acepta_un_tercer_archivo(self):
+        with pytest.raises(svc.ErrorObjeciones, match="uno o dos archivos"):
+            svc.procesar([_adres(), _homologador(), _adres()], _dgh(), fecha="2026-09-04")
+
+    def test_adres_sin_glosas_avisa_claro(self):
+        vacio = _excel(
+            "GLOSAS",
+            ["COD ELEMENTO", "VALOR GLOSADO", "VALOR ACEPTADO", "CODIGO NUMERICO"],
+            [],
+        )
+        with pytest.raises(svc.ErrorObjeciones, match="ninguna glosa"):
+            svc.procesar(vacio, _dgh(), entidad_id="adres", fecha="2026-09-04")
 
     def test_un_pdf_que_no_es_una_objecion(self, tmp_path):
         with pytest.raises(svc.ErrorObjeciones, match="PDF"):

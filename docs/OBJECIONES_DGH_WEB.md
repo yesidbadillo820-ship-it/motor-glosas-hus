@@ -27,15 +27,15 @@ el detalle por factura.
 | **SANITAS** | Hoja «Glosa» de 7 columnas. Ojo: la 2ª dice «NUMERO DE FACTURA» pero trae el código de glosa. |
 | **VCO** (COOSALUD, Fiduprevisora, SAVIA…) | Consolidado del acta del portal VCO, 10 columnas, con el acta en la primera. |
 | **EMSSANAR** | No manda Excel: son los **PDF** de ripslink («Objeción a Factura N° HUS…»), uno por factura. Se marcan varios de una vez (hasta 300, que es el tope del DGH). |
+| **ADRES** | Excel de glosas del ADRES. Tiene motor propio: homologa los códigos SOAT a los CUPS del hospital, aplica el tope de valor de cada servicio y decide el tipo por la columna `CLASIFICACION` (sus causales son de cuatro dígitos y no dicen el grupo). Se le puede agregar el **Homologador Gold Standard CUPS↔SOAT** como segundo archivo. |
 
 Si el formato cambió y no la reconoce, se elige a mano en el selector; si no la
 reconoce **no procesa a ciegas**, avisa qué encabezados leyó.
 
-**Las que todavía no están, y por qué.**
-
-| Entidad | Qué pasa |
-|---|---|
-| **ADRES** | Tiene flujo propio: homologa códigos SOAT ↔ CUPS con el Homologador Gold Standard, aplica el tope de valor de cada servicio y parte la salida en lotes de 300 facturas. Entra a la pantalla con un tercer archivo opcional (el homologador). |
+Con esto la pantalla sirve para **todas** las entidades que el motor sabe
+trabajar. Si un lote pasa de **300 facturas** —el tope que recibe el DGH en un
+archivo— la pantalla lo avisa: ese lote hay que partirlo antes de subirlo (por
+consola, el bot del ADRES ya lo parte solo en `_LOTE_01`, `_LOTE_02`…).
 
 ## 2) Por qué hacen falta los dos archivos
 
