@@ -550,3 +550,148 @@ class TestElActaQueSaleDeLaMesa:
         m = _abrir(cliente, _lista("542497"), _eps(("542497", "TA0201", 100))).json()
         cliente.post(f"/conciliaciones/mesa/{m['id']}/cerrar")
         assert cliente.get(f"/conciliaciones/mesa/{m['id']}/acta.xlsm").status_code == 200
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Subir soportes EN la mesa
+# ═══════════════════════════════════════════════════════════════════════
+
+_PDF = b"%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF"
+_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 40
+
+
+def _subir(cliente, mesa_id, nombre, datos, mime, factura="HUS0000542497", nota=""):
+    return cliente.post(
+        f"/conciliaciones/mesa/{mesa_id}/soportes-subidos",
+        files={"archivo": (nombre, datos, mime)},
+        data={"factura": factura, "nota": nota},
+    )
+
+
+class TestSubirSoportesEnLaMesa:
+    """El indexador solo LEE lo ya archivado. Lo que aparece en la audiencia
+    —el correo del médico, la autorización que la EPS pide en el momento—
+    no está ahí y no puede esperar a la próxima pasada del indexador."""
+
+    def _mesa(self, cliente):
+        return _abrir(cliente, _lista("542497"), _eps(("542497", "TA0201", 100))).json()
+
+    def test_un_pdf_entra_y_se_puede_volver_a_bajar(self, cliente):
+        m = self._mesa(cliente)
+        r = _subir(
+            cliente, m["id"], "autorizacion.pdf", _PDF, "application/pdf", nota="La autorización"
+        )
+        assert r.status_code == 201, r.text
+        subido = r.json()
+        assert subido["nombre"] == "autorizacion.pdf"
+        assert subido["tamano_bytes"] == len(_PDF)
+        assert subido["subido_por"], "hay que dejar constancia de quién lo subió"
+
+        listado = cliente.get(f"/conciliaciones/mesa/{m['id']}/soportes-subidos").json()
+        assert len(listado) == 1 and listado[0]["nota"] == "La autorización"
+
+        bajado = cliente.get(f"/conciliaciones/mesa/{m['id']}/soportes-subidos/{subido['id']}")
+        assert bajado.status_code == 200
+        assert bajado.content == _PDF, "lo que se baja tiene que ser lo mismo que se subió"
+
+    def test_una_imagen_tambien(self, cliente):
+        m = self._mesa(cliente)
+        assert _subir(cliente, m["id"], "foto.png", _PNG, "image/png").status_code == 201
+
+    def test_un_excel_se_rechaza_con_su_motivo(self, cliente):
+        """Solo PDF e imágenes. Un Excel hay que pasarlo antes a PDF."""
+        m = self._mesa(cliente)
+        r = _subir(
+            cliente,
+            m["id"],
+            "glosas.xlsx",
+            b"PK\x03\x04algo",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        assert r.status_code == 422
+        detalle = r.json()["detail"]
+        assert "PDF" in detalle and "imágenes" in detalle
+        assert "glosas.xlsx" in detalle, "el motivo tiene que nombrar el archivo"
+
+    def test_un_ejecutable_disfrazado_de_pdf_no_pasa(self, cliente):
+        """El content-type lo manda el navegador y se puede poner a mano."""
+        m = self._mesa(cliente)
+        r = _subir(cliente, m["id"], "virus.pdf", b"MZ\x90\x00" + b"\x00" * 50, "application/pdf")
+        assert r.status_code == 422
+        assert "no lo es" in r.json()["detail"]
+
+    def test_un_archivo_muy_pesado_se_rechaza_diciendo_cuanto_pesa(self, cliente):
+        m = self._mesa(cliente)
+        grande = _PDF + b"\x00" * (16 * 1024 * 1024)
+        r = _subir(cliente, m["id"], "escaneo.pdf", grande, "application/pdf")
+        assert r.status_code == 422
+        detalle = r.json()["detail"]
+        assert "MB" in detalle and "15 MB" in detalle
+        assert "Herramientas PDF" in detalle, "hay que decirle cómo bajarle el peso"
+
+    def test_un_archivo_vacio_se_rechaza(self, cliente):
+        m = self._mesa(cliente)
+        r = _subir(cliente, m["id"], "vacio.pdf", b"", "application/pdf")
+        assert r.status_code == 422
+        assert "vac" in r.json()["detail"].lower()
+
+    def test_sin_factura_no_se_guarda(self, cliente):
+        m = self._mesa(cliente)
+        r = _subir(cliente, m["id"], "x.pdf", _PDF, "application/pdf", factura="   ")
+        assert r.status_code == 422
+
+    def test_los_soportes_se_filtran_por_factura(self, cliente):
+        m = _abrir(
+            cliente,
+            _lista("542497", "542498"),
+            _eps(("542497", "TA0201", 100), ("542498", "SO3601", 200)),
+        ).json()
+        _subir(cliente, m["id"], "a.pdf", _PDF, "application/pdf", factura="HUS0000542497")
+        _subir(cliente, m["id"], "b.pdf", _PDF, "application/pdf", factura="HUS0000542498")
+        r = cliente.get(
+            f"/conciliaciones/mesa/{m['id']}/soportes-subidos?factura=HUS0000542497"
+        ).json()
+        assert len(r) == 1 and r[0]["nombre"] == "a.pdf"
+
+    def test_una_mesa_cerrada_no_recibe_soportes(self, cliente):
+        """El acta ya se firmó: meterle evidencia después la descuadra."""
+        m = self._mesa(cliente)
+        linea = m["lineas"][0]
+        cliente.patch(
+            f"/conciliaciones/mesa/{m['id']}/linea/{linea['id']}",
+            json={"valor_aceptado": 100, "tipo_glosa": "ADMINISTRATIVA"},
+        )
+        cliente.post(f"/conciliaciones/mesa/{m['id']}/cerrar")
+        r = _subir(cliente, m["id"], "tarde.pdf", _PDF, "application/pdf")
+        assert r.status_code == 409
+        assert "cerrada" in r.json()["detail"].lower()
+
+    def test_no_se_pueden_espiar_los_soportes_de_otra_mesa(self, cliente):
+        """Cambiar el número en la dirección no puede abrir otra audiencia."""
+        a = self._mesa(cliente)
+        b = self._mesa(cliente)
+        subido = _subir(cliente, a["id"], "reservado.pdf", _PDF, "application/pdf").json()
+        r = cliente.get(f"/conciliaciones/mesa/{b['id']}/soportes-subidos/{subido['id']}")
+        assert r.status_code == 404
+
+    def test_un_soporte_subido_por_error_se_puede_quitar(self, cliente):
+        m = self._mesa(cliente)
+        subido = _subir(cliente, m["id"], "equivocado.pdf", _PDF, "application/pdf").json()
+        assert (
+            cliente.delete(
+                f"/conciliaciones/mesa/{m['id']}/soportes-subidos/{subido['id']}"
+            ).status_code
+            == 200
+        )
+        assert cliente.get(f"/conciliaciones/mesa/{m['id']}/soportes-subidos").json() == []
+
+    def test_el_nombre_no_puede_romper_la_cabecera_al_bajarlo(self, cliente):
+        """Un nombre con comillas o saltos de línea inyecta otra cabecera."""
+        m = self._mesa(cliente)
+        subido = _subir(
+            cliente, m["id"], 'malo";\r\nX-Inyectado: si.pdf', _PDF, "application/pdf"
+        ).json()
+        r = cliente.get(f"/conciliaciones/mesa/{m['id']}/soportes-subidos/{subido['id']}")
+        assert r.status_code == 200
+        assert "x-inyectado" not in {k.lower() for k in r.headers}
+        assert "\r" not in r.headers.get("content-disposition", "")

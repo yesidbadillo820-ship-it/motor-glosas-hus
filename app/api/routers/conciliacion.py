@@ -1009,6 +1009,122 @@ def mesa_ver_linea(
     return r
 
 
+@router.get("/mesa/{mesa_id}/soportes-subidos")
+def mesa_soportes_subidos(
+    mesa_id: int,
+    factura: str = Query("", max_length=50),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Los soportes que se subieron EN esta mesa (no los del archivo)."""
+    from app.services import mesa_conciliacion as svc_mesa
+
+    _mesa_o_404(db, mesa_id)
+    return svc_mesa.soportes_subidos(db, mesa_id, factura)
+
+
+@router.post("/mesa/{mesa_id}/soportes-subidos", status_code=201)
+async def mesa_subir_soporte(
+    mesa_id: int,
+    factura: str = Form(..., max_length=50),
+    nota: str = Form("", max_length=500),
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Sube un soporte en plena audiencia (PDF o imagen).
+
+    Una mesa cerrada no recibe archivos: el acta ya se firmó y meterle
+    evidencia después la haría dejar de cuadrar con lo que se acordó.
+    """
+    from app.services import mesa_conciliacion as svc_mesa
+
+    mesa = _mesa_o_404(db, mesa_id)
+    if (mesa.estado or "").upper() == "CERRADA":
+        raise HTTPException(
+            409,
+            "Esta mesa ya está cerrada. Para agregarle soportes hay que "
+            "reabrirla, y eso lo autoriza un coordinador.",
+        )
+
+    contenido = await archivo.read()
+    try:
+        return svc_mesa.subir_soporte(
+            db,
+            mesa_id=mesa_id,
+            factura=factura,
+            nombre=archivo.filename or "archivo",
+            mime=archivo.content_type or "",
+            contenido=contenido,
+            autor=current_user.email,
+            nota=nota,
+        )
+    except svc_mesa.SoporteRechazado as e:
+        # 422 y no 500: el archivo está mal, el motor no. El texto del
+        # motivo es el que ve el auditor en pantalla.
+        raise HTTPException(422, str(e))
+
+
+@router.get("/mesa/{mesa_id}/soportes-subidos/{soporte_id}")
+def mesa_bajar_soporte(
+    mesa_id: int,
+    soporte_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Baja un soporte subido en la mesa."""
+    from urllib.parse import quote as _urlquote
+
+    from fastapi.responses import Response
+
+    from app.services import mesa_conciliacion as svc_mesa
+
+    _mesa_o_404(db, mesa_id)
+    encontrado = svc_mesa.leer_soporte_subido(db, mesa_id, soporte_id)
+    if encontrado is None:
+        raise HTTPException(404, "Ese soporte no es de esta mesa, o está dañado.")
+    reg, datos = encontrado
+
+    # El nombre lo puso quien subió el archivo. Sin sanear, unas comillas o
+    # un salto de línea rompen la cabecera o inyectan otra.
+    seguro = "".join(c for c in (reg.nombre or "soporte") if c.isalnum() or c in "._- ")[:120]
+    seguro = seguro.strip() or "soporte"
+    return Response(
+        content=datos,
+        media_type=reg.mime_type or "application/octet-stream",
+        headers={
+            "Content-Disposition": "attachment; filename=\"%s\"; filename*=UTF-8''%s"
+            % (seguro, _urlquote(reg.nombre or "soporte"))
+        },
+    )
+
+
+@router.delete("/mesa/{mesa_id}/soportes-subidos/{soporte_id}")
+def mesa_borrar_soporte(
+    mesa_id: int,
+    soporte_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_auditor_o_superior),
+):
+    """Quita un soporte subido por error."""
+    from app.services import mesa_conciliacion as svc_mesa
+
+    mesa = _mesa_o_404(db, mesa_id)
+    if (mesa.estado or "").upper() == "CERRADA":
+        raise HTTPException(409, "Esta mesa ya está cerrada: sus soportes no se tocan.")
+    if not svc_mesa.borrar_soporte_subido(db, mesa_id, soporte_id):
+        raise HTTPException(404, "Ese soporte no es de esta mesa.")
+    AuditRepository(db).registrar(
+        usuario_email=current_user.email,
+        usuario_rol=current_user.rol,
+        accion="MESA_BORRAR_SOPORTE",
+        tabla="soportes_mesa",
+        registro_id=soporte_id,
+        detalle=f"Mesa {mesa_id}",
+    )
+    return {"ok": True}
+
+
 class ComentarioMesaIn(BaseModel):
     texto: str = Field(..., min_length=1, max_length=4000)
 

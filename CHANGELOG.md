@@ -1,5 +1,71 @@
 # Registro de cambios
 
+## Sesión 08-sep-2026 — Suite en cero fallas, gates de verdad y subida de soportes
+
+### La suite ya no arrastra doce fallas
+
+- **`office_tools.modulos_libreoffice_faltantes()` / `libreoffice_puede_convertir()`** —
+  la causa real de las doce fallas: `libreoffice-core` instalado sin Writer,
+  Calc ni Draw. `hay_libreoffice()` solo miraba el ejecutable, así que
+  `soffice` «existía» y la conversión moría con «source file could not be
+  loaded» — un mensaje que manda a buscar un archivo dañado que no existe.
+  Ahora `a_pdf()` comprueba el módulo del tipo de archivo ANTES de intentar y
+  nombra el paquete a instalar.
+- **`scripts/preparar_entorno_pruebas.sh`** — instala LibreOffice completo y
+  `extract-msg` (con `--no-deps`: su dependencia `red-black-tree-mod` ya no
+  compila, y solo hace falta para re-escribir `.msg`, no para leerlos). Lo usa
+  el CI y sirve igual en un contenedor de desarrollo.
+- **`tests/test_tools/_entorno.py`** — en un PC sin las herramientas las
+  pruebas se saltan diciendo qué falta; en el CI,
+  `EXIGIR_HERRAMIENTAS_DE_PRUEBA=1` hace que la ausencia reviente al importar.
+  Un `skipif` ahí dejaría el CI verde con doce pruebas saltadas.
+
+### Gates que de verdad bloquean
+
+- **`scripts/revisar_vulnerabilidades.py`** — el paso de seguridad terminaba
+  en `|| true`: encontraba 22 vulnerabilidades y decía que todo estaba bien.
+  Ahora falla ante cualquier vulnerabilidad **nueva**; las conocidas están en
+  `seguridad/vulnerabilidades_conocidas.txt`, a la vista. Poner el gate en
+  cero de una vez dejaría el CI rojo permanentemente y bloquearía los propios
+  arreglos.
+- **Job `CI OK`** — una sola casilla que exige los tres pasos, para que el día
+  que se agregue un cuarto no quede fuera del gate.
+- **`.github/rulesets/motor-glosas-protegida.json`** — la protección lista
+  para importar. Aplicarla requiere permisos de dueño del repositorio.
+
+### El indexador ya no puede pintar en blanco
+
+- **`app/services/soportes_contrato.py`** — modelos Pydantic
+  (`SoporteDeFactura`, `RespuestaSoportes`) y `leer_soportes()`, el único
+  camino que deben usar las pantallas. Cinco estados explícitos:
+  `CON_SOPORTES`, `SIN_SOPORTES`, `INDEXANDO`, `SIN_INDICE` y
+  `DATOS_INVALIDOS`. Un registro malo se descarta y se **cuenta**; no tumba a
+  los buenos ni se cuela como fila vacía. Nunca lanza: un índice caído es un
+  estado que se pinta, no una excepción que tumba la mesa.
+- **`mesaPintarSoportes()`** en el frontend — una sola función pinta los cinco
+  estados. Los errores en rojo (`.mesa-sop-err`), lo que aún no se sabe en
+  ámbar (`.mesa-sop-duda`). «Dice que hay 3 y no se pudo leer ninguno» ya no
+  es una caja vacía.
+
+### Subir soportes en la mesa
+
+- **`SoporteMesaRecord`** — guardado en la base y no en el share: el índice
+  del hospital se reconstruye cada tantas horas y un archivo puesto a mano
+  desaparecería. Por factura, no por renglón.
+- **`validar_soporte()`** — peso (15 MB), tipo (PDF e imágenes) y **firma
+  real** del archivo: el `content-type` lo manda el navegador y un ejecutable
+  renombrado a `.pdf` llega diciendo «application/pdf».
+- **Cuatro rutas** bajo `/conciliaciones/mesa/{id}/soportes-subidos`. Una mesa
+  cerrada devuelve 409. La descarga filtra por mesa —cambiar el número en la
+  dirección no abre los soportes de otra audiencia— y sanea el nombre para
+  que no inyecte cabeceras.
+- **Frontend** — el peso se comprueba antes de mandar, el botón se bloquea
+  mientras sube (un doble clic no sube dos veces) y se desbloquea en
+  `finally`, con spinner que respeta `prefers-reduced-motion`.
+
+93 pruebas nuevas.
+
+
 ## Sesión 07-sep-2026 (noche, 2) — La mesa muestra por qué se glosó y con qué refutar
 
 La tabla cortaba el motivo de la glosa a media línea y no decía si la factura

@@ -133,3 +133,97 @@ class TestLaTablaQuedoMasLimpia:
     def test_el_encabezado_sigue_fijo_y_la_tabla_en_su_caja(self):
         assert "position:sticky" in _regla(".mesa-tabla th")
         assert "overflow:auto" in _regla(".mesa-tabla-wrap")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Subir soportes desde la mesa, y no pintar nunca una caja en blanco
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestNingunComponenteEnBlanco:
+    """El caso que lo enseñó: «3 soportes» y tres renglones vacíos.
+
+    No falló nada; simplemente no se veía nada. En una audiencia eso se lee
+    como «esta factura no tiene con qué defenderse», y no era verdad.
+    """
+
+    def test_hay_una_sola_funcion_que_pinta_los_soportes(self):
+        assert "function mesaPintarSoportes(" in HTML, (
+            "si cada sitio lo pinta a su manera, el estado de error se olvida en uno"
+        )
+
+    def test_los_cinco_estados_estan_contemplados(self):
+        cuerpo = _funcion("mesaPintarSoportes")
+        for estado in ("CON_SOPORTES", "SIN_SOPORTES", "DATOS_INVALIDOS", "SIN_INDICE"):
+            assert estado in cuerpo, f"falta el estado {estado}"
+
+    def test_una_lista_vacia_con_cuantos_mayor_que_cero_es_error(self):
+        """Decía que había 3 y no llegó ninguno legible: eso es un error."""
+        cuerpo = _funcion("mesaPintarSoportes")
+        assert "filter(" in cuerpo and "a.nombre" in cuerpo, (
+            "hay que descartar los archivos sin nombre, que son los renglones en blanco"
+        )
+        assert "no se pudo leer ninguno" in cuerpo, (
+            "sin este aviso, la caja queda vacía y parece que no hay soportes"
+        )
+
+    def test_un_error_no_se_pinta_como_ausencia(self):
+        cuerpo = _funcion("mesaPintarSoportes")
+        i_err = cuerpo.index("DATOS_INVALIDOS")
+        assert "mesa-sop-err" in cuerpo[i_err : i_err + 300], (
+            "un fallo del buscador tiene que verse como fallo, no como un dato"
+        )
+        assert ".mesa-sop-err{" in HTML, "sin el estilo, el error se lee igual que el texto normal"
+
+    def test_indexando_nunca_dice_que_no_hay(self):
+        cuerpo = _funcion("mesaPintarSoportes")
+        final = cuerpo[cuerpo.index("INDEXANDO") if "INDEXANDO" in cuerpo else -400 :]
+        assert "Todavía no se puede saber" in cuerpo
+        assert "mesa-sop-duda" in final or "mesa-sop-duda" in cuerpo
+
+
+class TestSubirSoportesEnLaMesa:
+    def test_la_caja_de_subida_existe(self):
+        assert "function mesaCajaDeSubida(" in HTML
+        assert "function mesaSubirSoporte(" in HTML
+
+    def test_solo_deja_elegir_pdf_e_imagenes(self):
+        cuerpo = _funcion("mesaCajaDeSubida")
+        assert "accept=" in cuerpo
+        assert ".pdf" in cuerpo and "image/png" in cuerpo
+        assert ".xlsx" not in cuerpo, "un Excel hay que pasarlo antes a PDF"
+
+    def test_el_peso_se_revisa_antes_de_mandarlo(self):
+        """En la red del hospital, subir 40 MB para que los rechacen son minutos."""
+        cuerpo = _funcion("mesaSubirSoporte")
+        assert "15*1024*1024" in cuerpo.replace(" ", "")
+        assert "f.size" in cuerpo
+        i = cuerpo.index("f.size")
+        assert "return" in cuerpo[i : i + 400], "si pesa de más, no debe llegar a mandarse"
+
+    def test_hay_estado_de_carga_y_el_boton_se_bloquea(self):
+        """Un doble clic no puede subir el mismo soporte dos veces."""
+        cuerpo = _funcion("mesaSubirSoporte")
+        assert "btn.disabled = true" in cuerpo
+        assert "Subiendo…" in cuerpo
+        assert "mesa-spinner" in cuerpo
+        assert ".mesa-spinner{" in HTML, "sin el estilo no se ve que está trabajando"
+
+    def test_el_boton_se_desbloquea_pase_lo_que_pase(self):
+        cuerpo = _funcion("mesaSubirSoporte")
+        assert "finally" in cuerpo, "si falla la red, el botón quedaría muerto para siempre"
+        i = cuerpo.index("finally")
+        assert "btn.disabled = false" in cuerpo[i:]
+
+    def test_el_error_del_servidor_se_muestra_tal_cual(self):
+        cuerpo = _funcion("mesaSubirSoporte")
+        assert "e.detail" in cuerpo, (
+            "el motivo del rechazo lo escribe el motor en español; hay que mostrarlo"
+        )
+
+    def test_la_animacion_respeta_a_quien_la_desactiva(self):
+        assert "prefers-reduced-motion" in HTML
+
+    def test_al_subir_se_refresca_la_insignia_de_la_tabla(self):
+        cuerpo = _funcion("mesaSubirSoporte")
+        assert "mesaCargarSubidos" in cuerpo

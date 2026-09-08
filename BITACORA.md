@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 07-09-2026
+**Última actualización:** 08-09-2026
 
 ---
 
@@ -90,6 +90,72 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 08-09-2026 — Cuatro cosas que estaban flojas por debajo
+
+**1. Las doce pruebas que «siempre fallaban» sí eran un problema.**
+
+Durante meses la suite terminaba con doce fallas y se aceptaron como «cosas
+del entorno». No lo eran. LibreOffice estaba instalado **a medias**: el
+programa arrancaba, pero le faltaban Writer, Calc y Draw — o sea, todo lo
+que abre documentos. El motor contestaba «LibreOffice no pudo convertir el
+archivo», que suena a archivo dañado, y mandaba a buscar donde no era.
+
+Ahora el motor **mira si el módulo está** antes de intentar, y cuando falta
+lo dice con nombre propio: «le falta el módulo Writer… no es que el archivo
+esté dañado… instale libreoffice-writer». Se agregó
+`scripts/preparar_entorno_pruebas.sh`, que deja el entorno listo de una vez.
+La suite quedó en **cero fallas**.
+
+Y para que no vuelva a pasar: en el CI, una prueba que se salte por falta de
+herramienta **es un fallo**, no un aviso. Antes, si la instalación del
+servidor se rompía, la suite habría seguido dando verde con doce pruebas
+saltadas y nadie se habría enterado.
+
+**2. La rama del hospital ya no se puede fusionar a ciegas.**
+
+`motor-glosas` es de la que el PC de cartera baja el código cada 5 minutos.
+Se podía fusionar con las pruebas todavía corriendo — pasó ayer mismo con la
+PR #649, fusionada 38 segundos después de abrirse. Queda listo el archivo de
+protección para aplicar en dos minutos (`.github/rulesets/`, con las
+instrucciones); **ese último clic lo tiene que dar usted**, porque cambiar la
+configuración del repositorio necesita permisos de dueño.
+
+De paso se descubrió algo peor: el paso de «escaneo de seguridad» del CI
+terminaba en `|| true`, es decir, **decía que todo estaba bien pasara lo que
+pasara**. Encontraba 22 vulnerabilidades en las librerías del motor y las
+ocultaba. Ahora falla si aparece una **nueva**, y las 22 conocidas quedaron
+anotadas y a la vista en `seguridad/vulnerabilidades_conocidas.txt`.
+Actualizarlas es trabajo aparte y queda en PENDIENTE: son el corazón de la
+aplicación que corre en el hospital y no se cambian de afán.
+
+**3. La pantalla ya no puede quedarse en blanco.**
+
+El buscador de soportes puede contestar cinco cosas distintas y antes tres
+de ellas se veían igual: una caja vacía. «No tiene soportes», «todavía estoy
+buscando» y «no pude mirar» son tres cosas muy diferentes, y en una mesa
+confundirlas hace aceptar una glosa que sí estaba soportada. Ahora cada
+respuesta se valida al entrar y se pinta como lo que es: los errores en rojo,
+lo que aún no se sabe en ámbar, y nunca una caja vacía sin explicación.
+
+**4. Ya se pueden subir soportes desde la mesa.**
+
+Era lo que quedó a medias ayer. Ahora, en plena audiencia, se sube el PDF o
+la foto del documento desde el mismo cajón: se elige el archivo, se le pone
+una nota de para qué sirve, y queda guardado en el motor con quién lo subió
+y cuándo. Se puede volver a bajar y quitarlo si se subió por error.
+
+Solo entran **PDF e imágenes**, hasta **15 MB**. Un Excel o un Word hay que
+pasarlo antes a PDF. El peso se revisa **antes de mandarlo**, para no perder
+minutos subiendo algo que iba a ser rechazado. Y se comprueba que el archivo
+**sea** lo que dice ser: un programa al que le cambiaron la extensión a
+`.pdf` no entra. Una mesa ya cerrada no recibe soportes: el acta está firmada
+y agregarle evidencia después la descuadraría.
+
+93 pruebas nuevas.
+
+---
+
 
 ### 07-09-2026 (noche, 2) — En la mesa se ve por qué se glosó y con qué refutarlo
 
@@ -11245,10 +11311,27 @@ valor leido del PDF o con el objetado.
 
 ## 3) PENDIENTE
 
+### Lo que quedó de la revisión del 08-09
+- **APLICAR LA PROTECCIÓN DE LA RAMA — es un clic suyo.** Está todo listo en
+  `.github/rulesets/`; hay que importarlo en
+  Settings → Rules del repositorio. Claude no puede: cambiar la
+  configuración del repositorio necesita permisos de dueño. Mientras no se
+  haga, `motor-glosas` se sigue pudiendo fusionar con el CI en rojo.
+- **Las 22 vulnerabilidades de las librerías.** Están anotadas en
+  `seguridad/vulnerabilidades_conocidas.txt`. Ninguna se ha mirado una por
+  una todavía: son la foto de lo que el `|| true` venía tapando. Subir de
+  versión `starlette`, `jinja2`, `python-jose`, `python-multipart` y
+  `pdfminer-six` hay que hacerlo con calma y probando, porque son el corazón
+  de la aplicación que corre en el hospital.
+- **Probar la mesa con un lote de verdad**: una lista de facturas y el
+  consolidado de la MISMA remesa de la EPS, de punta a punta hasta bajar el
+  acta.
+- **Centros de costo que no están en el catálogo de contabilidad** (por
+  ejemplo `734005 - LABORATORIO - INMUNOLOGIA`): se muestra el centro pero no
+  se pone cuenta. Falta que contabilidad diga si hay regla.
+
+
 ### Mesa de conciliación en pantalla (07-09)
-- **Subir soportes desde la mesa.** El cajón «Gestionar» ya deja **ver** los
-  soportes que hay en el archivo del hospital, pero todavía no deja **subir**
-  un archivo desde ahí. Se pidió cargar y descargar; quedó solo el ver.
 - **Probarla con un lote de verdad.** Falta correrla con una lista de facturas
   y el consolidado de la MISMA remesa de la EPS. Los tres archivos de prueba
   que hay son de remesas distintas, así que cruzan poco.
@@ -12149,6 +12232,14 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
   son para que el área los mire, no se unieron por parecido.
 
 ## 4) PARA MAÑANA
+
+**Lo primero, y son dos minutos: aplicar la protección de la rama.** Abrir
+Settings → Rules del repositorio, importar
+`.github/rulesets/motor-glosas-protegida.json` y darle Create. Con eso
+`motor-glosas` deja de aceptar fusiones con el CI en rojo o todavía
+corriendo. El paso a paso y la tabla de qué queda exigido están en
+`.github/rulesets/README.md`. Ese clic no lo puede dar Claude.
+
 
 **Mesa de conciliación — probarla de verdad.** Abrir una mesa con una lista de
 facturas y el consolidado de la MISMA remesa de la EPS, y trabajarla de punta a

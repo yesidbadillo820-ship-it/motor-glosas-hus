@@ -24,6 +24,7 @@ TRES DUEÑOS EN CADA RENGLÓN, y conviene no confundirlos:
 
 from __future__ import annotations
 
+import base64
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -414,48 +415,21 @@ def a_excel(db: Any, mesa: MesaConciliacionRecord, modelo: bytes) -> bytes:
 
 
 def _soportes_de(factura: str) -> dict:
-    """Qué soportes tiene esa factura, según el indexador del hospital.
+    """Qué soportes tiene esa factura, con su estado explícito.
 
-    TRES RESPUESTAS, NO DOS. «Tiene soportes», «no tiene» y **«todavía no
-    sé»**: el indexador recorre el share del hospital y ese escaneo tarda
-    horas. Decir «no tiene soportes» mientras el índice se arma es peor que
-    no decir nada — en una mesa, esa frase manda a aceptar una glosa que sí
-    estaba soportada.
+    La lectura y la validación viven en `soportes_contrato`: ahí los datos
+    del indexador pasan por Pydantic una sola vez, en vez de que cada
+    pantalla los interprete a su manera. Eso ya costó un error real —el
+    cajón mostraba «3 soportes» con tres renglones en blanco— y por eso
+    ninguna pantalla vuelve a leer al indexador directo.
+
+    CINCO estados, no dos. «Tiene», «no tiene», «todavía no sé», «no pude
+    mirar» y «me contestaron basura» son cinco cosas distintas, y en una
+    mesa confundirlas manda a aceptar una glosa que sí estaba soportada.
     """
-    try:
-        from app.services import soportes_autodiscovery_service as sas
+    from app.services.soportes_contrato import leer_soportes
 
-        indexador = sas.get_indexer()
-        stats = indexador.stats()
-        archivos = indexador.lookup(factura, auto_rebuild=False) or []
-    except Exception as e:  # noqa: BLE001
-        return {"estado": "SIN_INDICE", "cuantos": 0, "archivos": [], "detalle": str(e)[:200]}
-
-    if not archivos and stats.get("construyendo"):
-        return {
-            "estado": "INDEXANDO",
-            "cuantos": 0,
-            "archivos": [],
-            "detalle": "El buscador de soportes todavía está recorriendo el archivo.",
-        }
-    return {
-        "estado": "CON_SOPORTES" if archivos else "SIN_SOPORTES",
-        "cuantos": len(archivos),
-        # `lookup` devuelve DICCIONARIOS (`asdict` de SoporteEntry), no
-        # objetos: hay que leerlos con `.get`, no con `getattr`, o el cajón
-        # muestra una lista de nombres en blanco.
-        "archivos": [
-            {
-                "nombre": a.get("nombre_archivo") or "",
-                "tipo": a.get("tipo") or "",
-                "tipo_codigo": a.get("tipo_codigo") or "",
-                "tamano_kb": a.get("tamano_kb") or 0,
-                "ruta": a.get("ruta") or "",
-            }
-            for a in archivos[:40]
-            if isinstance(a, dict)
-        ],
-    }
+    return leer_soportes(factura).model_dump(mode="json")
 
 
 def detalle_linea(db: Any, mesa_id: int, linea_id: int) -> dict:
@@ -549,3 +523,177 @@ def soportes_de_la_mesa(db: Any, mesa_id: int) -> dict:
     """
     facturas = {x.factura for x in lineas_de(db, mesa_id) if x.factura}
     return {f: _soportes_de(f) for f in sorted(facturas)}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Soportes que se suben EN la mesa
+# ═══════════════════════════════════════════════════════════════════════
+#
+# El indexador del hospital solo LEE lo que ya estaba archivado, y reconstruye
+# su índice cada tantas horas. Lo que aparece en plena audiencia —el correo
+# que manda el médico, la autorización que la EPS pide en el momento— no está
+# ahí y no puede esperar a la próxima pasada del indexador. Estos soportes se
+# guardan en la base, con quién los subió y cuándo, porque eso es lo que
+# después se cita en el acta.
+
+# Un soporte de mesa es un PDF o una foto de un documento. Nada más: aceptar
+# ejecutables o comprimidos por este camino sería abrirle la puerta a que
+# entre cualquier cosa a la base del motor.
+TIPOS_DE_SOPORTE_OK = {
+    "application/pdf": ".pdf",
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/webp": ".webp",
+    "image/tiff": ".tif",
+}
+
+MAX_BYTES_SOPORTE = 15 * 1024 * 1024  # 15 MB
+
+# Las primeras firmas de cada formato. El `content-type` lo manda el
+# navegador y se puede poner a mano: un .exe renombrado a .pdf llega
+# diciendo «application/pdf». Se comprueba lo que el archivo ES.
+_FIRMAS = {
+    "application/pdf": (b"%PDF-",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/jpg": (b"\xff\xd8\xff",),
+    "image/webp": (b"RIFF",),
+    "image/tiff": (b"II*\x00", b"MM\x00*"),
+}
+
+
+class SoporteRechazado(ValueError):
+    """El archivo no se puede guardar, con el motivo en español."""
+
+
+def validar_soporte(nombre: str, mime: str, contenido: bytes) -> str:
+    """Comprueba peso, tipo y contenido real. Devuelve el mime bueno.
+
+    Levanta `SoporteRechazado` con un motivo que el auditor entienda. El
+    orden importa: primero el peso (es lo que más pasa), después el tipo.
+    """
+    if not contenido:
+        raise SoporteRechazado(
+            f"«{nombre}» llegó vacío (0 bytes). Vuelva a seleccionarlo; puede que "
+            "el archivo esté abierto en otro programa."
+        )
+    if len(contenido) > MAX_BYTES_SOPORTE:
+        mb = len(contenido) / (1024 * 1024)
+        raise SoporteRechazado(
+            f"«{nombre}» pesa {mb:.1f} MB y el tope son "
+            f"{MAX_BYTES_SOPORTE // (1024 * 1024)} MB. Si es un PDF escaneado, "
+            "bájele el peso con la caja de Herramientas PDF antes de subirlo."
+        )
+
+    mime = (mime or "").split(";")[0].strip().lower()
+    if mime not in TIPOS_DE_SOPORTE_OK:
+        raise SoporteRechazado(
+            f"«{nombre}» es de tipo «{mime or 'desconocido'}». Acá solo entran "
+            "PDF e imágenes (PNG, JPG, WEBP, TIFF). Un Excel o un Word se pasa "
+            "primero a PDF."
+        )
+
+    firmas = _FIRMAS.get(mime, ())
+    if firmas and not any(contenido.startswith(f) for f in firmas):
+        raise SoporteRechazado(
+            f"«{nombre}» dice ser {mime} pero su contenido no lo es. Puede que le "
+            "hayan cambiado la extensión a mano, o que se haya dañado al copiarlo. "
+            "No se guarda: un soporte que no abre no sirve de evidencia."
+        )
+    return mime
+
+
+def subir_soporte(
+    db: Any,
+    mesa_id: int,
+    factura: str,
+    nombre: str,
+    mime: str,
+    contenido: bytes,
+    autor: str,
+    nota: str = "",
+) -> dict:
+    """Guarda un soporte de la mesa. Valida antes de tocar la base."""
+    from app.models.db import SoporteMesaRecord
+
+    factura = (factura or "").strip()
+    if not factura:
+        raise SoporteRechazado("No se indicó a qué factura pertenece el soporte.")
+
+    mime_ok = validar_soporte(nombre or "archivo", mime, contenido)
+
+    reg = SoporteMesaRecord(
+        mesa_id=mesa_id,
+        factura=factura[:50],
+        nombre=(nombre or "archivo")[:300],
+        mime_type=mime_ok,
+        tamano_bytes=len(contenido),
+        contenido_b64=base64.b64encode(contenido).decode("ascii"),
+        nota=(nota or "")[:500],
+        subido_por=(autor or "")[:200],
+    )
+    db.add(reg)
+    db.commit()
+    db.refresh(reg)
+    logger.info(f"[MESA] soporte subido a la mesa {mesa_id} / factura {factura}: {reg.nombre}")
+    return _soporte_a_dict(reg)
+
+
+def _soporte_a_dict(reg: Any) -> dict:
+    return {
+        "id": reg.id,
+        "factura": reg.factura or "",
+        "nombre": reg.nombre or "",
+        "mime_type": reg.mime_type or "",
+        "tamano_bytes": reg.tamano_bytes or 0,
+        "nota": reg.nota or "",
+        "subido_por": reg.subido_por or "",
+        "subido_en": reg.subido_en.isoformat() if reg.subido_en else None,
+    }
+
+
+def soportes_subidos(db: Any, mesa_id: int, factura: str = "") -> list[dict]:
+    """Los soportes que se han subido en esta mesa (opcionalmente, de una factura)."""
+    from app.models.db import SoporteMesaRecord
+
+    q = db.query(SoporteMesaRecord).filter(SoporteMesaRecord.mesa_id == mesa_id)
+    if factura:
+        q = q.filter(SoporteMesaRecord.factura == factura.strip()[:50])
+    return [_soporte_a_dict(r) for r in q.order_by(SoporteMesaRecord.id.desc()).all()]
+
+
+def leer_soporte_subido(db: Any, mesa_id: int, soporte_id: int) -> Optional[tuple[Any, bytes]]:
+    """El registro y el contenido de un soporte, para descargarlo.
+
+    Se filtra por mesa además de por id: sin eso, cambiar el número en la
+    dirección dejaría bajar los soportes de la mesa de otra EPS.
+    """
+    from app.models.db import SoporteMesaRecord
+
+    reg = (
+        db.query(SoporteMesaRecord)
+        .filter(SoporteMesaRecord.id == soporte_id)
+        .filter(SoporteMesaRecord.mesa_id == mesa_id)
+        .first()
+    )
+    if reg is None:
+        return None
+    try:
+        return reg, base64.b64decode(reg.contenido_b64 or "")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[MESA] soporte {soporte_id} ilegible: {e}")
+        return None
+
+
+def borrar_soporte_subido(db: Any, mesa_id: int, soporte_id: int) -> bool:
+    from app.models.db import SoporteMesaRecord
+
+    n = (
+        db.query(SoporteMesaRecord)
+        .filter(SoporteMesaRecord.id == soporte_id)
+        .filter(SoporteMesaRecord.mesa_id == mesa_id)
+        .delete()
+    )
+    db.commit()
+    return bool(n)
