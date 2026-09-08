@@ -433,3 +433,330 @@ def test_dimension_mentirosa_se_relee(tmp_path):
 
     formato, filas, _ = org.leer_entrada(entrada)
     assert formato == "cargue" and len(filas) == 1
+
+
+# ---------------------------------------------------------------------------
+# Las cuatro reglas fijas del archivo de OBJECIONES (ver CLAUDE.md)
+# ---------------------------------------------------------------------------
+
+
+def _xlsx_dgh(ruta: Path, filas) -> Path:
+    """Export de servicios facturados del DGH, con los encabezados reales."""
+    wb = Workbook()
+    ws = wb.active
+    ws.append(
+        [
+            "FACTURA",
+            "SERVICIOS DGH",
+            "DESCRIPCION INSTITUCIONAL",
+            "NOMBRE MEDICAMENTO",
+            "CODIGO MEDICAMENTO",
+            "CAT SERVICIOS",
+            "VR_SERVICIO",
+            "NOM CENTRO COSTO",
+        ]
+    )
+    for fila in filas:
+        ws.append(fila)
+    wb.save(str(ruta))
+    return ruta
+
+
+def _consolidado_reglas(ruta: Path) -> Path:
+    """Dos facturas: una sólo administrativa, otra con CL y administrativa."""
+    return _xlsx_consolidado(
+        ruta,
+        filas=[
+            [
+                "ACTA-77",
+                "HUS0000123456",
+                50000,
+                "TA08 01 TARIFAS-APOYO DIAGNOSTICO",
+                "SE OBJETA MAYOR VALOR",
+                "903437",
+                "HEMOGRAMA IV",
+                1,
+                50000,
+                50000,
+            ],
+            [
+                "ACTA-77",
+                "HUS0000123456",
+                12000,
+                "TA2901",
+                "SE OBJETA",
+                "",
+                "ACETAMINOFEN TABLETA 500 MG",
+                2,
+                6000,
+                12000,
+            ],
+            [
+                "ACTA-77",
+                "HUS0000999999",
+                80000,
+                "CL0101 CALIDAD-PERTINENCIA",
+                "SE OBJETA PERTINENCIA",
+                "FMQ0113",
+                "EQUIPO DE VENOCLISIS",
+                1,
+                80000,
+                80000,
+            ],
+            [
+                "ACTA-77",
+                "HUS0000999999",
+                30000,
+                "SO3401",
+                "FALTA SOPORTE",
+                "",
+                "RADIOGRAFIA DE TORAX",
+                1,
+                30000,
+                30000,
+            ],
+        ],
+    )
+
+
+def _dgh_reglas(ruta: Path) -> Path:
+    return _xlsx_dgh(
+        ruta,
+        [
+            ["HUS0000123456", "903437H", "HEMOGRAMA IV", "", "", 1, 50000, "LABORATORIO"],
+            [
+                "HUS0000123456",
+                "",
+                "",
+                "ACETAMINOFEN TABLETA 500 MG",
+                "105M01",
+                2,
+                12000,
+                "FARMACIA",
+            ],
+            [
+                "HUS0000999999",
+                "FMQ0113",
+                "EQUIPO DE VENOCLISIS",
+                "",
+                "",
+                1,
+                80000,
+                "HOSPITALIZACION",
+            ],
+            ["HUS0000999999", "871121", "RADIOGRAFIA DE TORAX", "", "", 1, 30000, "IMAGENES"],
+        ],
+    )
+
+
+def _leer_objeciones(ruta: Path) -> list[dict]:
+    ws = load_workbook(str(ruta))["OBJECIONES"]
+    columnas = [c.value for c in ws[1]]
+    return [dict(zip(columnas, fila)) for fila in ws.iter_rows(min_row=2, values_only=True)]
+
+
+class TestCodigoDeGlosaLimpio:
+    """Regla 4: en CRNCONOBJ va el código solo, sin la descripción pegada."""
+
+    @pytest.mark.parametrize(
+        "crudo, esperado",
+        [
+            ("TA08 01 TARIFAS-APOYO DIAGNÓSTICO - X", "TA0801"),
+            ("TA0801 TARIFAS", "TA0801"),
+            ("CL08 01", "CL0801"),
+            ("TA0801", "TA0801"),
+        ],
+    )
+    def test_deja_solo_el_codigo(self, crudo, esperado):
+        assert org.codigo_glosa_limpio(crudo) == esperado
+
+    def test_lo_que_no_calza_se_devuelve_tal_cual(self):
+        """No se inventa un código donde no lo hay."""
+        assert org.codigo_glosa_limpio("SIN CODIGO") == "SIN CODIGO"
+        assert org.codigo_glosa_limpio(None) == ""
+
+    def test_el_codigo_limpio_alimenta_clase_y_concepto(self):
+        assert org._partir_codigo_glosa(org.codigo_glosa_limpio("TA08 01 TARIFAS")) == ("TA", 8)
+
+
+class TestTipoDeObjecionPorFactura:
+    """Regla 2: 0 administrativa, 1 médica, 2 mixta — decidido por factura."""
+
+    def test_solo_administrativas_es_cero(self):
+        assert org.crotipobj_factura({"TA", "SO", "FA"}) == 0
+
+    def test_solo_clinicas_es_uno(self):
+        assert org.crotipobj_factura({"CL"}) == 1
+
+    def test_mezcla_es_dos(self):
+        assert org.crotipobj_factura({"CL", "TA"}) == 2
+
+    def test_una_factura_sin_codigo_no_se_cuenta_como_administrativa(self):
+        assert org.crotipobj_factura({"CL", ""}) == 1
+
+    def test_toda_la_factura_lleva_el_mismo_tipo(self, tmp_path):
+        entrada = _consolidado_reglas(tmp_path / "c.xlsx")
+        salida = tmp_path / "OBJECIONES_VCO.xlsx"
+        assert _correr_cli(["--entrada", str(entrada), "--salida", str(salida)]) == 0
+        filas = _leer_objeciones(salida)
+        tipos = {}
+        for f in filas:
+            tipos.setdefault(f["CRNCXC"], set()).add(f["CROTIPOBJ"])
+        assert tipos == {"HUS0000123456": {0}, "HUS0000999999": {2}}
+
+    def test_tipo_objecion_explicito_sigue_mandando(self, tmp_path):
+        """Compatibilidad: un cargue viejo puede forzar el valor."""
+        entrada = _consolidado_reglas(tmp_path / "c.xlsx")
+        salida = tmp_path / "o.xlsx"
+        assert (
+            _correr_cli(
+                ["--entrada", str(entrada), "--salida", str(salida), "--tipo-objecion", "1"]
+            )
+            == 0
+        )
+        assert {f["CROTIPOBJ"] for f in _leer_objeciones(salida)} == {"1"}
+
+
+class TestCentroDeCostoVacio:
+    """Regla 1: CTNCENCOS va vacía siempre."""
+
+    def test_sale_vacia_aunque_el_dgh_sepa_el_centro(self, tmp_path):
+        entrada = _consolidado_reglas(tmp_path / "c.xlsx")
+        dgh = _dgh_reglas(tmp_path / "dgh.xlsx")
+        salida = tmp_path / "o.xlsx"
+        assert (
+            _correr_cli(
+                ["--entrada", str(entrada), "--salida", str(salida), "--servicios-dgh", str(dgh)]
+            )
+            == 0
+        )
+        assert {f["CTNCENCOS"] for f in _leer_objeciones(salida)} == {None}
+
+
+class TestCruceContraElDgh:
+    """Regla 3: todo SLNSERPRO escrito existe en el export del DGH de ESA factura."""
+
+    def test_llena_el_codigo_que_el_acta_no_trae(self, tmp_path):
+        entrada = _consolidado_reglas(tmp_path / "c.xlsx")
+        dgh = _dgh_reglas(tmp_path / "dgh.xlsx")
+        salida = tmp_path / "o.xlsx"
+        assert (
+            _correr_cli(
+                ["--entrada", str(entrada), "--salida", str(salida), "--servicios-dgh", str(dgh)]
+            )
+            == 0
+        )
+        codigos = [f["SLNSERPRO"] for f in _leer_objeciones(salida)]
+        # El medicamento y la radiografía venían sin código en el acta.
+        assert codigos == ["903437H", "105M01", "FMQ0113", "871121"]
+
+    def test_sin_export_se_respeta_el_codigo_del_acta(self, tmp_path):
+        entrada = _consolidado_reglas(tmp_path / "c.xlsx")
+        salida = tmp_path / "o.xlsx"
+        assert _correr_cli(["--entrada", str(entrada), "--salida", str(salida)]) == 0
+        codigos = [f["SLNSERPRO"] for f in _leer_objeciones(salida)]
+        assert codigos == ["903437", None, "FMQ0113", None]
+
+    def test_un_codigo_que_no_esta_en_esa_factura_no_se_escribe(self, tmp_path):
+        """El acta trae un código de otra cuenta: la celda queda vacía."""
+        entrada = _xlsx_consolidado(
+            tmp_path / "c.xlsx",
+            filas=[
+                [
+                    "ACTA-1",
+                    "HUS0000123456",
+                    999,
+                    "TA0801",
+                    "SE OBJETA",
+                    "999999",
+                    "SERVICIO QUE NO EXISTE EN ESA CUENTA",
+                    1,
+                    999,
+                    999,
+                ]
+            ],
+        )
+        dgh = _dgh_reglas(tmp_path / "dgh.xlsx")
+        salida = tmp_path / "o.xlsx"
+        assert (
+            _correr_cli(
+                ["--entrada", str(entrada), "--salida", str(salida), "--servicios-dgh", str(dgh)]
+            )
+            == 0
+        )
+        assert _leer_objeciones(salida)[0]["SLNSERPRO"] is None
+
+    def test_el_archivo_lleva_el_100_por_ciento_de_los_renglones(self, tmp_path):
+        """Regla 5: lo que no cruza no se borra, sale con la celda vacía."""
+        entrada = _consolidado_reglas(tmp_path / "c.xlsx")
+        dgh = _xlsx_dgh(tmp_path / "dgh.xlsx", [])
+        salida = tmp_path / "o.xlsx"
+        assert (
+            _correr_cli(
+                ["--entrada", str(entrada), "--salida", str(salida), "--servicios-dgh", str(dgh)]
+            )
+            == 0
+        )
+        filas = _leer_objeciones(salida)
+        assert len(filas) == 4
+        assert all(f["SLNSERPRO"] is None for f in filas)
+
+    def test_reporte_de_cruce_trae_las_tres_hojas(self, tmp_path):
+        entrada = _consolidado_reglas(tmp_path / "c.xlsx")
+        dgh = _dgh_reglas(tmp_path / "dgh.xlsx")
+        reporte = tmp_path / "CRUCE.xlsx"
+        assert (
+            _correr_cli(
+                [
+                    "--entrada",
+                    str(entrada),
+                    "--salida",
+                    str(tmp_path / "o.xlsx"),
+                    "--servicios-dgh",
+                    str(dgh),
+                    "--reporte-cruce",
+                    str(reporte),
+                ]
+            )
+            == 0
+        )
+        assert set(load_workbook(str(reporte)).sheetnames) >= {"CRUCE", "REVISAR", "RESUMEN"}
+
+    def test_reporte_sin_export_es_error_claro(self, tmp_path, capsys):
+        entrada = _consolidado_reglas(tmp_path / "c.xlsx")
+        rc = _correr_cli(["--entrada", str(entrada), "--reporte-cruce", str(tmp_path / "r.xlsx")])
+        assert rc == 2
+        assert "--servicios-dgh" in capsys.readouterr().err
+
+    def test_export_inexistente_es_error_claro(self, tmp_path, capsys):
+        entrada = _consolidado_reglas(tmp_path / "c.xlsx")
+        rc = _correr_cli(["--entrada", str(entrada), "--servicios-dgh", str(tmp_path / "no.xlsx")])
+        assert rc == 2
+        assert "no existe" in capsys.readouterr().err.lower()
+
+
+class TestElArchivoTerminadoCumpleLasReglas:
+    def test_verificar_reglas_no_encuentra_fallas(self, tmp_path):
+        from _cruce_dgh import leer_servicios_dgh, verificar_reglas
+
+        entrada = _consolidado_reglas(tmp_path / "c.xlsx")
+        dgh = _dgh_reglas(tmp_path / "dgh.xlsx")
+        salida = tmp_path / "o.xlsx"
+        _correr_cli(
+            ["--entrada", str(entrada), "--salida", str(salida), "--servicios-dgh", str(dgh)]
+        )
+        filas = _leer_objeciones(salida)
+        fallas = verificar_reglas(
+            [
+                {
+                    "factura": f["CRNCXC"],
+                    "slnserpro": f["SLNSERPRO"],
+                    "ctncencos": f["CTNCENCOS"],
+                    "crotipobj": f["CROTIPOBJ"],
+                    "codigo_glosa": f["CRNCONOBJ"],
+                }
+                for f in filas
+            ],
+            leer_servicios_dgh(dgh),
+        )
+        assert fallas == []

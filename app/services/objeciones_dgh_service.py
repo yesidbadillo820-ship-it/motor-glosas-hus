@@ -18,6 +18,8 @@ Entidades que sabe leer hoy:
     SALUD TOTAL  6 columnas; sólo el nombre del servicio, sin código
     SANITAS      7 columnas; ojo, la 2ª se llama «NUMERO DE FACTURA» pero trae
                  el código de glosa
+    VCO          consolidado del acta del portal VCO (COOSALUD, FIDUPREVISORA,
+                 SAVIA…): 10 columnas, con el acta en la primera
 
 Las reglas fijas del formato (CTNCENCOS vacía, CROTIPOBJ por factura,
 SLNSERPRO sin códigos inventados, el 100% de los renglones) están en CLAUDE.md
@@ -133,6 +135,15 @@ ENTIDADES: tuple[Entidad, ...] = (
         senas=("NUMERO DE FACTURA", "VALOR REAL GLOSA", "CODIGO PROCEDIMIENTO"),
         columnas=7,
         ayuda="Hoja «Glosa». Ojo: la 2ª columna dice «NUMERO DE FACTURA» pero trae el código de glosa.",
+    ),
+    Entidad(
+        id="vco",
+        nombre="VCO (acta del portal)",
+        corto="VCO",
+        modulo="organizar_objeciones_vco",
+        senas=("NUMERO FACTURA", "VALOR GLOSA", "CODIGO GLOSA ESPECIFICA", "DESCRIPCION SERVICIO"),
+        columnas=10,
+        ayuda="Consolidado del acta del portal VCO (COOSALUD, FIDUPREVISORA, SAVIA…).",
     ),
 )
 
@@ -313,12 +324,45 @@ def _filas_sanitas(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[
     return bot.construir_filas(bot.leer_sanitas(ruta), fecha, servicios, trazas)
 
 
+# GENUSUARIO4 con el que la pantalla firma todos los cargues, el mismo de los
+# demás bots (el de VCO por consola escribe "CARTERA").
+GENUSUARIO4_PANTALLA = "999"
+
+
+@dataclass
+class _ConfigVco:
+    """Lo que el bot de VCO espera de su `argparse` cuando lo llama la pantalla."""
+
+    fecha_documento: date
+    fecha_objecion: date
+    consecutivo_inicial: int = 1
+    referencia: str = ""
+    usuario: str = GENUSUARIO4_PANTALLA
+    centro_costos: str = ""  # regla fija: CTNCENCOS va vacía
+    tipo_objecion: str = ""  # vacío = se decide por factura (0/1/2)
+    sin_prefijo: bool = False
+    detalle_servicio: bool = False
+
+
+def _filas_vco(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[dict]:
+    formato, filas, idx = bot.leer_entrada(ruta, None)
+    if formato != "consolidado":
+        raise ValueError(
+            "Ese archivo ya viene en formato OBJECIONES (16 columnas). Acá se "
+            "sube el consolidado del acta del portal VCO, el de NUMERO FACTURA "
+            "y VALOR GLOSA."
+        )
+    cfg = _ConfigVco(fecha_documento=fecha.date(), fecha_objecion=fecha.date())
+    return bot.consolidado_a_registros(filas, idx, cfg, servicios_dgh=servicios, trazas=trazas)
+
+
 _ARMADORES = {
     "famisanar": _filas_famisanar,
     "dispensario": _filas_dispensario,
     "savia": _filas_savia,
     "saludtotal": _filas_saludtotal,
     "sanitas": _filas_sanitas,
+    "vco": _filas_vco,
 }
 
 
@@ -419,6 +463,8 @@ def _escribir_objeciones(bot, entidad_id: str, filas: list[dict], salida: Path) 
         bot.escribir_excel([[f[c] for c in bot.ENCABEZADOS] for f in filas], salida)
     elif entidad_id == "sanitas":
         bot.escribir_objeciones(filas, salida)
+    elif entidad_id == "vco":
+        bot.escribir_cargue([[f[c] for c in bot.COLUMNAS_CARGUE] for f in filas], salida)
     else:
         bot.escribir_consolidado(filas, salida)
 

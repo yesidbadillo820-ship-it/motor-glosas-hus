@@ -61,6 +61,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _dinero import a_numero  # noqa: E402
 
+# Motor del cruce contra el DGH, común a todos los bots (ver `_cruce_dgh.py`).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _cruce_dgh import (  # noqa: E402
+    escribir_reporte_cruce,
+    leer_servicios_dgh,
+    resolver_servicio,
+    traza,
+    verificar_reglas,
+)
+
 logger = logging.getLogger("organizar_objeciones_vco")
 
 # ---------------------------------------------------------------------------
@@ -239,6 +249,42 @@ def _partir_codigo_glosa(codigo: str) -> tuple[str, int | str]:
     return m.group(1), int(m.group(2))
 
 
+# El acta a veces trae el código pegado a su descripción, en una sola celda.
+_RE_CODIGO_GLOSA_TEXTO = re.compile(r"^([A-Z]{2})\s*(\d{2})\s*(\d{2})\b\s*(.*)$", re.DOTALL)
+
+
+def codigo_glosa_limpio(texto: object) -> str:
+    """'TA08 01 TARIFAS-APOYO DIAGNOSTICO' → 'TA0801'.
+
+    Regla fija del archivo de OBJECIONES: en CRNCONOBJ va el código solo, sin
+    la descripción pegada. Lo que no calza el patrón se devuelve tal cual (no
+    se inventa un código).
+    """
+    t = _norm(texto)
+    m = _RE_CODIGO_GLOSA_TEXTO.match(t)
+    if m:
+        return m.group(1) + m.group(2) + m.group(3)
+    return t
+
+
+GRUPO_CLINICO = "CL"
+
+
+def crotipobj_factura(grupos: set[str]) -> int:
+    """Solo administrativos (TA/FA/SO/AU/CO…) → 0; solo CL → 1; mezcla → 2.
+
+    Se decide POR FACTURA, no por renglón: es una de las reglas fijas del
+    archivo de OBJECIONES (ver `CLAUDE.md`).
+    """
+    tiene_cl = GRUPO_CLINICO in grupos
+    tiene_admin = any(g and g != GRUPO_CLINICO for g in grupos)
+    if tiene_cl and tiene_admin:
+        return 2
+    if tiene_cl:
+        return 1
+    return 0
+
+
 def _mapear_encabezados(fila_encabezado, alias: dict[str, list[str]]) -> dict[str, int]:
     """{campo: índice de columna} para los encabezados presentes."""
     indices: dict[str, int] = {}
@@ -315,15 +361,32 @@ def leer_entrada(ruta: Path, nombre_hoja: str | None = None):
 # ---------------------------------------------------------------------------
 
 
-def consolidado_a_cargue(filas, idx: dict[str, int], cfg) -> list[list]:
-    """Arma las filas del cargue ERP a partir del consolidado del acta."""
+def consolidado_a_registros(
+    filas,
+    idx: dict[str, int],
+    cfg,
+    *,
+    servicios_dgh: dict | None = None,
+    trazas: list[dict] | None = None,
+) -> list[dict]:
+    """Arma las objeciones del cargue ERP, una por renglón del acta.
+
+    Devuelve diccionarios con las 16 columnas (`COLUMNAS_CARGUE`) para que la
+    pantalla del motor pueda revisarlos antes de escribir el Excel.
+
+    Con `servicios_dgh` (el export de servicios facturados) el bot cruza cada
+    renglón contra los servicios de ESA factura para llenar `SLNSERPRO`: es la
+    regla de no inventar códigos. Sin él, se conserva el código que trae el
+    acta, que es como venía trabajando el bot.
+    """
 
     def celda(fila, campo):
         pos = idx.get(campo)
         return fila[pos] if pos is not None and pos < len(fila) else None
 
     consecutivos: OrderedDict[str, int] = OrderedDict()
-    salida: list[list] = []
+    registros: list[dict] = []
+    grupos_por_factura: dict[str, set[str]] = {}
     for fila in filas:
         factura = _texto(celda(fila, "factura"))
         if not factura:
@@ -333,19 +396,23 @@ def consolidado_a_cargue(filas, idx: dict[str, int], cfg) -> list[list]:
             consecutivos[factura] = cfg.consecutivo_inicial + len(consecutivos)
 
         acta = _texto(celda(fila, "acta")) or cfg.referencia
-        codigo_glosa = _texto(celda(fila, "codigo_glosa"))
+        codigo_glosa = codigo_glosa_limpio(celda(fila, "codigo_glosa"))
         clase, concepto_general = _partir_codigo_glosa(codigo_glosa)
         observacion = _texto(celda(fila, "observacion"))
+        descripcion = _texto(celda(fila, "descripcion_servicio"))
+        cantidad = _numero(celda(fila, "cantidad")) or 0
+        valor_unitario = _numero(celda(fila, "valor_unitario")) or 0
+        valor_glosa = _numero(celda(fila, "valor_glosa"))
+        cod_acta = _texto(celda(fila, "codigo_servicio"))
 
         if cfg.detalle_servicio:
-            desc = _texto(celda(fila, "descripcion_servicio"))
             cant = _texto(celda(fila, "cantidad"))
             vunit = _numero(celda(fila, "valor_unitario"))
             vtotal = _numero(celda(fila, "valor_total"))
             partes = [
                 p
                 for p in (
-                    f"SERVICIO {desc}" if desc else "",
+                    f"SERVICIO {descripcion}" if descripcion else "",
                     f"CANT {cant}" if cant else "",
                     f"VLR UNIT {vunit}" if vunit is not None else "",
                     f"VLR TOTAL {vtotal}" if vtotal is not None else "",
@@ -359,27 +426,70 @@ def consolidado_a_cargue(filas, idx: dict[str, int], cfg) -> list[list]:
         if cfg.sin_prefijo:
             factura_erp = re.sub(r"^[A-Za-z]+", "", factura)
 
-        salida.append(
-            [
-                consecutivos[factura],  # CDCONSEC
-                cfg.fecha_documento,  # CDFECDOC
-                factura_erp,  # CRNCXC
-                cfg.fecha_objecion,  # CROFECOBJ
-                acta,  # CROREFERE
-                acta,  # CROOBSERV
-                clase,  # CROCLAOBJ
-                concepto_general,  # CRNCLAOBJ
-                cfg.usuario,  # GENUSUARIO4
-                codigo_glosa,  # CRNCONOBJ
-                _texto(celda(fila, "codigo_servicio")),  # SLNSERPRO
-                "",  # IDRIPS (no viene en el consolidado)
-                cfg.centro_costos,  # CTNCENCOS
-                _numero(celda(fila, "valor_glosa")),  # CROVALOBJ
-                observacion,  # CRDOBSERV
-                cfg.tipo_objecion,  # CROTIPOBJ
-            ]
+        slnserpro = cod_acta
+        if servicios_dgh is not None:
+            # El cruce manda: el código escrito tiene que existir en el export
+            # del DGH de esa factura. Si no se identifica, la celda va vacía.
+            cruce = resolver_servicio(
+                servicios_dgh.get(factura_erp, []),
+                codigo=cod_acta,
+                descripcion=descripcion,
+                valor=valor_glosa or 0,
+                valor_unitario=valor_unitario,
+                cantidad=cantidad,
+            )
+            slnserpro = cruce.linea.codigo if cruce.linea else ""
+            if trazas is not None:
+                trazas.append(
+                    traza(
+                        factura=factura_erp,
+                        codigo_objecion=codigo_glosa,
+                        valor=int(valor_glosa or 0),
+                        cod_entidad=cod_acta,
+                        desc_entidad=descripcion,
+                        unitario_entidad=int(valor_unitario or 0),
+                        observacion=observacion,
+                        cruce=cruce,
+                    )
+                )
+
+        grupos_por_factura.setdefault(factura_erp, set()).add(clase or "")
+        registros.append(
+            {
+                "CDCONSEC": consecutivos[factura],
+                "CDFECDOC": cfg.fecha_documento,
+                "CRNCXC": factura_erp,
+                "CROFECOBJ": cfg.fecha_objecion,
+                "CROREFERE": acta,
+                "CROOBSERV": acta,
+                "CROCLAOBJ": clase,
+                "CRNCLAOBJ": concepto_general,
+                "GENUSUARIO4": cfg.usuario,
+                "CRNCONOBJ": codigo_glosa,
+                "SLNSERPRO": slnserpro,
+                "IDRIPS": "",  # no viene en el consolidado
+                # Regla fija: CTNCENCOS va vacía siempre.
+                "CTNCENCOS": _texto(getattr(cfg, "centro_costos", "")),
+                "CROVALOBJ": valor_glosa,
+                "CRDOBSERV": observacion,
+                "CROTIPOBJ": 0,  # provisional: se decide por factura abajo
+            }
         )
-    return salida
+
+    # CROTIPOBJ se decide POR FACTURA según la mezcla de conceptos. Un
+    # --tipo-objecion explícito manda (compatibilidad con cargues viejos).
+    forzado = _texto(getattr(cfg, "tipo_objecion", ""))
+    for reg in registros:
+        reg["CROTIPOBJ"] = (
+            forzado if forzado else crotipobj_factura(grupos_por_factura[reg["CRNCXC"]])
+        )
+    return registros
+
+
+def consolidado_a_cargue(filas, idx: dict[str, int], cfg, **kwargs) -> list[list]:
+    """Las mismas objeciones de `consolidado_a_registros`, ya como filas."""
+    registros = consolidado_a_registros(filas, idx, cfg, **kwargs)
+    return [[reg[col] for col in COLUMNAS_CARGUE] for reg in registros]
 
 
 def escribir_cargue(filas_cargue: list[list], ruta_salida: Path) -> None:
@@ -588,6 +698,21 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Anexa servicio/cantidad/valores a CRDOBSERV en el cargue",
     )
+    parser.add_argument(
+        "--servicios-dgh",
+        type=Path,
+        default=None,
+        help="Export de servicios facturados del DGH. Con esto SLNSERPRO se llena "
+        "con el código que el DGH tiene en ESA factura (regla de no inventar "
+        "códigos); lo que no se identifique queda en blanco para completar a mano.",
+    )
+    parser.add_argument(
+        "--reporte-cruce",
+        type=Path,
+        default=None,
+        help="Excel de trabajo con el detalle del cruce (hojas CRUCE, REVISAR y "
+        "RESUMEN). Requiere --servicios-dgh.",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -602,11 +727,42 @@ def main(argv: list[str] | None = None) -> int:
         _fecha(args.fecha_objecion) if args.fecha_objecion else args.fecha_documento
     )
 
+    if args.reporte_cruce is not None and args.servicios_dgh is None:
+        sys.stderr.write("ERROR: --reporte-cruce necesita --servicios-dgh.\n")
+        return 2
+
+    servicios_dgh = None
+    if args.servicios_dgh is not None:
+        if not args.servicios_dgh.is_file():
+            sys.stderr.write(f"ERROR: no existe el export del DGH: {args.servicios_dgh}\n")
+            return 2
+        logger.info("Leyendo servicios facturados del DGH: %s", args.servicios_dgh.name)
+        try:
+            servicios_dgh = leer_servicios_dgh(args.servicios_dgh, avisar=logger.warning)
+        except ValueError as e:
+            sys.stderr.write(f"ERROR: {e}\n")
+            return 2
+        logger.info(
+            "  %d renglones de servicio en %d facturas.",
+            sum(len(v) for v in servicios_dgh.values()),
+            len(servicios_dgh),
+        )
+
+    if _texto(args.centro_costos):
+        logger.warning(
+            "CTNCENCOS va vacía en el archivo de OBJECIONES (regla fija de Cartera). "
+            "Se está usando --centro-costos, revise que el DGH lo acepte."
+        )
+
     formato, filas, idx = leer_entrada(ruta_entrada, args.hoja)
     entidad_archivo = re.sub(r"\s+", "_", _norm(args.entidad)) or "ENTIDAD"
 
     if formato == "consolidado":
-        filas_salida = consolidado_a_cargue(filas, idx, args)
+        trazas: list[dict] = []
+        registros = consolidado_a_registros(
+            filas, idx, args, servicios_dgh=servicios_dgh, trazas=trazas
+        )
+        filas_salida = [[reg[col] for col in COLUMNAS_CARGUE] for reg in registros]
         if not filas_salida:
             sys.stderr.write("ERROR: el consolidado no tiene filas con factura.\n")
             return 2
@@ -623,6 +779,54 @@ def main(argv: list[str] | None = None) -> int:
                 COLUMNAS_CARGUE.index("CROOBSERV"),
             )
         )
+
+        if servicios_dgh is not None:
+            cuenta = {
+                k: sum(1 for t in trazas if t["confianza"] == k)
+                for k in ("ALTA", "MEDIA", "BAJA", "SIN CRUCE")
+            }
+            ubicados = cuenta["ALTA"] + cuenta["MEDIA"]
+            logger.info(
+                "  Cruce contra los servicios del DGH: %d de %d servicios ubicados "
+                "con confianza alta/media (%.0f%%).",
+                ubicados,
+                len(trazas),
+                100 * ubicados / (len(trazas) or 1),
+            )
+            logger.info(
+                "    ALTA=%d  MEDIA=%d  BAJA=%d  SIN CRUCE=%d  → revisar %d.",
+                cuenta["ALTA"],
+                cuenta["MEDIA"],
+                cuenta["BAJA"],
+                cuenta["SIN CRUCE"],
+                cuenta["BAJA"] + cuenta["SIN CRUCE"],
+            )
+
+        verificar_reglas(
+            [
+                {
+                    "factura": r["CRNCXC"],
+                    "slnserpro": r["SLNSERPRO"],
+                    "ctncencos": r["CTNCENCOS"],
+                    "crotipobj": r["CROTIPOBJ"],
+                    "codigo_glosa": r["CRNCONOBJ"],
+                }
+                for r in registros
+            ],
+            servicios_dgh,
+            avisar=logger.info,
+        )
+
+        if args.reporte_cruce is not None:
+            escribir_reporte_cruce(trazas, args.reporte_cruce, entidad=_norm(args.entidad))
+            pendientes = sum(
+                1 for t in trazas if t["aviso"] or t["confianza"] in ("BAJA", "SIN CRUCE")
+            )
+            logger.info(
+                "Detalle del cruce: %s (%d renglón(es) en REVISAR).",
+                args.reporte_cruce,
+                pendientes,
+            )
     else:
         filas_salida = cargue_a_consolidado(filas, idx)
         if not filas_salida:

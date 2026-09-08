@@ -16,18 +16,26 @@ Antes de descargar nada, la pantalla muestra el resumen: cuántas objeciones
 quedaron en ALTA, MEDIA, BAJA y sin cruce, la tabla de lo que hay que revisar y
 el detalle por factura.
 
-**Entidades que reconoce solo:** FAMISANAR, Dispensario Médico, SAVIA SALUD y
-SANITAS. Si el formato cambió y no la reconoce, se elige a mano en el selector;
-si no la reconoce **no procesa a ciegas**, avisa qué encabezados leyó.
+**Entidades que reconoce solo:**
 
-**Las que todavía no están, y por qué.** No es que falte trabajo: es que su
-formato de salida no obedece las mismas reglas y eso lo tiene que decidir el
-área, no el programa.
+| Entidad | Qué archivo se sube |
+|---|---|
+| **FAMISANAR** | Export DEVYGLOSAS de 4 columnas; el servicio va escondido en el texto de la glosa. |
+| **Dispensario Médico** | Excel de glosa inicial de 5 columnas, con el servicio objetado en columna propia. |
+| **SAVIA SALUD** | Export de 8 columnas, con código y nombre del servicio. |
+| **SALUD TOTAL** | Export NotificacionGLS de 6 columnas. No manda código: el servicio se ubica por nombre y valor. |
+| **SANITAS** | Hoja «Glosa» de 7 columnas. Ojo: la 2ª dice «NUMERO DE FACTURA» pero trae el código de glosa. |
+| **VCO** (COOSALUD, Fiduprevisora, SAVIA…) | Consolidado del acta del portal VCO, 10 columnas, con el acta en la primera. |
+
+Si el formato cambió y no la reconoce, se elige a mano en el selector; si no la
+reconoce **no procesa a ciegas**, avisa qué encabezados leyó.
+
+**Las que todavía no están, y por qué.**
 
 | Entidad | Qué pasa |
 |---|---|
-| **VCO** (COOSALUD, Fiduprevisora…) | Su bot llena `CTNCENCOS` con un centro de costo de configuración y `CROTIPOBJ` con una bandera fija, no calculado por factura. Es el flujo del portal VCO, con actas, y funciona así hace tiempo. Meterlo a esta pantalla obliga a decidir si VCO también debe seguir las cuatro reglas; mientras tanto se sigue usando su bot. |
-| **EMSSANAR** | Su entrada son **PDF** de objeción, no un Excel. La pantalla pide dos Excel, así que necesitaría aceptar PDF además. |
+| **EMSSANAR** | Su entrada son **PDF** de objeción, no un Excel. La pantalla pide dos Excel, así que necesita aceptar PDF además. |
+| **ADRES** | Tiene flujo propio: homologa códigos SOAT ↔ CUPS con el Homologador Gold Standard, aplica el tope de valor de cada servicio y parte la salida en lotes de 300 facturas. Entra a la pantalla con un tercer archivo opcional (el homologador). |
 
 ## 2) Por qué hacen falta los dos archivos
 

@@ -155,6 +155,51 @@ def _sanitas() -> bytes:
     )
 
 
+def _vco() -> bytes:
+    """Consolidado del acta del portal VCO: 10 columnas, el acta en la primera."""
+    return _excel(
+        "Hoja1",
+        [
+            "CROOBSERV",
+            "NUMERO FACTURA",
+            "VALOR GLOSA",
+            "CODIGO GLOSA ESPECIFICA",
+            "OBSERVACION",
+            "CODIGO SERVICIO",
+            "DESCRIPCION SERVICIO",
+            "CANTIDAD",
+            "VALOR UNITARIO SERVICIO",
+            "VALOR TOTAL SERVICIO",
+        ],
+        [
+            [
+                "ACTA-77",
+                "HUS0000548556",
+                5800,
+                "TA08 01 TARIFAS-MAYOR VALOR COBRADO",
+                "SE OBJETA MAYOR VALOR",
+                "",
+                "CATETER INTRAVENOSO 20",
+                1,
+                5800,
+                5800,
+            ],
+            [
+                "ACTA-77",
+                "HUS0000548556",
+                4700,
+                "CL0101",
+                "SE OBJETA PERTINENCIA",
+                "903883",
+                "GLUCOMETRIA GLUCOSA SEMIAUTOMATIZADA",
+                1,
+                4700,
+                4700,
+            ],
+        ],
+    )
+
+
 # ─── De quién es el archivo ─────────────────────────────────────────────────
 
 
@@ -174,6 +219,9 @@ class TestDetectarEntidad:
     def test_sanitas(self):
         assert svc.detectar_entidad(_sanitas()).id == "sanitas"
 
+    def test_vco(self):
+        assert svc.detectar_entidad(_vco()).id == "vco"
+
     def test_archivo_desconocido_no_se_procesa_a_ciegas(self):
         otro = _excel("Hoja1", ["COSA", "OTRA COSA"], [["a", "b"]])
         with pytest.raises(svc.ErrorObjeciones, match="No reconozco"):
@@ -190,7 +238,7 @@ class TestDetectarEntidad:
 
     def test_catalogo(self):
         ids = {e["id"] for e in svc.catalogo_entidades()}
-        assert {"famisanar", "dispensario", "savia", "saludtotal", "sanitas"} <= ids
+        assert {"famisanar", "dispensario", "savia", "saludtotal", "sanitas", "vco"} <= ids
 
 
 # ─── El armado ──────────────────────────────────────────────────────────────
@@ -245,6 +293,29 @@ class TestProcesar:
         assert r.entidad_id == "sanitas"
         assert r.objeciones == 1
         assert r.nombre_objeciones == "OBJECIONES_SANITAS_04092026.xlsx"
+
+    def test_vco_de_punta_a_punta(self):
+        """El acta del portal VCO (COOSALUD, FIDUPREVISORA, SAVIA…)."""
+        r = svc.procesar(_vco(), _dgh(), fecha="2026-09-04")
+        assert r.entidad_id == "vco"
+        assert r.objeciones == 2 and r.facturas == 1
+        assert r.valor_total == 10500
+        assert r.confianza["ALTA"] == 2
+        assert r.reglas_ok and not r.fallas_reglas
+        assert r.nombre_objeciones == "OBJECIONES_VCO_04092026.xlsx"
+        assert r.nombre_cruce == "CRUCE_VCO_04092026.xlsx"
+
+    def test_vco_mezcla_clinica_y_administrativa_es_tipo_2(self):
+        r = svc.procesar(_vco(), _dgh(), fecha="2026-09-04")
+        assert r.por_factura[0]["tipo"] == 2
+
+    def test_vco_no_acepta_un_archivo_ya_armado(self):
+        """Si suben el OBJECIONES de 16 columnas en vez del acta, se avisa."""
+        ya_armado = _excel(
+            "OBJECIONES", list(svc._cargar("organizar_objeciones_vco").COLUMNAS_CARGUE), []
+        )
+        with pytest.raises(svc.ErrorObjeciones):
+            svc.procesar(ya_armado, _dgh(), entidad_id="vco", fecha="2026-09-04")
 
     def test_el_excel_sale_con_las_16_columnas_y_las_reglas(self):
         import io
