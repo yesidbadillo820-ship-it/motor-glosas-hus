@@ -459,6 +459,81 @@ def resolver_servicio(
     return Cruce(mejor, confianza, ", ".join(mejor_motivos), round(mejor_pts, 2), aviso)
 
 
+# ─── Verificación de las reglas fijas del archivo de OBJECIONES ──────────────
+
+
+def verificar_reglas(
+    renglones: list[dict], servicios_dgh: dict[str, list[LineaDgh]] | None, avisar=None
+) -> list[str]:
+    """Revisa el archivo terminado contra las reglas que fijó el área.
+
+    No cambia nada: sólo mira lo que se va a entregar y devuelve la lista de
+    incumplimientos. Existe para que las reglas no dependan de que alguien se
+    acuerde de revisarlas a mano:
+
+    1. `CTNCENCOS` vacía en todos los renglones.
+    2. Todo `SLNSERPRO` escrito existe en el export del DGH de ESA factura
+       (prohibido inventar códigos).
+    3. `CROTIPOBJ` igual para toda la factura y acorde a sus grupos de glosa:
+       0 = ADMINISTRATIVA (sólo TA/FA/SO/AU/CO…), 1 = MEDICA (sólo CL),
+       2 = MIXTA (CL junto con administrativas).
+
+    Cada renglón es un dict con: factura, slnserpro, ctncencos, crotipobj y
+    codigo_glosa.
+    """
+    fallas: list[str] = []
+
+    con_centro = [r for r in renglones if r.get("ctncencos") not in (None, "")]
+    if con_centro:
+        fallas.append(
+            f"CTNCENCOS: {len(con_centro)} renglón(es) traen dato y debe ir vacía "
+            f"(primera factura: {con_centro[0].get('factura')})."
+        )
+
+    if servicios_dgh is not None:
+        inventados = []
+        for r in renglones:
+            cod = r.get("slnserpro")
+            if not cod:
+                continue
+            lineas = servicios_dgh.get(r.get("factura", ""), [])
+            if not any(variantes_codigo(cod) & linea.codigos for linea in lineas):
+                inventados.append((r.get("factura"), cod))
+        if inventados:
+            muestra = ", ".join(f"{f}:{c}" for f, c in inventados[:5])
+            fallas.append(
+                f"SLNSERPRO: {len(inventados)} código(s) no existen en el export del "
+                f"DGH de su factura ({muestra})."
+            )
+
+    grupos: dict[str, set[str]] = defaultdict(set)
+    tipos: dict[str, set] = defaultdict(set)
+    for r in renglones:
+        factura = r.get("factura", "")
+        grupos[factura].add(str(r.get("codigo_glosa") or "")[:2].upper())
+        tipos[factura].add(r.get("crotipobj"))
+    for factura, gs in grupos.items():
+        tiene_cl = "CL" in gs
+        tiene_admin = any(g and g != "CL" for g in gs)
+        esperado = 2 if (tiene_cl and tiene_admin) else 1 if tiene_cl else 0
+        if tipos[factura] != {esperado}:
+            fallas.append(
+                f"CROTIPOBJ: la factura {factura} tiene grupos {sorted(g for g in gs if g)} "
+                f"→ debía ser {esperado} y quedó {sorted(tipos[factura])}."
+            )
+
+    if avisar is not None:
+        if fallas:
+            for f in fallas:
+                avisar(f"  ✗ REGLA INCUMPLIDA — {f}")
+        else:
+            avisar(
+                "  ✓ Reglas verificadas: CTNCENCOS vacía, ningún SLNSERPRO inventado "
+                "y CROTIPOBJ correcto en todas las facturas."
+            )
+    return fallas
+
+
 # ─── Reporte de trabajo del auditor ──────────────────────────────────────────
 
 COLORES_CONFIANZA = {

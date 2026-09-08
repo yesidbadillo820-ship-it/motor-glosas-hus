@@ -70,6 +70,7 @@ from _cruce_dgh import (  # noqa: E402
     leer_servicios_dgh,
     resolver_servicio,
     traza,
+    verificar_reglas,
 )
 from _dinero import a_entero  # noqa: E402
 
@@ -852,6 +853,23 @@ def main(argv: list[str] | None = None) -> int:
     if not registros:
         logger.error("No se encontró ninguna objeción en el archivo de entrada.")
         return 1
+
+    # Las reglas fijas del área se comprueban sobre lo que se va a entregar,
+    # no de memoria (ver verificar_reglas en tools/_cruce_dgh.py).
+    verificar_reglas(
+        [
+            {
+                "factura": reg["CRNCXC"],
+                "slnserpro": reg["SLNSERPRO"],
+                "ctncencos": reg["CTNCENCOS"],
+                "crotipobj": reg["CROTIPOBJ"],
+                "codigo_glosa": reg["CRNCONOBJ"],
+            }
+            for reg in registros
+        ],
+        servicios_dgh,
+        avisar=logger.info,
+    )
 
     if args.consolidado:
         escribir_consolidado(registros, args.salida)

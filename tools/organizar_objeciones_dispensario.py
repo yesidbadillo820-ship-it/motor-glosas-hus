@@ -77,6 +77,7 @@ from _cruce_dgh import (  # noqa: E402
     leer_servicios_dgh,
     resolver_servicio,
     traza,
+    verificar_reglas,
 )
 
 logger = logging.getLogger("organizar_objeciones")
@@ -703,6 +704,23 @@ def procesar_excel(
             cuenta["SIN CRUCE"],
             cuenta["BAJA"] + cuenta["SIN CRUCE"],
         )
+
+    # Las reglas fijas del área se comprueban sobre lo que se va a entregar.
+    cols = {n: k for k, n in enumerate(ENCABEZADOS)}
+    verificar_reglas(
+        [
+            {
+                "factura": f[cols["CRNCXC"]],
+                "slnserpro": f[cols["SLNSERPRO"]],
+                "ctncencos": f[cols["CTNCENCOS"]],
+                "crotipobj": f[cols["CROTIPOBJ"]],
+                "codigo_glosa": f[cols["CRNCONOBJ"]],
+            }
+            for f in filas
+        ],
+        servicios_dgh,
+        avisar=logger.info,
+    )
 
     facturas = sorted({o["cxc"] for o in objeciones})
     if consolidado is not None:

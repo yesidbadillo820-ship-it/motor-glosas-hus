@@ -342,3 +342,62 @@ class TestReporteCruce:
         assert resumen[0][2] == 285700
         assert "Revisar" in resumen[0][7]
         assert resumen[-1][0] == "TOTAL"
+
+
+# ─── Las reglas fijas del archivo de OBJECIONES ──────────────────────────────
+
+
+class TestVerificarReglas:
+    def _servicios(self):
+        return {"HUS0000549272": [_linea("FMQ0113", "CATETER INTRAVENOSO 20", 1, 5800)]}
+
+    def _renglon(self, **kw):
+        base = {
+            "factura": "HUS0000549272",
+            "slnserpro": "FMQ0113",
+            "ctncencos": None,
+            "crotipobj": 0,
+            "codigo_glosa": "CO0601",
+        }
+        base.update(kw)
+        return base
+
+    def test_archivo_que_cumple(self):
+        avisos: list[str] = []
+        fallas = cd.verificar_reglas([self._renglon()], self._servicios(), avisar=avisos.append)
+        assert fallas == []
+        assert avisos and "Reglas verificadas" in avisos[0]
+
+    def test_ctncencos_con_dato(self):
+        fallas = cd.verificar_reglas([self._renglon(ctncencos="URGENCIAS")], self._servicios())
+        assert any("CTNCENCOS" in f for f in fallas)
+
+    def test_slnserpro_que_no_existe_en_esa_factura(self):
+        fallas = cd.verificar_reglas([self._renglon(slnserpro="FMQ9999")], self._servicios())
+        assert any("no existen en el export" in f for f in fallas)
+
+    def test_slnserpro_vacio_no_es_falla(self):
+        """Los renglones sin cruce van igual en el archivo, con la celda vacía."""
+        assert cd.verificar_reglas([self._renglon(slnserpro=None)], self._servicios()) == []
+
+    def test_crotipobj_mal_clasificada(self):
+        renglones = [
+            self._renglon(codigo_glosa="CO0601", crotipobj=0),
+            self._renglon(codigo_glosa="CL0701", crotipobj=0),  # debía ser 2 (mixta)
+        ]
+        fallas = cd.verificar_reglas(renglones, self._servicios())
+        assert any("CROTIPOBJ" in f and "debía ser 2" in f for f in fallas)
+
+    def test_crotipobj_medica_cuando_todas_son_clinicas(self):
+        renglones = [self._renglon(codigo_glosa="CL0801", crotipobj=1, slnserpro=None)]
+        assert cd.verificar_reglas(renglones, self._servicios()) == []
+
+    def test_crotipobj_distinto_dentro_de_la_misma_factura(self):
+        renglones = [
+            self._renglon(codigo_glosa="CO0601", crotipobj=0),
+            self._renglon(codigo_glosa="TA0801", crotipobj=2),
+        ]
+        assert any("CROTIPOBJ" in f for f in cd.verificar_reglas(renglones, self._servicios()))
+
+    def test_sin_export_del_dgh_no_revisa_los_codigos(self):
+        assert cd.verificar_reglas([self._renglon(slnserpro="LO_QUE_SEA")], None) == []
