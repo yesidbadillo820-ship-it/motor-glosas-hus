@@ -185,3 +185,82 @@ class TestElPlazoEsParametro:
         assert r["prescripcion"]["meses_plazo"] == 36
         assert r["prescripcion"]["fecha_corte"] == "2027-03-25"
         assert r["prescripcion"]["prescrita"] is False
+
+
+class TestElFalsoPrescritaDeLasSesiones:
+    """08-09-2026, HUS559324. El defecto que casi cuesta una cuenta.
+
+    20 sesiones de terapia del 13-feb al 14-mar de 2025. El RIPS trae una
+    sola línea con la primera sesión, así que el egreso «deducido» quedaba un
+    mes antes del real y la cuenta salía PRESCRITA cuando le faltaban seis
+    días. Ahora manda el egreso de la factura y el sistema avisa del reparo.
+    """
+
+    CARATULA = (
+        "FACTURA ELECTRONICA DE VENTA HUS0000559324\n"
+        "Fec Ingreso 13 feb. 2025 06:54 a. m. Fec Egreso 14 mar. 2025 05:29 p. m."
+    )
+
+    def _sembrar_caso(self, raiz, con_pdf=True):
+        c = raiz / "202609" / "FACTURAS_SALUD" / "HUS0000559324"
+        c.mkdir(parents=True, exist_ok=True)
+        # El RIPS: una sola línea de procedimiento, sin fecha de salida.
+        (c / "Rips_HUS0000559324.json").write_text(
+            json.dumps(
+                {
+                    "numFactura": "HUS0000559324",
+                    "usuarios": [
+                        {
+                            "tipoDocumentoIdentificacion": "CC",
+                            "numDocumentoIdentificacion": "63535112",
+                            "codSexo": "F",
+                            "servicios": {
+                                "procedimientos": [{"fechaInicioAtencion": "2025-02-13 06:55"}]
+                            },
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        if con_pdf:
+            from reportlab.lib.pagesizes import letter
+            from reportlab.pdfgen import canvas
+
+            pdf = canvas.Canvas(str(c / "fv1.pdf"), pagesize=letter)
+            y = 700
+            for linea in self.CARATULA.splitlines():
+                pdf.drawString(40, y, linea)
+                y -= 14
+            pdf.save()
+        return c
+
+    def test_con_la_factura_a_la_vista_la_cuenta_NO_esta_prescrita(self, db, servidor):
+        _factura(db, numero="HUS0000559324", f_factura=datetime(2026, 9, 4))
+        self._sembrar_caso(servidor)
+
+        r = revisar(db, "HUS0000559324", hoy=date(2026, 9, 8))
+        assert r["prescripcion"]["prescrita"] is False
+        assert r["prescripcion"]["estado"] == "POR_VENCER"
+        assert r["prescripcion"]["fecha_corte"] == "2026-09-14"
+        assert r["origen_del_egreso"] == "la factura impresa"
+
+    def test_sin_la_factura_avisa_que_el_egreso_es_deducido(self, db, servidor):
+        _factura(db, numero="HUS0000559324", f_factura=datetime(2026, 9, 4))
+        self._sembrar_caso(servidor, con_pdf=False)
+
+        r = revisar(db, "HUS0000559324", hoy=date(2026, 9, 8))
+        codigos = {h["codigo"] for h in r["hallazgos"]}
+        assert "EGRESO_DEDUCIDO" in codigos
+        (aviso,) = [h for h in r["hallazgos"] if h["codigo"] == "EGRESO_DEDUCIDO"]
+        assert "verifíquelo en la factura" in aviso["mensaje"]
+        assert r["fechas"]["egreso_deducido"] is True
+        assert r["origen_del_egreso"] == "el RIPS"
+
+    def test_una_hospitalizacion_con_egreso_propio_no_se_marca_deducida(self, db, servidor):
+        _factura(db, f_factura=datetime(2024, 3, 28))
+        _sembrar_rips(servidor, "202403", "HUS0000556635", "2024-03-10 08:00", "2024-03-25 14:00")
+        r = revisar(db, "HUS0000556635", hoy=date(2026, 9, 8))
+        assert r["fechas"]["egreso_deducido"] is False
+        assert "EGRESO_DEDUCIDO" not in {h["codigo"] for h in r["hallazgos"]}
+        assert r["origen_del_egreso"] == "el RIPS"

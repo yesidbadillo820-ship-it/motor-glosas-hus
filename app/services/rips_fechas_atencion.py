@@ -52,6 +52,12 @@ class FechasAtencion:
     tipo_atencion: str = ""  # HOSPITALIZACION | URGENCIAS | AMBULATORIO
     archivo: str = ""
     problema: str = ""
+    # El RIPS NO trajo fecha de salida y se dedujo de la última atención.
+    # Pasa en las cuentas ambulatorias: si la factura son 20 sesiones y el
+    # RIPS trae una sola línea, la «última atención» es la PRIMERA sesión, y
+    # el egreso deducido se queda corto. Caso HUS559324 (08-09-2026): el RIPS
+    # decía 13/02/2025 y el egreso real, según la factura, fue el 14/03/2025.
+    egreso_deducido: bool = False
 
     @property
     def completas(self) -> bool:
@@ -66,6 +72,7 @@ class FechasAtencion:
             "archivo": self.archivo,
             "problema": self.problema,
             "completas": self.completas,
+            "egreso_deducido": self.egreso_deducido,
         }
 
 
@@ -127,6 +134,11 @@ def fechas_de_datos(datos: dict, archivo: str = "") -> FechasAtencion:
     if atencion.fecha_egreso is None:
         faltantes.append("fecha de egreso")
 
+    # En las cuentas ambulatorias el lector no encuentra una fecha de salida:
+    # toma la última fecha de atención que haya. Eso es una deducción, no un
+    # dato, y quien lo use tiene que saberlo.
+    deducido = bool(atencion.fecha_egreso) and (atencion.tipo or "") == "AMBULATORIO"
+
     return FechasAtencion(
         factura=payload.factura or "",
         fecha_ingreso=atencion.fecha_ingreso,
@@ -134,6 +146,7 @@ def fechas_de_datos(datos: dict, archivo: str = "") -> FechasAtencion:
         tipo_atencion=atencion.tipo or "",
         archivo=archivo,
         problema=("el RIPS no trae " + " ni ".join(faltantes)) if faltantes else "",
+        egreso_deducido=deducido,
     )
 
 

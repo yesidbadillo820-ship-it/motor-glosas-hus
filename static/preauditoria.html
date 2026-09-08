@@ -915,6 +915,17 @@ function atencionHtml(a){
     h+='<p class="leyenda">Según el RIPS ('+esc(a.fechas.tipo_atencion||'')+'): ingreso <b>'+
        fDia(a.fechas.fecha_ingreso)+'</b> · egreso <b>'+fDia(a.fechas.fecha_egreso)+'</b></p>';
   }
+  // De dónde salieron las fechas con que se contrastó el RIPS. Se dice
+  // siempre que las haya: el gestor tiene que poder rastrear el dato.
+  if(a.declaradas && a.declaradas.completas){
+    h+='<p class="leyenda">La '+esc(a.declaradas.origen||'factura')+' declara: ingreso <b>'+
+       fDia(a.declaradas.fecha_ingreso)+'</b> · egreso <b>'+fDia(a.declaradas.fecha_egreso)+'</b></p>';
+  }
+  // Con qué egreso se contó el plazo. Se dice siempre: es lo primero que
+  // hay que mirar cuando el dictamen no cuadra con lo que sabe el gestor.
+  if(a.prescripcion && a.origen_del_egreso){
+    h+='<p class="leyenda">El plazo se contó con el egreso de <b>'+esc(a.origen_del_egreso)+'</b>.</p>';
+  }
   return h;
 }
 // Evita que un doble clic (o clics repetidos porque el servidor va lento)

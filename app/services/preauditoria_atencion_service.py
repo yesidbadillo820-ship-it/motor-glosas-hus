@@ -33,7 +33,8 @@ from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
-from app.services.cotejo_fechas_atencion import cotejar, hay_reparos_graves
+from app.services.cotejo_fechas_atencion import ADVIERTE, GRAVE, cotejar, hay_reparos_graves
+from app.services.fechas_declaradas_factura import buscar as buscar_declaradas
 from app.services.prescripcion_adres import MESES_PLAZO_ADRES, evaluar
 from app.services.rips_fechas_atencion import fechas_de_archivo
 from app.services.rips_localizador import localizar
@@ -74,6 +75,16 @@ def revisar(
     ubicado = localizar(factura, fuente.get("f_factura"))
     fechas = fechas_de_archivo(ubicado.ruta) if ubicado.encontrado else None
 
+    # Las fechas que el hospital DECLARÓ: salen del XML de la factura
+    # electrónica (o del resultado del validador), que están en la misma
+    # carpeta del servidor. Solo se buscan si no vinieron dadas.
+    declaradas = None
+    if ingreso_declarado is None and egreso_declarado is None:
+        declaradas = buscar_declaradas(factura, fuente.get("f_factura"))
+        if declaradas.completas:
+            ingreso_declarado = declaradas.fecha_ingreso
+            egreso_declarado = declaradas.fecha_egreso
+
     hallazgos = cotejar(
         fechas,
         ingreso_declarado=ingreso_declarado,
@@ -92,9 +103,47 @@ def revisar(
             )
         ] + hallazgos[1:]
 
+    # ── CON QUÉ EGRESO SE CUENTA EL PLAZO ────────────────────────────────
+    # Caso HUS559324 (08-09-2026): el RIPS traía UNA línea de 20 sesiones de
+    # terapia, así que el egreso «deducido» era el día de la primera sesión
+    # —un mes antes del real— y la cuenta salió marcada como prescrita
+    # cuando todavía le quedaban seis días. Un falso «prescrita» es peor que
+    # no tener la alerta: manda a soltar plata que sí se podía cobrar.
+    #
+    # Por eso: si el RIPS dedujo el egreso y la factura declara uno posterior,
+    # manda el de la factura, que es el que imprime el día de salida.
+    egreso_para_el_plazo = fechas.fecha_egreso if fechas is not None else None
+    origen_del_egreso = "el RIPS"
+    if (
+        fechas is not None
+        and fechas.egreso_deducido
+        and declaradas is not None
+        and declaradas.fecha_egreso is not None
+        and (egreso_para_el_plazo is None or declaradas.fecha_egreso > egreso_para_el_plazo)
+    ):
+        egreso_para_el_plazo = declaradas.fecha_egreso
+        origen_del_egreso = f"la {declaradas.origen}"
+
     prescripcion = None
-    if fechas is not None and fechas.fecha_egreso is not None:
-        prescripcion = evaluar(fechas.fecha_egreso, hoy=hoy, meses_plazo=meses_plazo)
+    if egreso_para_el_plazo is not None:
+        prescripcion = evaluar(egreso_para_el_plazo, hoy=hoy, meses_plazo=meses_plazo)
+
+    # Avisos que nacen de la calidad del dato, no de la factura.
+    marca = type(hallazgos[0]) if hallazgos else None
+    if marca is None:
+        from app.services.cotejo_fechas_atencion import Hallazgo as marca
+    if fechas is not None and fechas.egreso_deducido and origen_del_egreso == "el RIPS":
+        hallazgos.append(
+            marca(
+                "EGRESO_DEDUCIDO",
+                ADVIERTE,
+                "El RIPS no trae fecha de salida: se tomó la última atención que "
+                "aparece. Si la cuenta son varias sesiones, el egreso real puede ser "
+                "posterior — verifíquelo en la factura antes de decidir por el plazo.",
+            )
+        )
+    if declaradas is not None and declaradas.problema and declaradas.completas:
+        hallazgos.append(marca("FUENTES_NO_COINCIDEN", GRAVE, declaradas.problema))
 
     return {
         "factura": factura,
@@ -103,7 +152,9 @@ def revisar(
         "entidad": fuente.get("entidad"),
         "archivo_rips": ubicado.ruta,
         "fechas": fechas.a_dict() if fechas is not None else None,
+        "declaradas": declaradas.a_dict() if declaradas is not None else None,
         "prescripcion": prescripcion.a_dict() if prescripcion is not None else None,
+        "origen_del_egreso": origen_del_egreso if prescripcion is not None else "",
         "hallazgos": [h.a_dict() for h in hallazgos],
         "hay_reparos_graves": hay_reparos_graves(hallazgos),
     }
