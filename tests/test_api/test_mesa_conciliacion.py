@@ -568,6 +568,44 @@ def _subir(cliente, mesa_id, nombre, datos, mime, factura="HUS0000542497", nota=
     )
 
 
+@pytest.fixture(autouse=True)
+def carpeta_de_soportes_aparte(tmp_path, monkeypatch):
+    """Los archivos de prueba NO se escriben en el repositorio.
+
+    Sin esto, la suite dejaba 47 MB de PDF de mentiras en `data/`, que es
+    donde el motor de verdad guarda los soportes del hospital.
+    """
+    monkeypatch.setenv("SOPORTES_MESA_ROOT", str(tmp_path / "soportes_mesa"))
+    yield
+
+
+class TestDondeQuedanLosArchivos:
+    """El motor se actualiza solo cada cinco minutos.
+
+    Si los soportes cayeran en una ruta del contenedor y no en el volumen
+    persistente, la evidencia de una audiencia duraría minutos.
+    """
+
+    def test_van_al_volumen_persistente_del_hospital(self, monkeypatch, tmp_path):
+        from app.services import mesa_conciliacion as svc
+
+        monkeypatch.delenv("SOPORTES_MESA_ROOT", raising=False)
+        # Es lo que el docker-compose del hospital le pone al contenedor.
+        monkeypatch.setenv("SOPORTES_ROOT", str(tmp_path / "data" / "soportes"))
+        carpeta = svc.carpeta_de_soportes()
+        assert carpeta == tmp_path / "data" / "soportes_mesa", (
+            "los soportes tienen que quedar junto a la base, en /data — el volumen "
+            "que sobrevive a las actualizaciones"
+        )
+        assert carpeta.is_dir()
+
+    def test_se_puede_mandar_a_otra_carpeta_a_proposito(self, monkeypatch, tmp_path):
+        from app.services import mesa_conciliacion as svc
+
+        monkeypatch.setenv("SOPORTES_MESA_ROOT", str(tmp_path / "otra"))
+        assert svc.carpeta_de_soportes() == tmp_path / "otra"
+
+
 class TestSubirSoportesEnLaMesa:
     """El indexador solo LEE lo ya archivado. Lo que aparece en la audiencia
     —el correo del médico, la autorización que la EPS pide en el momento—
@@ -620,14 +658,140 @@ class TestSubirSoportesEnLaMesa:
         assert r.status_code == 422
         assert "no lo es" in r.json()["detail"]
 
-    def test_un_archivo_muy_pesado_se_rechaza_diciendo_cuanto_pesa(self, cliente):
+    def test_un_escaneo_de_los_de_verdad_entra(self, cliente):
+        """Los escaneos de cartera pesan entre 25 y 40 MB.
+
+        El tope nació en 15 MB —un número que puse yo, no un dato— y los
+        dejaba a TODOS afuera. Esta prueba es la que impide que alguien lo
+        vuelva a bajar sin darse cuenta.
+        """
         m = self._mesa(cliente)
-        grande = _PDF + b"\x00" * (16 * 1024 * 1024)
+        escaneo = _PDF + b"\x00" * (30 * 1024 * 1024)
+        r = _subir(cliente, m["id"], "historia_escaneada.pdf", escaneo, "application/pdf")
+        assert r.status_code == 201, r.text
+        assert r.json()["tamano_bytes"] == len(escaneo)
+
+    def test_un_archivo_muy_pesado_se_rechaza_diciendo_cuanto_pesa(self, cliente, monkeypatch):
+        """Se baja el tope a propósito para no mover 50 MB en una prueba."""
+        from app.services import mesa_conciliacion as svc
+
+        monkeypatch.setattr(svc, "MAX_BYTES_SOPORTE", 2 * 1024 * 1024)
+        m = self._mesa(cliente)
+        grande = _PDF + b"\x00" * (3 * 1024 * 1024)
         r = _subir(cliente, m["id"], "escaneo.pdf", grande, "application/pdf")
         assert r.status_code == 422
         detalle = r.json()["detail"]
-        assert "MB" in detalle and "15 MB" in detalle
+        assert "MB" in detalle and "escaneo.pdf" in detalle
         assert "Herramientas PDF" in detalle, "hay que decirle cómo bajarle el peso"
+
+    def test_lo_que_pasa_del_tope_no_queda_ocupando_disco(self, cliente, monkeypatch):
+        """Se corta MIENTRAS se escribe; lo escrito a medias se borra."""
+        from app.services import mesa_conciliacion as svc
+
+        monkeypatch.setattr(svc, "MAX_BYTES_SOPORTE", 2 * 1024 * 1024)
+        m = self._mesa(cliente)
+        antes = sum(1 for _ in svc.carpeta_de_soportes().rglob("*") if _.is_file())
+        _subir(
+            cliente, m["id"], "enorme.pdf", _PDF + b"\x00" * (5 * 1024 * 1024), "application/pdf"
+        )
+        despues = sum(1 for _ in svc.carpeta_de_soportes().rglob("*") if _.is_file())
+        assert despues == antes, "quedó un archivo a medio escribir ocupando disco"
+
+    def test_el_archivo_no_se_guarda_en_la_base(self, cliente, db):
+        """Un escaneo de 40 MB en base64 son 53 MB de texto.
+
+        El contenedor del hospital corre con 640 MB y su propio compose
+        documenta que el OOM killer ya mató procesos. Guardarlos en la base
+        obligaba a cargarlos enteros hasta para listarlos.
+        """
+        from app.models.db import SoporteMesaRecord
+
+        m = self._mesa(cliente)
+        subido = _subir(cliente, m["id"], "a.pdf", _PDF, "application/pdf").json()
+        reg = db.query(SoporteMesaRecord).filter(SoporteMesaRecord.id == subido["id"]).first()
+        assert not reg.contenido_b64, "el contenido no puede quedar en la base"
+        assert reg.ruta_relativa, "tiene que decir dónde quedó el archivo"
+        assert len(reg.sha256 or "") == 64, "sin resumen no se puede saber si se dañó"
+
+    def test_listar_no_lee_el_contenido_de_los_archivos(self, cliente, db):
+        """Listar diez soportes de 40 MB no puede cargar 400 MB a memoria."""
+        from app.models.db import SoporteMesaRecord
+
+        m = self._mesa(cliente)
+        _subir(cliente, m["id"], "a.pdf", _PDF, "application/pdf")
+        # Se simula un soporte VIEJO, de los que sí tienen el contenido en la
+        # base: listar no lo debe traer.
+        db.add(
+            SoporteMesaRecord(
+                mesa_id=m["id"],
+                factura="HUS0000542497",
+                nombre="viejo.pdf",
+                mime_type="application/pdf",
+                tamano_bytes=10,
+                contenido_b64="X" * 200000,
+            )
+        )
+        db.commit()
+        listado = cliente.get(f"/conciliaciones/mesa/{m['id']}/soportes-subidos").json()
+        assert len(listado) == 2
+        for fila in listado:
+            assert "contenido_b64" not in fila, "el contenido no puede salir en el listado"
+
+    def test_un_soporte_viejo_de_la_base_todavia_se_puede_bajar(self, cliente, db):
+        """Lo que ya se subió antes del cambio no se puede perder."""
+        import base64
+
+        from app.models.db import SoporteMesaRecord
+
+        m = self._mesa(cliente)
+        reg = SoporteMesaRecord(
+            mesa_id=m["id"],
+            factura="HUS0000542497",
+            nombre="antiguo.pdf",
+            mime_type="application/pdf",
+            tamano_bytes=len(_PDF),
+            contenido_b64=base64.b64encode(_PDF).decode("ascii"),
+        )
+        db.add(reg)
+        db.commit()
+        db.refresh(reg)
+        r = cliente.get(f"/conciliaciones/mesa/{m['id']}/soportes-subidos/{reg.id}")
+        assert r.status_code == 200 and r.content == _PDF
+
+    def test_si_el_archivo_desaparecio_del_disco_se_dice_claro(self, cliente, db):
+        from app.models.db import SoporteMesaRecord
+        from app.services import mesa_conciliacion as svc
+
+        m = self._mesa(cliente)
+        subido = _subir(cliente, m["id"], "a.pdf", _PDF, "application/pdf").json()
+        reg = db.query(SoporteMesaRecord).filter(SoporteMesaRecord.id == subido["id"]).first()
+        (svc.carpeta_de_soportes() / reg.ruta_relativa).unlink()
+        r = cliente.get(f"/conciliaciones/mesa/{m['id']}/soportes-subidos/{subido['id']}")
+        assert r.status_code == 404
+        assert "volver a cargarlo" in r.json()["detail"]
+
+    def test_al_borrarlo_tambien_se_va_el_archivo(self, cliente, db):
+        from app.models.db import SoporteMesaRecord
+        from app.services import mesa_conciliacion as svc
+
+        m = self._mesa(cliente)
+        subido = _subir(cliente, m["id"], "a.pdf", _PDF, "application/pdf").json()
+        reg = db.query(SoporteMesaRecord).filter(SoporteMesaRecord.id == subido["id"]).first()
+        ruta = svc.carpeta_de_soportes() / reg.ruta_relativa
+        assert ruta.is_file()
+        cliente.delete(f"/conciliaciones/mesa/{m['id']}/soportes-subidos/{subido['id']}")
+        assert not ruta.exists(), "el archivo quedó ocupando disco para siempre"
+
+    def test_el_nombre_del_usuario_no_escribe_fuera_de_la_carpeta(self, cliente, db):
+        """Un nombre con `../` no puede sacar el archivo de su sitio."""
+        from app.models.db import SoporteMesaRecord
+        from app.services import mesa_conciliacion as svc
+
+        m = self._mesa(cliente)
+        subido = _subir(cliente, m["id"], "../../../etc/pasado.pdf", _PDF, "application/pdf").json()
+        reg = db.query(SoporteMesaRecord).filter(SoporteMesaRecord.id == subido["id"]).first()
+        destino = (svc.carpeta_de_soportes() / reg.ruta_relativa).resolve()
+        assert destino.is_relative_to(svc.carpeta_de_soportes().resolve())
 
     def test_un_archivo_vacio_se_rechaza(self, cliente):
         m = self._mesa(cliente)

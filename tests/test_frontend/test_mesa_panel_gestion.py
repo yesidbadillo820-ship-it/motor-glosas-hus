@@ -196,7 +196,9 @@ class TestSubirSoportesEnLaMesa:
     def test_el_peso_se_revisa_antes_de_mandarlo(self):
         """En la red del hospital, subir 40 MB para que los rechacen son minutos."""
         cuerpo = _funcion("mesaSubirSoporte")
-        assert "15*1024*1024" in cuerpo.replace(" ", "")
+        assert "50*1024*1024" in cuerpo.replace(" ", ""), (
+            "el tope tiene que ser el mismo que el del servidor"
+        )
         assert "f.size" in cuerpo
         i = cuerpo.index("f.size")
         assert "return" in cuerpo[i : i + 400], "si pesa de más, no debe llegar a mandarse"

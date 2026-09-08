@@ -25,7 +25,11 @@ TRES DUEÑOS EN CADA RENGLÓN, y conviene no confundirlos:
 from __future__ import annotations
 
 import base64
+import hashlib
+import os
+import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 from app.core.logging_utils import logger
@@ -532,13 +536,22 @@ def soportes_de_la_mesa(db: Any, mesa_id: int) -> dict:
 # El indexador del hospital solo LEE lo que ya estaba archivado, y reconstruye
 # su índice cada tantas horas. Lo que aparece en plena audiencia —el correo
 # que manda el médico, la autorización que la EPS pide en el momento— no está
-# ahí y no puede esperar a la próxima pasada del indexador. Estos soportes se
-# guardan en la base, con quién los subió y cuándo, porque eso es lo que
-# después se cita en el acta.
+# ahí y no puede esperar a la próxima pasada del indexador.
+#
+# EL ARCHIVO VA A DISCO Y SE ESCRIBE POR PEDAZOS. Los escaneos de cartera
+# pesan entre 25 y 40 MB. La primera versión los leía enteros a memoria y los
+# guardaba como base64 en la base: eso los inflaba un 33% y obligaba a
+# cargarlos completos para cualquier cosa, hasta para listarlos. El
+# contenedor del hospital corre con 640 MB de tope —y su propio
+# docker-compose documenta que el OOM killer ya mató procesos antes—, así
+# que listar diez soportes lo habría tumbado en plena audiencia.
+#
+# Ahora se escribe en pedazos de 1 MB y la memoria que se usa no depende del
+# tamaño del archivo.
 
 # Un soporte de mesa es un PDF o una foto de un documento. Nada más: aceptar
 # ejecutables o comprimidos por este camino sería abrirle la puerta a que
-# entre cualquier cosa a la base del motor.
+# entre cualquier cosa a la carpeta del motor.
 TIPOS_DE_SOPORTE_OK = {
     "application/pdf": ".pdf",
     "image/png": ".png",
@@ -548,7 +561,15 @@ TIPOS_DE_SOPORTE_OK = {
     "image/tiff": ".tif",
 }
 
-MAX_BYTES_SOPORTE = 15 * 1024 * 1024  # 15 MB
+# 50 MB. El tope lo dictaron los archivos de verdad: los escaneos de cartera
+# pesan entre 25 y 40 MB, así que 15 MB —el número con el que nació esto— los
+# dejaba a todos afuera. Se deja margen para el escaneo grande sin abrir la
+# puerta a que alguien suba un video por equivocación.
+MAX_BYTES_SOPORTE = 50 * 1024 * 1024
+
+# De a un mega. Es lo que se sostiene en memoria de cada archivo, pese al
+# tamaño que tenga.
+_PEDAZO = 1024 * 1024
 
 # Las primeras firmas de cada formato. El `content-type` lo manda el
 # navegador y se puede poner a mano: un .exe renombrado a .pdf llega
@@ -567,25 +588,29 @@ class SoporteRechazado(ValueError):
     """El archivo no se puede guardar, con el motivo en español."""
 
 
-def validar_soporte(nombre: str, mime: str, contenido: bytes) -> str:
-    """Comprueba peso, tipo y contenido real. Devuelve el mime bueno.
+def carpeta_de_soportes() -> Path:
+    """Dónde viven los archivos subidos en las mesas.
 
-    Levanta `SoporteRechazado` con un motivo que el auditor entienda. El
-    orden importa: primero el peso (es lo que más pasa), después el tipo.
+    Va bajo el mismo volumen persistente que la base (`/data` en el
+    hospital). Si fuera una ruta del contenedor a secas, los soportes se
+    perderían en la próxima actualización —y el motor se actualiza solo cada
+    cinco minutos—, o sea que la evidencia de una audiencia duraría minutos.
     """
-    if not contenido:
-        raise SoporteRechazado(
-            f"«{nombre}» llegó vacío (0 bytes). Vuelva a seleccionarlo; puede que "
-            "el archivo esté abierto en otro programa."
+    raiz = os.environ.get("SOPORTES_MESA_ROOT", "").strip()
+    if not raiz:
+        soportes = os.environ.get("SOPORTES_ROOT", "").strip()
+        raiz = (
+            os.path.join(os.path.dirname(soportes), "soportes_mesa")
+            if soportes
+            else "data/soportes_mesa"
         )
-    if len(contenido) > MAX_BYTES_SOPORTE:
-        mb = len(contenido) / (1024 * 1024)
-        raise SoporteRechazado(
-            f"«{nombre}» pesa {mb:.1f} MB y el tope son "
-            f"{MAX_BYTES_SOPORTE // (1024 * 1024)} MB. Si es un PDF escaneado, "
-            "bájele el peso con la caja de Herramientas PDF antes de subirlo."
-        )
+    ruta = Path(raiz)
+    ruta.mkdir(parents=True, exist_ok=True)
+    return ruta
 
+
+def _validar_tipo(nombre: str, mime: str) -> str:
+    """El tipo declarado. Levanta `SoporteRechazado` si no se acepta."""
     mime = (mime or "").split(";")[0].strip().lower()
     if mime not in TIPOS_DE_SOPORTE_OK:
         raise SoporteRechazado(
@@ -593,15 +618,132 @@ def validar_soporte(nombre: str, mime: str, contenido: bytes) -> str:
             "PDF e imágenes (PNG, JPG, WEBP, TIFF). Un Excel o un Word se pasa "
             "primero a PDF."
         )
+    return mime
 
+
+def _validar_firma(nombre: str, mime: str, comienzo: bytes) -> None:
+    """Que el archivo SEA lo que dice ser, mirando sus primeros bytes."""
     firmas = _FIRMAS.get(mime, ())
-    if firmas and not any(contenido.startswith(f) for f in firmas):
+    if firmas and not any(comienzo.startswith(f) for f in firmas):
         raise SoporteRechazado(
             f"«{nombre}» dice ser {mime} pero su contenido no lo es. Puede que le "
             "hayan cambiado la extensión a mano, o que se haya dañado al copiarlo. "
             "No se guarda: un soporte que no abre no sirve de evidencia."
         )
-    return mime
+
+
+def _mensaje_muy_pesado(nombre: str, bytes_leidos: int) -> str:
+    return (
+        f"«{nombre}» pasa de {MAX_BYTES_SOPORTE // (1024 * 1024)} MB, que es el "
+        f"tope (llevaba {bytes_leidos / (1024 * 1024):.1f} MB). Si es un PDF "
+        "escaneado, bájele el peso con la caja de Herramientas PDF antes de "
+        "subirlo."
+    )
+
+
+def validar_soporte(nombre: str, mime: str, contenido: bytes) -> str:
+    """Comprueba peso, tipo y contenido real de un archivo ya en memoria.
+
+    Se conserva para quien tenga los bytes a mano (una prueba, un bot). El
+    camino de la pantalla NO pasa por acá: usa `guardar_soporte_en_disco`,
+    que no carga el archivo entero.
+    """
+    if not contenido:
+        raise SoporteRechazado(
+            f"«{nombre}» llegó vacío (0 bytes). Vuelva a seleccionarlo; puede que "
+            "el archivo esté abierto en otro programa."
+        )
+    if len(contenido) > MAX_BYTES_SOPORTE:
+        raise SoporteRechazado(_mensaje_muy_pesado(nombre, len(contenido)))
+    mime_ok = _validar_tipo(nombre, mime)
+    _validar_firma(nombre, mime_ok, contenido[:16])
+    return mime_ok
+
+
+async def guardar_soporte_en_disco(
+    archivo: Any, nombre: str, mime: str
+) -> tuple[str, str, int, str]:
+    """Escribe el archivo por pedazos. Devuelve (mime, ruta relativa, bytes, sha256).
+
+    El tope se comprueba MIENTRAS se escribe, no al final: si alguien manda
+    500 MB, se corta a los 50 y se borra lo escrito, en vez de sostenerlos en
+    memoria para después decir que no. Con 640 MB de contenedor, esa
+    diferencia es que el motor siga vivo o no.
+    """
+    mime_ok = _validar_tipo(nombre, mime)
+    carpeta = carpeta_de_soportes()
+    # Nombre en disco propio: el que puso el usuario puede traer barras,
+    # tildes o `..` y terminar escribiendo fuera de la carpeta.
+    relativa = f"{datetime.now(timezone.utc):%Y%m}/{uuid.uuid4().hex}{TIPOS_DE_SOPORTE_OK[mime_ok]}"
+    destino = carpeta / relativa
+    destino.parent.mkdir(parents=True, exist_ok=True)
+
+    resumen = hashlib.sha256()
+    total = 0
+    primeros = b""
+    try:
+        with open(destino, "wb") as f:
+            while True:
+                pedazo = await archivo.read(_PEDAZO)
+                if not pedazo:
+                    break
+                if not primeros:
+                    primeros = pedazo[:16]
+                    _validar_firma(nombre, mime_ok, primeros)
+                total += len(pedazo)
+                if total > MAX_BYTES_SOPORTE:
+                    raise SoporteRechazado(_mensaje_muy_pesado(nombre, total))
+                resumen.update(pedazo)
+                f.write(pedazo)
+        if total == 0:
+            raise SoporteRechazado(
+                f"«{nombre}» llegó vacío (0 bytes). Vuelva a seleccionarlo; puede "
+                "que el archivo esté abierto en otro programa."
+            )
+    except Exception:
+        # Un archivo a medio escribir no es evidencia de nada y ocupa disco.
+        destino.unlink(missing_ok=True)
+        raise
+    return mime_ok, relativa, total, resumen.hexdigest()
+
+
+def registrar_soporte(
+    db: Any,
+    mesa_id: int,
+    factura: str,
+    nombre: str,
+    mime: str,
+    ruta_relativa: str,
+    tamano: int,
+    sha256: str,
+    autor: str,
+    nota: str = "",
+) -> dict:
+    """Anota en la base un soporte que ya quedó escrito en disco."""
+    from app.models.db import SoporteMesaRecord
+
+    reg = SoporteMesaRecord(
+        mesa_id=mesa_id,
+        factura=(factura or "").strip()[:50],
+        nombre=(nombre or "archivo")[:300],
+        mime_type=mime,
+        tamano_bytes=tamano,
+        ruta_relativa=ruta_relativa,
+        sha256=sha256,
+        # La columna nació NOT NULL y SQLite no sabe quitarlo con un ALTER.
+        # Los soportes nuevos no la usan: va vacía a propósito.
+        contenido_b64="",
+        nota=(nota or "")[:500],
+        subido_por=(autor or "")[:200],
+    )
+    db.add(reg)
+    db.commit()
+    db.refresh(reg)
+    logger.info(
+        f"[MESA] soporte en la mesa {mesa_id} / factura {factura}: "
+        f"{reg.nombre} ({tamano / 1048576:.1f} MB)"
+    )
+    return _soporte_a_dict(reg)
 
 
 def subir_soporte(
@@ -614,30 +756,34 @@ def subir_soporte(
     autor: str,
     nota: str = "",
 ) -> dict:
-    """Guarda un soporte de la mesa. Valida antes de tocar la base."""
-    from app.models.db import SoporteMesaRecord
+    """Guarda un soporte que ya está en memoria (pruebas, bots).
 
+    La pantalla no usa este camino —usa el que escribe por pedazos—, pero
+    tener los bytes a mano es cómodo para probar.
+    """
     factura = (factura or "").strip()
     if not factura:
         raise SoporteRechazado("No se indicó a qué factura pertenece el soporte.")
-
     mime_ok = validar_soporte(nombre or "archivo", mime, contenido)
 
-    reg = SoporteMesaRecord(
+    carpeta = carpeta_de_soportes()
+    relativa = f"{datetime.now(timezone.utc):%Y%m}/{uuid.uuid4().hex}{TIPOS_DE_SOPORTE_OK[mime_ok]}"
+    destino = carpeta / relativa
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_bytes(contenido)
+
+    return registrar_soporte(
+        db,
         mesa_id=mesa_id,
-        factura=factura[:50],
-        nombre=(nombre or "archivo")[:300],
-        mime_type=mime_ok,
-        tamano_bytes=len(contenido),
-        contenido_b64=base64.b64encode(contenido).decode("ascii"),
-        nota=(nota or "")[:500],
-        subido_por=(autor or "")[:200],
+        factura=factura,
+        nombre=nombre,
+        mime=mime_ok,
+        ruta_relativa=relativa,
+        tamano=len(contenido),
+        sha256=hashlib.sha256(contenido).hexdigest(),
+        autor=autor,
+        nota=nota,
     )
-    db.add(reg)
-    db.commit()
-    db.refresh(reg)
-    logger.info(f"[MESA] soporte subido a la mesa {mesa_id} / factura {factura}: {reg.nombre}")
-    return _soporte_a_dict(reg)
 
 
 def _soporte_a_dict(reg: Any) -> dict:
@@ -654,20 +800,40 @@ def _soporte_a_dict(reg: Any) -> dict:
 
 
 def soportes_subidos(db: Any, mesa_id: int, factura: str = "") -> list[dict]:
-    """Los soportes que se han subido en esta mesa (opcionalmente, de una factura)."""
+    """Los soportes subidos en esta mesa (opcionalmente, de una factura).
+
+    Se piden SOLO las columnas que se muestran. Traer la fila entera
+    arrastraría `contenido_b64` de los soportes viejos —hasta 53 MB de texto
+    cada uno— y listar diez tumbaría el contenedor.
+    """
     from app.models.db import SoporteMesaRecord
 
-    q = db.query(SoporteMesaRecord).filter(SoporteMesaRecord.mesa_id == mesa_id)
+    columnas = (
+        SoporteMesaRecord.id,
+        SoporteMesaRecord.factura,
+        SoporteMesaRecord.nombre,
+        SoporteMesaRecord.mime_type,
+        SoporteMesaRecord.tamano_bytes,
+        SoporteMesaRecord.nota,
+        SoporteMesaRecord.subido_por,
+        SoporteMesaRecord.subido_en,
+    )
+    q = db.query(*columnas).filter(SoporteMesaRecord.mesa_id == mesa_id)
     if factura:
         q = q.filter(SoporteMesaRecord.factura == factura.strip()[:50])
-    return [_soporte_a_dict(r) for r in q.order_by(SoporteMesaRecord.id.desc()).all()]
+    return [_soporte_a_dict(fila) for fila in q.order_by(SoporteMesaRecord.id.desc()).all()]
 
 
-def leer_soporte_subido(db: Any, mesa_id: int, soporte_id: int) -> Optional[tuple[Any, bytes]]:
-    """El registro y el contenido de un soporte, para descargarlo.
+def ruta_del_soporte(
+    db: Any, mesa_id: int, soporte_id: int
+) -> Optional[tuple[Any, Optional[Path]]]:
+    """El registro y la ruta en disco de un soporte, para bajarlo.
 
     Se filtra por mesa además de por id: sin eso, cambiar el número en la
     dirección dejaría bajar los soportes de la mesa de otra EPS.
+
+    La ruta viene `None` en los soportes viejos, que están en la base. Para
+    esos hay `contenido_del_soporte`.
     """
     from app.models.db import SoporteMesaRecord
 
@@ -679,21 +845,42 @@ def leer_soporte_subido(db: Any, mesa_id: int, soporte_id: int) -> Optional[tupl
     )
     if reg is None:
         return None
+    if not reg.ruta_relativa:
+        return reg, None
+    ruta = carpeta_de_soportes() / reg.ruta_relativa
+    if not ruta.is_file():
+        logger.warning(f"[MESA] el soporte {soporte_id} no está en disco: {ruta}")
+        return reg, None
+    return reg, ruta
+
+
+def contenido_del_soporte(reg: Any) -> Optional[bytes]:
+    """Los bytes de un soporte guardado en la base (los de antes del 08-09)."""
+    if not reg.contenido_b64:
+        return None
     try:
-        return reg, base64.b64decode(reg.contenido_b64 or "")
+        return base64.b64decode(reg.contenido_b64)
     except Exception as e:  # noqa: BLE001
-        logger.warning(f"[MESA] soporte {soporte_id} ilegible: {e}")
+        logger.warning(f"[MESA] soporte {reg.id} ilegible: {e}")
         return None
 
 
 def borrar_soporte_subido(db: Any, mesa_id: int, soporte_id: int) -> bool:
     from app.models.db import SoporteMesaRecord
 
-    n = (
+    reg = (
         db.query(SoporteMesaRecord)
         .filter(SoporteMesaRecord.id == soporte_id)
         .filter(SoporteMesaRecord.mesa_id == mesa_id)
-        .delete()
+        .first()
     )
+    if reg is None:
+        return False
+    relativa = reg.ruta_relativa
+    db.delete(reg)
     db.commit()
-    return bool(n)
+    # El archivo se borra DESPUÉS de que la base confirmó. Al revés, si la
+    # base fallara quedaría un renglón apuntando a un archivo que ya no está.
+    if relativa:
+        (carpeta_de_soportes() / relativa).unlink(missing_ok=True)
+    return True
