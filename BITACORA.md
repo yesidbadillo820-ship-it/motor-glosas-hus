@@ -132,6 +132,18 @@ factura, con dos columnas nuevas en el informe (de dónde salieron y cuántos
 archivos). Van 14 pruebas. **Pendiente:** repetir la corrida completa con el
 bot corregido (los soportes tardan más por el recorrido de los servidores).
 
+**Ajuste de la búsqueda de soportes (más noche):** el auditor reportó que no
+llegaron los soportes (ejemplo real: `Y:\3. MARZO...\COOSALUD\KARIN\ENV-...-OK-C-DGH\IMG\HUS472660\`).
+Se verificó con esa estructura exacta que el buscador SÍ la encuentra y copia
+(12/12 archivos) — y que esa factura NO estaba en el Excel de las 356, o sea
+que el bot nunca la buscó. Para que no vuelva a pasar ni a quedar en duda:
+(1) nuevo `--solo HUS472660` que procesa una factura puntual sin Excel, ideal
+para probar; (2) si una ruta `\\Prime\radicacion_2026\...` no abre, el bot
+prueba solo su equivalente `Y:\...` (la unidad mapeada con credenciales) y
+viceversa, sin escanear dos veces la misma carpeta; (3) latido de progreso
+cada 2.000 carpetas y AVISO cuando una ruta termina sin ningún hallazgo.
+Van 17 pruebas.
+
 ### 07-09-2026 (tarde) — FAMISANAR 3 de septiembre: el lote donde por fin aparecieron glosas médicas
 
 Cuarto archivo de objeciones con el mismo procedimiento: **321 objeciones de 12

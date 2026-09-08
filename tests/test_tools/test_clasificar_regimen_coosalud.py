@@ -307,6 +307,55 @@ class TestSoportesRadicacion:
         idx = cr.indexar_radicacion([r1], {"349680"})
         assert [p.name for p in idx["349680"]] == ["HUS349680"]
 
+    def test_estructura_env_img_como_la_real(self, tmp_path):
+        """La estructura real que reporto el auditor:
+        <raiz>\\COOSALUD\\KARIN\\ENV-222670-OK-C-DGH\\IMG\\HUS472660\\*.pdf"""
+        raiz = tmp_path / "3. MARZO 2026 - SOPORTES RADICACION"
+        carpeta = raiz / "COOSALUD" / "KARIN" / "ENV-222670-OK-C-DGH" / "IMG" / "HUS472660"
+        carpeta.mkdir(parents=True)
+        for pref in ("CRC", "EPI", "FEV", "HAM"):
+            (carpeta / f"{pref}_900006037_HUS472660.pdf").write_bytes(b"%PDF")
+        (carpeta / "HUS472660.xml").write_text("<x/>", encoding="utf-8")
+        idx = cr.indexar_radicacion([raiz], {"472660"})
+        assert [p.name for p in idx["472660"]] == ["HUS472660"]
+        copiados, obs = cr.copiar_soportes(idx["472660"], tmp_path / "out")
+        assert copiados == 5 and obs == []
+
+    def test_solo_procesa_facturas_puntuales_sin_excel(self, tmp_path):
+        share = _armar_share(tmp_path)
+        destino = tmp_path / "CLASIFICADO"
+        argv = [
+            "clasificar_regimen_coosalud.py",
+            "--solo",
+            "HUS0000349680",
+            "--share",
+            str(share),
+            "--destino",
+            str(destino),
+            "--sin-soportes",
+        ]
+        viejo = sys.argv
+        sys.argv = argv
+        try:
+            assert cr.main() == 0
+        finally:
+            sys.argv = viejo
+        filas = _filas(destino)
+        assert set(filas) == {"HUS0000349680"}
+        assert filas["HUS0000349680"][COL_REGIMEN] == "Subsidiado"
+
+    def test_resolver_raices_deduplica_equivalentes(self, tmp_path, monkeypatch):
+        # Y:\X y \\Prime\radicacion_2026\X canonizan igual → una sola pasada.
+        assert cr._canon_raiz(r"Y:\3. MARZO 2026") == cr._canon_raiz(
+            "\\\\Prime\\radicacion_2026\\3. MARZO 2026"
+        )
+        # Con rutas reales (tmp) el resolver deja pasar las accesibles y avisa
+        # (sin reventar) las inexistentes.
+        existente = tmp_path / "raiz_ok"
+        existente.mkdir()
+        out = cr.resolver_raices([str(existente), str(tmp_path / "no_existe")])
+        assert out == [existente]
+
 
 class TestPiezas:
     def test_norm_factura(self):
