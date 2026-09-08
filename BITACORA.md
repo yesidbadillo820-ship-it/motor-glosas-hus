@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 07-09-2026
+**Última actualización:** 08-09-2026
 
 ---
 
@@ -90,6 +90,25 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 08-09-2026 — Trámites DGH de la recepción 01/09–08/09: el bot ahora junta radicaciones de varias fuentes
+
+Llegó la **recepción de objeciones de DGH** de la semana (55.181 conceptos,
+858 facturas, 583 de COOSALUD) para armar el cargue de TRÁMITES. La primera
+corrida dio **0 facturas**: la carpeta «CARGUE MASIVO COOSALUD» del Escritorio
+es de un cargue viejo (589 cabeceras, cero cruce). Al cruzar contra el portal
+se entendió el porqué: de las 583 de COOSALUD solo **45 siguen en el portal**
+(5 en bolsa + 40 en pausa); las otras **538 son de lotes ya respondidos** en
+semanas pasadas, y sus fechas de radicación quedaron repartidas en los
+consolidados y carpetas de esos cargues. Se mejoró
+`tools/respuesta_tramites_dgh.py`: `--carpeta` ahora se puede **repetir**
+(varios cargues masivos) y el nuevo `--radicaciones` acepta consolidados
+(CONSOLIDADO FACTURAS, hoja BASE de un CONSOLIDADO RESPUESTAS), cabeceras
+sueltas o carpetas con esos Excel — gana la primera fuente que traiga cada
+factura, y el log dice cuántas aportó cada una. Con 5 pruebas nuevas.
+**Pendiente:** ubicar en el disco los consolidados/carpetas de los cargues
+viejos, bajar el ZIP del portal para las 45 vigentes y correr el trámite
+completo.
 
 ### 07-09-2026 — Clasificador por régimen para re-radicar COOSALUD (Excel «PARA BRAYAN»)
 
