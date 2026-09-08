@@ -14,6 +14,7 @@ Entidades que sabe leer hoy:
 
     FAMISANAR    4 columnas; el servicio va escondido en el texto de la glosa
     DISPENSARIO  5 columnas; trae el nombre del servicio en columna propia
+    SAVIA SALUD  8 columnas; trae código y nombre del servicio
     SANITAS      7 columnas; ojo, la 2ª se llama «NUMERO DE FACTURA» pero trae
                  el código de glosa
 
@@ -98,6 +99,14 @@ ENTIDADES: tuple[Entidad, ...] = (
         senas=("FACTURA", "VALOR GLOSA INICIAL", "SERVICIO OBJETADO", "CODIGO GLOSA INICIAL"),
         columnas=5,
         ayuda="Excel de glosa inicial, con el servicio objetado en su propia columna.",
+    ),
+    Entidad(
+        id="savia",
+        nombre="SAVIA SALUD",
+        modulo="organizar_objeciones_savia",
+        senas=("NUMERO_FACTURA", "COD_SERVICIO", "VALOR_GLOSA", "MOTIVO_ESP_GLOSA_VALOR_A"),
+        columnas=8,
+        ayuda="Export de 8 columnas, con el código y el nombre del servicio en columnas propias.",
     ),
     Entidad(
         id="sanitas",
@@ -264,6 +273,18 @@ def _filas_dispensario(bot, ruta: Path, fecha: datetime, servicios, trazas) -> l
     return [dict(zip(bot.ENCABEZADOS, f, strict=True)) for f in filas]
 
 
+def _filas_savia(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[dict]:
+    return bot.construir_registros(
+        ruta,
+        fecha=fecha,
+        consecutivo=1,
+        codigo_sufijo="01",
+        mapa_codigos=None,
+        servicios_dgh=servicios,
+        trazas=trazas,
+    )
+
+
 def _filas_sanitas(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[dict]:
     return bot.construir_filas(bot.leer_sanitas(ruta), fecha, servicios, trazas)
 
@@ -271,6 +292,7 @@ def _filas_sanitas(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[
 _ARMADORES = {
     "famisanar": _filas_famisanar,
     "dispensario": _filas_dispensario,
+    "savia": _filas_savia,
     "sanitas": _filas_sanitas,
 }
 

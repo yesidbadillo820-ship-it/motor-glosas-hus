@@ -91,6 +91,40 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (cierre 2) — SAVIA entra a la pantalla; VCO y EMSSANAR quedan con una pregunta
+
+Se completó lo que faltaba de la pantalla **Objeciones DGH**: reconocer también
+los archivos de **SAVIA SALUD**. Ahora la pantalla sirve cuatro entidades:
+FAMISANAR, Dispensario, SAVIA y SANITAS.
+
+**Lo que se le agregó a SAVIA.** Su bot ya traía el código del servicio en
+columna propia, pero ese código no siempre es el que DGH reconoce. Ahora acepta
+`--servicios-dgh` y comprueba contra el export que exista **en esa factura**;
+si el DGH lo tiene con otro código, pone el del hospital, y sin cruce confiable
+deja la celda vacía. Sin esa opción el bot se comporta **exactamente igual que
+antes** — se comprobó con sus 41 pruebas, que siguen pasando sin tocarlas.
+
+**Las otras dos no entraron, y no por falta de trabajo:**
+
+- **VCO** llena `CTNCENCOS` con un centro de costo de configuración y
+  `CROTIPOBJ` con una bandera fija, en vez de calcularlo por factura. Es el
+  flujo del portal VCO, con actas, y lleva tiempo funcionando así. Meterlo a
+  esta pantalla obliga a decidir **si VCO también debe seguir las cuatro
+  reglas**; eso lo decide el área, no el programa, así que no se tocó.
+- **EMSSANAR** lee **PDF** de objeción, no Excel. La pantalla pide dos Excel;
+  aceptar PDF es otro cambio.
+
+**Estado de las pruebas al cerrar.** Todo lo del frente de objeciones en verde.
+En el contenedor de trabajo quedan 12 pruebas rojas de otras herramientas
+(correos .msg y conversión con LibreOffice): les falta LibreOffice y
+`extract_msg` instalados, no son de este trabajo y en el CI del repo pasan.
+
+**Lo que sigue bloqueado esperando al área:** el lote de **ADRES**. Llegó el
+maestro de servicios pero falta el listado de objeciones, y falta decidir si el
+cruce va contra la hoja `DETALLE_CONSOLIDACION` traduciendo con
+`HOMOLOGACION_DGH`, o si se saca el `SERVICIOS_FACTURADOS_DGH` de esas facturas
+como en los demás lotes.
+
 ### 08-09-2026 (cierre) — El cruce de objeciones entró al Motor: botón «Objeciones DGH»
 
 Hasta hoy, armar el archivo de objeciones era pedírselo al chat. Ahora es una
@@ -11283,6 +11317,14 @@ valor leido del PDF o con el objetado.
 - **Agendar** geriatría, nefrología, fisiatría y los laboratorios a domicilio
   (con ayuno de 8–10 horas, menos la creatinina), y **confirmar el inicio**
   de las terapias de deglución y respiratoria ya autorizadas.
+
+### Objeciones DGH — lo que falta decidir (08-09)
+- **VCO:** ¿debe seguir las cuatro reglas (CTNCENCOS vacía y CROTIPOBJ por
+  factura) como las demás entidades, o su flujo de actas es distinto a
+  propósito? Sin esa respuesta no entra a la pantalla.
+- **EMSSANAR:** su entrada son PDF. Decidir si la pantalla debe aceptar PDF
+  además de Excel.
+- **ADRES:** falta el listado de objeciones y elegir contra qué se cruza.
 
 ### Objeciones DGH en la pantalla (08-09)
 - **Estrenarla con un lote real**: subir los dos Excel del próximo lote por la

@@ -97,6 +97,23 @@ def _dispensario() -> bytes:
     )
 
 
+def _savia() -> bytes:
+    return _excel(
+        "Hoja1",
+        [
+            "Numero_factura",
+            "Cod_Servicio",
+            "Servicio",
+            "Cantidad_Servicio",
+            "Valor_Unitario",
+            "Valor_Glosa",
+            "Motivo_Esp_Glosa_Valor_A",
+            "Observacion_Glosa_A",
+        ],
+        [["HUS0000548556", "FMQ0113", "CATETER INTRAVENOSO 20", 1, 5800, 5800, "TA0801", "No pactado"]],
+    )  # fmt: skip
+
+
 def _sanitas() -> bytes:
     return _excel(
         "Glosa",
@@ -133,6 +150,9 @@ class TestDetectarEntidad:
     def test_dispensario(self):
         assert svc.detectar_entidad(_dispensario()).id == "dispensario"
 
+    def test_savia(self):
+        assert svc.detectar_entidad(_savia()).id == "savia"
+
     def test_sanitas(self):
         assert svc.detectar_entidad(_sanitas()).id == "sanitas"
 
@@ -152,7 +172,7 @@ class TestDetectarEntidad:
 
     def test_catalogo(self):
         ids = {e["id"] for e in svc.catalogo_entidades()}
-        assert {"famisanar", "dispensario", "sanitas"} <= ids
+        assert {"famisanar", "dispensario", "savia", "sanitas"} <= ids
 
 
 # ─── El armado ──────────────────────────────────────────────────────────────
@@ -175,6 +195,15 @@ class TestProcesar:
         assert r.entidad_id == "dispensario"
         assert r.objeciones == 1
         assert r.nombre_objeciones == "OBJECIONES_DISPENSARIO_04092026.xlsx"
+
+    def test_savia_de_punta_a_punta(self):
+        r = svc.procesar(_savia(), _dgh(), fecha="2026-09-04")
+        assert r.entidad_id == "savia"
+        assert r.objeciones == 1
+        assert r.confianza["ALTA"] == 1
+        assert r.reglas_ok
+        # El nombre del archivo usa la primera palabra: SAVIA SALUD → SAVIA.
+        assert r.nombre_objeciones == "OBJECIONES_SAVIA_04092026.xlsx"
 
     def test_sanitas_de_punta_a_punta(self):
         r = svc.procesar(_sanitas(), _dgh(), fecha="2026-09-04")
