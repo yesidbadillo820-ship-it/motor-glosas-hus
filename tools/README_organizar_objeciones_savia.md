@@ -178,3 +178,24 @@ py -m pip install openpyxl
   fecha de radicación/objeción que corresponda.
 - **`CDCONSEC` / `GENUSUARIO4` / constantes**: se replican de la guía
   (`1` / `999` / `0`). Si tu Dispensario espera otros valores, avisá y se ajustan.
+
+
+## Cruce contra el DGH (`--servicios-dgh`)
+
+SAVIA manda el código del servicio en su propia columna (`Cod_Servicio`), pero
+ese código no siempre es el que Dinámica Gerencial reconoce. Con el export de
+servicios facturados se comprueba que exista **en esa factura** y, si el DGH lo
+tiene con otro código, se pone el del hospital. Sin cruce confiable la celda
+queda vacía: **nunca se inventa un código**.
+
+```powershell
+py tools\organizar_objeciones_savia.py `
+  --entrada       "D:\...\SAVIA_SALUD.xlsx" `
+  --servicios-dgh "D:\...\SERVICIOS_FACTURADOS_DGH.xlsx" `
+  --salida        "D:\...\OBJECIONES_SAVIA.xlsx" --consolidado `
+  --reporte-cruce "D:\...\CRUCE_SAVIA.xlsx"
+```
+
+Sin `--servicios-dgh` el bot se comporta exactamente como antes. El motor del
+cruce es el común (`tools/_cruce_dgh.py`) y al terminar comprueba las reglas
+fijas del formato sobre el archivo ya armado.

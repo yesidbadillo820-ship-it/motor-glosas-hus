@@ -219,3 +219,266 @@ def test_procesar_detecta_descuadre(tmp_path, caplog):
     rc = org.procesar([pdf], tmp_path, "DISPENSARIO", "10/07/2026", None)
     assert rc == 1
     assert "DESCUADRE" in caplog.text
+
+
+# ─── Fuente 2: Excel de glosa inicial + cruce contra el DGH ──────────────────
+
+_HEADERS_EXCEL = [
+    "FACTURA",
+    "VALOR GLOSA INICIAL",
+    "SERVICIO OBJETADO",
+    "CODIGO GLOSA INICIAL",
+    "DESCRIPCION GLOSA INICIAL",
+]
+
+_HEADERS_DGH = [
+    "SERVICIOS DGH",
+    "DESCRIPCION INSTITUCIONAL",
+    "SLNSERPRO_CUPS",
+    "DESCRIPCION CUPS",
+    "CODIGO_MEDICAMENTO",
+    "FACTURA",
+    "CAT_SERVICIOS",
+    "Vr_SERVICIO",
+    "SALDO_FACT",
+]
+
+_COD_TA0801 = (
+    "TA08 01 TARIFAS-APOYO DIAGNÓSTICO - LOS CARGOS POR APOYO DIAGNÓSTICO QUE "
+    "VIENEN RELACIONADOS PRESENTAN DIFERENCIAS CON LOS VALORES PACTADOS."
+)
+_COD_CL0301 = "CL03 01 CALIDAD-HONORARIOS - NO ES PERTINENTE."
+
+
+def _crear_excel(ruta, filas, headers=None):
+    import openpyxl as _x
+
+    wb = _x.Workbook()
+    ws = wb.active
+    ws.append(headers or _HEADERS_EXCEL)
+    for f in filas:
+        ws.append(f)
+    wb.save(str(ruta))
+    return ruta
+
+
+def _crear_dgh_excel(ruta, filas):
+    import openpyxl as _x
+
+    wb = _x.Workbook()
+    ws = wb.active
+    ws.append(_HEADERS_DGH)
+    for f in filas:
+        ws.append(f)
+    wb.save(str(ruta))
+    return ruta
+
+
+class TestCodigoYConcepto:
+    def test_codigo_partido_por_un_espacio(self):
+        assert org.codigo_y_concepto(_COD_TA0801)[0] == "TA0801"
+        assert org.codigo_y_concepto(_COD_TA0801)[1].startswith("TARIFAS-APOYO")
+
+    def test_codigo_sin_espacio(self):
+        assert org.codigo_y_concepto("SO0801 SOPORTES-APOYO DIAGNÓSTICO") == (
+            "SO0801",
+            "SOPORTES-APOYO DIAGNÓSTICO",
+        )
+
+    def test_sin_codigo_reconocible(self):
+        assert org.codigo_y_concepto("TEXTO SUELTO") == ("", "TEXTO SUELTO")
+
+    def test_codigo_en_minuscula_se_lee_igual(self):
+        """Lote del 7 de septiembre: el Dispensario mandó 19 códigos en
+        minúscula y salían con CRNCONOBJ vacío."""
+        assert org.codigo_y_concepto("ta01 01 TARIFAS-ESTANCIA U OBSERVACIÓN")[0] == "TA0101"
+        assert org.codigo_y_concepto("cl03 02 CALIDAD-HONORARIOS")[0] == "CL0302"
+        assert org.codigo_y_concepto("fa08 02 FACTURACION-APOYO")[0] == "FA0802"
+        assert org.codigo_y_concepto("ta0801 TARIFAS")[0] == "TA0801"
+
+    def test_una_factura_con_el_cl_en_minuscula_sigue_siendo_mixta(self):
+        """El bug no sólo vaciaba el código: dejaba la factura en tipo 0
+        (administrativa) porque el 'cl' tampoco se leía."""
+        grupos = {org.codigo_y_concepto(t)[0][:2] for t in ("ta01 01 TARIFAS", "cl03 02 CALIDAD")}
+        assert org.crotipobj_factura(grupos) == 2
+
+
+class TestCrotipobjDispensario:
+    def test_los_tres_valores(self):
+        assert org.crotipobj_factura({"TA", "FA"}) == 0  # administrativa
+        assert org.crotipobj_factura({"CL"}) == 1  # médica
+        assert org.crotipobj_factura({"CL", "TA"}) == 2  # mixta
+
+
+class TestExcelGlosaInicial:
+    def _archivos(self, tmp_path):
+        entrada = _crear_excel(
+            tmp_path / "dispensario.xlsx",
+            [
+                [
+                    "HUS0000550094",
+                    16600,
+                    "MONITOREO ELECTROCARDIOGRAFICO CONTINUO (HOLTER)",
+                    _COD_TA0801,
+                    "SE GLOSA MVC EN ELECTROCARDIOGRAFIA",
+                ],
+                [
+                    "HUS0000549282",
+                    1200,
+                    "SONDA NELATON 08 FR",
+                    _COD_TA0801,
+                    "SE GLOSA EL INSUMO",
+                ],
+                [
+                    "HUS0000549282",
+                    9999,
+                    "SERVICIO QUE NO ESTA EN LA FACTURA",
+                    _COD_TA0801,
+                    "SE GLOSA ALGO",
+                ],
+            ],
+        )
+        dgh = _crear_dgh_excel(
+            tmp_path / "dgh.xlsx",
+            [
+                [
+                    "895001",
+                    "MONITOREO ELECTROCARDIOGRAFICO CONTINUO (HOLTER)",
+                    "895001",
+                    "",
+                    "",
+                    "HUS0000550094",
+                    1,
+                    740516,
+                    740516,
+                ],
+                [
+                    "FMQ0214-1",
+                    "SONDA NELATON 08 FR",
+                    "FMQ0214-1",
+                    "",
+                    "",
+                    "HUS0000549282",
+                    1,
+                    1200,
+                    1200,
+                ],
+            ],
+        )
+        return entrada, dgh
+
+    def test_lee_las_cinco_columnas(self, tmp_path):
+        entrada, _ = self._archivos(tmp_path)
+        objeciones = org.leer_excel_glosa_inicial(entrada)
+        assert len(objeciones) == 3
+        assert objeciones[0]["cxc"] == "HUS0000550094"
+        assert objeciones[0]["codigo"] == "TA0801"
+        assert objeciones[0]["valor"] == 16600
+        assert objeciones[0]["servicio"] == "MONITOREO ELECTROCARDIOGRAFICO CONTINUO (HOLTER)"
+
+    def test_el_cruce_llena_slnserpro(self, tmp_path):
+        entrada, dgh = self._archivos(tmp_path)
+        trazas: list[dict] = []
+        filas = org.filas_desde_excel(
+            org.leer_excel_glosa_inicial(entrada),
+            datetime(2026, 9, 3),
+            org.leer_servicios_dgh(dgh),
+            trazas,
+        )
+        cols = {n: k for k, n in enumerate(org.ENCABEZADOS)}
+        # El nombre identifica el servicio aunque el valor objetado sea sólo la
+        # diferencia de tarifa (16.600 contra un renglón de 740.516).
+        assert filas[0][cols["SLNSERPRO"]] == "895001"
+        assert filas[1][cols["SLNSERPRO"]] == "FMQ0214-1"
+        # Un servicio que no está en la factura NO se inventa.
+        assert filas[2][cols["SLNSERPRO"]] is None
+        assert trazas[2]["confianza"] == "SIN CRUCE"
+
+    def test_ctncencos_vacia_y_crotipobj_por_factura(self, tmp_path):
+        entrada, dgh = self._archivos(tmp_path)
+        filas = org.filas_desde_excel(
+            org.leer_excel_glosa_inicial(entrada), datetime(2026, 9, 3), org.leer_servicios_dgh(dgh)
+        )
+        cols = {n: k for k, n in enumerate(org.ENCABEZADOS)}
+        assert all(f[cols["CTNCENCOS"]] is None for f in filas)
+        assert all(f[cols["CROTIPOBJ"]] == 0 for f in filas)
+
+    def test_crotipobj_mixta_cuando_la_factura_trae_una_clinica(self, tmp_path):
+        entrada = _crear_excel(
+            tmp_path / "d.xlsx",
+            [
+                ["HUS0000550094", 100, "SERVICIO A", _COD_TA0801, "x"],
+                ["HUS0000550094", 200, "SERVICIO B", _COD_CL0301, "y"],
+            ],
+        )
+        filas = org.filas_desde_excel(org.leer_excel_glosa_inicial(entrada), datetime(2026, 9, 3))
+        cols = {n: k for k, n in enumerate(org.ENCABEZADOS)}
+        assert [f[cols["CROTIPOBJ"]] for f in filas] == [2, 2]
+
+    def test_cdconsec_uno_por_factura(self, tmp_path):
+        entrada, _ = self._archivos(tmp_path)
+        filas = org.filas_desde_excel(org.leer_excel_glosa_inicial(entrada), datetime(2026, 9, 3))
+        cols = {n: k for k, n in enumerate(org.ENCABEZADOS)}
+        assert [f[cols["CDCONSEC"]] for f in filas] == ["1", "2", "2"]
+
+    def test_crdobserv_lleva_codigo_concepto_motivo_y_valor(self, tmp_path):
+        entrada, _ = self._archivos(tmp_path)
+        filas = org.filas_desde_excel(org.leer_excel_glosa_inicial(entrada), datetime(2026, 9, 3))
+        cols = {n: k for k, n in enumerate(org.ENCABEZADOS)}
+        obs = filas[0][cols["CRDOBSERV"]]
+        assert obs.startswith("TA0801 TARIFAS-APOYO")
+        assert ": SE GLOSA MVC EN ELECTROCARDIOGRAFIA" in obs
+        assert obs.endswith("$16600")
+
+    def test_excel_sin_las_columnas_esperadas(self, tmp_path):
+        ruta = _crear_excel(tmp_path / "malo.xlsx", [["x"]], ["CUALQUIER COSA"])
+        with pytest.raises(ValueError, match="no encontré"):
+            org.leer_excel_glosa_inicial(ruta)
+
+    def test_cli_end_to_end(self, tmp_path):
+        entrada, dgh = self._archivos(tmp_path)
+        salida = tmp_path / "OBJECIONES.xlsx"
+        reporte = tmp_path / "CRUCE.xlsx"
+        assert (
+            org.main(
+                [
+                    "--entrada-excel",
+                    str(entrada),
+                    "--servicios-dgh",
+                    str(dgh),
+                    "--consolidado",
+                    str(salida),
+                    "--reporte-cruce",
+                    str(reporte),
+                    "--fecha",
+                    "03/09/2026",
+                ]
+            )
+            == 0
+        )
+        import openpyxl as _x
+
+        ws = _x.load_workbook(str(salida))["OBJECIONES"]
+        headers = [c.value for c in ws[1]]
+        assert headers == org.ENCABEZADOS
+        fila = dict(zip(headers, [c.value for c in ws[2]], strict=True))
+        assert fila["CRNCXC"] == "HUS0000550094"
+        assert fila["SLNSERPRO"] == "895001"
+        assert fila["CTNCENCOS"] is None
+        assert reporte.is_file()
+
+    def test_reporte_sin_export_del_dgh_avisa(self, tmp_path):
+        entrada, _ = self._archivos(tmp_path)
+        assert (
+            org.main(
+                [
+                    "--entrada-excel",
+                    str(entrada),
+                    "--consolidado",
+                    str(tmp_path / "o.xlsx"),
+                    "--reporte-cruce",
+                    str(tmp_path / "c.xlsx"),
+                ]
+            )
+            == 2
+        )

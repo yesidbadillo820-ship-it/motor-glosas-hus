@@ -91,6 +91,344 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (cierre 3) — la pantalla Objeciones DGH ya sirve para TODAS las entidades
+
+Se terminó lo que faltaba: **las ocho entidades** que el motor sabe trabajar ya
+entran por la pantalla. Antes eran cuatro. Se sumaron **SALUD TOTAL**, el
+**acta del portal VCO** (COOSALUD, Fiduprevisora, SAVIA…), **EMSSANAR** y el
+**ADRES**. El auditor sube el archivo que le mandó la entidad y el export de
+servicios facturados del DGH, y bajan los dos de siempre: el que se sube y el
+respaldo con la hoja REVISAR.
+
+**Lo nuevo que hay que saber para usarla:**
+
+- **EMSSANAR no manda Excel, manda PDF** (uno por factura). Ahora se pueden
+  marcar **varios PDF de una vez** en el mismo recuadro.
+- **Del ADRES** se puede agregar el **Homologador Gold Standard CUPS↔SOAT**
+  como segundo archivo. Sin él, sus códigos SOAT sólo cruzan por nombre y
+  valor.
+- Si un lote pasa de **300 facturas**, la pantalla lo avisa: ese es el tope
+  que recibe el DGH en un archivo y hay que partirlo antes de subirlo.
+
+**Dos cosas que estaban mal y se corrigieron:**
+
+1. **El ADRES estaba llenando la celda CTNCENCOS** con el centro de costo que
+   sacaba del cruce. La regla del área dice que esa celda va **vacía siempre,
+   sin excepciones**. Ya sale vacía. El dato no se perdió: queda en el reporte
+   de revisión, como pista.
+2. **EMSSANAR estaba escribiendo el código de servicio de una tabla vieja** de
+   145 códigos sacada de un lote de hace meses: ponía un código aunque ese
+   servicio no estuviera en esa factura, que es justo lo que la regla prohíbe.
+   Ahora cruza contra el export del DGH y lo que no se identifica queda en
+   blanco para completarlo a mano.
+   También le cambió la columna **CROTIPOBJ**: antes llevaba «Glosa o
+   Devolución» (0 ó 2), que **no es lo mismo** que administrativa/médica/mixta.
+   Una devolución de puras glosas administrativas salía marcada 2 (mixta)
+   cuando la regla dice 0. Ya se decide por factura como en las demás.
+
+### 08-09-2026 — lote del DISPENSARIO del 7 de septiembre
+
+**97 objeciones · 39 facturas · $36.268.402.** Cuadra: las 39 facturas están en
+el export del DGH y ninguna se glosa por encima de lo facturado ni del saldo.
+Cruzaron con seguridad 35 (ALTA) y 59 con confianza media; **3 quedaron en
+REVISAR** y **1 sin código de servicio** para completar a mano.
+
+**Se encontró y corrigió un defecto que dañaba el archivo.** Este lote trajo
+**19 códigos de glosa escritos en minúscula** (`ta01 01`, `cl03 02`,
+`fa08 02`…) y el lector sólo aceptaba mayúsculas. Resultado: esos 19 renglones
+salían **sin código de glosa**, y —lo grave— la factura **HUS0000551822**
+quedaba marcada como **0 (administrativa) cuando es 2 (mixta)**, porque el
+`cl03 02` tampoco se leía y no contaba como glosa clínica. Ya se lee sin
+importar mayúsculas o minúsculas, con su prueba para que no vuelva a pasar.
+
+**Lo que le quedó al auditor para mirar:**
+
+1. **HUS0000549861 · TA0201 · $1.779** — «INTERCONSULTA POR ESPECIALISTA EN
+   INFECTOLOGÍA PEDIÁTRICA»: el nombre coincide al 98 % pero el valor no
+   cuadra, así que **no se adivinó** y la celda quedó vacía. Casi seguro es
+   ese servicio; hay que confirmarlo.
+2. **HUS0000550614 · SO3701 · $997.235** y **HUS0000549573 · SO0201 ·
+   $114.200** — el Dispensario mandó esos dos renglones **sin nombre de
+   servicio**; cruzaron sólo por valor.
+3. **HUS0000549713 — posible doble glosa de glucometrías.** El DGH tiene 15
+   glucometrías de $5.029. El Dispensario objeta **5 por soportes (SO0801) y
+   otras 5 por calidad (CL0601)**. En total no se pasa, pero si son las mismas
+   cinco, están glosando dos veces $25.145. **Vale la pena reclamarlo.**
+
+Los 9 grupos de renglones repetidos (9 terapias respiratorias, 5 anticuerpos,
+3 hemocultivos…) **sí son legítimos**: el DGH los tiene facturados uno por uno.
+
+### 08-09-2026 (cierre 2) — SAVIA entra a la pantalla; VCO y EMSSANAR quedan con una pregunta
+
+Se completó lo que faltaba de la pantalla **Objeciones DGH**: reconocer también
+los archivos de **SAVIA SALUD**. Ahora la pantalla sirve cuatro entidades:
+FAMISANAR, Dispensario, SAVIA y SANITAS.
+
+**Lo que se le agregó a SAVIA.** Su bot ya traía el código del servicio en
+columna propia, pero ese código no siempre es el que DGH reconoce. Ahora acepta
+`--servicios-dgh` y comprueba contra el export que exista **en esa factura**;
+si el DGH lo tiene con otro código, pone el del hospital, y sin cruce confiable
+deja la celda vacía. Sin esa opción el bot se comporta **exactamente igual que
+antes** — se comprobó con sus 41 pruebas, que siguen pasando sin tocarlas.
+
+**Las otras dos no entraron, y no por falta de trabajo:**
+
+- **VCO** llena `CTNCENCOS` con un centro de costo de configuración y
+  `CROTIPOBJ` con una bandera fija, en vez de calcularlo por factura. Es el
+  flujo del portal VCO, con actas, y lleva tiempo funcionando así. Meterlo a
+  esta pantalla obliga a decidir **si VCO también debe seguir las cuatro
+  reglas**; eso lo decide el área, no el programa, así que no se tocó.
+- **EMSSANAR** lee **PDF** de objeción, no Excel. La pantalla pide dos Excel;
+  aceptar PDF es otro cambio.
+
+**Estado de las pruebas al cerrar.** Todo lo del frente de objeciones en verde.
+En el contenedor de trabajo quedan 12 pruebas rojas de otras herramientas
+(correos .msg y conversión con LibreOffice): les falta LibreOffice y
+`extract_msg` instalados, no son de este trabajo y en el CI del repo pasan.
+
+**Lo que sigue bloqueado esperando al área:** el lote de **ADRES**. Llegó el
+maestro de servicios pero falta el listado de objeciones, y falta decidir si el
+cruce va contra la hoja `DETALLE_CONSOLIDACION` traduciendo con
+`HOMOLOGACION_DGH`, o si se saca el `SERVICIOS_FACTURADOS_DGH` de esas facturas
+como en los demás lotes.
+
+### 08-09-2026 (cierre) — El cruce de objeciones entró al Motor: botón «Objeciones DGH»
+
+Hasta hoy, armar el archivo de objeciones era pedírselo al chat. Ahora es una
+pantalla del Motor: **barra lateral → Objeciones DGH**, se suben los dos Excel
+—las glosas de la entidad y el export de servicios facturados del DGH— y salen
+los dos archivos de siempre.
+
+**Lo que se ve antes de descargar.** El resumen del cruce (cuántas quedaron en
+ALTA, MEDIA, BAJA y sin cruce), la tabla de lo que hay que revisar con el
+motivo de cada una, y el detalle por factura con su tipo de objeción. Y arriba,
+el veredicto de las reglas: si `CTNCENCOS` quedó vacía, si algún código no
+existe en el DGH y si `CROTIPOBJ` está bien. **Si eso sale en rojo, no se
+sube.**
+
+**Reconoce sola de quién es el archivo:** FAMISANAR, Dispensario o SANITAS. Y
+si no lo reconoce, **no procesa a ciegas**: avisa qué encabezados leyó y deja
+elegir la entidad a mano. Es la misma defensa que salvó el lote de SANITAS.
+
+**Lo importante: no se copió ni una regla.** La pantalla llama a los mismos
+bots de `tools/` que se usan por consola, así que lo que baja el auditor es
+**idéntico** a lo que se venía entregando por chat — se comprobó con los tres
+lotes reales (FAMISANAR 3-sep, Dispensario 3-sep y SANITAS 4-sep): mismos
+números, mismos archivos. Si mañana cambia una regla, se cambia en el bot y la
+pantalla la hereda sola.
+
+**Cuidado con los datos.** Los archivos armados esperan media hora en memoria a
+que el auditor los baje, sólo los ve quien los armó, y después se sueltan
+solos. Los Excel del auditor se procesan en una carpeta temporal que se borra
+sola: no quedan datos de pacientes tirados en el servidor.
+
+**Una aclaración de alcance:** el Motor no puede entrar al DGH por su cuenta.
+El export de servicios facturados lo sigue sacando el auditor; «subir y que
+salga todo» funciona con esos dos Excel.
+
+Guía: `docs/OBJECIONES_DGH_WEB.md`. 38 pruebas nuevas entre el servicio y las
+rutas.
+
+### 08-09-2026 (noche) — SANITAS entra al circuito, y su archivo traía una trampa
+
+Primer lote de **SANITAS**: 113 objeciones de **una sola factura**
+(HUS0000548650) por **$49.670.750**, contra 725 renglones de servicio del DGH.
+**Las 113 quedaron con su servicio identificado en confianza ALTA**, ninguna en
+revisión.
+
+**La trampa del archivo, que era lo importante.** SANITAS repite el encabezado
+«NUMERO DE FACTURA» en la **segunda** columna, pero ahí lo que manda es el
+**código de glosa** (CO2301, TA0801…). Si se hubiera procesado con un lector
+que resuelve columnas por nombre —como el de FAMISANAR— habría tomado «CODIGO
+PROCEDIMIENTO» como código de glosa y el archivo habría salido malo **sin que
+nadie lo notara** hasta que DGH lo rechazara. Por eso el bot nuevo lee por
+posición y **verifica el contenido antes de procesar**: si la primera columna
+no trae facturas y la segunda no trae códigos de glosa, se detiene con un
+mensaje claro en vez de entregar un archivo silenciosamente malo.
+
+**Lo que se construyó.** `tools/organizar_objeciones_sanitas.py`, delgado
+porque el motor del cruce ya es común (`tools/_cruce_dgh.py`). Guía en
+`tools/README_organizar_objeciones_sanitas.md` y 22 pruebas. Una de esas
+pruebas encontró un hueco de verdad mientras se escribía: la comprobación de
+«esto parece una factura» aceptaba `CO2301` como factura, así que un archivo
+con las columnas cambiadas habría pasado igual. Se corrigió exigiendo cinco
+dígitos o más.
+
+**Lo que hay que saber de SANITAS para los próximos lotes.** Parte el valor de
+un mismo servicio en varias objeciones: mandó **50 objeciones de $2.350** para
+**25 glucometrías** facturadas, y el total coincide exacto ($117.500). El texto
+de esas filas dice «Glosa Calculada Afiliado», así que parece un reparto entre
+la porción del afiliado y la de la entidad. **No hay sobre-objeción** —se
+comprobó sumando por código, que es lo correcto; contar renglones engaña— pero
+en DGH van a aparecer varias objeciones sobre el mismo servicio. Lo objetado
+($49,7 millones) es menos que lo facturado de esos mismos servicios ($70,9
+millones), sobre una factura con saldo de $113,4 millones.
+
+**Archivos entregados:** `OBJECIONES_SANITAS_04092026.xlsx` y
+`CRUCE_SANITAS_04092026.xlsx` (hoja REVISAR vacía).
+
+### 08-09-2026 — Trámites DGH de la recepción 01/09–08/09: el bot ahora junta radicaciones de varias fuentes
+
+Llegó la **recepción de objeciones de DGH** de la semana (55.181 conceptos,
+858 facturas, 583 de COOSALUD) para armar el cargue de TRÁMITES. La primera
+corrida dio **0 facturas**: la carpeta «CARGUE MASIVO COOSALUD» del Escritorio
+es de un cargue viejo (589 cabeceras, cero cruce). Al cruzar contra el portal
+se entendió el porqué: de las 583 de COOSALUD solo **45 siguen en el portal**
+(5 en bolsa + 40 en pausa); las otras **538 son de lotes ya respondidos** en
+semanas pasadas, y sus fechas de radicación quedaron repartidas en los
+consolidados y carpetas de esos cargues. Se mejoró
+`tools/respuesta_tramites_dgh.py`: `--carpeta` ahora se puede **repetir**
+(varios cargues masivos) y el nuevo `--radicaciones` acepta consolidados
+(CONSOLIDADO FACTURAS, hoja BASE de un CONSOLIDADO RESPUESTAS), cabeceras
+sueltas o carpetas con esos Excel — gana la primera fuente que traiga cada
+factura, y el log dice cuántas aportó cada una. Con 5 pruebas nuevas.
+**Pendiente:** ubicar en el disco los consolidados/carpetas de los cargues
+viejos, bajar el ZIP del portal para las 45 vigentes y correr el trámite
+completo.
+
+**Cacería de los 159 soportes faltantes (con el auditor, misma tarde):** la
+corrida con el bot corregido dejó 19 alertas reales (antes 200 falsas) y 197
+de 356 con soportes. Explorando los servidores con comandos guiados se
+descubrió el porqué: el lote trae 164 facturas de ene–ago 2025 y 3 de 2024,
+y esas épocas no estaban en ninguna de las 11 rutas — los soportes viejos
+viven en **RADICACION DIGITAL** (la radicación electrónica por EPS:
+`...\Radicacion Digital - Carpeta 2\RADICACION\RADICACION DIGITAL\2025\01. ENERO\COOSALUD\...`
+y `X:\RADICACION DIGITAL` con 2023/2024). Se agregaron esas dos rutas a la
+lista fija del bot y la equivalencia X: ≡ \\Prime\servidor_radicación
+(además de la Y: que ya existía). Queda listo el script final para la corrida
+unificada de las 356.
+
+### 08-09-2026 — FAMISANAR 4 de septiembre (lote chico) y las reglas ya se verifican solas
+
+**El lote.** 65 objeciones de 4 facturas por **$7.219.290**, contra 122
+renglones del DGH. Resultado: **60 con el servicio identificado** (55 ALTA, 5
+MEDIA), 4 en BAJA y 1 sin cruce. Cinco renglones en REVISAR. Ninguna factura
+trae glosas de calidad, así que `CROTIPOBJ` quedó en 0 en las cuatro.
+
+**Lo que hay que mirar en REVISAR (5 renglones):**
+
+- **SO0101 de HUS0000548207, $1.315.200** — la epicrisis de la estancia, con el
+  texto cortado otra vez. Candidato con el valor exacto: **`129A02H`**
+  INTERNACION ADULTOS COMPLEJIDAD ALTA, 3 × $438.400 (la factura trae 4
+  unidades por $1.753.600).
+- **Dos AU5701 de $309.000**, uno en HUS0000549133 y otro en HUS0000549334, con
+  el mismo texto cortado y sin nombrar servicio. El cruce los llevó a `662201`
+  ABLACION U OCLUSION DE TROMPA DE FALOPIO porque ese valor es único en cada
+  factura, **pero el código de glosa no cuadra con el servicio**: AU5701 es
+  «apoyos terapéuticos con diferencia respecto a lo autorizado» y una ablación
+  de trompas es un procedimiento quirúrgico. Hay que confirmarlo con FAMISANAR
+  antes de subirlo.
+- **FA0701 de $51.800** — el cruce es correcto (`20099563-3` PARACETAMOL) y el
+  texto sí lo dice: «SE GLOSA ACETAMINOFEN 1000MG/100ML». Quedó en BAJA sólo
+  porque el lector de texto reconoce «SE OBJETA» y «SE RECONOCE» pero no «SE
+  GLOSA», así que no le extrajo el nombre y cruzó únicamente por valor. Es una
+  mejora chica y acotada al lector; queda propuesta, sin aplicar, porque las
+  reglas del motor no se tocan sin visto bueno.
+- **CO0601 de $21.600** — el caso conocido de nomenclatura IUM (`91026647`
+  contra `FMQ3607`).
+
+**Las reglas ya no dependen de la memoria.** Quedaron escritas en `CLAUDE.md`
+(sección «REGLAS FIJAS DEL ARCHIVO DE OBJECIONES PARA DGH») y el bot las
+comprueba **sobre el archivo terminado** en cada corrida con
+`verificar_reglas()`: `CTNCENCOS` vacía, ningún `SLNSERPRO` que no exista en el
+export del DGH de esa factura, y `CROTIPOBJ` bien clasificada. Este lote pasó
+la verificación en verde. Se probó también contra los cuatro lotes anteriores:
+salen idénticos celda por celda.
+
+**Archivos entregados:** `OBJECIONES_FAMISANAR_04092026.xlsx` y
+`CRUCE_FAMISANAR_04092026.xlsx`.
+
+### 07-09-2026 — Clasificador por régimen para re-radicar COOSALUD (Excel «PARA BRAYAN»)
+
+Llegó un Excel con **356 facturas** que hay que volver a radicar a COOSALUD,
+separadas por régimen. Nació el bot **`tools/clasificar_regimen_coosalud.py`**
+(con su doble clic `CLASIFICAR_REGIMEN_COOSALUD.cmd`): busca cada factura en
+el share de facturación electrónica (`\\172.16.32.83\...\AAAAMM\FACTURAS_SALUD\`),
+lee el **RIPS** para saber si el paciente es **Subsidiado o Contributivo**
+(entiende el RIPS JSON nuevo y los TXT viejos), copia la carpeta completa de
+soportes (XML, PDF, RIPS, CUV) a la carpeta maestra de su régimen y deja un
+**Excel de auditoría** que cruza las fechas de atención/egreso del RIPS contra
+las de ingreso/egreso del XML de la factura, con la columna
+**Alerta_Diferencia (SI/NO)** pintada en rojo/verde. Lo que no se puede
+clasificar queda en `SIN_CLASIFICAR\` con la razón anotada — nada se inventa.
+Con 7 pruebas de pytest (share simulado con los dos formatos de RIPS).
+**Corrida real del mismo día:** el piloto de 5 salió bien y la corrida
+completa procesó las **356 de 356** (índice del share: 423 mil carpetas en
+~3 minutos). Resultado grueso: casi todas Subsidiado, unas 40 Contributivo,
+4 SIN_CLASIFICAR (facturas viejas sin RIPS en la carpeta) y 1 «Otro (05)»
+(paciente no afiliado). La única falla fue al final: el Excel de auditoría
+estaba **abierto** y Windows no dejó guardarlo. Se blindó el bot: si el
+Excel está abierto, guarda el informe con sufijo de hora en vez de perder
+la corrida (con su prueba; van 8). El informe se regenera con `--sin-copiar`
+sin volver a copiar nada.
+
+**Revisión con la factura real (noche):** el auditor subió la carpeta completa
+de la HUS349680 (XML, PDF, RIPS) y detectó que **Factura_Egreso salía mal**
+(11/02 en vez del 10/02 real). Al disecar el paquete se descubrió que el
+`EndDate` del XML **no es el egreso del paciente: es la fecha de facturación**
+(idéntica al IssueDate) — por eso 199 de las 200 «alertas» de la corrida eran
+falsas alarmas de ese mismo artefacto. El egreso clínico real solo vive en el
+RIPS y en el **PDF impreso de la factura** (`fv*.pdf`: «Fec Ingreso… Fec
+Egreso…»). El bot ahora lee las fechas de la factura del PDF (con pymupdf,
+que el doble clic instala solo); del XML solo toma el ingreso, y si no hay
+evidencia de egreso deja la celda vacía — no inventa. Verificado contra la
+factura real: RIPS 07/02–10/02 vs Factura 07/02–10/02, **alerta NO**. Además
+el bot ahora **busca los soportes del servicio en las 11 rutas de radicación**
+(`Y:\` y `\\Prime\...`) y los copia en `SOPORTES_RADICACION\` dentro de cada
+factura, con dos columnas nuevas en el informe (de dónde salieron y cuántos
+archivos). Van 14 pruebas. **Pendiente:** repetir la corrida completa con el
+bot corregido (los soportes tardan más por el recorrido de los servidores).
+
+**Ajuste de la búsqueda de soportes (más noche):** el auditor reportó que no
+llegaron los soportes (ejemplo real: `Y:\3. MARZO...\COOSALUD\KARIN\ENV-...-OK-C-DGH\IMG\HUS472660\`).
+Se verificó con esa estructura exacta que el buscador SÍ la encuentra y copia
+(12/12 archivos) — y que esa factura NO estaba en el Excel de las 356, o sea
+que el bot nunca la buscó. Para que no vuelva a pasar ni a quedar en duda:
+(1) nuevo `--solo HUS472660` que procesa una factura puntual sin Excel, ideal
+para probar; (2) si una ruta `\\Prime\radicacion_2026\...` no abre, el bot
+prueba solo su equivalente `Y:\...` (la unidad mapeada con credenciales) y
+viceversa, sin escanear dos veces la misma carpeta; (3) latido de progreso
+cada 2.000 carpetas y AVISO cuando una ruta termina sin ningún hallazgo.
+Van 17 pruebas.
+
+### 07-09-2026 (tarde) — FAMISANAR 3 de septiembre: el lote donde por fin aparecieron glosas médicas
+
+Cuarto archivo de objeciones con el mismo procedimiento: **321 objeciones de 12
+facturas por $41.259.676**, cruzadas contra el export del DGH (676 renglones de
+esas mismas 12 facturas).
+
+**Resultado: 318 de las 321 con el servicio identificado** (242 ALTA, 20 MEDIA,
+56 BAJA) y 3 sin cruce. En la hoja REVISAR quedaron 60 renglones.
+
+**Lo nuevo de este lote: trae glosas de CALIDAD.** Es el primero con códigos CL
+(CL0101, CL0701, CL2301, CL5801) y por eso es el primero donde `CROTIPOBJ` no
+sale todo en 0: cuatro facturas —HUS0000547688, HUS0000549332, HUS0000549336 y
+HUS0000549608— mezclan glosas clínicas con administrativas y salieron en **2 =
+MIXTA**, que es lo que corresponde. Las otras ocho, en 0. Se revisó factura por
+factura contra la regla.
+
+**Las 3 que quedaron sin cruce, y por qué está bien que quedaran así.**
+
+| Factura | Glosa | Valor | Por qué |
+|---|---|---|---|
+| HUS0000551404 | SO0101 | $6.467.100 | La epicrisis de la estancia. El texto viene cortado y no nombra servicio. Candidato con el valor exacto: **`108A01`** UCI intensivo neonatal, 3 × $2.155.700. |
+| HUS0000547688 | CO0601 | $4.000 | FAMISANAR sólo mandó el texto de la norma. En la factura ese valor lo tienen **dos** servicios distintos (solución salina 250 ml, o 5 electrodos de $800): no hay forma de saber cuál sin adivinar. |
+| HUS0000547688 | CO0601 | $6.200 | Igual, pero peor: **tres** sondas Foley de distinto calibre, todas a $6.200. |
+
+Los dos últimos son el ejemplo de para qué sirve la regla de no inventar: el
+valor solo no alcanza cuando varios servicios de la misma factura valen lo
+mismo, y el bot se abstiene en vez de escribir un código al azar.
+
+**Un aviso que vale la pena mirar y que resultó correcto.** El renglón
+`U44762-03` «FOSFOLIPIDOS NATURALES (SURVANTA)» por $1.417.593 salió marcado
+con «el nombre no coincide», porque el DGH lo llama **`44762-3` SURFACTANTE
+PULMONAR AMP X 200 MG/8ML**. Es el mismo medicamento —Survanta *es* surfactante
+pulmonar de fosfolípidos naturales— y coinciden el código, el valor unitario y
+el del renglón: el nombre comercial contra el genérico. El cruce quedó bien; el
+aviso hizo su trabajo de ponerlo a la vista.
+
+**Archivos entregados:** `OBJECIONES_FAMISANAR_03092026.xlsx` (el que se sube)
+y `CRUCE_FAMISANAR_03-09-2026.xlsx` (el respaldo, 60 renglones en REVISAR).
 ### 08-09-2026 (noche, 3) — El dictamen ya no puede contradecir el contrato del propio motor
 
 **El caso.** En la prueba del botón Analizar, la glosa de tarifas de COOSALUD
@@ -895,6 +1233,46 @@ está urgente, qué está pendiente y qué quejas conviene radicar.
 
 **Para la próxima vez.** Subir los documentos nuevos de Sura al chat y pedir
 «actualizar el tablero de cuidados»; Claude entrega el HTML al día.
+
+### 04-09-2026 (noche) — Dispensario Médico, 3 de septiembre: 145 de 145 ubicadas
+
+Tercer lote del día, ahora del **Dispensario Médico**: 145 objeciones de **118
+facturas** por **$10.744.054**, cruzadas contra el export del DGH (213
+renglones de esas mismas 118 facturas).
+
+**Resultado: las 145 quedaron con su servicio identificado** (29 en confianza
+ALTA y 116 en MEDIA), ninguna en revisión. Salió así de limpio porque el Excel
+del Dispensario trae el **nombre del servicio en su propia columna**, y ese
+nombre viene del catálogo del hospital: calza exacto con el del DGH en 143 de
+los 145 renglones. Los otros dos también estaban bien, sólo que el DGH usa un
+nombre más largo para lo mismo («SONDA FOLEY DOS VIAS 14 FR **BALON 5-10CC**»).
+
+**Lo que hubo que construir.** El bot del Dispensario
+(`organizar_objeciones_dispensario.py`) sólo sabía leer el **PDF** del auditor.
+Ahora también lee el **Excel de glosa inicial** (`--entrada-excel`), que es como
+llega el listado hoy: FACTURA | VALOR GLOSA INICIAL | SERVICIO OBJETADO |
+CODIGO GLOSA INICIAL | DESCRIPCION GLOSA INICIAL. De ahí saca el código de
+glosa (viene partido: «TA08 01 TARIFAS-…» → `TA0801`) y arma las 16 columnas de
+siempre, con `CTNCENCOS` vacía y `CROTIPOBJ` por factura (las 118 dieron 0,
+administrativas).
+
+**El motor del cruce quedó compartido.** Para no tener dos copias de la misma
+lógica, lo que se escribió para FAMISANAR se movió a **`tools/_cruce_dgh.py`**
+(igual que `_dinero.py`) y ahora lo usan los dos bots. Se comprobó que los dos
+lotes de FAMISANAR salen **idénticos** después del cambio: mismo archivo, celda
+por celda.
+
+**Una regla nueva del cruce, que pidió este lote.** El Dispensario objeta la
+**diferencia** de tarifa, así que el valor de la objeción casi nunca coincide
+con el del renglón facturado (glosa $16.600 de un servicio de $740.516). Antes
+eso dejaba el cruce en confianza baja aunque el nombre calzara exacto. Ahora,
+si el nombre coincide exacto **y en la factura hay un solo servicio que se
+llame así**, eso identifica el renglón — es la misma idea del «valor único en
+la factura», pero por el lado del nombre.
+
+**Archivos entregados:** `OBJECIONES_DISPENSARIO_03092026.xlsx` (el que se
+sube) y `CRUCE_DISPENSARIO_03-09-2026.xlsx` (el respaldo, con la hoja REVISAR
+vacía).
 
 ### 04-09-2026 (tarde) — FAMISANAR 2 de septiembre: 104 de 105 al primer intento
 
@@ -11689,6 +12067,21 @@ valor leido del PDF o con el objetado.
 
 ## 3) PENDIENTE
 
+### Objeciones DGH — pantalla (08-09)
+- **Probar la pantalla con un lote real de EMSSANAR** (varios PDF a la vez).
+  Se probó con PDF armados a propósito, no con los de ripslink.
+- **Cerrar el lote del ADRES que quedó a medias.** Ese día sólo llegó el
+  `MAESTRO_SERVICIOS_FACTURADOS_ADRES_1.xlsx` y nunca llegó el Excel de
+  glosas del ADRES. Hay que decidir además si se cruza contra el
+  `DETALLE_CONSOLIDACION` traduciendo con `HOMOLOGACION_DGH`, o si se exporta
+  el `SERVICIOS_FACTURADOS_DGH` de esas facturas (que es lo más limpio).
+- **HUS0000549713 (Dispensario, 7-sep): reclamar la posible doble glosa** de
+  glucometrías ($25.145).
+- **FAMISANAR:** el lector del texto de la glosa entiende «SE OBJETA» y
+  «SE RECONOCE», pero no «SE GLOSA». Se propuso agregarlo; **falta que el
+  auditor autorice** el cambio.
+
+
 ### Motor de Glosas — lo que destapó la prueba de cinco casos (08-09)
 - **Tarifas: trató un medicamento (CUM) como procedimiento (CUPS).** Lo de la
   contradicción con el contrato ya quedó resuelto (08-09, noche 3); falta esta
@@ -11771,6 +12164,55 @@ valor leido del PDF o con el objetado.
 - **Agendar** geriatría, nefrología, fisiatría y los laboratorios a domicilio
   (con ayuno de 8–10 horas, menos la creatinina), y **confirmar el inicio**
   de las terapias de deglución y respiratoria ya autorizadas.
+
+### Objeciones DGH — lo que falta decidir (08-09)
+- **VCO:** ¿debe seguir las cuatro reglas (CTNCENCOS vacía y CROTIPOBJ por
+  factura) como las demás entidades, o su flujo de actas es distinto a
+  propósito? Sin esa respuesta no entra a la pantalla.
+- **EMSSANAR:** su entrada son PDF. Decidir si la pantalla debe aceptar PDF
+  además de Excel.
+- **ADRES:** falta el listado de objeciones y elegir contra qué se cruza.
+
+### Objeciones DGH en la pantalla (08-09)
+- **Estrenarla con un lote real**: subir los dos Excel del próximo lote por la
+  pantalla en vez de pedirlo por chat, y comparar que el archivo sea el mismo.
+- **Faltan entidades**: hoy reconoce FAMISANAR, Dispensario y SANITAS. SAVIA,
+  VCO y EMSSANAR ya tienen bot pero todavía no están en esta pantalla (siguen
+  en el Centro de Automatización, que recibe un solo archivo).
+
+### SANITAS — objeciones del 4 de septiembre (08-09)
+- **Piloto en DGH** con la factura HUS0000548650 antes de dar por bueno el
+  formato de SANITAS: es la primera vez que se carga esta entidad.
+- **Confirmar el reparto «Glosa Calculada Afiliado»**: 50 objeciones de $2.350
+  para 25 glucometrías. Los totales cuadran, pero conviene preguntarle a
+  SANITAS si esas parejas de renglones deben ir como dos objeciones o como una.
+
+### FAMISANAR — objeciones del 4 de septiembre (08-09)
+- **Confirmar con FAMISANAR los dos AU5701 de $309.000**: el código de glosa
+  (apoyos terapéuticos) no cuadra con el servicio al que apunta el valor
+  (ablación de trompas). Es lo único raro del lote.
+- **Completar la SO0101 de HUS0000548207**: candidato `129A02H`, 3 unidades.
+- **Decidir si el lector de texto debe reconocer «SE GLOSA»** además de «SE
+  OBJETA» y «SE RECONOCE». Hoy no lo hace y por eso algunos renglones cruzan
+  sólo por valor y quedan en BAJA aunque el nombre esté en el texto.
+
+### FAMISANAR — objeciones del 3 de septiembre (07-09)
+- **Completar las 3 sin cruce** (tabla en la entrada del 07-09): la SO0101 de
+  HUS0000551404 tiene candidato con el valor exacto (`108A01`, 3 unidades); las
+  dos CO0601 de HUS0000547688 hay que resolverlas mirando la factura, porque
+  varios servicios valen lo mismo.
+- **Revisar los 56 renglones de confianza BAJA** de
+  `CRUCE_FAMISANAR_03-09-2026.xlsx`.
+- **Confirmar el renglón del SURVANTA** (`44762-3`, $1.417.593): el cruce se ve
+  correcto —nombre comercial contra genérico— pero conviene verlo.
+
+### Dispensario Médico — objeciones del 3 de septiembre (04-09)
+- **Piloto de una factura en DGH** antes del cargue de las 118 (regla del
+  repo). El archivo no dejó nada en REVISAR, pero el piloto se hace igual.
+- **Ojo con HUS0000550812:** son 11 objeciones del mismo servicio (`891901H`,
+  monitorización electroencefalográfica, $234.057 cada una). Está bien —la
+  factura tiene 12 renglones de ese servicio, uno por unidad— pero conviene
+  mirarlo en pantalla la primera vez.
 
 ### FAMISANAR — objeciones del 2 de septiembre (04-09)
 - **Completar la SO0101 de HUS0000544976** ($1.500.000). Candidato con el valor
@@ -12654,10 +13096,10 @@ dictó el texto de cobertura, se deja fijo en el bot y se cierra HUS545379.
 2. Llamar a la IPS del programa domiciliario para **agendar la visita del
    médico** antes de que se venza la fórmula del mes.
 
-### FAMISANAR — lo primero
-1. Revisar la hoja **REVISAR** de los dos cruces (1 y 2 de septiembre) y hacer
-   el **piloto de una factura** en DGH. Si el piloto entra bien, cargar el
-   resto de los dos lotes.
+### Objeciones para DGH — lo primero
+1. Revisar la hoja **REVISAR** de los cuatro cruces y hacer el **piloto de
+   una factura** en DGH con cada archivo (FAMISANAR 1-sep, 2-sep y 3-sep, y
+   Dispensario 3-sep). Si el piloto entra bien, cargar el resto.
 
 ### Análisis de velas — lo primero
 1. **Armar la aplicación con su histórico** y abrirla en el celular. En el PC

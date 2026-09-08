@@ -1655,6 +1655,7 @@ from app.api.routers.auth_router import router as auth_router
 from app.api.routers.glosas import router as glosas_router
 from app.api.routers.glosas_adres import router as glosas_adres_router
 from app.api.routers.automatizaciones import router as automatizaciones_router
+from app.api.routers.objeciones_dgh import router as objeciones_dgh_router
 from app.api.routers.inteligencia import router as inteligencia_router
 from app.api.routers.bots import router as bots_router
 from app.api.routers.gobierno_ia import router as gobierno_ia_router
@@ -1729,6 +1730,7 @@ app.include_router(quality_gate_stats_router)  # Ola 1: estado del Quality Gate
 app.include_router(glosas_router)
 app.include_router(glosas_adres_router)  # Paquetes de glosas del ADRES
 app.include_router(automatizaciones_router)
+app.include_router(objeciones_dgh_router)
 app.include_router(inteligencia_router)
 app.include_router(bots_router)
 app.include_router(gobierno_ia_router)
