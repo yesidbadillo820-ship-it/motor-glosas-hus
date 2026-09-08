@@ -187,46 +187,133 @@ DESC_RTA_EXTEMPORANEA = (
 COD_RTA_NORMAL = "RE9901"
 DESC_RTA_NORMAL = "RE9901 - Respuesta a glosa dentro de los términos establecidos por la Ley"
 
-OBS_EXTEMPORANEA = (
-    "ESE HUS NO ACEPTA GLOSA, SE LE INFORMA A LA ENTIDAD QUE LA OBJECION ES "
-    "EXTEMPORANEA, NO FUE NOTIFICADA EN LOS TIEMPOS PERENTORIOS DE LA NORMA ESTO "
-    "EN FUNCION DE LA LEY 1438 DE 2011 EN SU ARTÍCULO 57º. TRÁMITE DE GLOSAS. "
-    "LAS ENTIDADES RESPONSABLES DEL PAGO DE SERVICIOS DE SALUD DENTRO DE LOS "
-    "VEINTE (20) DÍAS HÁBILES SIGUIENTES A LA PRESENTACIÓN DE LA FACTURA CON "
-    "TODOS SUS SOPORTES, FORMULARÁN Y COMUNICARÁN A LOS PRESTADORES DE SERVICIOS "
-    "DE SALUD LAS GLOSAS A CADA FACTURA, CON BASE EN LA CODIFICACIÓN Y ALCANCE "
-    "DEFINIDOS EN LA NORMATIVIDAD VIGENTE. UNA VEZ FORMULADAS LAS GLOSAS A UNA "
-    "FACTURA NO SE PODRÁN FORMULAR NUEVAS GLOSAS A LA MISMA FACTURA, SALVO LAS "
-    "QUE SURJAN DE HECHOS NUEVOS DETECTADOS EN LA RESPUESTA DADA A LA GLOSA "
-    "INICIAL."
+COD_RTA_TOPES = "RE9602"
+DESC_RTA_TOPES = "RE9602 - Respuesta a glosa por topes autorizados"
+# Texto del área para la glosa de "FACTURA EXCEDE TOPES AUTORIZADOS". Queda
+# guardado pero el bot NO lo pone solo: el área decide en qué lote se usa. Hoy
+# todas las glosas de cobertura salen con RE9901 y el texto de COBERTURA.
+OBS_TOPES_AUTORIZADOS = (
+    "NOS PERMITIMOS INFORMAR QUE NO SE ACEPTA NI TRAMITA MOTIVO DE GLOSA "
+    'DENOMINADA "FACTURA EXCEDE TOPES AUTORIZADOS", TODA VEZ QUE LA CAUSAL '
+    "INVOCADA POR LA ERP COOSALUD, NO SE ENCUENTRA DESCRITA DENTRO DEL ANEXO 6 "
+    "DE LA RESOLUCIÓN 3047 DE 2008, CONSIDERÁNDOSE ASÍ ESTA GLOSA, UNA MANIOBRA "
+    "INDEBIDA QUE CONLLEVA A UNA DILACIÓN EN EL PAGO DE LAS FACTURAS RADICADAS A "
+    "LA ERP; POR ENCONTRARSE IMPERTINENTE FRENTE A LA TIPOLOGÍA CONTRACTUAL "
+    "ACORDADA POR LAS PARTES. ESTA ENTIDAD NO EVIDENCIA NINGUNA CIRCUNSTANCIA EL "
+    "QUE DE LUGAR A LA GLOSA. ES DE ANOTAR QUE LAS RESPECTIVAS FACTURAS DE VENTA "
+    "FUERON RADICADAS CON LOS SOPORTES QUE RESPALDAN LA PRESTACIÓN DEL SERVICIO"
 )
+
+# Texto de la glosa extemporánea (actualizado por el área el 07-09-2026).
+# Lleva DOS datos que cambian por factura: los días hábiles que pasaron entre la
+# radicación y la glosa, y la fecha de radicación. El bot ya los tiene calculados,
+# así que los escribe él — antes iba un texto genérico y al auditor le tocaba
+# completarlo a mano factura por factura.
+PLANTILLA_OBS_EXTEMPORANEA = (
+    "LA E.S.E. HOSPITAL UNIVERSITARIO DE SANTANDER (HUS) INFORMA A LA ENTIDAD "
+    "RESPONSABLE DEL PAGO (ERP) QUE NO ACEPTA LA GLOSA PRESENTADA, TODA VEZ QUE "
+    "LA OBJECIÓN ES EXTEMPORÁNEA. LA NOTIFICACIÓN SE REALIZÓ FUERA DE LOS "
+    "TÉRMINOS PERENTORIOS ESTABLECIDOS POR LA LEY. LO ANTERIOR, DE CONFORMIDAD "
+    "CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011, EL CUAL ESTIPULA QUE LAS "
+    "ENTIDADES PAGADORAS DISPONEN DE VEINTE (20) DÍAS HÁBILES TRAS LA RADICACIÓN "
+    "DE LA FACTURA PARA REPORTAR Y COMUNICAR TODAS SUS OBJECIONES; (HAN "
+    "TRANSCURRIDO {dias} DÍAS HÁBILES, CONTADOS ENTRE LA RADICACIÓN DE LA FACTURA "
+    "({radicacion}) VENCIDO ESTE PLAZO LEGAL, PRECLUYE LA OPORTUNIDAD PARA EL "
+    "EFECTO. POR LO TANTO, NO ES PROCEDENTE LA FORMULACIÓN DE NUEVAS OBJECIONES, "
+    "SALVO QUE DERIVEN ESTRICTAMENTE DE HECHOS NUEVOS DETECTADOS EN LA RESPUESTA "
+    "A UNA GLOSA INICIAL DEBIDAMENTE PRESENTADA EN EL TIEMPO REGLAMENTARIO. NOTA: "
+    "DE CONFORMIDAD CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011, EN CONCORDANCIA "
+    "CON EL DECRETO 441 DE 2022, SI LA ENTIDAD RESPONSABLE DEL PAGO (ERP) NO SE "
+    "PRONUNCIA O NO RATIFICA SU OBJECIÓN DENTRO DE LOS DIEZ (10) DÍAS HÁBILES "
+    "POSTERIORES A LA RECEPCIÓN DE ESTA RESPUESTA, OPERARÁ DE PLENO DERECHO LA "
+    "ACEPTACIÓN TÁCITA Y SE DARÁ POR LEVANTADA LA RESPECTIVA GLOSA, QUEDANDO LA "
+    "FACTURA EN FIRME PARA SU PAGO INMEDIATO."
+)
+
+
+def obs_extemporanea(dias: int | None = None, radicacion: object = None) -> str:
+    """Texto de extemporaneidad con los días hábiles y la fecha de radicación.
+
+    Sin datos deja los huecos como los escribió el área (`xx` y `XXXX-XX-XX`),
+    para que se vea de una que faltó completarlos y nadie los dé por buenos.
+    """
+    if hasattr(radicacion, "strftime"):
+        fecha = radicacion.strftime("%Y-%m-%d")
+    else:
+        fecha = str(radicacion).strip()[:10] if radicacion else "XXXX-XX-XX"
+    return PLANTILLA_OBS_EXTEMPORANEA.format(
+        dias=dias if dias is not None else "xx",
+        radicacion=fecha or "XXXX-XX-XX",
+    )
+
+
+# Compatibilidad: el texto sin los datos de la factura. Preferir la función.
+OBS_EXTEMPORANEA = obs_extemporanea()
 
 OBS_POR_TIPO = {
     "TARIFAS": (
-        "ESE HUS NO ACEPTA GLOSA POR TARIFAS, TENIENDO EN CUENTA CONTRATO "
-        "68001S00060339-24 Y 68001C00060340-24 VIGENTE ENTRE LAS PARTES PARA LA "
-        "PRESTACIÓN DEL SERVICIO, POR LO TANTO, SE FACTURA A TARIFA A TARIFAS "
-        "ESTABLECIDAS ENTRE LAS PARTES SOAT SMLV-15% Y TARIFAS INSTITUCIONALES "
-        "MEDIANTE RESOLUCIÓN DE LA ESE HUS. NOTA: DE ACUERDO AL ARTÍCULO 57 DE "
-        "LA LEY 1438 DE 2011, DE NO OBTENERSE RATIFICACIÓN DE LA RESPUESTA A LA "
-        "GLOSA EN LOS TÉRMINOS ESTABLECIDOS, SE DARÁ POR LEVANTADA LA RESPECTIVA "
-        "OBJECIÓN"
+        "E.S.E. HUS NO ACEPTA GLOSA POR TARIFAS, LA LIQUIDACIÓN DE LOS SERVICIOS "
+        "SE REALIZO TENIENDO EN CUENTA CONTRATO 68001S00060339-24 Y "
+        "68001C00060340-24 LOS CUAL SE ENCUENTRA VIGENTE PARA LA PRESTACIÓN DE "
+        "LOS SERVICIOS DE SALUD OBJETO DE COBRO. LOS VALORES FUERON FACTURADOS "
+        "BAJO LA MODALIDAD DE MANUAL SOAT LIQUIDADO A SALARIO MÍNIMO LEGAL "
+        "VIGENTE (SMLV) MENOS EL 15%  Y/O APLICANDO LA TARIFA INSTITUCIONAL "
+        "DEBIDAMENTE ADOPTADA MEDIANTE RESOLUCIÓN INTERNA DE LA E.S.E. HUS. "
+        "NOTA: DE CONFORMIDAD CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011, EN "
+        "CONCORDANCIA CON EL DECRETO 441 DE 2022, SI LA ENTIDAD RESPONSABLE DEL "
+        "PAGO (ERP) NO SE PRONUNCIA O NO RATIFICA SU OBJECIÓN DENTRO DE LOS DIEZ "
+        "(10) DÍAS HÁBILES POSTERIORES A LA RECEPCIÓN DE ESTA RESPUESTA, OPERARÁ "
+        "DE PLENO DERECHO LA ACEPTACIÓN TÁCITA Y SE DARÁ POR LEVANTADA LA "
+        "RESPECTIVA GLOSA, QUEDANDO LA FACTURA EN FIRME PARA SU INMEDIATO PAGO"
+    ),
+    "COBERTURA": (
+        "E.S.E. HUS NO ACEPTA LA GLOSA POR COBERTURA, TODA VEZ QUE LOS SERVICIOS "
+        "FUERON EFECTIVAMENTE PRESTADOS Y FACTURADOS CONFORME AL OBJETO Y "
+        "CONDICIONES DE LOS CONTRATOS N.° 68001S00060339-24 Y 68001C00060340-24, "
+        "VIGENTES PARA LA PRESTACIÓN, Y A LAS TARIFAS CONTRACTUALMENTE PACTADAS. "
+        "LA GLOSA SE SUSTENTA EN LA RESOLUCIÓN 3047 DE 2008, ACTUALMENTE "
+        "DEROGADA, SIN ACREDITAR SOPORTE NORMATIVO, CONTRACTUAL O TÉCNICO QUE "
+        "DEMUESTRE LA EXCLUSIÓN DEL SERVICIO. POR LO ANTERIOR, SE SOLICITA EL "
+        "LEVANTAMIENTO DE LA GLOSA Y EL PAGO ÍNTEGRO DE LA FACTURA. ASIMISMO, DE "
+        "CONFORMIDAD CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011 Y EL DECRETO 441 "
+        "DE 2022, LA FALTA DE PRONUNCIAMIENTO O RATIFICACIÓN DENTRO DE LOS DIEZ "
+        "(10) DÍAS HÁBILES DARÁ LUGAR A LA ACEPTACIÓN TÁCITA Y AL LEVANTAMIENTO "
+        "DE LA GLOSA."
     ),
     "AUTORIZACION": (
-        "ESE HUS NO ACEPTA GLOSA POR AUTORIZACIÓN SE EVIDENCIA LA NOTIFICACIÓN A "
-        "LA EPS ANEXO AT 02 Y AT 03 Y ENVÍOS CORRESPONDIENTES (1-2-3 Y 4) ANEXOS "
-        "PRORROGAS Y EGRESO CON LOS ENVÍOS CORRESPONDIENTES PARA LA SOLICITUD "
-        "AUTORIZACIÓN SEGÚN RESOLUCIÓN 3047/2008 Y DECRETO 4747/2007, PACIENTE "
-        "CON ATENTACIÓN INTEGRAL. NOTA: DE ACUERDO AL ARTÍCULO 57 DE LA LEY 1438 "
-        "DE 2011, DE NO OBTENERSE RATIFICACIÓN DE LA RESPUESTA A LA GLOSA EN LOS "
-        "TÉRMINOS ESTABLECIDOS, SE DARÁ POR LEVANTADA LA RESPECTIVA OBJECIÓN"
+        # El área lo entregó nombrando a NUEVA EPS (venía de ese flujo). Aquí
+        # dice COOSALUD, que es la entidad de este bot: mandarle a COOSALUD una
+        # respuesta que nombra a otro pagador es regalarle la glosa.
+        "E.S.E. HUS NO ACEPTA GLOSA, SE EVIDENCIA QUE EL SOPORTE DE AUTORIZACIÓN "
+        "EMITIDO POR COOSALUD CORRESPONDE A LOS SERVICIOS Y CÓDIGOS FACTURADOS. "
+        "ASIMISMO, LA INSTITUCIÓN CUMPLIÓ A CABALIDAD CON EL FLUJO DE "
+        "INFORMACIÓN NORMATIVO, REALIZANDO LAS NOTIFICACIONES DE LOS ANEXOS "
+        "TÉCNICOS 2 (INFORME DE ATENCIÓN INICIAL DE URGENCIAS) Y 3 (SOLICITUD DE "
+        "AUTORIZACIÓN) MEDIANTE LOS ENVÍOS 1, 2, 3 Y 4. DE IGUAL FORMA, SE "
+        "TRAMITARON OPORTUNAMENTE LAS PRÓRROGAS Y EL EGRESO DEL USUARIO BAJO LOS "
+        "ENVÍOS CORRESPONDIENTES PARA GARANTIZAR EL PRINCIPIO DE ATENCIÓN "
+        "INTEGRAL, EN CONCORDANCIA CON EL DECRETO 4747 DE 2007 Y LA RESOLUCIÓN "
+        "3047 DE 2008. NOTA: DE CONFORMIDAD CON EL ARTÍCULO 57 DE LA LEY 1438 DE "
+        "2011, EN CONCORDANCIA CON EL DECRETO 441 DE 2022, SI LA ENTIDAD "
+        "RESPONSABLE DEL PAGO (ERP) NO SE PRONUNCIA O NO RATIFICA SU OBJECIÓN "
+        "DENTRO DE LOS DIEZ (10) DÍAS HÁBILES POSTERIORES A LA RECEPCIÓN DE ESTA "
+        "RESPUESTA, OPERARÁ DE PLENO DERECHO LA ACEPTACIÓN TÁCITA Y SE DARÁ POR "
+        "LEVANTADA LA RESPECTIVA GLOSA, QUEDANDO LA FACTURA EN FIRME PARA SU "
+        "INMEDIATO PAGO"
     ),
     "FACTURACION": (
-        "ESE HUS NO ACEPTA GLOSA POR FACTURACION EN SERVICIOS MEDICOS PRESTADOS "
-        "AL PACIENTE DURANTE SU ESTANCIA EN LA ESE HUS, SERVICIOS LOS CUALES SE "
-        "FACTURAN EN CONCORDANCIA CON EL DECRETO 2423 DEL 96, SERVICIOS PACTADOS "
-        "ENTRE LAS PARTES, LOS SERVICISO FACTURADOS ESTAN ORDENADOS SOPORTADOS Y "
-        "JUSTIFICADOS EN HISTORIA CLINICA ADJUNTA EN FACTURA ENVIADA A LA ENTIDAD"
+        "E.S.E. HUS NO ACEPTA GLOSA POR FACTURACION, APLICADA A LOS SERVICIOS "
+        "MEDICOS PRESTADOS AL PACIENTE DURANTE SU ESTANCIA. TODA LA ATENCION SE "
+        "FACTURO EN ESTRICTA CONCORDANCIA CON EL DECRETO 2423 DE 1996 Y LOS "
+        "ACUERDOS PACTADOS ENTRE LAS PARTES. ASIMISMO, CADA UNO DE LOS SERVICIOS "
+        "COBRADOS SE ENCUENTRA DEBIDAMENTE ORDENADO, SOPORTADO Y JUSTIFICADO EN "
+        "LA HISTORIA CLINICA ADJUNTA A LA FACTURA ENVIADA A SU ENTIDAD. NOTA: DE "
+        "CONFORMIDAD CON EL ARTÍCULO 57 DE LA LEY 1438 DE 2011, EN CONCORDANCIA "
+        "CON EL DECRETO 441 DE 2022, SI LA ENTIDAD RESPONSABLE DEL PAGO (ERP) NO "
+        "SE PRONUNCIA O NO RATIFICA SU OBJECIÓN DENTRO DE LOS DIEZ (10) DÍAS "
+        "HÁBILES POSTERIORES A LA RECEPCIÓN DE ESTA RESPUESTA, OPERARÁ DE PLENO "
+        "DERECHO LA ACEPTACIÓN TÁCITA Y SE DARÁ POR LEVANTADA LA RESPECTIVA "
+        "GLOSA, QUEDANDO LA FACTURA EN FIRME PARA SU INMEDIATO PAGO"
     ),
     "SOPORTES": (
         "ESE HUS NO ACEPTA GLOSA SE ANEXA SOPORTE CORRESPONDIENTE, NOTA: SEGÚN "
@@ -242,6 +329,7 @@ TIPO_POR_PREFIJO = {
     "AU": "AUTORIZACION",
     "FA": "FACTURACION",
     "SO": "SOPORTES",
+    "CO": "COBERTURA",
     "CL": "CALIDAD",
     "DE": "DEVOLUCION",
 }
@@ -385,6 +473,38 @@ def cruzar_codigo(
         objetivo = _cod_sufijo_num(cod)
         return min(candidatos, key=lambda c: (abs(_cod_sufijo_num(c) - objetivo), len(c), c))
     return None
+
+
+# Mínimo de caracteres para fiarse del principio de una descripción. Con menos
+# ("SOL", "GEL") el parecido no dice nada. Con 6 alcanza para OXIGENO.
+MIN_DESC_PRINCIPIO = 6
+
+
+def cruzar_por_principio_desc(cruces: dict, fact: str, descripcion: object) -> str | None:
+    """Último respaldo: la descripción del portal es el PRINCIPIO de la de DGH.
+
+    COOSALUD glosa "OXIGENO" y DGH lo tiene como "OXIGENO MEDICINAL": el código
+    no se parece en nada (1O1044511000101 contra V03AN01) y la descripción no
+    es idéntica, así que ningún respaldo anterior lo agarra. DGH rechaza esas
+    filas con "la cuenta por cobrar no tiene asociado el servicio" y, como el
+    cargue es todo o nada, tumba el archivo entero.
+
+    Solo cruza si dentro de ESA factura hay UN único servicio cuya descripción
+    empiece igual. Si hay varios —"OXIGENO" también empieza la de "OXIGENO
+    MEDICINAL" pero no la de "CANULA NASAL PARA OXIGENO"— se deja quieto y la
+    fila va a NO_CRUZADOS para revisarla a mano. Mejor perder una objeción que
+    objetarle a DGH un servicio que no es.
+    """
+    d = norm_desc(descripcion)
+    if len(d) < MIN_DESC_PRINCIPIO:
+        return None
+    candidatos = {
+        cod
+        for desc_dgh, cod in cruces.get("desc_lista", {}).get(fact, ())
+        if len(desc_dgh) >= MIN_DESC_PRINCIPIO
+        and (desc_dgh.startswith(d) or d.startswith(desc_dgh))
+    }
+    return next(iter(candidatos)) if len(candidatos) == 1 else None
 
 
 def a_numero(v: object) -> float | None:
@@ -726,14 +846,16 @@ def generar_respuestas_glosas(
         extemporanea = dia > DIAS_HABILES_EPS
         if extemporanea:
             n_ext += 1
-            cod, desc, obs = COD_RTA_EXTEMPORANEA, DESC_RTA_EXTEMPORANEA, OBS_EXTEMPORANEA
+            cod, desc = COD_RTA_EXTEMPORANEA, DESC_RTA_EXTEMPORANEA
+            obs = obs_extemporanea(dia, rad)
         else:
             cod, desc = COD_RTA_NORMAL, DESC_RTA_NORMAL
             obs = OBS_POR_TIPO.get(tipo, "")
             if not obs:
-                # CALIDAD (y cualquier tipo sin texto del área): la respuesta es
+                # Tipo sin texto del área (hoy solo CALIDAD): la respuesta es
                 # de auditoría médica — se deja TODO vacío (código y observación)
                 # para que las doctoras diligencien su propia respuesta.
+                # COBERTURA ya no cae aquí: tiene su texto y la responde cartera.
                 cod, desc = "", ""
                 sin_texto[tipo or codigo[:2].upper()] = sin_texto.get(tipo or "?", 0) + 1
         devol = "SI" if codigo[:2].upper() == "DE" or tipo == "DEVOLUCION" else "NO"
@@ -1093,12 +1215,19 @@ def cargar_base_dgh(
 
     # La descripción solo sirve de cruce si es inequívoca (un único código DGH).
     cruce_desc = {k: next(iter(v)) for k, v in desc_a_cod.items() if len(v) == 1}
+    # Índice por factura para el respaldo por PRINCIPIO de la descripción (ver
+    # cruzar_por_principio_desc): solo entran las descripciones inequívocas.
+    desc_por_fact: dict[str, list[tuple[str, str]]] = {}
+    for (f_desc, d_desc), cods in desc_a_cod.items():
+        if len(cods) == 1:
+            desc_por_fact.setdefault(f_desc, []).append((d_desc, next(iter(cods))))
     cruces = {
         "srv_exact": cruce_srv_exact,
         "exact": cruce_exact,
         "sufijo": cruce_sufijo,
         "base": cruce_base,
         "desc": cruce_desc,
+        "desc_lista": desc_por_fact,
         "nom_med": {f: tuple(s) for f, s in nom_med_idx.items()},
         "valor": valor,
         "saldo": saldo,
@@ -1147,8 +1276,26 @@ def generar_objeciones(
     consecutivo = 0
     factura_actual: str | None = None
 
-    # CROTIPOBJ se fija por FACTURA más abajo, según el CRNCONOBJ realmente
-    # escrito en cada fila (no según las glosas crudas). Ver el bloque al final.
+    # Topes sacados del PROPIO detalle de COOSALUD (no necesitan la base DGH):
+    # por (factura, código de servicio), la suma del valor de todas sus líneas
+    # menos la suma de sus copagos. DGH le descuenta el copago al valor del
+    # servicio, así que ese es el máximo que acepta objetar. Se usan cuando no
+    # hay base DGH, para que el cargue no se caiga por el error de siempre
+    # ("El VALOR OBJECION no puede ser mayor al valor del servicio").
+    # Si a alguna línea de un código le falta el valor, ese código no se topa
+    # (mejor no capar que capar con un tope incompleto).
+    topes_portal: dict[tuple[str, str], float] = {}
+    _sin_valor: set[tuple[str, str]] = set()
+    for _s in glosados:
+        _k = (norm_factura(_s["factura"]), norm_codigo(_s["codigo_servicio"]))
+        _v = a_numero(_s.get("valor_servicio"))
+        if _v is None:
+            _sin_valor.add(_k)
+            continue
+        topes_portal[_k] = topes_portal.get(_k, 0.0) + _v - (a_numero(_s.get("copago")) or 0.0)
+    for _k in _sin_valor:
+        topes_portal.pop(_k, None)
+
     for srv in glosados:
         fact = srv["factura"]
         if _num_factura(fact) is None:
@@ -1161,15 +1308,19 @@ def generar_objeciones(
         slnserpro = cod_portal or None
         valor_final = srv["valor_glosado"]
         motivo = None
+        fkey = norm_factura(fact)
         if cruces is not None:
-            fkey = norm_factura(fact)
             del_dgh = cruzar_codigo(
                 cruces, fkey, srv["codigo_servicio"], srv.get("descripcion", "")
             )
             if not del_dgh:
-                # Último respaldo: por descripción (rescata códigos totalmente
+                # Respaldo por descripción exacta (rescata códigos totalmente
                 # distintos, p. ej. DERECHOS DE SALA PARA CURACIONES).
                 del_dgh = cruces["desc"].get((fkey, norm_desc(srv.get("descripcion", ""))))
+            if not del_dgh:
+                # Y por el PRINCIPIO de la descripción, si es inequívoco dentro
+                # de la factura (OXIGENO -> OXIGENO MEDICINAL).
+                del_dgh = cruzar_por_principio_desc(cruces, fkey, srv.get("descripcion", ""))
             if del_dgh:
                 if del_dgh != cod_portal:
                     por_respaldo += 1
@@ -1177,73 +1328,77 @@ def generar_objeciones(
             else:
                 motivo = "no está en DGH"
 
-            # --- Guardián de valor/saldo (solo si el código cruzó) ---
-            # DGH no acepta objetar más que el valor del servicio ni más que el
-            # saldo de la cuenta. Se CAPA la objeción a lo que quede disponible
-            # (para no perder la objeción entera) y se reporta el ajuste. Si ya
-            # no queda cupo, se manda a NO_CRUZADOS.
-            if motivo is None:
-                valobj = a_numero(srv["valor_glosado"])
-                if valobj is not None:
+        # --- Guardián de valor/saldo ---
+        # DGH no acepta objetar más que el valor del servicio ni más que el
+        # saldo de la cuenta. Se CAPA la objeción a lo que quede disponible
+        # (para no perder la objeción entera) y se reporta el ajuste. Si ya
+        # no queda cupo, se manda a NO_CRUZADOS.
+        # CON base DGH el tope es el de DGH; SIN base DGH se usa el del propio
+        # detalle de COOSALUD (topes_portal), que ya ataja el error del COPAGO.
+        if motivo is None:
+            valobj = a_numero(srv["valor_glosado"])
+            if valobj is not None:
+                if cruces is not None:
                     lim_cod = cruces["valor"].get((fkey, slnserpro))
                     lim_sal = cruces["saldo"].get(fkey)
-                    cupo = float("inf")
-                    if lim_cod is not None:
-                        cupo = min(cupo, lim_cod - acum_cod.get((fkey, slnserpro), 0.0))
-                    if lim_sal is not None:
-                        cupo = min(cupo, lim_sal - acum_fac.get(fkey, 0.0))
-                    # Copago (cuota moderadora): DGH descuenta el copago del
-                    # valor del servicio, así que el máximo objetable de esta
-                    # línea es (valor del servicio - copago). La cuota la paga
-                    # el paciente, no la EPS; si se objeta de más, DGH la rechaza
-                    # con "El VALOR OBJECION no puede ser mayor al valor del
-                    # servicio". Se capa la línea a lo que DGH sí acepta.
-                    vserv = a_numero(srv.get("valor_servicio"))
-                    copago = a_numero(srv.get("copago")) or 0.0
-                    if vserv is not None and copago > 0.5:
-                        tope_copago = vserv - copago
-                        if tope_copago < cupo:
-                            cupo = tope_copago
-                            capados_copago += 1
-                    if cupo <= 0.5:
-                        motivo = "sin cupo en DGH (servicio o saldo ya cubierto por otras glosas)"
-                    elif valobj > cupo + 0.5:
-                        # Capar al máximo que DGH acepta y registrar el ajuste.
-                        capado = int(round(cupo))
-                        ajustados.append(
-                            [
-                                factura_dgh(fact),
-                                srv["id_detalle"],
-                                slnserpro,
-                                srv.get("descripcion", ""),
-                                srv["valor_glosado"],
-                                capado,
-                                srv["observacion"][:90],
-                            ]
-                        )
-                        valor_final = capado
-                        valobj = float(capado)
-                    acum_cod[(fkey, slnserpro)] = acum_cod.get((fkey, slnserpro), 0.0) + (
-                        valobj or 0.0
+                else:
+                    lim_cod = topes_portal.get((fkey, cod_portal))
+                    lim_sal = None
+                cupo = float("inf")
+                if lim_cod is not None:
+                    cupo = min(cupo, lim_cod - acum_cod.get((fkey, slnserpro), 0.0))
+                if lim_sal is not None:
+                    cupo = min(cupo, lim_sal - acum_fac.get(fkey, 0.0))
+                # Copago (cuota moderadora): DGH descuenta el copago del
+                # valor del servicio, así que el máximo objetable de esta
+                # línea es (valor del servicio - copago). La cuota la paga
+                # el paciente, no la EPS; si se objeta de más, DGH la rechaza
+                # con "El VALOR OBJECION no puede ser mayor al valor del
+                # servicio". Se capa la línea a lo que DGH sí acepta.
+                vserv = a_numero(srv.get("valor_servicio"))
+                copago = a_numero(srv.get("copago")) or 0.0
+                if vserv is not None and copago > 0.5:
+                    tope_copago = vserv - copago
+                    if tope_copago < cupo:
+                        cupo = tope_copago
+                        capados_copago += 1
+                if cupo <= 0.5:
+                    motivo = "sin cupo en DGH (servicio o saldo ya cubierto por otras glosas)"
+                elif valobj > cupo + 0.5:
+                    # Capar al máximo que DGH acepta y registrar el ajuste.
+                    capado = int(round(cupo))
+                    ajustados.append(
+                        [
+                            factura_dgh(fact),
+                            srv["id_detalle"],
+                            slnserpro,
+                            srv.get("descripcion", ""),
+                            srv["valor_glosado"],
+                            capado,
+                            srv["observacion"][:90],
+                        ]
                     )
-                    acum_fac[fkey] = acum_fac.get(fkey, 0.0) + (valobj or 0.0)
+                    valor_final = capado
+                    valobj = float(capado)
+                acum_cod[(fkey, slnserpro)] = acum_cod.get((fkey, slnserpro), 0.0) + (valobj or 0.0)
+                acum_fac[fkey] = acum_fac.get(fkey, 0.0) + (valobj or 0.0)
 
-            if motivo:
-                no_cruzados.append(
-                    [
-                        factura_dgh(fact),
-                        srv["id_detalle"],
-                        srv["codigo_servicio"],
-                        srv.get("descripcion", ""),
-                        srv["valor_glosado"],
-                        motivo,
-                        srv["observacion"][:90],
-                    ]
-                )
-                if excluir_no_cruzados:
-                    # No se agrega al OBJECIONES (DGH lo marcaría con error).
-                    excluidos += 1
-                    continue
+        if motivo:
+            no_cruzados.append(
+                [
+                    factura_dgh(fact),
+                    srv["id_detalle"],
+                    srv["codigo_servicio"],
+                    srv.get("descripcion", ""),
+                    srv["valor_glosado"],
+                    motivo,
+                    srv["observacion"][:90],
+                ]
+            )
+            if excluir_no_cruzados:
+                # No se agrega al OBJECIONES (DGH lo marcaría con error).
+                excluidos += 1
+                continue
 
         # El consecutivo solo avanza para las filas que SÍ quedan en el archivo,
         # para no dejar huecos cuando se excluyen los no cruzados.
@@ -1605,11 +1760,24 @@ def main(argv: list[str] | None = None) -> int:
                     ", ".join(sorted(res_rta["sin_radicacion"])[:5]),
                 )
             if res_rta["sin_texto"]:
-                logger.warning(
-                    "  Glosas A TIEMPO que responde AUDITORÍA MÉDICA (quedan sin "
-                    "código ni observación, las diligencian las doctoras): %s",
-                    " · ".join(f"{t}: {n}" for t, n in res_rta["sin_texto"].items()),
-                )
+                # Ojo con quién responde cada una: las doctoras solo contestan
+                # CALIDAD (pertinencia). COBERTURA la contesta CARTERA — sale
+                # aquí porque todavía no hay texto tipificado, no porque haya
+                # que esperar a auditoría médica.
+                medicas = {t: n for t, n in res_rta["sin_texto"].items() if t == "CALIDAD"}
+                cartera = {t: n for t, n in res_rta["sin_texto"].items() if t != "CALIDAD"}
+                if medicas:
+                    logger.warning(
+                        "  Glosas A TIEMPO que responde AUDITORÍA MÉDICA (quedan sin "
+                        "código ni observación, las diligencian las doctoras): %s",
+                        " · ".join(f"{t}: {n}" for t, n in medicas.items()),
+                    )
+                if cartera:
+                    logger.warning(
+                        "  Glosas A TIEMPO que responde CARTERA y quedaron sin texto "
+                        "tipificado (hay que definirlo, NO son de las doctoras): %s",
+                        " · ".join(f"{t}: {n}" for t, n in cartera.items()),
+                    )
 
             if base_ok:
                 # Solo las filas DGH de las facturas de ESTE lote.

@@ -26,6 +26,12 @@ openpyxl = pytest.importorskip("openpyxl")
 
 from nucleo import msg_tools  # noqa: E402
 
+from ._entorno import SIN_EXTRACT_MSG  # noqa: E402
+
+# Sin extract-msg no hay nada que probar acá. En el CI la ausencia
+# revienta al importar en vez de saltarse.
+pytestmark = SIN_EXTRACT_MSG
+
 
 def _silencio(_):
     pass

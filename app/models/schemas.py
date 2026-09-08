@@ -200,6 +200,14 @@ class GlosaResult(BaseModel):
     # no emitió el bloque (degradación elegante). Opcional para no romper
     # consumidores que no lo esperan.
     campos_estructurados: Optional[dict] = None
+    # 08-09-2026 — EL SELLO Y EL «⛔ NO RADICAR» NO PUEDEN CONVIVIR.
+    # En la prueba de cinco casos, cuatro dictámenes salieron con el sello
+    # verde «VALIDADO POR QUALITY GATE» y, dos renglones abajo, «⛔ NO RADICAR
+    # TODAVÍA». Un sello junto a una prohibición no significa nada y enseña a
+    # ignorar los dos. El motor ya sabía que estaba bloqueando —lo escribía en
+    # el texto— pero no se lo decía a la pantalla. Ahora lo dice, y por qué.
+    bloqueado_para_radicar: Optional[bool] = None
+    motivos_bloqueo: Optional[list[str]] = None
 
 
 class GlosaHistorialItem(BaseModel):

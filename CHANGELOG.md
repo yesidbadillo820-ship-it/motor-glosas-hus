@@ -1,5 +1,300 @@
 # Registro de cambios
 
+## Sesión 08-sep-2026 (noche, 3) — El escrito no puede contradecir la ficha del motor
+
+Caso 1 de la prueba del botón Analizar (TA0701, COOSALUD). El motor tiene el
+contrato cargado y lo imprime en el recuadro del dictamen; la argumentación del
+mismo documento decía «EL VALOR LIQUIDADO COINCIDE CON LA TARIFA SOAT PLENO» y
+«COOSALUD NO HA APORTADO ELEMENTOS DE PRUEBA QUE DEMUESTREN LA EXISTENCIA DE
+UNA TARIFA PACTADA DISTINTA O INFERIOR».
+
+- **`_contradice_la_ficha_contractual(argumento, ficha)`** — cruza el texto del
+  argumento contra la ficha de `get_contrato`. Detecta tres cosas: decir «SOAT
+  PLENO» con descuento pactado, negar el contrato que el motor tiene, y
+  exigirle a la entidad probar una tarifa pactada que el hospital ya tiene.
+  Devuelve las frases con ambos valores nombrados, para que el gestor lea qué
+  contradice a qué.
+- **`_hay_tarifa_pactada_de_verdad(ficha)`** — las tres puertas que evitan el
+  falso positivo: sin contrato, con `_vigencia_vencida` o con
+  `_tarifa_indeterminada` no se marca, porque ahí decir «SOAT pleno» es
+  correcto. Y un pacto A SOAT pleno (factor 1.0) tampoco contradice.
+- **Bloquea, no avisa.** Nueva marca en `_MARCAS_DE_BLOQUEO`, así que el sello
+  sale rojo por la vía de la PR anterior. El aviso de `[PLATA-INVENTADA]` ya
+  existía y solo avisaba: el caso 1 salió sellado en verde encima de la
+  contradicción.
+- **No reescribe el argumento.** Redactarle la defensa jurídica al modelo es
+  peor que marcarlo.
+
+La red anterior (`_vigencia_vencida`) solo cubría el contrato vencido; con uno
+vigente nadie cruzaba el texto contra la ficha.
+
+28 pruebas nuevas, incluido el párrafo del caso real palabra por palabra.
+
+
+## Sesión 08-sep-2026 (noche, 2) — Cuatro señales del dictamen que se contradecían
+
+Prueba de cinco casos desde `/analizar` (TA0701, SO3401, CL0101, FA1605,
+CO4601). La IA no fallaba de fondo; fallaba lo que el motor decía de sí mismo.
+
+- **`GlosaResult.bloqueado_para_radicar` + `motivos_bloqueo`** — el motor ya
+  escribía «⛔ NO RADICAR TODAVÍA» en el texto pero no se lo decía a la
+  pantalla, que estampaba «✓ VALIDADO POR QUALITY GATE» encima.
+  `_bloqueos_para_radicar()` lee las marcas que el propio motor deja
+  (falta de soporte de la causal, entidad sin identificar, afirmar contenido
+  de documentos no aportados). En `renderResult`, si viene bloqueado el sello
+  es rojo (`.qg-bloqueado`, «⛔ NO LISTO PARA RADICAR») con los motivos en el
+  `title`; el verde solo cuando no. Respuestas sin el campo (caminos de
+  salida temprana, historial viejo) se comportan como antes.
+- **`_neutralizar_eps_generica_en_dictamen()`** — con la EPS en «OTRA / SIN
+  DEFINIR», el escrito radicable decía «INTERPUESTA POR OTRA / SIN DEFINIR» y
+  «SE SOLICITA A OTRA / SIN DEFINIR PRECISAR». Se sustituye por «LA ENTIDAD
+  RESPONSABLE DE PAGO» **solo la forma suelta**: la del aviso al gestor
+  («quedó como «OTRA / SIN DEFINIR»») se conserva. `_parrafo_cobertura_soat`
+  deja de usar el marcador como nombre. En los dos impresos (`imprimirDictamen`
+  e `imprimirLoteConsolidado`) el marcador sale como «ENTIDAD PAGADORA SIN
+  IDENTIFICAR».
+- **`_paciente_honesto()`** — el prompt daba por defecto «PACIENTE
+  IDENTIFICADO EN EXPEDIENTE» y la cabecera lo mostraba sobre facturas sin
+  expediente. Ahora el prompt, `dictamen_directo` y el post-proceso dicen
+  «PACIENTE NO IDENTIFICADO EN LOS SOPORTES» cuando no hay nombre.
+- **`_avisos_de_soportes_no_leidos()`** — los avisos «no se adjuntó ningún
+  soporte» y «sí se adjuntaron, pero ninguno de ese tipo» salían juntos con
+  cero PDF: el segundo se calculaba contra un texto vacío y todo le parecía
+  faltante. Ahora la decisión se toma una vez: sin soportes va el de cero; con
+  soportes, la revisión por tipo.
+
+63 pruebas nuevas (51 de servicio, 10 de pantalla, 2 actualizadas). Chequeo
+en navegador de `renderResult` con resultado simulado en los tres estados.
+
+
+## Sesión 08-sep-2026 (noche) — Los soportes de mesa van a disco, en flujo
+
+El auditor reportó que sus escaneos pesan **25–40 MB**. El tope era de 15 MB
+—un número escogido sin dato— y los dejaba a todos afuera. Pero subir el
+número a secas habría tumbado el motor.
+
+### Lo que había mal, y no era el tope
+
+- El archivo se guardaba como base64 en SQLite: +33% de tamaño.
+- `soportes_subidos()` hacía `query(SoporteMesaRecord).all()`, así que
+  SQLAlchemy traía **todas** las columnas, `contenido_b64` incluida. Listar
+  diez soportes de 40 MB eran ~500 MB de texto en memoria.
+- `docker-compose.yml` fija `mem_limit: 640m` y su propio comentario
+  documenta que el OOM killer ya mató procesos al azar antes.
+
+### Cómo queda
+
+- **`guardar_soporte_en_disco()`** — escribe en pedazos de 1 MB. La memoria
+  usada no depende del tamaño del archivo. El tope se comprueba **mientras**
+  se escribe: 500 MB se cortan a los 50, no se sostienen para después
+  rechazarlos. Lo escrito a medias se borra.
+- **`carpeta_de_soportes()`** — deriva de `SOPORTES_ROOT`, así que en el
+  hospital cae en `/data/soportes_mesa`: el volumen persistente, junto a la
+  base. El motor se autoactualiza cada 5 minutos; fuera del volumen, la
+  evidencia de una audiencia duraría minutos.
+- **Nombre en disco propio** (`AAAAMM/<uuid>.<ext>`) — el nombre que pone el
+  usuario puede traer `../` y escribir fuera de la carpeta.
+- **`sha256`** por soporte — un archivo alterado no sirve de evidencia.
+- **`soportes_subidos()`** pide solo las columnas que muestra.
+- **Descarga con `FileResponse`** — por pedazos, no entera en memoria.
+- **`MAX_BYTES_SOPORTE = 50 MB`**, y el mismo tope en el frontend.
+- Aviso en pantalla cuando el archivo pasa de 8 MB: «puede tardar, no cierre
+  la ventana». Sin eso, el auditor cree que se colgó y le da otra vez.
+
+### Compatibilidad
+
+`contenido_b64` pasa a ser opcional y se sigue leyendo: los soportes subidos
+esta tarde, antes del cambio, se bajan igual. Migración en `app/main.py` para
+`ruta_relativa` y `sha256`.
+
+15 pruebas nuevas, incluidas: que un escaneo de 30 MB entra, que el
+contenido NO queda en la base, que listar no lee los archivos, que lo
+rechazado no deja basura en disco, que un nombre con `../` no escribe fuera
+de la carpeta, y que la carpeta cae en el volumen persistente.
+
+
+## Sesión 08-sep-2026 — Suite en cero fallas, gates de verdad y subida de soportes
+
+### La suite ya no arrastra doce fallas
+
+- **`office_tools.modulos_libreoffice_faltantes()` / `libreoffice_puede_convertir()`** —
+  la causa real de las doce fallas: `libreoffice-core` instalado sin Writer,
+  Calc ni Draw. `hay_libreoffice()` solo miraba el ejecutable, así que
+  `soffice` «existía» y la conversión moría con «source file could not be
+  loaded» — un mensaje que manda a buscar un archivo dañado que no existe.
+  Ahora `a_pdf()` comprueba el módulo del tipo de archivo ANTES de intentar y
+  nombra el paquete a instalar.
+- **`scripts/preparar_entorno_pruebas.sh`** — instala LibreOffice completo y
+  `extract-msg` (con `--no-deps`: su dependencia `red-black-tree-mod` ya no
+  compila, y solo hace falta para re-escribir `.msg`, no para leerlos). Lo usa
+  el CI y sirve igual en un contenedor de desarrollo.
+- **`tests/test_tools/_entorno.py`** — en un PC sin las herramientas las
+  pruebas se saltan diciendo qué falta; en el CI,
+  `EXIGIR_HERRAMIENTAS_DE_PRUEBA=1` hace que la ausencia reviente al importar.
+  Un `skipif` ahí dejaría el CI verde con doce pruebas saltadas.
+
+### Gates que de verdad bloquean
+
+- **`scripts/revisar_vulnerabilidades.py`** — el paso de seguridad terminaba
+  en `|| true`: encontraba 22 vulnerabilidades y decía que todo estaba bien.
+  Ahora falla ante cualquier vulnerabilidad **nueva**; las conocidas están en
+  `seguridad/vulnerabilidades_conocidas.txt`, a la vista. Poner el gate en
+  cero de una vez dejaría el CI rojo permanentemente y bloquearía los propios
+  arreglos.
+- **Job `CI OK`** — una sola casilla que exige los tres pasos, para que el día
+  que se agregue un cuarto no quede fuera del gate.
+- **`.github/rulesets/motor-glosas-protegida.json`** — la protección lista
+  para importar. Aplicarla requiere permisos de dueño del repositorio.
+
+### El indexador ya no puede pintar en blanco
+
+- **`app/services/soportes_contrato.py`** — modelos Pydantic
+  (`SoporteDeFactura`, `RespuestaSoportes`) y `leer_soportes()`, el único
+  camino que deben usar las pantallas. Cinco estados explícitos:
+  `CON_SOPORTES`, `SIN_SOPORTES`, `INDEXANDO`, `SIN_INDICE` y
+  `DATOS_INVALIDOS`. Un registro malo se descarta y se **cuenta**; no tumba a
+  los buenos ni se cuela como fila vacía. Nunca lanza: un índice caído es un
+  estado que se pinta, no una excepción que tumba la mesa.
+- **`mesaPintarSoportes()`** en el frontend — una sola función pinta los cinco
+  estados. Los errores en rojo (`.mesa-sop-err`), lo que aún no se sabe en
+  ámbar (`.mesa-sop-duda`). «Dice que hay 3 y no se pudo leer ninguno» ya no
+  es una caja vacía.
+
+### Subir soportes en la mesa
+
+- **`SoporteMesaRecord`** — guardado en la base y no en el share: el índice
+  del hospital se reconstruye cada tantas horas y un archivo puesto a mano
+  desaparecería. Por factura, no por renglón.
+- **`validar_soporte()`** — peso (15 MB), tipo (PDF e imágenes) y **firma
+  real** del archivo: el `content-type` lo manda el navegador y un ejecutable
+  renombrado a `.pdf` llega diciendo «application/pdf».
+- **Cuatro rutas** bajo `/conciliaciones/mesa/{id}/soportes-subidos`. Una mesa
+  cerrada devuelve 409. La descarga filtra por mesa —cambiar el número en la
+  dirección no abre los soportes de otra audiencia— y sanea el nombre para
+  que no inyecte cabeceras.
+- **Frontend** — el peso se comprueba antes de mandar, el botón se bloquea
+  mientras sube (un doble clic no sube dos veces) y se desbloquea en
+  `finally`, con spinner que respeta `prefers-reduced-motion`.
+
+93 pruebas nuevas.
+
+
+## Sesión 07-sep-2026 (noche, 2) — La mesa muestra por qué se glosó y con qué refutar
+
+La tabla cortaba el motivo de la glosa a media línea y no decía si la factura
+tenía soportes. Con la EPS al frente, eso obligaba a abrir el Excel aparte.
+
+- **`glosa_del_motor()`** (`mesa_conciliacion.py`) — enlaza el renglón con la
+  glosa del historial por factura **y** código. Solo por factura traería la
+  primera de doce y se mostraría el dictamen de otra. Se guarda en
+  `MesaLineaRecord.glosa_id` al abrir la mesa (migración en `app/main.py`).
+- **`detalle_linea()`** — devuelve el dictamen del motor, los soportes y los
+  comentarios del equipo. Cuando la glosa no está en el motor (vino solo en el
+  archivo de la EPS) lo dice explícitamente en vez de responder vacío.
+- **`_soportes_de()`** — **tres** estados, no dos: `CON_SOPORTES`,
+  `SIN_SOPORTES` y `INDEXANDO`/`SIN_INDICE`. Decir «no tiene» mientras el
+  índice se construye induce a aceptar una glosa soportada.
+- **`soportes_de_la_mesa()`** — consulta por factura, no por renglón: doce
+  glosas de la misma factura comparten soportes y recorrer el índice doce
+  veces daría la misma respuesta.
+- **Pantalla** (`static/index.html`) — flecha que despliega el motivo completo
+  con `white-space:pre-wrap` (+ `title` para verlo al pasar el mouse), columna
+  de soportes con insignia, botón «Gestionar» que abre un cajón lateral con
+  cuatro secciones, y limpieza de la tabla (renglones alternados, hover,
+  `tabular-nums`).
+- **`.mesa-drawer[hidden]{display:none}`** — sin esta regla el `display:flex`
+  ganaba sobre `hidden` y el fondo invisible del cajón se comía todos los
+  clics de la página.
+
+Corregido en el camino:
+
+- `lookup()` del indexador devuelve **diccionarios**, no objetos: se leían con
+  `getattr` y el cajón mostraba «3 soportes» con tres nombres en blanco. Va
+  con prueba que falla contra el código anterior.
+- El ayudante `_funcion()` de `test_mesa_conciliacion_pantalla.py` cortaba el
+  cuerpo a 2.600 caracteres: agregarle una línea a la función dejaba el resto
+  fuera y las pruebas de «esto no aparece» (`toLocaleString`) pasaban sin
+  haber mirado. Ahora corta en la función siguiente.
+
+30 pruebas nuevas (11 de API, 18 de pantalla, 1 de regresión de soportes).
+
+
+## Sesión 07-sep-2026 (noche) — La mesa de conciliación vive en el motor
+
+El acta se arma, se guarda y se trabaja en pantalla; el Excel sale al final.
+
+- **`MesaConciliacionRecord` + `MesaLineaRecord`** — el acta en curso y sus
+  renglones. Tres dueños por renglón que no se mezclan: lo que trajo la EPS
+  (solo lectura), lo que decide la mesa y lo contable.
+- **`app/services/mesa_conciliacion.py`** — `abrir()`, `guardar_linea()`,
+  `resumen()`, `cerrar()`, `reabrir()` y `a_excel()`. Solo los campos de
+  `CAMPOS_EDITABLES` se tocan: el valor objetado y el código son de la EPS.
+  Guardar NO impide repartir de más —en una mesa se tantea— pero devuelve el
+  pendiente al instante y el `revisar()` lo atrapa al cerrar.
+- **`app/services/conceptos_nota_hus.py`** — el catálogo de contabilidad, 234
+  combinaciones. El centro de costo sale de `conceptos_glosa` (DGH) y se
+  consulta con vía ACTAS. Sin centro en el catálogo devuelve None: no se
+  aproxima una cuenta contable.
+- **Siete rutas** bajo `/conciliaciones/mesa`. Reabrir exige coordinador.
+- **Pantalla**: tabla con encabezado fijo, guardado automático, botones
+  «todo A/L/R» por renglón, renglones en ámbar cuando falta decidir, y la
+  tabla ancha recorriéndose en su propia caja.
+- **58 pruebas nuevas** (20 de ruta, 19 de pantalla, 19 de servicio y
+  catálogo).
+
+## Sesión 07-sep-2026 (hotfix) — El acta generada abría «[Reparado]»
+
+- **`_reponer_lo_que_openpyxl_se_lleva()`** — openpyxl no edita el `.xlsm`, lo
+  reconstruye, y descarta 3 de los 5 `definedNames` del modelo (los
+  `_FilterDatabase` de ACTA, GLOSAS y TRAMITES), dejando el superviviente
+  reasignado a `Hoja3`. También pierde `printerSettings` y las rels de una
+  hoja. Se repone todo desde el original tras guardar. `calcChain.xml` y
+  `sharedStrings.xml` se dejan fuera a propósito: son cachés, y un calcChain
+  previo a la escritura es en sí mismo un disparador de reparación.
+- **`_borrar_renglones_sobrantes()`** — el modelo trae 260 filas prebordeadas;
+  un acta de 3 líneas salía con 257 de cuadrícula vacía. Se les quita borde y
+  relleno en vez de borrar las filas: `delete_rows` correría el pie del acta
+  (bloque de observaciones y firmas, en celdas combinadas) y lo rompería. El
+  fin de la banda de datos se detecta por la primera combinación bajo el
+  encabezado, no por un número fijo.
+- **11 pruebas nuevas**: los 5 nombres sobreviven y cada autofiltro sigue en
+  su hoja, no falta ninguna parte salvo las dos cachés, las líneas reales
+  conservan su formato y el pie no se movió.
+
+## Sesión 07-sep-2026 (tarde) — Armar el ACTA SINAC desde la lista y el archivo de la EPS
+
+Faltaba el paso de **aguas arriba** del módulo de conciliación: ya se sabía
+leer, revisar y optimizar un acta llena, pero no armarla. Se hacía a mano.
+
+- **`app/services/acta_conciliacion_armar.py`** — cruza la lista de facturas
+  con el consolidado de la EPS y produce `Acta` + `LineaActa`, las mismas
+  estructuras de `acta_conciliacion_excel`, así que lo generado pasa tal cual
+  por el `revisar()` que ya existía: el acta sale llena **y cuadrada**.
+  - Llave del cruce tolerante a los tres formatos del número de factura.
+  - Encabezados de la EPS buscados **por nombre**, no por posición (cada EPS
+    manda el consolidado en otro orden), con emparejado exacto para que
+    «VALOR FACTURA» no le robe la columna a «FACTURA».
+  - Tipificación deducida del código (CL/FA/SO/TA), verificada contra las 257
+    líneas del acta 709 del Dispensario.
+  - `escribir_en_modelo()` vuelca sobre el `.xlsm` oficial con `keep_vba`,
+    resolviendo las celdas combinadas del encabezado (openpyxl solo deja
+    escribir en la superior izquierda del grupo).
+- **`ConciliacionTipificacionRecord`** — memoria por factura + código de lo
+  que decidió una persona. Lo que el código no puede deducir (pertinencia
+  mixta vs. médica) se pregunta una vez y queda guardado.
+- **`POST /conciliaciones/acta-excel/armar`** — con `solo_revisar` devuelve el
+  parte; si no, el `.xlsm` con el parte en la cabecera `X-Acta-Parte`.
+  **`POST /conciliaciones/acta-excel/aprender`** alimenta la memoria desde el
+  acta ya trabajada.
+- **Pantalla** en Conciliación: dos zonas de arrastre, las casillas del
+  encabezado, «Ver qué sale» y «Armar y descargar acta».
+- **`plantillas/ACTA_SINAC_modelo.xlsm`** — el formato oficial en blanco.
+- **58 pruebas nuevas** (39 de servicio, 19 de ruta y pantalla).
+
+Lo que NO se rellena solo: el tipo de las glosas de pertinencia (decisión
+clínica) y los valores de aceptar/levantar/ratificar, que se escriben en la
+audiencia.
+
 ## Sesión 07-sep-2026 — Pre-Auditoría: tres defectos de producción
 
 Hallados auditando el código, no por una prueba fallida: los tres se

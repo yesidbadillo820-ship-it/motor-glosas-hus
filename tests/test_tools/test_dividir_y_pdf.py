@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import shutil
 import sys
 from pathlib import Path
 
@@ -27,6 +26,8 @@ from test_ajustar_detallado_glosas import (  # noqa: E402
     _membrete,
     _pie_archivo,
 )
+
+from ._entorno import SIN_LIBREOFFICE  # noqa: E402
 
 
 @pytest.fixture()
@@ -263,10 +264,9 @@ class TestCLI:
         assert pdf.main(["--origen", str(vacia)]) == 2
 
 
-@pytest.mark.skipif(
-    not shutil.which("soffice") and not Path("/usr/lib/libreoffice/program/soffice").exists(),
-    reason="hace falta LibreOffice para convertir de verdad",
-)
+# Mira los MÓDULOS de LibreOffice, no solo el ejecutable: con
+# `libreoffice-core` a secas, `soffice` existe pero no abre ningún documento.
+@SIN_LIBREOFFICE
 class TestConversionReal:
     def test_genera_los_pdf(self, carpeta_excels, tmp_path):
         salida = tmp_path / "pdf"

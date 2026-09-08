@@ -44,10 +44,40 @@ from app.models.db import (
 
 # Regla del proceso: una misma factura se acepta devuelta máximo 3 veces.
 MAX_DEVOLUCIONES = 3
+
+
+def tope_devoluciones(canon: "FacturaPreauditoriaRecord") -> int:
+    """El máximo de devoluciones para ESTA factura.
+
+    Es el tope del proceso (3) más las devoluciones EXTRA que coordinación haya
+    autorizado como excepción puntual (con testigo). Sin excepción, devuelve 3.
+    """
+    return MAX_DEVOLUCIONES + int(getattr(canon, "devoluciones_extra", 0) or 0)
+
+
 # Un mismo envío puede cargarse en hasta 3 oficios distintos: el original y
 # las recargas de subsanación (facturación reenvía las devueltas con el
 # MISMO número de envío dentro de un oficio nuevo — caso real 30-07-2026).
 MAX_OFICIOS_POR_ENVIO = 3
+
+
+def tope_cargas_envio(db: Session, envio: str) -> int:
+    """El máximo de oficios en que puede cargarse ESTE envío.
+
+    Es el tope del proceso (3) más las devoluciones extra que coordinación haya
+    autorizado a alguna factura del envío. Las dos reglas son gemelas: una
+    devolución más es una vuelta más, y cada vuelta trae el envío en un oficio
+    nuevo (caso HUS315614, 08-09-2026: la excepción subía el cupo de
+    devoluciones pero este tope seguía bloqueando la carga). Sin excepción,
+    devuelve 3.
+    """
+    extra = (
+        db.query(sa_func.max(FacturaPreauditoriaRecord.devoluciones_extra))
+        .filter(FacturaPreauditoriaRecord.envio_actual == str(envio).strip())
+        .scalar()
+    )
+    return MAX_OFICIOS_POR_ENVIO + int(extra or 0)
+
 
 # Plazo para auditar un oficio: 3 días hábiles (lunes a viernes),
 # contados a partir del día siguiente al recibo.
@@ -1116,7 +1146,7 @@ def preview_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> dic
         elif canon.resultado_actual == RESULTADO_DEVUELTA:
             clasif = "REINGRESO"
             reingresos += 1
-            if canon.num_devoluciones >= MAX_DEVOLUCIONES:
+            if canon.num_devoluciones >= tope_devoluciones(canon):
                 alertas.append(
                     f"{r.factura} lleva {canon.num_devoluciones} devoluciones: solo radicar/escalar"
                 )
@@ -1154,7 +1184,7 @@ def preview_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> dic
             else ("otro oficio" if otro else None)
         ),
         "veces_cargado": len(cargas),
-        "max_cargas_envio": MAX_OFICIOS_POR_ENVIO,
+        "max_cargas_envio": tope_cargas_envio(db, envio),
         "oficios_donde_cargado": _radicados_de_cargas(db, cargas),
         "total_en_fuente": len(src),
         "nuevas": nuevas,
@@ -1210,13 +1240,14 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
             "envio": envio,
             "cargado_en": a_utc(aqui.cargado_en).isoformat() if aqui.cargado_en else None,
         }
-    if len(cargas) >= MAX_OFICIOS_POR_ENVIO:
+    tope_envio = tope_cargas_envio(db, envio)
+    if len(cargas) >= tope_envio:
         radicados = ", ".join(_radicados_de_cargas(db, cargas))
         return {
             "ya_cargado": True,
             "mensaje": (
                 f"El envío {envio} ya fue cargado en {len(cargas)} oficios ({radicados}): "
-                f"el proceso acepta máximo {MAX_OFICIOS_POR_ENVIO}."
+                f"el proceso acepta máximo {tope_envio}."
             ),
             "envio": envio,
         }
@@ -1295,7 +1326,7 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
                     _nuevo_evento(canon, "REINGRESO", oficio=oficio, fuente=fuente, usuario=usuario)
                 )
                 reingresos += 1
-                if canon.num_devoluciones >= MAX_DEVOLUCIONES:
+                if canon.num_devoluciones >= tope_devoluciones(canon):
                     alertas.append(
                         f"{r.factura} ya lleva {canon.num_devoluciones} devoluciones: "
                         "solo debería radicarse o escalarse."
@@ -1390,12 +1421,12 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
         total_cargas = (
             db.query(EnvioCargadoRecord).filter(EnvioCargadoRecord.envio == envio).count()
         )
-        if total_cargas > MAX_OFICIOS_POR_ENVIO:
+        if total_cargas > tope_envio:
             db.rollback()
             return {
                 "ya_cargado": True,
                 "mensaje": (
-                    f"El envío {envio} ya alcanzó el máximo de {MAX_OFICIOS_POR_ENVIO} "
+                    f"El envío {envio} ya alcanzó el máximo de {tope_envio} "
                     "oficios (otra carga entró al mismo tiempo). Actualice la página."
                 ),
                 "envio": envio,
@@ -1526,14 +1557,15 @@ def auditar_factura(
                     "que sale en el oficio de devolución."
                 ),
             }
-        if canon.num_devoluciones >= MAX_DEVOLUCIONES:
+        if canon.num_devoluciones >= tope_devoluciones(canon):
             return {
                 "ok": False,
                 "codigo": 409,
                 "mensaje": (
                     f"La factura {canon.factura} ya fue devuelta {canon.num_devoluciones} veces; "
-                    f"el proceso acepta máximo {MAX_DEVOLUCIONES} devoluciones. Debe radicarse "
-                    "o escalarse al coordinador."
+                    f"el proceso acepta máximo {tope_devoluciones(canon)} devoluciones. Debe "
+                    "radicarse, escalarse al coordinador o —si es un caso excepcional— pedir a "
+                    "coordinación que autorice una devolución extra."
                 ),
             }
 
@@ -1603,7 +1635,7 @@ def auditar_factura(
         canon.resultado_actual = RESULTADO_DEVUELTA
         canon.motivo_ultima_devolucion = motivo.strip()
         canon.pendiente_subsanacion = 1
-        if canon.num_devoluciones >= MAX_DEVOLUCIONES:
+        if canon.num_devoluciones >= tope_devoluciones(canon):
             canon.estado = ESTADO_BLOQUEADA
         elif canon.ronda_actual == 1:
             canon.estado = ESTADO_DEVUELTA_PEND
@@ -1664,6 +1696,63 @@ def auditar_factura(
         return {"ok": True}
 
     return {"ok": False, "codigo": 400, "mensaje": "Resultado inválido."}
+
+
+# ==================================================================
+# Excepción al tope de 3 devoluciones (autorizada por coordinación)
+# ==================================================================
+
+
+def autorizar_devolucion_extra(
+    db: Session,
+    canon: FacturaPreauditoriaRecord,
+    usuario: str,
+    motivo: str = None,
+) -> dict:
+    """Coordinación autoriza UNA devolución más allá del tope de 3.
+
+    POR QUÉ EXISTE (caso real 07-09-2026): la HUS315614 se devolvió las 3 veces
+    del tope, pero el caso ameritaba una cuarta. La regla de 3 sigue firme para
+    todos; esto es una EXCEPCIÓN puntual, por factura, y con testigo: sube el
+    cupo en uno (el tope de esta factura pasa a 4), queda grabado en el
+    historial quién lo autorizó y por qué, y al usarse la cuarta la factura se
+    vuelve a bloquear sola. No abre un hueco permanente.
+    """
+    if not (motivo or "").strip():
+        return {
+            "ok": False,
+            "codigo": 400,
+            "mensaje": "Escriba por qué se autoriza la devolución extra: queda en el historial.",
+        }
+    oficio = (
+        db.get(OficioRecepcionRecord, canon.oficio_actual_id) if canon.oficio_actual_id else None
+    )
+    fuente = datos_fuente(db, canon.factura)
+    canon.devoluciones_extra = int(canon.devoluciones_extra or 0) + 1
+    # Si estaba marcada BLOQUEADA por haber tocado el tope, ya no lo está:
+    # queda como devuelta pendiente de subsanación, que es su estado real.
+    if canon.estado == ESTADO_BLOQUEADA:
+        canon.estado = ESTADO_NUEV_DEVUELTA if canon.ronda_actual >= 2 else ESTADO_DEVUELTA_PEND
+    db.flush()
+    db.add(
+        _nuevo_evento(
+            canon,
+            "DEVOLUCION_EXTRA_AUTORIZADA",
+            oficio=oficio,
+            fuente=fuente,
+            usuario=usuario,
+            motivo=motivo.strip(),
+        )
+    )
+    db.commit()
+    db.refresh(canon)
+    return {
+        "ok": True,
+        "factura": canon.factura,
+        "devoluciones_extra": canon.devoluciones_extra,
+        "tope": tope_devoluciones(canon),
+        "num_devoluciones": canon.num_devoluciones,
+    }
 
 
 # ==================================================================
@@ -1824,7 +1913,7 @@ def _deshacer_facturas(db: Session, facturas: list, oficio_id: int) -> tuple[int
             else:
                 f.resultado_actual = RESULTADO_DEVUELTA
                 f.pendiente_subsanacion = 1
-                if f.num_devoluciones >= MAX_DEVOLUCIONES:
+                if f.num_devoluciones >= tope_devoluciones(f):
                     f.estado = ESTADO_BLOQUEADA
                 elif f.ronda_actual == 1:
                     f.estado = ESTADO_DEVUELTA_PEND

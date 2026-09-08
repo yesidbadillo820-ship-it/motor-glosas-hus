@@ -275,6 +275,57 @@ class ComentarioGlosaRecord(Base):
     __table_args__ = (Index("ix_comentarios_glosa", "glosa_id", "creado_en"),)
 
 
+class SoporteMesaRecord(Base):
+    """Un soporte que el auditor sube DESDE la mesa, en plena audiencia.
+
+    Va aparte del indexador del hospital a propósito. Aquel recorre el share
+    y solo LEE lo que ya estaba archivado; su índice se reconstruye entero
+    cada tantas horas, así que un archivo que se meta ahí a mano puede
+    desaparecer en la siguiente pasada. Lo que se sube en una mesa es
+    evidencia de esa mesa y no se puede perder: queda registrada con quién la
+    subió y cuándo, que es lo que después se cita en el acta.
+
+    EL ARCHIVO VA A DISCO, NO A LA BASE. Los escaneos que maneja cartera
+    pesan entre 25 y 40 MB. Guardarlos como base64 en SQLite los inflaba un
+    33% y, peor, obligaba a cargarlos enteros en memoria para cualquier cosa
+    —hasta para LISTARLOS—. El contenedor del hospital corre con 640 MB de
+    tope y el compose ya documenta que el OOM killer mató procesos antes:
+    listar diez soportes de 40 MB lo habría tumbado en plena audiencia.
+    Ahora solo se guardan los datos del archivo, y el archivo vive en
+    `/data/soportes_mesa/`, en el mismo volumen persistente que la base.
+
+    Se guarda por FACTURA, no por renglón: una factura con doce glosas
+    comparte sus soportes, y obligar a subir el mismo PDF doce veces en una
+    audiencia es tiempo que no hay.
+    """
+
+    __tablename__ = "soportes_mesa"
+
+    id = Column(Integer, primary_key=True, index=True)
+    mesa_id = Column(Integer, ForeignKey("mesas_conciliacion.id", ondelete="CASCADE"), index=True)
+    # Sin `index=True` acá: el índice compuesto de abajo ya cubre la búsqueda
+    # que de verdad se hace (los soportes de UNA factura de UNA mesa), y dos
+    # índices sobre lo mismo solo cuestan escrituras.
+    factura = Column(String(50))
+    nombre = Column(String(300))
+    mime_type = Column(String(100))
+    tamano_bytes = Column(Integer)
+    # Dónde quedó el archivo, relativo a la carpeta de soportes de mesa.
+    ruta_relativa = Column(String(400))
+    # Para saber si el archivo se dañó o alguien lo cambió por fuera. Un
+    # soporte alterado no sirve como evidencia, y peor: engaña.
+    sha256 = Column(String(64))
+    # Los soportes subidos ANTES de pasar a disco (08-09-2026) viven acá.
+    # Se siguen leyendo para no perder nada de lo ya cargado; los nuevos
+    # nunca lo usan.
+    contenido_b64 = Column(Text)
+    nota = Column(String(500))  # para qué sirve este soporte, en la mesa
+    subido_por = Column(String(200))
+    subido_en = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("ix_soportes_mesa_por_factura", "mesa_id", "factura"),)
+
+
 class PlantillaGoldRecord(Base):
     """Argumentos técnico-jurídicos que ganaron (EPS levantó la glosa).
 
@@ -1282,6 +1333,12 @@ class FacturaPreauditoriaRecord(Base):
     ronda_actual = Column(Integer, default=1, nullable=False)  # 1=primera; 2+=subsanación
     num_subsanacion = Column(Integer, default=0, nullable=False)  # 0,1,2,3 = ronda_actual-1
     num_devoluciones = Column(Integer, default=0, nullable=False)  # veces devuelta (tope 3)
+    # Devoluciones EXTRA autorizadas por coordinación por encima del tope de 3
+    # (excepción puntual y con testigo). El tope efectivo es 3 + este número.
+    # Caso 07-09-2026: HUS315614 necesitó una cuarta devolución autorizada.
+    # server_default="0": el DDL lleva DEFAULT 0, así los INSERT crudos que
+    # omiten la columna (importador de consolidado, comparar acta) no fallan.
+    devoluciones_extra = Column(Integer, default=0, server_default="0", nullable=False)
     pendiente_subsanacion = Column(Integer, default=0, nullable=False)  # 0/1
 
     # Última auditoría
@@ -1688,3 +1745,162 @@ class PreAuditoriaEventoRecord(Base):
     actor = Column(String(120), index=True)
 
     __table_args__ = (Index("ix_pre_auditoria_estado_creado", "estado", "creado_en"),)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  MEMORIA DE TIPIFICACIÓN PARA LAS MESAS DE CONCILIACIÓN
+# ══════════════════════════════════════════════════════════════════════════
+
+
+class ConciliacionTipificacionRecord(Base):
+    """Qué era cada glosa, para no volver a preguntarlo.
+
+    «Estas facturas son las mismas que trabajamos acá siempre», dijo el
+    auditor, y tiene razón: las cuentas vuelven mesa tras mesa. La
+    tipificación (TARIFAS, SOPORTES, PERTINENCIA, FACTURACIÓN) sale sola del
+    código de glosa, pero el TIPO —administrativa, mixta o médica— no: en las
+    de pertinencia lo decide un médico auditor mirando el caso.
+
+    Acá queda escrito lo que decidió, por factura y código. La próxima vez que
+    esa glosa aparezca en un acta, el armador ya lo sabe y no la marca. Con el
+    tiempo, hasta las de pertinencia se llenan solas.
+
+    Se guarda también lo que el motor dedujo, para poder mirar después en qué
+    se equivocó la deducción y en qué no.
+    """
+
+    __tablename__ = "conciliacion_tipificacion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    actualizado_en = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # La llave: la factura en dígitos (sin prefijo ni ceros) y el código.
+    factura_clave = Column(String(30), index=True, nullable=False)
+    cod_glosa = Column(String(12), index=True, nullable=False)
+
+    # TARIFAS / SOPORTES / PERTINENCIA / FACTURACION — se deduce del código.
+    tipificacion = Column(String(30))
+    # ADMINISTRATIVA / MIXTA / MEDICO — lo que decidió una persona.
+    tipo_glosa = Column(String(30), index=True)
+
+    # Lo que el motor había deducido solo, para poder auditar la deducción.
+    tipo_deducido = Column(String(30))
+    # Quién lo decidió y en qué acta.
+    definido_por = Column(String(200))
+    numero_acta = Column(String(60), index=True)
+
+    __table_args__ = (
+        Index("ix_conciliacion_tipif_llave", "factura_clave", "cod_glosa", unique=True),
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  LA MESA DE CONCILIACIÓN: EL ACTA VIVE EN EL MOTOR MIENTRAS SE TRABAJA
+# ══════════════════════════════════════════════════════════════════════════
+
+MESA_ABIERTA = "ABIERTA"
+MESA_CERRADA = "CERRADA"
+
+
+class MesaConciliacionRecord(Base):
+    """Un acta de conciliación en curso.
+
+    POR QUÉ EXISTE. Una audiencia con la EPS dura horas y se trabaja renglón
+    por renglón. Antes el acta se bajaba en Excel y se llenaba por fuera: si
+    se cerraba el archivo sin guardar, o dos personas lo abrían a la vez, el
+    trabajo de la mesa se perdía o se pisaba.
+
+    Ahora el acta se arma y **se queda acá**. Se trabaja en pantalla, cada
+    cambio queda escrito, y el Excel se genera al final, con lo conciliado.
+    Si se cierra el navegador o se va la luz, la mesa está donde se dejó.
+    """
+
+    __tablename__ = "mesas_conciliacion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    creado_en = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    actualizado_en = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # ── El encabezado del acta, que escribe el auditor ──
+    nit = Column(String(30))
+    razon_social = Column(String(300))
+    numero_acta = Column(String(60), index=True)
+    periodo = Column(String(60))
+    fecha_conciliacion = Column(DateTime(timezone=True))
+
+    estado = Column(String(20), default=MESA_ABIERTA, index=True)
+    creado_por = Column(String(200), index=True)
+    cerrado_en = Column(DateTime(timezone=True))
+    cerrado_por = Column(String(200))
+
+    # Cuántas facturas traía la lista, para poder decir «de 63 facturas, 50
+    # tenían glosas» sin recalcularlo cada vez.
+    facturas_en_lista = Column(Integer, default=0)
+
+
+class MesaLineaRecord(Base):
+    """Un renglón del acta: una glosa de una factura.
+
+    Guarda las tres cosas que conviven en una línea y que tienen dueños
+    distintos: lo que trajo el archivo de la EPS (no se toca), lo que se
+    decide en la mesa (los valores y el texto) y lo contable (centro de
+    costo, cuenta y concepto de la nota crédito).
+    """
+
+    __tablename__ = "mesa_conciliacion_lineas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    mesa_id = Column(Integer, index=True, nullable=False)
+    orden = Column(Integer, default=0)
+
+    # La glosa del motor a la que corresponde este renglón, si la tenemos.
+    # Los renglones vienen del archivo de la EPS, no del historial, así que
+    # puede estar vacía: hay facturas que la EPS glosa y que el motor nunca
+    # recibió. Cuando está, abre la puerta al historial, a los comentarios
+    # del equipo y a los soportes que ya se le cargaron.
+    glosa_id = Column(Integer, index=True)
+
+    # ── Lo que vino del archivo de la EPS ──
+    item = Column(String(10))
+    radicado = Column(String(60))
+    factura = Column(String(50), index=True)
+    factura_clave = Column(String(30), index=True)
+    fecha_factura = Column(String(20))
+    cod_glosa = Column(String(12), index=True)
+    descripcion = Column(Text)
+    valor_factura = Column(Float, default=0.0)
+    glosa_inicial = Column(Float, default=0.0)
+
+    # ── Lo que se deduce, y lo que decide una persona ──
+    tipificacion = Column(String(30))
+    tipo_glosa = Column(String(30))
+    # Por qué esta línea necesita a alguien. Vacío si salió completa.
+    aviso = Column(Text)
+
+    # ── Lo que se escribe EN la mesa ──
+    acepta_ips = Column(Float, default=0.0)
+    levanta_entidad = Column(Float, default=0.0)
+    ratificado = Column(Float, default=0.0)
+    texto_conciliacion = Column(Text)
+
+    # ── Lo contable, para la nota crédito ──
+    centro_costo = Column(String(200))
+    cuenta_contable = Column(String(30))
+    concepto_nota = Column(String(10))
+
+    actualizado_en = Column(DateTime(timezone=True), onupdate=func.now())
+    actualizado_por = Column(String(200))
+
+    __table_args__ = (Index("ix_mesa_lineas_mesa_orden", "mesa_id", "orden"),)
+
+    @property
+    def pendiente(self) -> float:
+        """Lo que queda por repartir en la mesa."""
+        return round(
+            (self.glosa_inicial or 0.0)
+            - (self.acepta_ips or 0.0)
+            - (self.levanta_entidad or 0.0)
+            - (self.ratificado or 0.0),
+            2,
+        )

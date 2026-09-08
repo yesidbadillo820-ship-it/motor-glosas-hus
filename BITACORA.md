@@ -429,6 +429,675 @@ aviso hizo su trabajo de ponerlo a la vista.
 
 **Archivos entregados:** `OBJECIONES_FAMISANAR_03092026.xlsx` (el que se sube)
 y `CRUCE_FAMISANAR_03-09-2026.xlsx` (el respaldo, 60 renglones en REVISAR).
+### 08-09-2026 (noche, 3) — El dictamen ya no puede contradecir el contrato del propio motor
+
+**El caso.** En la prueba del botón Analizar, la glosa de tarifas de COOSALUD
+salió así: el recuadro del dictamen decía —bien— «Contrato 68001C00060340-24 ·
+Tarifa pactada SOAT −15 %», que es lo que el motor tiene cargado. Y dos
+párrafos más arriba, en el texto que se radica, decía que el valor liquidado
+«coincide con la tarifa **SOAT PLENO**» y que **COOSALUD no había probado que
+existiera una tarifa pactada distinta o inferior**.
+
+Sí existe. La tiene el hospital, y sale impresa en el mismo papel.
+
+**Por qué es grave.** A la EPS le basta leer el recuadro de nuestro propio
+dictamen —o abrir su copia del contrato— para tumbar la respuesta sin discutir
+el fondo. Y en una glosa de tarifas, decir «SOAT pleno» cuando lo pactado es
+un 15 % menos es concederle a la entidad justo lo que objetó.
+
+**Por qué no lo atrapó nada.** Había una red que corregía esto, pero solo
+cuando el contrato estaba **vencido**. Con un contrato vigente, nadie cruzaba
+el texto contra la ficha. El aviso de «plata que el motor no calculó» sí vio
+algo raro, pero solo **avisaba**: el dictamen salió con el sello verde.
+
+**Cómo queda.** Ahora, cuando el motor tiene un contrato vigente con descuento
+pactado, se revisa que el escrito no diga lo contrario. Si lo dice, el dictamen
+queda **bloqueado** —sello rojo, no verde— y se le nombra al gestor qué
+contradice a qué: «dice SOAT PLENO y lo pactado es SOAT −15 %».
+
+**Lo que NO hace, a propósito:** no reescribe el argumento. Redactarle la
+defensa jurídica al modelo es peor que marcarlo; el gestor corrige y radica.
+
+Y para que el aviso no salga siempre —un aviso que sale siempre se aprende a
+ignorar—, solo actúa cuando hay pacto de verdad: sin contrato, con la vigencia
+terminada o con la tarifa indeterminada, decir «SOAT pleno» es correcto y no
+se marca.
+
+28 pruebas nuevas.
+
+---
+
+
+### 08-09-2026 (noche, 2) — Cinco casos por el botón Analizar: el motor se contradecía a sí mismo
+
+**Lo que se hizo.** Se probaron cinco glosas inventadas para eso —tarifas,
+soportes, pertinencia, una extemporánea y una con el valor en cero— y se
+leyeron los cinco dictámenes de punta a punta.
+
+**Lo que funcionó bien:** el detector de extemporaneidad contó los 31 días
+hábiles solo, con el argumento del Art. 57 puesto como defensa adicional; el
+caso del valor en cero no inventó ninguna cifra; y en los cinco, la relación
+de soportes dijo la verdad («no se encontró el expediente») en vez de listar
+documentos que no existen.
+
+**Lo que falló, y quedó corregido en esta tanda (cuatro cosas):**
+
+1. **El sello verde salía junto al «⛔ NO RADICAR».** Cuatro de los cinco
+   dictámenes tenían arriba «VALIDADO POR QUALITY GATE» y abajo «NO RADICAR
+   TODAVÍA». Un sello junto a una prohibición no significa nada y enseña a
+   ignorar los dos. Ahora, cuando el motor bloquea, el sello es **rojo** y
+   dice «NO LISTO PARA RADICAR», con el motivo al pasar el mouse. El verde
+   solo sale cuando de verdad no hay nada que lo impida.
+2. **«OTRA / SIN DEFINIR» escrito en el dictamen como si fuera la EPS.** «La
+   glosa interpuesta por OTRA / SIN DEFINIR», «se solicita a OTRA / SIN
+   DEFINIR precisar el tope». Eso es el texto del desplegable de la pantalla
+   metido en el escrito que se radica. Ahora, si no se supo la entidad, el
+   escrito dice «la entidad responsable de pago» — y el aviso al gestor de que
+   falta identificarla se conserva.
+3. **«DEFENSA TÉCNICA: PACIENTE IDENTIFICADO EN EXPEDIENTE»** en cuatro casos
+   que decían, dos renglones abajo, «no se encontró el expediente». Era el
+   texto por defecto que el prompt le daba a la IA. Ahora, si no hay nombre,
+   dice «paciente no identificado en los soportes».
+4. **Dos avisos que se desmentían entre sí:** «no se adjuntó ningún soporte»
+   y, debajo, «SÍ se adjuntaron soportes, pero ninguno de ese tipo», con la
+   casilla de PDF vacía. Ahora se decide una sola vez cuál de los dos va.
+
+**Lo que se vio y queda para la siguiente tanda** (está en PENDIENTE): el
+caso de tarifas contradice el contrato que el motor tiene guardado; la
+ratificación «mantiene» una respuesta inicial que no existe; una corrección
+automática dejó una frase rota; las citas mal usadas pasan el verificador; y
+los indicadores de riesgo se contradicen entre sí.
+
+**Además:** SURA, SALUD TOTAL y MUTUAL SER no aparecen en la lista de
+entidades del botón Analizar. Se anota aparte.
+
+63 pruebas nuevas y un chequeo en navegador del sello con un resultado
+simulado (bloqueado, limpio y respuesta vieja sin el dato).
+
+---
+
+
+### 08-09-2026 (noche, 2) — La HUS559324: el sistema se equivocó, por qué, y qué quedó arreglado
+
+**Lo que pasó.** Yesid abrió la factura **HUS0000559324** (ADRES, $670.000,
+envío 234449) y la pantalla la marcó en rojo: *cuenta prescrita*. Pasó el
+archivo para comprobar si el sistema estaba en lo cierto.
+
+**El sistema se equivocó, y la cuenta NO estaba prescrita.** Al principio
+pareció que sí: tres fuentes decían lo mismo. Pero al mirar el PDF de la
+factura apareció que las tres beben del mismo dato malo:
+
+| De dónde | Ingreso | Egreso |
+|---|---|---|
+| **La factura impresa (PDF)** | 13/02/2025 | **14/03/2025** ← el bueno |
+| El RIPS | 13/02/2025 | 13/02/2025 |
+| El XML que va a la DIAN y al ADRES | 13/02/2025 | 13/02/2025 |
+| El validador del Ministerio | 13/02/2025 | 13/02/2025 |
+
+Eran **20 sesiones de terapia física** del 13 de febrero al 14 de marzo. El
+RIPS trae UNA sola línea con la fecha de la primera sesión, y el XML copió
+esa misma fecha como si fuera la salida. Con el egreso bueno la cuenta
+**vencía el 14/09/2026**: le quedaban seis días, no estaba prescrita.
+
+Un falso «prescrita» es **peor que no tener la alerta**: manda a soltar una
+cuenta que todavía se podía cobrar.
+
+**Lo que quedó arreglado.**
+
+- Cuando el RIPS **no trae fecha de salida** y el sistema la deduce de la
+  última atención, ahora **lo dice** y avisa que si la cuenta son varias
+  sesiones el egreso real puede ser posterior.
+- El sistema **lee el PDF de la factura**, que es el único documento que
+  imprime el día en que el paciente salió, y **cuenta el plazo con ese**.
+- Si el PDF y el XML **se contradicen**, sale un reparo grave: el XML es el
+  que viaja al ADRES, así que hay que corregirlo en facturación.
+- En pantalla queda escrito **con qué egreso se contó el plazo**, que es lo
+  primero que hay que mirar cuando el dictamen no cuadra.
+
+**Un problema del hospital, aparte del sistema.** El XML que se le manda a
+la DIAN y al ADRES dice que esa atención empezó y terminó el mismo minuto
+(13/02/2025 06:54 → 06:55), cuando fueron 20 sesiones en un mes. Eso el
+ADRES lo puede glosar, y si viene del sistema de facturación no es solo esta
+factura. Vale la pena revisar otras cuentas de sesiones.
+
+**Lo que también quedó — y era la pieza que faltaba.** El aviso decía
+«el sistema no tiene fechas de ingreso y egreso declaradas por el hospital».
+Resulta que **sí las hay**, y en la misma carpeta del servidor:
+
+- el **XML de la factura electrónica** trae el período de la atención (es lo
+  que el hospital le declara a la DIAN), y
+- el **resultado del validador del Ministerio** lo trae también, ya validado
+  para expedir el CUV.
+
+Ahora el sistema las lee solo y **contrasta de verdad** el RIPS contra lo que
+declaró el hospital: si no coinciden, lo dice con los días de diferencia.
+Prefiere el XML de la factura, y si no está usa el del validador. En pantalla
+queda escrito de dónde salió el dato, para poder rastrearlo.
+
+**No hizo falta el detallado de DGH** que se había pensado usar: la
+información estaba más cerca y es más confiable.
+
+51 pruebas nuevas, incluidas las que reproducen la HUS559324 completa y
+fijan que ya no salga como prescrita.
+
+---
+
+### 08-09-2026 (noche) — El tope de los soportes, y algo peor que encontré al subirlo
+
+**Lo que se pidió.** Usted probó y dijo que sus escaneos pesan entre 25 y
+40 MB. El tope que yo había puesto era de 15 MB — un número que me inventé,
+sin preguntar. Los dejaba a **todos** afuera. Ya está en **50 MB**.
+
+**Lo que apareció al ir a cambiarlo.** El número era lo de menos. La forma en
+que estaba guardando los archivos habría **tumbado el motor** con archivos de
+ese tamaño:
+
+- Los guardaba dentro de la base de datos, convertidos a texto. Eso los
+  engorda un 33%: un escaneo de 40 MB ocupaba 53.
+- Peor: para **cualquier cosa** —hasta para mostrar la lista de lo ya
+  subido— había que cargarlos enteros en memoria. Listar diez soportes eran
+  500 MB de golpe.
+- El motor del hospital corre con **640 MB** de tope de memoria, y el propio
+  archivo de configuración deja escrito que cuando se pasa de ahí el sistema
+  operativo empieza a matar programas al azar. Ya pasó antes.
+
+O sea: con el tope en 15 MB casi nadie podía subir nada, y **el día que
+alguien lo subiera a 50 sin mirar el resto, el motor se caía en plena
+audiencia**.
+
+**Cómo quedó.** Los archivos ya no van a la base: van a la carpeta `/data`,
+la misma donde vive la base y que sobrevive a las actualizaciones (el motor
+se actualiza solo cada cinco minutos; si hubieran quedado en otro lado, la
+evidencia de una audiencia habría durado minutos). Se escriben **de a un
+mega por vez**, así que da igual que el archivo pese 5 MB o 50: la memoria
+que se usa es la misma. La lista ya no lee los archivos, solo sus datos.
+
+Además, de cada soporte se guarda una **huella** para saber si se dañó o si
+alguien lo cambió por fuera — un soporte alterado no sirve de evidencia, y
+peor, engaña.
+
+**Nada de lo ya subido se pierde:** los soportes que se cargaron esta tarde,
+antes del cambio, se siguen pudiendo bajar igual.
+
+Probado con un PDF de 30 MB, del tamaño de los suyos. 15 pruebas nuevas.
+
+---
+
+### 08-09-2026 (tarde, 3) — Las cuentas del ADRES ya avisan cuándo se están venciendo
+
+**Lo que pidió Yesid.** Que el sistema mire, para las facturas que van al
+ADRES, la fecha de ingreso y de egreso del paciente; que las lea del archivo
+RIPS que está en el servidor de facturación electrónica; que las compare con
+las de la factura y avise si no cuadran; y que cuente los **18 meses** desde
+el egreso para marcar la cuenta si ya se pasó del plazo.
+
+**Lo que quedó listo (primera parte).** Cuatro piezas, todas con prueba:
+
+- **El calendario colombiano ya se calcula solo.** Los festivos venían
+  escritos a mano en una lista. Ahora salen de la fórmula (la ley que corre
+  los festivos al lunes, más la Semana Santa) y sirven para cualquier año.
+- **La cuenta de los 18 meses**, con la parte fina que es donde se equivocan
+  las cuentas hechas a mano: un egreso del **31 de agosto** vence el **28 de
+  febrero**, no el 3 de marzo.
+- **La lectura del RIPS**: abre el `Rips_HUSxxxx.json` y saca ingreso y
+  egreso. Si el archivo no está, llegó a medias o no trae egreso, **dice el
+  motivo y no inventa la fecha**.
+- **El cotejo**: marca como error grave un egreso anterior al ingreso, una
+  factura hecha antes de que el paciente saliera, o un egreso posterior al
+  día en que Facturación entregó la cuenta. Y cuando no hay con qué
+  comparar, lo dice — no da por bueno lo que nadie revisó.
+
+**Un problema que apareció de paso.** Los festivos de **2027 y 2028** que
+tenía el motor escritos a mano **están equivocados**: los que se corren al
+lunes quedaron en el lunes *anterior* en vez del *siguiente* (el Día de la
+Raza de 2027 quedó el 11 de octubre y va el 18), y la Semana Santa de 2027
+está una semana adelante. Eso afecta los conteos de días hábiles del motor
+de glosas. **No se tocó la lista vieja** para no meter el motor de glosas en
+un cambio de pre-auditoría: queda anotado para decidirlo aparte.
+
+**Dos cosas que quedaron dichas, no supuestas.**
+
+1. Un plazo de **meses** se cuenta por calendario: los festivos **no mueven**
+   la fecha de corte de los 18 meses. Donde sí sirven es para decir cuál es
+   el **último día en que de verdad se puede radicar** (si el corte cae
+   domingo o festivo) y cuántos **días hábiles** quedan.
+2. El término de 18 meses **no aparece en el corpus de normas del sistema**,
+   así que la alerta **no cita ningún artículo**: el plazo quedó como un
+   parámetro del hospital. El sistema cuenta; la norma la escribe el gestor.
+
+**Lo que ya quedó enganchado (segunda parte, el mismo día).** Al abrir una
+factura del ADRES en «Auditar», la ventana muestra sola:
+
+- si la cuenta está **vigente, por vencer o prescrita**, con la fecha en que
+  vence y cuántos días hábiles quedan;
+- los **reparos de fechas** (en rojo los imposibles);
+- el **ingreso y el egreso** que dice el RIPS.
+
+El sistema busca el RIPS **yendo directo a la carpeta de la factura** en el
+servidor de facturación electrónica (`<AAAAMM>\FACTURAS_SALUD\<HUSxxxx>`),
+mirando también el mes anterior y el siguiente. No recorre el servidor
+entero: eso tardaría horas. Y se calcula **cuando el gestor abre la
+factura**, no al cargar el envío, para no volver lenta la carga de todos los
+días.
+
+Solo aplica a las facturas del **ADRES** (se reconocen por NIT o por nombre,
+con el mismo criterio que ya usaba el resto del sistema). En las demás no se
+pinta nada.
+
+**Antes de usarlo hay que decirle dónde está el servidor.** En el PC del
+motor, crear el archivo `config\facturacion_electronica_root.txt` con una
+sola línea:
+
+```
+\\172.16.32.83\factura_electronica_net22
+```
+
+Mientras no exista, la pantalla lo dice con todas sus letras («no está
+configurado el servidor de facturación electrónica») en vez de quedarse
+callada.
+
+**Lo que sigue pendiente.** Las fechas de ingreso y egreso **declaradas por
+el hospital**: hoy el sistema no las guarda en ninguna tabla, así que el
+cotejo compara el RIPS contra la fecha de la factura y la del oficio, y
+avisa que nadie contrastó las de atención. Buscando se encontró de dónde
+podrían salir: el **detallado de DGH sí trae las columnas FECHA_INGRESO y
+FECHA_EGRESO**, pero el lector del sistema no las mapea (le faltan dos
+líneas). Queda para confirmarlo con Yesid y engancharlo.
+
+---
+
+### 08-09-2026 (tarde, 2) — La excepción de las 3 devoluciones también abre el cuarto oficio del envío
+
+**Lo que mostró Yesid.** Con la excepción ya autorizada para la HUS315614
+(quedó **3/4**), Facturación reenvió la factura con el **mismo número de
+envío (228254)** en un oficio nuevo, y al cargarlo el sistema seguía diciendo:
+«ya fue cargado en 3 oficios: el proceso acepta máximo 3». Es una regla
+**gemela** de la de las devoluciones: un envío solo puede cargarse en 3
+oficios — y la excepción solo había abierto una de las dos.
+
+**Lo que quedó.** Las dos reglas van de la mano: una devolución más es **una
+vuelta más**, y cada vuelta trae el envío en un oficio nuevo. Ahora, cuando
+coordinación autoriza la devolución extra, el envío de esa factura también
+puede cargarse **una vez más** (el máximo pasa a 4). Al usarse, todo se
+vuelve a bloquear solo. Sin excepción, ambos topes siguen en 3.
+
+Con la prueba del caso completo: tres vueltas con el mismo envío, el cuarto
+oficio bloqueado, coordinación autoriza, el cuarto oficio entra, la cuarta
+devolución pasa, y el quinto oficio vuelve a quedar bloqueado.
+
+---
+
+### 08-09-2026 (tarde) — El motivo del oficio de devolución sale numerado y legible
+
+**Lo que mostró Yesid.** En el PDF del oficio de devolución (el
+DEV-PRE-AUD-0149-2026), el MOTIVO salía como **un bloque corrido**: las
+observaciones que el gestor separa con «//» quedaban pegadas unas con otras,
+ilegibles para Facturación. Tanto, que al área le habían dado un *prompt* de
+IA para numerarlas a mano cada vez.
+
+**Lo que quedó.** Eso lo hace el sistema solo, con las mismas reglas que usaba
+el área: cada «//» es un corte; la primera observación arranca con «1- », la
+siguiente con «2- », «3- »…; un renglón en blanco entre una y otra; el «//»
+no se imprime; y **no se cambia ni una palabra** del texto. Con una sola
+observación no se toca nada. Si el gestor ya había numerado a mano, no se
+duplica el número.
+
+- Aplica en el **PDF del oficio de devolución** y en el **historial** de la
+  factura en pantalla (donde se lee). La caja donde se **escribe** el motivo
+  sigue tal cual, con sus «//», que es lo que el gestor necesita conservar.
+- De paso se cerró un riesgo: un «<» o un «&» dentro del motivo rompía el
+  PDF. Ya no.
+
+Los gestores siguen escribiendo igual (separando con «//»); solo dejan de
+pasar el texto por una IA aparte. 17 pruebas nuevas (incluida una que genera
+el PDF real y lee que salga «1- … 2- … 3- …»).
+
+---
+
+### 08-09-2026 (tarde) — La rama del hospital quedó blindada
+
+Ya está puesta la protección de `motor-glosas`, la rama de la que el PC de
+cartera baja el código cada 5 minutos. **Ya no se puede fusionar nada sin que
+los cuatro chequeos terminen bien**: formato, pruebas, escaneo de seguridad y
+la casilla que exige los tres. Tampoco se puede empujar directo sin pull
+request, ni borrar la rama, ni reescribir su historia.
+
+**Ojo con esto si algún día hay que rehacerlo:** al importar el archivo de
+reglas, GitHub **NO trajo la lista de chequeos exigidos** — quedó vacía. Hubo
+que agregar los cuatro a mano, buscándolos por su nombre exacto:
+
+```
+Lint (ruff)
+Tests (pytest)
+Security scan (pip-audit)
+CI OK
+```
+
+Sin ese paso la regla queda puesta pero no exige nada, que es peor que no
+tenerla: uno cree que está protegido y no lo está. La forma de comprobarlo en
+diez segundos: en la siguiente pull request, el botón verde de fusionar tiene
+que salir **gris** hasta que los cuatro terminen.
+
+---
+
+### 08-09-2026 — Cuatro cosas que estaban flojas por debajo
+
+**1. Las doce pruebas que «siempre fallaban» sí eran un problema.**
+
+Durante meses la suite terminaba con doce fallas y se aceptaron como «cosas
+del entorno». No lo eran. LibreOffice estaba instalado **a medias**: el
+programa arrancaba, pero le faltaban Writer, Calc y Draw — o sea, todo lo
+que abre documentos. El motor contestaba «LibreOffice no pudo convertir el
+archivo», que suena a archivo dañado, y mandaba a buscar donde no era.
+
+Ahora el motor **mira si el módulo está** antes de intentar, y cuando falta
+lo dice con nombre propio: «le falta el módulo Writer… no es que el archivo
+esté dañado… instale libreoffice-writer». Se agregó
+`scripts/preparar_entorno_pruebas.sh`, que deja el entorno listo de una vez.
+La suite quedó en **cero fallas**.
+
+Y para que no vuelva a pasar: en el CI, una prueba que se salte por falta de
+herramienta **es un fallo**, no un aviso. Antes, si la instalación del
+servidor se rompía, la suite habría seguido dando verde con doce pruebas
+saltadas y nadie se habría enterado.
+
+**2. La rama del hospital ya no se puede fusionar a ciegas.**
+
+`motor-glosas` es de la que el PC de cartera baja el código cada 5 minutos.
+Se podía fusionar con las pruebas todavía corriendo — pasó ayer mismo con la
+PR #649, fusionada 38 segundos después de abrirse. Queda listo el archivo de
+protección para aplicar en dos minutos (`.github/rulesets/`, con las
+instrucciones); **ese último clic lo tiene que dar usted**, porque cambiar la
+configuración del repositorio necesita permisos de dueño.
+
+De paso se descubrió algo peor: el paso de «escaneo de seguridad» del CI
+terminaba en `|| true`, es decir, **decía que todo estaba bien pasara lo que
+pasara**. Encontraba 22 vulnerabilidades en las librerías del motor y las
+ocultaba. Ahora falla si aparece una **nueva**, y las 22 conocidas quedaron
+anotadas y a la vista en `seguridad/vulnerabilidades_conocidas.txt`.
+Actualizarlas es trabajo aparte y queda en PENDIENTE: son el corazón de la
+aplicación que corre en el hospital y no se cambian de afán.
+
+**3. La pantalla ya no puede quedarse en blanco.**
+
+El buscador de soportes puede contestar cinco cosas distintas y antes tres
+de ellas se veían igual: una caja vacía. «No tiene soportes», «todavía estoy
+buscando» y «no pude mirar» son tres cosas muy diferentes, y en una mesa
+confundirlas hace aceptar una glosa que sí estaba soportada. Ahora cada
+respuesta se valida al entrar y se pinta como lo que es: los errores en rojo,
+lo que aún no se sabe en ámbar, y nunca una caja vacía sin explicación.
+
+**4. Ya se pueden subir soportes desde la mesa.**
+
+Era lo que quedó a medias ayer. Ahora, en plena audiencia, se sube el PDF o
+la foto del documento desde el mismo cajón: se elige el archivo, se le pone
+una nota de para qué sirve, y queda guardado en el motor con quién lo subió
+y cuándo. Se puede volver a bajar y quitarlo si se subió por error.
+
+Solo entran **PDF e imágenes**, hasta **15 MB**. Un Excel o un Word hay que
+pasarlo antes a PDF. El peso se revisa **antes de mandarlo**, para no perder
+minutos subiendo algo que iba a ser rechazado. Y se comprueba que el archivo
+**sea** lo que dice ser: un programa al que le cambiaron la extensión a
+`.pdf` no entra. Una mesa ya cerrada no recibe soportes: el acta está firmada
+y agregarle evidencia después la descuadraría.
+
+93 pruebas nuevas.
+
+---
+
+### 07-09-2026 (noche, 2) — En la mesa se ve por qué se glosó y con qué refutarlo
+
+**El problema.** La tabla de la mesa mostraba el motivo de la glosa cortado a
+media línea. Un motivo de verdad tiene tres o cuatro renglones de texto —
+«supera el valor pactado en el anexo técnico 2 del contrato…»— y en pantalla
+se veía «supera el valor pact…». Para leerlo completo tocaba abrir el Excel
+de la EPS aparte, en plena audiencia, con la EPS esperando.
+
+**Cómo queda.**
+
+- **El motivo completo, sin romper la tabla.** Cada renglón tiene una flecha
+  al principio: se hace clic y se abre debajo el texto entero, con los saltos
+  de línea como los mandó la EPS. Y pasando el mouse por encima también se ve.
+  La tabla no se estira: sigue cabiendo en la pantalla.
+
+- **Una columna que dice si hay soportes.** Un clip con el número (📎 3)
+  cuando la factura tiene soportes en el archivo del hospital, una raya
+  cuando no tiene, y un signo de interrogación cuando el buscador **todavía
+  no ha terminado de revisar**. Esa tercera respuesta es a propósito: decir
+  «no tiene soportes» mientras el índice se está armando lleva a aceptar una
+  glosa que sí estaba soportada.
+
+- **Un botón «Gestionar» en cada renglón.** Abre un cajón lateral con cuatro
+  cosas, sin salir de la mesa: lo que objeta la EPS, el dictamen que el motor
+  ya escribió para esa glosa, la lista de soportes de la factura, y los
+  comentarios del equipo. Es lo que hace falta para refutar en el momento.
+
+- **La tabla, más limpia.** Renglones alternados, se resalta el que está bajo
+  el mouse, las cifras alineadas por la coma y los bordes más suaves.
+
+**Un detalle que importa.** No todas las glosas del archivo de la EPS están en
+el motor: hay facturas que ella glosa y que nunca entraron por el flujo
+normal. En esos renglones el cajón lo dice con todas sus letras («no hay
+dictamen ni comentarios que mostrar») en vez de mostrar un cajón vacío que
+parece un error.
+
+**Lo que NO se hizo, y hay que decirlo.** El cajón **deja ver** los soportes
+que ya existen, pero todavía **no permite subir archivos** desde la mesa. Se
+pidió «cargar/descargar»; quedó la mitad. Queda anotado en PENDIENTE.
+
+30 pruebas nuevas y una revisión en navegador de toda la pantalla.
+
+---
+
+### 07-09-2026 (noche) — La conciliación se trabaja en la pantalla, no en un Excel suelto
+
+**El problema de fondo.** Una audiencia con la EPS dura horas. Hasta ahora el
+acta se bajaba en Excel y se llenaba por fuera del sistema: si alguien cerraba
+el archivo sin guardar, o dos personas lo abrían a la vez, el trabajo de la
+mesa se perdía o se pisaba. Y al final había que volver a subirlo.
+
+**Cómo queda.** El acta se arma y **se queda en el motor**. Se trabaja en la
+pantalla, renglón por renglón, y cada cosa que se escribe se guarda sola. Si
+se cierra el navegador o se va la luz, la mesa está donde se dejó. El Excel se
+baja **al final**, ya con todo lo conciliado.
+
+**Lo que se ve en la mesa.** Una tabla con los renglones y, arriba, las cifras
+que se van moviendo: glosado, lo que acepta el hospital, lo que levanta la EPS,
+lo ratificado, y cuántos renglones quedan sin repartir.
+
+Cada renglón tiene tres botones de un clic —**todo A**, **todo L**, **todo
+R**— que mandan la glosa completa a aceptada, levantada o ratificada. En un
+acta de cien renglones eso es la diferencia entre una hora y una tarde.
+
+Los renglones que **necesitan que alguien decida** salen en ámbar, con el
+motivo al pasar el mouse. Son los de pertinencia, donde hay que decir si la
+glosa es mixta o médica: eso lo define un médico auditor, no un código.
+
+**La nota crédito, puesta sola.** Cada renglón muestra la cuenta contable y el
+concepto de nota que le corresponde. Sale del centro de costo que el DGH ya
+tiene guardado, cruzado con el catálogo de contabilidad. Y usa siempre el
+concepto de **actas**, que no es el mismo que el de glosa inicial: en UCI, la
+glosa inicial es 004 y por acta es 020. Cuando el centro de costo no está en
+el catálogo, se muestra el centro pero **no se inventa la cuenta** — un
+asiento mal hecho lo corrige contabilidad meses después.
+
+**Y aprende.** Al cerrar la mesa, lo que decidió el médico auditor queda
+guardado por factura y código. La próxima vez que esa glosa aparezca, ya sale
+llena. Se puede reabrir una mesa cerrada, porque las audiencias se reanudan.
+
+**Lo que la EPS mandó no se puede tocar**: el valor objetado, el código y la
+factura vienen de su archivo y son de solo lectura. Si se pudieran cambiar, el
+acta dejaría de cuadrar con lo que ella radicó y la mesa se discutiría sobre
+cifras distintas.
+
+58 pruebas nuevas.
+
+---
+
+### 07-09-2026 (tarde, 3) — El acta ya no sale «[Reparado]» ni con cuadrícula de sobra
+
+**Lo que reportó Yesid.** Al abrir el acta que arma el motor, Excel decía
+**«[Reparado]»** — o sea que había encontrado algo dañado y lo había
+arreglado por su cuenta. Y debajo de los renglones con datos quedaban
+cientos de filas de cuadrícula vacía.
+
+**Por qué pasaba lo del reparado.** La librería que escribe el Excel **no
+edita el archivo: lo vuelve a construir entero**, y en el camino se llevaba
+por delante tres de los cinco «nombres definidos» del modelo — los filtros
+automáticos de las hojas ACTA, GLOSAS y TRAMITES. Peor: el único que
+sobrevivía quedaba apuntando a la hoja equivocada.
+
+Un acta que Excel tiene que reparar es un acta que uno no sabe si puede
+firmar. Y esa sale de una mesa con una EPS.
+
+**Lo que se hizo.** Ahora, después de escribir, se le repone al archivo todo
+lo que la librería se llevó, tal cual venía del modelo. Los cinco nombres
+vuelven, cada uno a su hoja, junto con la configuración de impresión — que
+no es un detalle, porque el acta se imprime para firmarla.
+
+**Lo de la cuadrícula.** El modelo trae 260 renglones con los bordes ya
+puestos, listos para llenar. Un acta de tres líneas salía con 257 filas
+vacías dibujadas debajo. Ahora se les quita el borde y desaparecen.
+
+**No se borran las filas, se les quita el formato**, y la diferencia importa:
+borrarlas correría hacia arriba el pie del acta —el bloque de observaciones y
+las firmas, que está en celdas combinadas— y lo rompería.
+
+11 pruebas nuevas que impiden que las dos cosas vuelvan.
+
+---
+
+### 07-09-2026 (tarde, 4) — Excepción autorizada al tope de 3 devoluciones (caso HUS315614)
+
+**Lo que pidió Yesid.** La factura **HUS315614** ya se había devuelto las 3
+veces del tope, pero el caso ameritaba una cuarta. La regla de «máximo 3
+devoluciones» está bien puesta y no se toca para las demás — lo que faltaba
+era una forma de hacer una **excepción puntual, por factura y con testigo**,
+en vez de un hueco permanente.
+
+**Cómo quedó.** En la ventana de auditar, cuando una factura ya agotó sus 3
+devoluciones, a **coordinación/administración** le aparece un botón
+**«➕ Autorizar devolución extra»**. Al usarlo:
+
+- pide el **motivo** (obligatorio) y lo guarda en el **historial** con el
+  nombre de quien autoriza — queda el testigo de la excepción;
+- sube el cupo de **esa** factura en uno (el tope pasa de 3 a 4), así que la
+  cuarta devolución ya pasa;
+- al usarse esa cuarta, la factura **se vuelve a bloquear sola** (el cupo era
+  de una sola): no se abre la puerta para siempre.
+
+Al auditor normal el botón no le aparece, y si intenta autorizar por otra vía
+el servidor lo rechaza. La regla de 3 sigue firme para todo lo demás.
+
+Cambios: un campo nuevo en la factura (`devoluciones_extra`, con su migración
+de arranque), el tope ahora se calcula «3 + extra», el endpoint y el botón de
+autorizar. 7 pruebas de servidor y 6 de pantalla.
+
+---
+
+---
+
+### 07-09-2026 (tarde, 3) — «Plata recuperada» se resistía a irse del menú
+
+Al aplicar lo del día anterior (ocultar cuatro botones), **tres se fueron**
+—Alertas, Resumen del mes y Gobierno IA— pero **«Plata recuperada» seguía
+apareciendo** para Yesid. La razón: ese botón tiene una marca de «solo
+coordinación», y la función que decide qué ve cada rol volvía a **mostrarlo**
+a la coordinación, ganándole a la orden de esconderlo.
+
+Se corrigió: un botón marcado como «oculto» ahora **se queda oculto aunque sea
+de coordinación**. «Plata recuperada» ya no reaparece, y las demás pantallas de
+coordinación (Inteligencia, Expediente, Usuarios) se siguen viendo igual. Queda
+con su prueba para que no vuelva a pasar.
+
+---
+
+### 07-09-2026 (tarde, 2) — El acta de conciliación se arma sola
+
+**El trabajo que quita.** Antes de cada mesa de conciliación, alguien se
+sentaba a copiar a mano —renglón por renglón— los datos del archivo que manda
+la EPS al formato del acta. Cien facturas son más de doscientos renglones con
+nueve datos cada uno: **media jornada de digitar**, y un número mal copiado se
+discute en la mesa como si fuera cierto.
+
+**Cómo queda ahora.** En la pantalla de **Conciliación** hay un cuadro nuevo,
+«🧰 Armar el acta». Se suben dos archivos:
+
+1. **la lista de facturas** que van a esa mesa (una columna en Excel — sirve
+   `HUS0000542497`, `542497` o `HUS542497`, da igual cómo esté escrita);
+2. **el archivo que mandó la EPS**, tal como llega.
+
+Se escribe el NIT, la razón social, el número de acta, el periodo y la fecha,
+y sale el acta **en el formato oficial, con sus macros**, lista para llevar a
+la audiencia.
+
+Antes de bajarla se puede oprimir **«Ver qué sale»**: dice cuántos renglones
+salen, cuánta plata hay para conciliar, qué facturas de la lista no tienen
+glosas en el archivo de la EPS, y cuáles del archivo quedaron por fuera.
+
+**Lo que el sistema decide solo, y lo que no.** La tipificación sale del
+código de glosa, que no deja lugar a dudas: CL es pertinencia, FA facturación,
+SO soportes y TA tarifas. El tipo también, para tres de ellas: facturación,
+soportes y tarifas son **siempre** administrativas.
+
+Las de **pertinencia** no. Se reparten entre mixtas y médicas según el caso,
+y eso lo decide un médico auditor mirando la historia. El sistema **no las
+rellena**: las deja marcadas «◄ DEFINIR» para que se vean. En un acta de cien
+renglones una casilla vacía se pasa por alto; un texto raro, no. Poner el tipo
+equivocado manda la glosa al abogado que no es.
+
+**Y aprende.** Como bien dijo Yesid, «son las mismas cuentas de siempre».
+Cuando el médico auditor reparte una glosa de pertinencia, esa decisión queda
+guardada por factura y código. La próxima vez que esa misma glosa aparezca en
+un acta, ya sale llena. Con el tiempo, hasta las de pertinencia se van
+llenando solas.
+
+Probado con los archivos reales: el consolidado del Dispensario con 146
+glosas se convirtió en un acta de $211.374.401, con **139 de las 146 líneas
+tipificadas solas** y las 7 restantes marcadas con su motivo. El acta que sale
+la lee y la cuadra el mismo revisor que ya existía, sin un solo hallazgo.
+
+58 pruebas nuevas.
+
+---
+
+### 07-09-2026 — COOSALUD: paquete de 560 facturas y el copago que tumbaba el cargue
+
+Llegó el paquete **COOSALUD_07092026** (GI-33-5434-2026): **560 facturas,
+66.388 glosas, $5.841.913.158**. Radicadas entre el 31/07 y el 13/08, glosadas
+el 07/09 — o sea que el **62% llegó extemporáneo** (40.986 glosas por
+$3.653.206.514 van con la aceptación tácita del artículo 57 de la Ley 1438).
+La respuesta en el portal vence el **14/09/2026**.
+
+Quedó organizado, consolidado y con los dos archivos de OBJECIONES (300 y 260
+facturas, que es el tope de DGH), las 4 listas para correr el portal en
+paralelo y el Excel de control con el GI ya escrito.
+
+**El copago ya no tumba el cargue.** El bot solo capaba las objeciones cuando
+se le pasaba la base de servicios de DGH. Pero el dato para capar **no es de
+DGH**: el valor del servicio y la cuota moderadora vienen del propio DETALLE de
+COOSALUD. Con la base sin bajar, las 11 facturas con copago salían objetando el
+valor completo del servicio y DGH las rechaza con *«El VALOR OBJECION no puede
+ser mayor al valor del servicio»* — y como el cargue es todo o nada, se caía el
+archivo entero.
+
+Ahora el guardián de valor corre **siempre**. Sin base DGH el tope sale del
+detalle de COOSALUD: por cada (factura, servicio), la **suma** del valor de sus
+líneas menos la suma de sus copagos — la misma regla de capacidad que enseñaron
+las 8 estancias. En este lote capó **167 objeciones** (136 por copago), sin
+perder ni una línea, y la revisión de las 62.130 filas contra el tope da **cero
+servicios por encima**. Son $500.534 menos objetados: justo la parte que paga
+el paciente. Cada ajuste queda en la hoja `VALOR_AJUSTADO` del archivo
+`REVISAR (no van en el cargue)`. 4 pruebas nuevas.
+
+**Las doctoras solo contestan CALIDAD.** El bot venía metiendo COBERTURA en el
+mismo saco y sacaba la factura completa a esperar auditoría médica. Cobertura
+la contesta cartera. Ahora se reportan aparte: 783 glosas de CALIDAD en 36
+facturas esperan a las doctoras, y 281 de COBERTURA en **una sola** factura
+(HUS545379, $47.882.455) esperan a que el área defina el texto — son CO4601,
+accidente de tránsito, la EPS pide agotar primero los topes del SOAT.
+
+---
 
 ### 07-09-2026 — Tres cosas que iban a fallar en producción, y ninguna prueba las veía
 
@@ -947,6 +1616,33 @@ daño que este módulo existe para evitar. Esa sigue saliendo solo por la
 bandeja, cuando una persona mira el portal y dice qué pasó.
 
 27 pruebas nuevas, entre ellas la caída del bot con la glosa en la mano.
+
+---
+
+### 04-09-2026 (tarde, 6) — Se quitan del menú cuatro botones que no se usan
+
+**Lo que pidió Yesid.** Quitar del menú lateral cuatro botones que «realmente
+nunca tendrán utilidad»: **Gobierno IA**, **Alertas**, **Plata recuperada** y
+**Resumen del mes**. Este último, además, aparecía **dos veces** (en el menú y
+como pestaña dentro de la barra de Reportes que se ve arriba de Dashboard y
+Glosas ADRES).
+
+**Cómo se hizo, y por qué así.** No se borró nada: los cuatro botones se
+**ocultaron** (igual que ya estaba «Plantillas Gold», que también se escondió
+cuando el equipo confirmó que no la usaban). Es reversible con una línea, y no
+se tocó ni la pantalla que abría cada botón ni el servidor — si algún día
+alguno vuelve a hacer falta, se muestra de nuevo sin rehacer nada.
+
+- Los cuatro salen del menú lateral.
+- «Resumen del mes» sale también de la barra de Reportes: ya no aparece dos
+  veces.
+- Y salen de los atajos de Ctrl+K (la búsqueda rápida), para que no se
+  reabran por ahí sin querer.
+
+Nada más cambia: las demás pantallas y los contadores del menú (Vencimientos,
+Contratos) siguen igual.
+
+---
 
 ---
 
@@ -6196,7 +6892,6 @@ tablero (dónde estamos hoy).
 
 ---
 
-
 ### 06-08 — 22 correcciones al motor, con las glosas de trampa como guía
 
 Yesid corrió dos tandas de glosas de prueba en el motor del hospital y pegó
@@ -11387,6 +12082,76 @@ valor leido del PDF o con el objetado.
   auditor autorice** el cambio.
 
 
+### Motor de Glosas — lo que destapó la prueba de cinco casos (08-09)
+- **Tarifas: trató un medicamento (CUM) como procedimiento (CUPS).** Lo de la
+  contradicción con el contrato ya quedó resuelto (08-09, noche 3); falta esta
+  parte: el acetaminofén tiene CUM, y el escrito habló del «código homologado
+  del CUPS facturado».
+- **Ratificación sin respuesta inicial.** El texto fijo dice «se mantiene la
+  respuesta dada en la glosa inicial» aunque la factura no tenga ninguna
+  respuesta previa registrada. Hay que detectarlo y avisar. Y no mostrar
+  «la IA recomienda» cuando la IA no corrió.
+- **Una corrección automática dejó una frase rota** («…LEY 1438 DE 2011 ART.
+  EL DECRETO 780…») y una nota de corrección con basura. Revisar el corte.
+- **Citas mal usadas pasan el verificador:** el Art. 5 de la Res. 2284/2023
+  salió explicado de dos formas distintas en dos dictámenes. El verificador
+  comprueba que la norma existe, no que diga lo que se le atribuye.
+- **Indicadores que se contradicen:** «riesgo BAJO» junto a «NO RADICAR»;
+  «DEFENDER 100 %» junto a «riesgo ALTO, preparar conciliación».
+- **SURA, SALUD TOTAL y MUTUAL SER no están en la lista de entidades** del
+  botón Analizar. Ya se sabe por qué: el desplegable se llena con las EPS que
+  tienen **contrato cargado** en la pantalla Contratos — es a propósito, sin
+  contrato el motor no puede citar tarifas. Para que aparezcan hay que cargar
+  su contrato ahí. Mientras tanto, si se analiza una glosa de esas EPS con
+  «OTRA / SIN DEFINIR», el dictamen sale sin contrato ni tarifa y con el
+  aviso de entidad sin identificar.
+- **Volver a correr el caso 3 (pertinencia) en etapa Inicial:** en
+  Ratificación no usa la IA, así que la prueba de si inventa hallazgos
+  clínicos quedó sin hacer.
+
+
+### Lo que quedó de la revisión del 08-09
+- **Las 22 vulnerabilidades de las librerías.** Están anotadas en
+  `seguridad/vulnerabilidades_conocidas.txt`. Ninguna se ha mirado una por
+  una todavía: son la foto de lo que el `|| true` venía tapando. Subir de
+  versión `starlette`, `jinja2`, `python-jose`, `python-multipart` y
+  `pdfminer-six` hay que hacerlo con calma y probando, porque son el corazón
+  de la aplicación que corre en el hospital.
+- **Probar la mesa con un lote de verdad**: una lista de facturas y el
+  consolidado de la MISMA remesa de la EPS, de punta a punta hasta bajar el
+  acta.
+- **Centros de costo que no están en el catálogo de contabilidad** (por
+  ejemplo `734005 - LABORATORIO - INMUNOLOGIA`): se muestra el centro pero no
+  se pone cuenta. Falta que contabilidad diga si hay regla.
+
+
+### Mesa de conciliación en pantalla (07-09)
+- **Probarla con un lote de verdad.** Falta correrla con una lista de facturas
+  y el consolidado de la MISMA remesa de la EPS. Los tres archivos de prueba
+  que hay son de remesas distintas, así que cruzan poco.
+- **«No se pudo cerrar».** No se pudo repetir el error en el motor de prueba.
+  Ahora el cierre aguanta que falle el aprendizaje y la pantalla muestra el
+  motivo exacto que devuelve el servidor: si vuelve a salir, ese texto dice
+  qué fue.
+- **Centros de costo que no están en el catálogo de contabilidad** (por
+  ejemplo `734005 - LABORATORIO - INMUNOLOGIA`): se muestra el centro pero no
+  se pone cuenta. Falta que contabilidad diga si hay regla para esos.
+
+
+### COOSALUD — paquete del 07-09 (GI-33-5434-2026)
+- **DECISIÓN SUYA: el texto de COBERTURA.** Son 281 glosas CO4601 en la factura
+  HUS545379 ($47.882.455). Apenas el área dicte el texto, se deja fijo en
+  `consolidar_coosalud.py` junto a los de TARIFAS, AUTORIZACIÓN, FACTURACIÓN y
+  SOPORTES, y esa factura queda lista. No se inventa.
+- **Falta la base de servicios de DGH.** Bajar el export SERVICIOS FACTURADOS de
+  COOSALUD con facturación del **26/06/2026 al 02/08/2026** y recortarlo con
+  FILTRAR BASE DGH usando el TXT de las 560. Sin ella, SLNSERPRO lleva el CUPS
+  de COOSALUD y CTNCENCOS e IDRIPS van vacías. El tope de valor ya quedó
+  resuelto sin la base, pero el código y el centro de costos no.
+- **36 facturas esperan auditoría médica** (783 glosas de CALIDAD). Las gruesas:
+  HUS543423 ($46,9 mill), HUS543160 ($20,9 mill), HUS541431 ($17,2 mill),
+  HUS543764 ($15,8 mill).
+- **Responder el portal antes del 14/09/2026.** Eso sí se puede hacer ya.
 ### Cuidados médicos de la familiar — EPS Sura (07-09)
 - **Radicar el memorial de impulso** al proceso de la Supersalud (el plazo de
   respuesta ya se venció) y **la queja a Sura** por lo que sigue sin
@@ -12310,6 +13075,18 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
   son para que el área los mire, no se unieron por parecido.
 
 ## 4) PARA MAÑANA
+
+
+**Mesa de conciliación — probarla de verdad.** Abrir una mesa con una lista de
+facturas y el consolidado de la MISMA remesa de la EPS, y trabajarla de punta a
+punta hasta bajar el acta. Es lo único que dice si sirve en una audiencia. Si
+al cerrar sale «No se pudo cerrar», ahora la pantalla muestra el motivo exacto:
+copiarlo al chat.
+
+**COOSALUD 07-09 — lo primero.** Correr el portal con las 4 listas (vence el
+14/09) y, en paralelo, bajar de DGH la base de servicios del 26/06 al 02/08
+para poder regenerar los dos OBJECIONES con los códigos de DGH. Si el área ya
+dictó el texto de cobertura, se deja fijo en el bot y se cierra HUS545379.
 
 ### Cuidados médicos de la familiar — lo primero
 1. Radicar el **Borrador A** (impulso a la Supersalud) por el correo oficial

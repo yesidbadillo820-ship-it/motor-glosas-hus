@@ -437,6 +437,9 @@ async def lifespan(app: FastAPI):
         ("paquetes_adres", "catalogo_centros", "TEXT"),
         ("glosas_adres", "cuenta_valor", "BOOLEAN DEFAULT 1"),
         ("facturas_adres", "valor_glosado_oficial", "DOUBLE PRECISION"),
+        # Pre-auditoría (07-09-2026): devoluciones extra autorizadas por
+        # coordinación por encima del tope de 3 (excepción con testigo).
+        ("preaud_facturas", "devoluciones_extra", "INTEGER DEFAULT 0"),
     ]
     for tabla, col_name, col_ddl in _ADRES_MISSING_COLUMNS:
         try:
@@ -876,6 +879,50 @@ async def lifespan(app: FastAPI):
 
     # IM F1.3: tabla nueva `lotes_importacion` — la crea Base.metadata
     # .create_all automaticamente si no existe. No requiere ALTER TABLE.
+
+    # La mesa de conciliación enlaza cada renglón con su glosa del motor,
+    # para poder abrir el historial y los comentarios desde la audiencia.
+    # La tabla ya existía sin esta columna: create_all() no la agrega.
+    try:
+        if _tiene_tabla("mesa_conciliacion_lineas") and not _tiene_columna(
+            "mesa_conciliacion_lineas", "glosa_id"
+        ):
+            logger.warning("MIGRACIÓN: Agregando columna 'glosa_id' a mesa_conciliacion_lineas")
+            db.execute(text("ALTER TABLE mesa_conciliacion_lineas ADD COLUMN glosa_id INTEGER"))
+            db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN mesa_conciliacion_lineas glosa_id: {e}")
+
+    # Los soportes de la mesa pasaron de guardarse como base64 en la base a
+    # guardarse en disco (08-09-2026): los escaneos de cartera pesan 25-40 MB
+    # y cargarlos en memoria tumbaba el contenedor, que corre con 640 MB.
+    # `contenido_b64` se deja para poder seguir leyendo lo ya subido.
+    _SOPORTES_MESA_NUEVAS = [
+        ("ruta_relativa", "VARCHAR(400)"),
+        ("sha256", "VARCHAR(64)"),
+    ]
+    for col_name, col_ddl in _SOPORTES_MESA_NUEVAS:
+        try:
+            if _tiene_tabla("soportes_mesa") and not _tiene_columna("soportes_mesa", col_name):
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a soportes_mesa")
+                db.execute(text(f"ALTER TABLE soportes_mesa ADD COLUMN {col_name} {col_ddl}"))
+                db.commit()
+        except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            logger.warning(f"MIGRACIÓN soportes_mesa {col_name}: {e}")
+
+    # `contenido_b64` nació NOT NULL. Ahora los soportes nuevos no lo usan,
+    # así que la restricción impediría guardarlos. SQLite no sabe quitar un
+    # NOT NULL con ALTER, y rehacer la tabla por esto sería desproporcionado:
+    # el servicio escribe cadena vacía en su lugar. Se anota para que nadie
+    # se sorprenda al ver esa columna vacía en las filas nuevas.
 
     # RustDesk: 2 columnas opcionales en usuarios para acceso remoto
     _USUARIOS_RUSTDESK = [
