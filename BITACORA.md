@@ -91,6 +91,73 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (cierre 3) — la pantalla Objeciones DGH ya sirve para TODAS las entidades
+
+Se terminó lo que faltaba: **las ocho entidades** que el motor sabe trabajar ya
+entran por la pantalla. Antes eran cuatro. Se sumaron **SALUD TOTAL**, el
+**acta del portal VCO** (COOSALUD, Fiduprevisora, SAVIA…), **EMSSANAR** y el
+**ADRES**. El auditor sube el archivo que le mandó la entidad y el export de
+servicios facturados del DGH, y bajan los dos de siempre: el que se sube y el
+respaldo con la hoja REVISAR.
+
+**Lo nuevo que hay que saber para usarla:**
+
+- **EMSSANAR no manda Excel, manda PDF** (uno por factura). Ahora se pueden
+  marcar **varios PDF de una vez** en el mismo recuadro.
+- **Del ADRES** se puede agregar el **Homologador Gold Standard CUPS↔SOAT**
+  como segundo archivo. Sin él, sus códigos SOAT sólo cruzan por nombre y
+  valor.
+- Si un lote pasa de **300 facturas**, la pantalla lo avisa: ese es el tope
+  que recibe el DGH en un archivo y hay que partirlo antes de subirlo.
+
+**Dos cosas que estaban mal y se corrigieron:**
+
+1. **El ADRES estaba llenando la celda CTNCENCOS** con el centro de costo que
+   sacaba del cruce. La regla del área dice que esa celda va **vacía siempre,
+   sin excepciones**. Ya sale vacía. El dato no se perdió: queda en el reporte
+   de revisión, como pista.
+2. **EMSSANAR estaba escribiendo el código de servicio de una tabla vieja** de
+   145 códigos sacada de un lote de hace meses: ponía un código aunque ese
+   servicio no estuviera en esa factura, que es justo lo que la regla prohíbe.
+   Ahora cruza contra el export del DGH y lo que no se identifica queda en
+   blanco para completarlo a mano.
+   También le cambió la columna **CROTIPOBJ**: antes llevaba «Glosa o
+   Devolución» (0 ó 2), que **no es lo mismo** que administrativa/médica/mixta.
+   Una devolución de puras glosas administrativas salía marcada 2 (mixta)
+   cuando la regla dice 0. Ya se decide por factura como en las demás.
+
+### 08-09-2026 — lote del DISPENSARIO del 7 de septiembre
+
+**97 objeciones · 39 facturas · $36.268.402.** Cuadra: las 39 facturas están en
+el export del DGH y ninguna se glosa por encima de lo facturado ni del saldo.
+Cruzaron con seguridad 35 (ALTA) y 59 con confianza media; **3 quedaron en
+REVISAR** y **1 sin código de servicio** para completar a mano.
+
+**Se encontró y corrigió un defecto que dañaba el archivo.** Este lote trajo
+**19 códigos de glosa escritos en minúscula** (`ta01 01`, `cl03 02`,
+`fa08 02`…) y el lector sólo aceptaba mayúsculas. Resultado: esos 19 renglones
+salían **sin código de glosa**, y —lo grave— la factura **HUS0000551822**
+quedaba marcada como **0 (administrativa) cuando es 2 (mixta)**, porque el
+`cl03 02` tampoco se leía y no contaba como glosa clínica. Ya se lee sin
+importar mayúsculas o minúsculas, con su prueba para que no vuelva a pasar.
+
+**Lo que le quedó al auditor para mirar:**
+
+1. **HUS0000549861 · TA0201 · $1.779** — «INTERCONSULTA POR ESPECIALISTA EN
+   INFECTOLOGÍA PEDIÁTRICA»: el nombre coincide al 98 % pero el valor no
+   cuadra, así que **no se adivinó** y la celda quedó vacía. Casi seguro es
+   ese servicio; hay que confirmarlo.
+2. **HUS0000550614 · SO3701 · $997.235** y **HUS0000549573 · SO0201 ·
+   $114.200** — el Dispensario mandó esos dos renglones **sin nombre de
+   servicio**; cruzaron sólo por valor.
+3. **HUS0000549713 — posible doble glosa de glucometrías.** El DGH tiene 15
+   glucometrías de $5.029. El Dispensario objeta **5 por soportes (SO0801) y
+   otras 5 por calidad (CL0601)**. En total no se pasa, pero si son las mismas
+   cinco, están glosando dos veces $25.145. **Vale la pena reclamarlo.**
+
+Los 9 grupos de renglones repetidos (9 terapias respiratorias, 5 anticuerpos,
+3 hemocultivos…) **sí son legítimos**: el DGH los tiene facturados uno por uno.
+
 ### 08-09-2026 (cierre 2) — SAVIA entra a la pantalla; VCO y EMSSANAR quedan con una pregunta
 
 Se completó lo que faltaba de la pantalla **Objeciones DGH**: reconocer también
@@ -11304,6 +11371,21 @@ valor leido del PDF o con el objetado.
 ---
 
 ## 3) PENDIENTE
+
+### Objeciones DGH — pantalla (08-09)
+- **Probar la pantalla con un lote real de EMSSANAR** (varios PDF a la vez).
+  Se probó con PDF armados a propósito, no con los de ripslink.
+- **Cerrar el lote del ADRES que quedó a medias.** Ese día sólo llegó el
+  `MAESTRO_SERVICIOS_FACTURADOS_ADRES_1.xlsx` y nunca llegó el Excel de
+  glosas del ADRES. Hay que decidir además si se cruza contra el
+  `DETALLE_CONSOLIDACION` traduciendo con `HOMOLOGACION_DGH`, o si se exporta
+  el `SERVICIOS_FACTURADOS_DGH` de esas facturas (que es lo más limpio).
+- **HUS0000549713 (Dispensario, 7-sep): reclamar la posible doble glosa** de
+  glucometrías ($25.145).
+- **FAMISANAR:** el lector del texto de la glosa entiende «SE OBJETA» y
+  «SE RECONOCE», pero no «SE GLOSA». Se propuso agregarlo; **falta que el
+  auditor autorice** el cambio.
+
 
 ### Cuidados médicos de la familiar — EPS Sura (07-09)
 - **Radicar el memorial de impulso** al proceso de la Supersalud (el plazo de
