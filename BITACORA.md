@@ -91,6 +91,44 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (noche) — SANITAS entra al circuito, y su archivo traía una trampa
+
+Primer lote de **SANITAS**: 113 objeciones de **una sola factura**
+(HUS0000548650) por **$49.670.750**, contra 725 renglones de servicio del DGH.
+**Las 113 quedaron con su servicio identificado en confianza ALTA**, ninguna en
+revisión.
+
+**La trampa del archivo, que era lo importante.** SANITAS repite el encabezado
+«NUMERO DE FACTURA» en la **segunda** columna, pero ahí lo que manda es el
+**código de glosa** (CO2301, TA0801…). Si se hubiera procesado con un lector
+que resuelve columnas por nombre —como el de FAMISANAR— habría tomado «CODIGO
+PROCEDIMIENTO» como código de glosa y el archivo habría salido malo **sin que
+nadie lo notara** hasta que DGH lo rechazara. Por eso el bot nuevo lee por
+posición y **verifica el contenido antes de procesar**: si la primera columna
+no trae facturas y la segunda no trae códigos de glosa, se detiene con un
+mensaje claro en vez de entregar un archivo silenciosamente malo.
+
+**Lo que se construyó.** `tools/organizar_objeciones_sanitas.py`, delgado
+porque el motor del cruce ya es común (`tools/_cruce_dgh.py`). Guía en
+`tools/README_organizar_objeciones_sanitas.md` y 22 pruebas. Una de esas
+pruebas encontró un hueco de verdad mientras se escribía: la comprobación de
+«esto parece una factura» aceptaba `CO2301` como factura, así que un archivo
+con las columnas cambiadas habría pasado igual. Se corrigió exigiendo cinco
+dígitos o más.
+
+**Lo que hay que saber de SANITAS para los próximos lotes.** Parte el valor de
+un mismo servicio en varias objeciones: mandó **50 objeciones de $2.350** para
+**25 glucometrías** facturadas, y el total coincide exacto ($117.500). El texto
+de esas filas dice «Glosa Calculada Afiliado», así que parece un reparto entre
+la porción del afiliado y la de la entidad. **No hay sobre-objeción** —se
+comprobó sumando por código, que es lo correcto; contar renglones engaña— pero
+en DGH van a aparecer varias objeciones sobre el mismo servicio. Lo objetado
+($49,7 millones) es menos que lo facturado de esos mismos servicios ($70,9
+millones), sobre una factura con saldo de $113,4 millones.
+
+**Archivos entregados:** `OBJECIONES_SANITAS_04092026.xlsx` y
+`CRUCE_SANITAS_04092026.xlsx` (hoja REVISAR vacía).
+
 ### 08-09-2026 — Trámites DGH de la recepción 01/09–08/09: el bot ahora junta radicaciones de varias fuentes
 
 Llegó la **recepción de objeciones de DGH** de la semana (55.181 conceptos,
@@ -11208,6 +11246,13 @@ valor leido del PDF o con el objetado.
 - **Agendar** geriatría, nefrología, fisiatría y los laboratorios a domicilio
   (con ayuno de 8–10 horas, menos la creatinina), y **confirmar el inicio**
   de las terapias de deglución y respiratoria ya autorizadas.
+
+### SANITAS — objeciones del 4 de septiembre (08-09)
+- **Piloto en DGH** con la factura HUS0000548650 antes de dar por bueno el
+  formato de SANITAS: es la primera vez que se carga esta entidad.
+- **Confirmar el reparto «Glosa Calculada Afiliado»**: 50 objeciones de $2.350
+  para 25 glucometrías. Los totales cuadran, pero conviene preguntarle a
+  SANITAS si esas parejas de renglones deben ir como dos objeciones o como una.
 
 ### FAMISANAR — objeciones del 4 de septiembre (08-09)
 - **Confirmar con FAMISANAR los dos AU5701 de $309.000**: el código de glosa
