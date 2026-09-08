@@ -24998,7 +24998,7 @@ function mesaCajaDeSubida(factura){
     +   '<input type="text" id="mesa-sub-nota" placeholder="¿para qué sirve? (opcional)" style="flex:1;min-width:12rem">'
     +   '<button class="btn btn-primary btn-sm" id="mesa-sub-btn" onclick="mesaSubirSoporte()">Subir</button>'
     + '</div>'
-    + '<small style="color:var(--text3)">Solo PDF e imágenes, hasta 15 MB. '
+    + '<small style="color:var(--text3)">Solo PDF e imágenes, hasta 50 MB. '
     +   'Un Excel o un Word hay que pasarlo antes a PDF.</small>'
     + '<div id="mesa-sub-estado"></div>'
     + '<div id="mesa-sub-lista"></div></div>';
@@ -25042,12 +25042,15 @@ async function mesaSubirSoporte(){
   // El tope se comprueba ACÁ TAMBIÉN, antes de mandar: en la red del
   // hospital, subir 40 MB para que el servidor los rechace son minutos
   // perdidos con la EPS en la sala.
-  if(f.size > 15*1024*1024){
+  if(f.size > 50*1024*1024){
     est.innerHTML = '<div class="mesa-sop-err">«' + escHtml(f.name) + '» pesa '
-      + (f.size/1048576).toFixed(1) + ' MB y el tope son 15 MB. Bájele el peso '
+      + (f.size/1048576).toFixed(1) + ' MB y el tope son 50 MB. Bájele el peso '
       + 'con la caja de Herramientas PDF antes de subirlo.</div>';
     return;
   }
+  // Un escaneo de 40 MB por la red del hospital no es instantáneo. Sin este
+  // aviso, el auditor cree que se colgó y le da otra vez.
+  var pesado = f.size > 8*1024*1024;
 
   // Estado de carga: el botón se bloquea para que un doble clic no suba el
   // mismo soporte dos veces.
@@ -25055,7 +25058,9 @@ async function mesaSubirSoporte(){
   var textoOriginal = btn.textContent;
   btn.textContent = 'Subiendo…';
   est.innerHTML = '<div class="mesa-sub-cargando"><span class="mesa-spinner"></span>'
-                + 'Subiendo «' + escHtml(f.name) + '»…</div>';
+                + 'Subiendo «' + escHtml(f.name) + '»'
+                + (pesado ? ' (' + (f.size/1048576).toFixed(0) + ' MB — puede tardar, no cierre la ventana)' : '')
+                + '…</div>';
   try{
     var fd = new FormData();
     fd.append('archivo', f);

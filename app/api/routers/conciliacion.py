@@ -1075,28 +1075,40 @@ def mesa_bajar_soporte(
     """Baja un soporte subido en la mesa."""
     from urllib.parse import quote as _urlquote
 
-    from fastapi.responses import Response
+    from fastapi.responses import FileResponse, Response
 
     from app.services import mesa_conciliacion as svc_mesa
 
     _mesa_o_404(db, mesa_id)
-    encontrado = svc_mesa.leer_soporte_subido(db, mesa_id, soporte_id)
+    encontrado = svc_mesa.ruta_del_soporte(db, mesa_id, soporte_id)
     if encontrado is None:
-        raise HTTPException(404, "Ese soporte no es de esta mesa, o está dañado.")
-    reg, datos = encontrado
+        raise HTTPException(404, "Ese soporte no es de esta mesa.")
+    reg, ruta = encontrado
 
     # El nombre lo puso quien subió el archivo. Sin sanear, unas comillas o
     # un salto de línea rompen la cabecera o inyectan otra.
     seguro = "".join(c for c in (reg.nombre or "soporte") if c.isalnum() or c in "._- ")[:120]
     seguro = seguro.strip() or "soporte"
-    return Response(
-        content=datos,
-        media_type=reg.mime_type or "application/octet-stream",
-        headers={
-            "Content-Disposition": "attachment; filename=\"%s\"; filename*=UTF-8''%s"
-            % (seguro, _urlquote(reg.nombre or "soporte"))
-        },
-    )
+    cabeceras = {
+        "Content-Disposition": "attachment; filename=\"%s\"; filename*=UTF-8''%s"
+        % (seguro, _urlquote(reg.nombre or "soporte"))
+    }
+    tipo = reg.mime_type or "application/octet-stream"
+
+    if ruta is not None:
+        # FileResponse lo manda por pedazos: un escaneo de 40 MB no pasa
+        # entero por la memoria del contenedor.
+        return FileResponse(path=str(ruta), media_type=tipo, headers=cabeceras)
+
+    # Los soportes subidos antes del 08-09-2026 viven en la base.
+    datos = svc_mesa.contenido_del_soporte(reg)
+    if datos is None:
+        raise HTTPException(
+            404,
+            "El archivo de este soporte ya no está. Quedó su registro (quién lo "
+            "subió y cuándo), pero hay que volver a cargarlo.",
+        )
+    return Response(content=datos, media_type=tipo, headers=cabeceras)
 
 
 @router.delete("/mesa/{mesa_id}/soportes-subidos/{soporte_id}")

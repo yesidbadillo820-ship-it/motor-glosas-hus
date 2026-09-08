@@ -897,6 +897,33 @@ async def lifespan(app: FastAPI):
             pass
         logger.warning(f"MIGRACIÓN mesa_conciliacion_lineas glosa_id: {e}")
 
+    # Los soportes de la mesa pasaron de guardarse como base64 en la base a
+    # guardarse en disco (08-09-2026): los escaneos de cartera pesan 25-40 MB
+    # y cargarlos en memoria tumbaba el contenedor, que corre con 640 MB.
+    # `contenido_b64` se deja para poder seguir leyendo lo ya subido.
+    _SOPORTES_MESA_NUEVAS = [
+        ("ruta_relativa", "VARCHAR(400)"),
+        ("sha256", "VARCHAR(64)"),
+    ]
+    for col_name, col_ddl in _SOPORTES_MESA_NUEVAS:
+        try:
+            if _tiene_tabla("soportes_mesa") and not _tiene_columna("soportes_mesa", col_name):
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a soportes_mesa")
+                db.execute(text(f"ALTER TABLE soportes_mesa ADD COLUMN {col_name} {col_ddl}"))
+                db.commit()
+        except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            logger.warning(f"MIGRACIÓN soportes_mesa {col_name}: {e}")
+
+    # `contenido_b64` nació NOT NULL. Ahora los soportes nuevos no lo usan,
+    # así que la restricción impediría guardarlos. SQLite no sabe quitar un
+    # NOT NULL con ALTER, y rehacer la tabla por esto sería desproporcionado:
+    # el servicio escribe cadena vacía en su lugar. Se anota para que nadie
+    # se sorprenda al ver esa columna vacía en las filas nuevas.
+
     # RustDesk: 2 columnas opcionales en usuarios para acceso remoto
     _USUARIOS_RUSTDESK = [
         ("rustdesk_id", "VARCHAR(40)"),

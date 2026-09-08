@@ -1,5 +1,51 @@
 # Registro de cambios
 
+## Sesión 08-sep-2026 (noche) — Los soportes de mesa van a disco, en flujo
+
+El auditor reportó que sus escaneos pesan **25–40 MB**. El tope era de 15 MB
+—un número escogido sin dato— y los dejaba a todos afuera. Pero subir el
+número a secas habría tumbado el motor.
+
+### Lo que había mal, y no era el tope
+
+- El archivo se guardaba como base64 en SQLite: +33% de tamaño.
+- `soportes_subidos()` hacía `query(SoporteMesaRecord).all()`, así que
+  SQLAlchemy traía **todas** las columnas, `contenido_b64` incluida. Listar
+  diez soportes de 40 MB eran ~500 MB de texto en memoria.
+- `docker-compose.yml` fija `mem_limit: 640m` y su propio comentario
+  documenta que el OOM killer ya mató procesos al azar antes.
+
+### Cómo queda
+
+- **`guardar_soporte_en_disco()`** — escribe en pedazos de 1 MB. La memoria
+  usada no depende del tamaño del archivo. El tope se comprueba **mientras**
+  se escribe: 500 MB se cortan a los 50, no se sostienen para después
+  rechazarlos. Lo escrito a medias se borra.
+- **`carpeta_de_soportes()`** — deriva de `SOPORTES_ROOT`, así que en el
+  hospital cae en `/data/soportes_mesa`: el volumen persistente, junto a la
+  base. El motor se autoactualiza cada 5 minutos; fuera del volumen, la
+  evidencia de una audiencia duraría minutos.
+- **Nombre en disco propio** (`AAAAMM/<uuid>.<ext>`) — el nombre que pone el
+  usuario puede traer `../` y escribir fuera de la carpeta.
+- **`sha256`** por soporte — un archivo alterado no sirve de evidencia.
+- **`soportes_subidos()`** pide solo las columnas que muestra.
+- **Descarga con `FileResponse`** — por pedazos, no entera en memoria.
+- **`MAX_BYTES_SOPORTE = 50 MB`**, y el mismo tope en el frontend.
+- Aviso en pantalla cuando el archivo pasa de 8 MB: «puede tardar, no cierre
+  la ventana». Sin eso, el auditor cree que se colgó y le da otra vez.
+
+### Compatibilidad
+
+`contenido_b64` pasa a ser opcional y se sigue leyendo: los soportes subidos
+esta tarde, antes del cambio, se bajan igual. Migración en `app/main.py` para
+`ruta_relativa` y `sha256`.
+
+15 pruebas nuevas, incluidas: que un escaneo de 30 MB entra, que el
+contenido NO queda en la base, que listar no lee los archivos, que lo
+rechazado no deja basura en disco, que un nombre con `../` no escribe fuera
+de la carpeta, y que la carpeta cae en el volumen persistente.
+
+
 ## Sesión 08-sep-2026 — Suite en cero fallas, gates de verdad y subida de soportes
 
 ### La suite ya no arrastra doce fallas
