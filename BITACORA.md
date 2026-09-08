@@ -91,6 +91,33 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (tarde) — El motivo del oficio de devolución sale numerado y legible
+
+**Lo que mostró Yesid.** En el PDF del oficio de devolución (el
+DEV-PRE-AUD-0149-2026), el MOTIVO salía como **un bloque corrido**: las
+observaciones que el gestor separa con «//» quedaban pegadas unas con otras,
+ilegibles para Facturación. Tanto, que al área le habían dado un *prompt* de
+IA para numerarlas a mano cada vez.
+
+**Lo que quedó.** Eso lo hace el sistema solo, con las mismas reglas que usaba
+el área: cada «//» es un corte; la primera observación arranca con «1- », la
+siguiente con «2- », «3- »…; un renglón en blanco entre una y otra; el «//»
+no se imprime; y **no se cambia ni una palabra** del texto. Con una sola
+observación no se toca nada. Si el gestor ya había numerado a mano, no se
+duplica el número.
+
+- Aplica en el **PDF del oficio de devolución** y en el **historial** de la
+  factura en pantalla (donde se lee). La caja donde se **escribe** el motivo
+  sigue tal cual, con sus «//», que es lo que el gestor necesita conservar.
+- De paso se cerró un riesgo: un «<» o un «&» dentro del motivo rompía el
+  PDF. Ya no.
+
+Los gestores siguen escribiendo igual (separando con «//»); solo dejan de
+pasar el texto por una IA aparte. 17 pruebas nuevas (incluida una que genera
+el PDF real y lee que salga «1- … 2- … 3- …»).
+
+---
+
 ### 08-09-2026 — Cuatro cosas que estaban flojas por debajo
 
 **1. Las doce pruebas que «siempre fallaban» sí eran un problema.**

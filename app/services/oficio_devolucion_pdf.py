@@ -14,9 +14,17 @@ firma manuscrita.
 from __future__ import annotations
 
 import os
+import re
 from io import BytesIO
+from xml.sax.saxutils import escape as _xml_escape
 
 from app.core.tz import ahora_bogota, dias_completos
+
+# Regla del área (08-09-2026): cuando una factura tiene varias observaciones,
+# el gestor las escribe en un solo motivo separándolas con «//». El PDF y la
+# pantalla las muestran numeradas («1- …», «2- …») y una por renglón; el «//»
+# no se imprime, solo marca dónde va el corte.
+SEPARADOR_OBSERVACIONES = "//"
 
 RUTA_LOGO = os.path.join("static", "LOGO SINAC.png")
 RUTA_FIRMA = os.path.join("static", "firma_preauditoria.png")
@@ -43,6 +51,38 @@ NOTA = (
 def _formatear_cop(valor: float) -> str:
     entero = f"{int(round(valor or 0)):,}".replace(",", ".")
     return f"$ {entero}"
+
+
+def partes_del_motivo(texto) -> list[str]:
+    """Las observaciones que el gestor separó con «//», limpias y en orden.
+
+    Un «//» al inicio o al final no cuenta (parte vacía). Si el gestor ya las
+    había numerado a mano («1- …»), se le quita ese número para no duplicarlo
+    al numerar. Con una sola observación no se le cambia ni una palabra.
+    """
+    if texto is None:
+        return []
+    partes = [p.strip() for p in str(texto).split(SEPARADOR_OBSERVACIONES)]
+    partes = [p for p in partes if p]
+    if len(partes) <= 1:
+        return partes
+    sin_numero = [re.sub(r"^\d+\s*-\s*", "", p).strip() for p in partes]
+    return [s or p for s, p in zip(sin_numero, partes, strict=True)]
+
+
+def motivo_para_pdf(texto) -> str:
+    """El motivo listo para el párrafo del PDF.
+
+    Varias observaciones → numeradas y con un renglón en blanco entre ellas
+    (el «doble salto» que pidió el área). Una sola → tal cual. Siempre
+    escapado: antes un «<» o un «&» dentro del motivo rompía el PDF.
+    """
+    partes = partes_del_motivo(texto)
+    if not partes:
+        return "—"
+    if len(partes) == 1:
+        return _xml_escape(partes[0])
+    return "<br/><br/>".join(f"{n}- {_xml_escape(p)}" for n, p in enumerate(partes, 1))
 
 
 def generar_pdf_oficio_devolucion(
@@ -206,7 +246,7 @@ def generar_pdf_oficio_devolucion(
                 Paragraph(str(f.get("nit") or "—"), st_celda),
                 Paragraph(str(f.get("entidad") or "—"), st_celda),
                 Paragraph(str(f.get("oficio") or numero_radicado or "—"), st_celda),
-                Paragraph(str(f.get("motivo_devolucion") or "—"), st_celda),
+                Paragraph(motivo_para_pdf(f.get("motivo_devolucion")), st_celda),
             ]
         )
     filas.append(
