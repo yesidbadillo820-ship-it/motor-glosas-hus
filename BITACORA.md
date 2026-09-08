@@ -132,6 +132,88 @@ Probado con un PDF de 30 MB, del tamaño de los suyos. 15 pruebas nuevas.
 
 ---
 
+### 08-09-2026 (tarde, 3) — Las cuentas del ADRES ya avisan cuándo se están venciendo
+
+**Lo que pidió Yesid.** Que el sistema mire, para las facturas que van al
+ADRES, la fecha de ingreso y de egreso del paciente; que las lea del archivo
+RIPS que está en el servidor de facturación electrónica; que las compare con
+las de la factura y avise si no cuadran; y que cuente los **18 meses** desde
+el egreso para marcar la cuenta si ya se pasó del plazo.
+
+**Lo que quedó listo (primera parte).** Cuatro piezas, todas con prueba:
+
+- **El calendario colombiano ya se calcula solo.** Los festivos venían
+  escritos a mano en una lista. Ahora salen de la fórmula (la ley que corre
+  los festivos al lunes, más la Semana Santa) y sirven para cualquier año.
+- **La cuenta de los 18 meses**, con la parte fina que es donde se equivocan
+  las cuentas hechas a mano: un egreso del **31 de agosto** vence el **28 de
+  febrero**, no el 3 de marzo.
+- **La lectura del RIPS**: abre el `Rips_HUSxxxx.json` y saca ingreso y
+  egreso. Si el archivo no está, llegó a medias o no trae egreso, **dice el
+  motivo y no inventa la fecha**.
+- **El cotejo**: marca como error grave un egreso anterior al ingreso, una
+  factura hecha antes de que el paciente saliera, o un egreso posterior al
+  día en que Facturación entregó la cuenta. Y cuando no hay con qué
+  comparar, lo dice — no da por bueno lo que nadie revisó.
+
+**Un problema que apareció de paso.** Los festivos de **2027 y 2028** que
+tenía el motor escritos a mano **están equivocados**: los que se corren al
+lunes quedaron en el lunes *anterior* en vez del *siguiente* (el Día de la
+Raza de 2027 quedó el 11 de octubre y va el 18), y la Semana Santa de 2027
+está una semana adelante. Eso afecta los conteos de días hábiles del motor
+de glosas. **No se tocó la lista vieja** para no meter el motor de glosas en
+un cambio de pre-auditoría: queda anotado para decidirlo aparte.
+
+**Dos cosas que quedaron dichas, no supuestas.**
+
+1. Un plazo de **meses** se cuenta por calendario: los festivos **no mueven**
+   la fecha de corte de los 18 meses. Donde sí sirven es para decir cuál es
+   el **último día en que de verdad se puede radicar** (si el corte cae
+   domingo o festivo) y cuántos **días hábiles** quedan.
+2. El término de 18 meses **no aparece en el corpus de normas del sistema**,
+   así que la alerta **no cita ningún artículo**: el plazo quedó como un
+   parámetro del hospital. El sistema cuenta; la norma la escribe el gestor.
+
+**Lo que ya quedó enganchado (segunda parte, el mismo día).** Al abrir una
+factura del ADRES en «Auditar», la ventana muestra sola:
+
+- si la cuenta está **vigente, por vencer o prescrita**, con la fecha en que
+  vence y cuántos días hábiles quedan;
+- los **reparos de fechas** (en rojo los imposibles);
+- el **ingreso y el egreso** que dice el RIPS.
+
+El sistema busca el RIPS **yendo directo a la carpeta de la factura** en el
+servidor de facturación electrónica (`<AAAAMM>\FACTURAS_SALUD\<HUSxxxx>`),
+mirando también el mes anterior y el siguiente. No recorre el servidor
+entero: eso tardaría horas. Y se calcula **cuando el gestor abre la
+factura**, no al cargar el envío, para no volver lenta la carga de todos los
+días.
+
+Solo aplica a las facturas del **ADRES** (se reconocen por NIT o por nombre,
+con el mismo criterio que ya usaba el resto del sistema). En las demás no se
+pinta nada.
+
+**Antes de usarlo hay que decirle dónde está el servidor.** En el PC del
+motor, crear el archivo `config\facturacion_electronica_root.txt` con una
+sola línea:
+
+```
+\\172.16.32.83\factura_electronica_net22
+```
+
+Mientras no exista, la pantalla lo dice con todas sus letras («no está
+configurado el servidor de facturación electrónica») en vez de quedarse
+callada.
+
+**Lo que sigue pendiente.** Las fechas de ingreso y egreso **declaradas por
+el hospital**: hoy el sistema no las guarda en ninguna tabla, así que el
+cotejo compara el RIPS contra la fecha de la factura y la del oficio, y
+avisa que nadie contrastó las de atención. Buscando se encontró de dónde
+podrían salir: el **detallado de DGH sí trae las columnas FECHA_INGRESO y
+FECHA_EGRESO**, pero el lector del sistema no las mapea (le faltan dos
+líneas). Queda para confirmarlo con Yesid y engancharlo.
+
+---
 
 ### 08-09-2026 (tarde, 2) — La excepción de las 3 devoluciones también abre el cuarto oficio del envío
 
@@ -272,7 +354,6 @@ y agregarle evidencia después la descuadraría.
 
 ---
 
-
 ### 07-09-2026 (noche, 2) — En la mesa se ve por qué se glosó y con qué refutarlo
 
 **El problema.** La tabla de la mesa mostraba el motivo de la glosa cortado a
@@ -316,7 +397,6 @@ pidió «cargar/descargar»; quedó la mitad. Queda anotado en PENDIENTE.
 30 pruebas nuevas y una revisión en navegador de toda la pantalla.
 
 ---
-
 
 ### 07-09-2026 (noche) — La conciliación se trabaja en la pantalla, no en un Excel suelto
 
@@ -6280,7 +6360,6 @@ bitácora sigue siendo la memoria (qué pasó y cuándo); `PROYECTO.md` es el
 tablero (dónde estamos hoy).
 
 ---
-
 
 ### 06-08 — 22 correcciones al motor, con las glosas de trampa como guía
 

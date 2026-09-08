@@ -48,6 +48,7 @@ from app.models.db import (
     RadicacionCuentaRecord,
     UsuarioRecord,
 )
+from app.services import preauditoria_atencion_service as atencion_svc
 from app.services import preauditoria_service as svc
 from app.services.oficio_devolucion_pdf import generar_pdf_oficio_devolucion
 
@@ -1025,6 +1026,24 @@ def ver_factura(
     if not f:
         raise HTTPException(404, "Factura no encontrada")
     return _factura_dict(db, f)
+
+
+@router.get("/facturas/{factura_id}/atencion")
+def ver_atencion(
+    factura_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Fechas de ingreso y egreso del RIPS, y cuánto le queda de plazo.
+
+    Solo se calcula para las facturas del ADRES, y solo cuando el gestor
+    abre la factura: cada revisión toca el servidor de facturación
+    electrónica, y hacerlo al cargar el envío volvería lentísima la carga.
+    """
+    f = db.get(FacturaPreauditoriaRecord, factura_id)
+    if not f:
+        raise HTTPException(404, "Factura no encontrada")
+    return atencion_svc.revisar(db, f.factura)
 
 
 @router.get("/facturas/{numero}/historial")
