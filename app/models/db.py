@@ -1316,6 +1316,12 @@ class FacturaPreauditoriaRecord(Base):
     ronda_actual = Column(Integer, default=1, nullable=False)  # 1=primera; 2+=subsanación
     num_subsanacion = Column(Integer, default=0, nullable=False)  # 0,1,2,3 = ronda_actual-1
     num_devoluciones = Column(Integer, default=0, nullable=False)  # veces devuelta (tope 3)
+    # Devoluciones EXTRA autorizadas por coordinación por encima del tope de 3
+    # (excepción puntual y con testigo). El tope efectivo es 3 + este número.
+    # Caso 07-09-2026: HUS315614 necesitó una cuarta devolución autorizada.
+    # server_default="0": el DDL lleva DEFAULT 0, así los INSERT crudos que
+    # omiten la columna (importador de consolidado, comparar acta) no fallan.
+    devoluciones_extra = Column(Integer, default=0, server_default="0", nullable=False)
     pendiente_subsanacion = Column(Integer, default=0, nullable=False)  # 0/1
 
     # Última auditoría

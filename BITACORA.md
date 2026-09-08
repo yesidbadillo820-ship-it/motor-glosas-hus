@@ -307,6 +307,36 @@ las firmas, que está en celdas combinadas— y lo rompería.
 
 ---
 
+### 07-09-2026 (tarde, 4) — Excepción autorizada al tope de 3 devoluciones (caso HUS315614)
+
+**Lo que pidió Yesid.** La factura **HUS315614** ya se había devuelto las 3
+veces del tope, pero el caso ameritaba una cuarta. La regla de «máximo 3
+devoluciones» está bien puesta y no se toca para las demás — lo que faltaba
+era una forma de hacer una **excepción puntual, por factura y con testigo**,
+en vez de un hueco permanente.
+
+**Cómo quedó.** En la ventana de auditar, cuando una factura ya agotó sus 3
+devoluciones, a **coordinación/administración** le aparece un botón
+**«➕ Autorizar devolución extra»**. Al usarlo:
+
+- pide el **motivo** (obligatorio) y lo guarda en el **historial** con el
+  nombre de quien autoriza — queda el testigo de la excepción;
+- sube el cupo de **esa** factura en uno (el tope pasa de 3 a 4), así que la
+  cuarta devolución ya pasa;
+- al usarse esa cuarta, la factura **se vuelve a bloquear sola** (el cupo era
+  de una sola): no se abre la puerta para siempre.
+
+Al auditor normal el botón no le aparece, y si intenta autorizar por otra vía
+el servidor lo rechaza. La regla de 3 sigue firme para todo lo demás.
+
+Cambios: un campo nuevo en la factura (`devoluciones_extra`, con su migración
+de arranque), el tope ahora se calcula «3 + extra», el endpoint y el botón de
+autorizar. 7 pruebas de servidor y 6 de pantalla.
+
+---
+
+---
+
 ### 07-09-2026 (tarde, 3) — «Plata recuperada» se resistía a irse del menú
 
 Al aplicar lo del día anterior (ocultar cuatro botones), **tres se fueron**
