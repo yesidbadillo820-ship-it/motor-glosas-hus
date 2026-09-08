@@ -20622,7 +20622,7 @@ async function objProcesar(){
     toast('Archivo armado', d.objeciones+' objeciones de '+d.entidad, 'success');
   }catch(e){
     estado.textContent = '';
-    caja.innerHTML = '<div class="chart-card" style="padding:1.1rem;border-left:3px solid var(--danger)">'
+    caja.innerHTML = '<div class="chart-card" style="padding:1.1rem;border-left:3px solid var(--c-red)">'
       + '<div style="font-weight:700;margin-bottom:.3rem">No se pudo armar el archivo</div>'
       + '<div style="font-size:.85rem;color:var(--text2)">' + objEsc(e.message) + '</div></div>';
   }finally{ btn.disabled = false; }
@@ -20665,14 +20665,14 @@ function objChip(texto, color){
     + 'font-weight:700;background:' + color + '22;color:' + color + '">' + objEsc(texto) + '</span>';
 }
 
-var OBJ_COLOR = {'ALTA':'var(--success)','MEDIA':'var(--warning)','BAJA':'var(--danger)','SIN CRUCE':'var(--danger)'};
+var OBJ_COLOR = {'ALTA':'var(--c-green)','MEDIA':'var(--c-amber)','BAJA':'var(--c-red)','SIN CRUCE':'var(--c-red)'};
 
 function objPintar(d){
   var caja = document.getElementById('obj-resultado');
 
   var reglas = d.reglas_ok
-    ? '<div style="font-size:.8rem;color:var(--success)">✓ Reglas verificadas: CTNCENCOS vacía, ningún código inventado y CROTIPOBJ correcto en todas las facturas.</div>'
-    : '<div style="font-size:.8rem;color:var(--danger)"><b>Reglas incumplidas:</b><br>' + d.fallas_reglas.map(objEsc).join('<br>') + '</div>';
+    ? '<div style="font-size:.8rem;color:var(--c-green)">✓ Reglas verificadas: CTNCENCOS vacía, ningún código inventado y CROTIPOBJ correcto en todas las facturas.</div>'
+    : '<div style="font-size:.8rem;color:var(--c-red)"><b>Reglas incumplidas:</b><br>' + d.fallas_reglas.map(objEsc).join('<br>') + '</div>';
 
   var tarjetas = ['ALTA','MEDIA','BAJA','SIN CRUCE'].map(function(k){
     return '<div style="text-align:center;padding:.5rem .8rem;border:1px solid var(--border);border-radius:10px;min-width:82px">'
@@ -20728,7 +20728,7 @@ function objPintar(d){
     }
     html += '</div>';
   }else{
-    html += '<div class="chart-card" style="padding:1.1rem;margin-bottom:1rem;font-size:.85rem;color:var(--success)">'
+    html += '<div class="chart-card" style="padding:1.1rem;margin-bottom:1rem;font-size:.85rem;color:var(--c-green)">'
       + '✓ No quedó nada por revisar: las ' + d.objeciones + ' objeciones tienen su servicio identificado.</div>';
   }
 
