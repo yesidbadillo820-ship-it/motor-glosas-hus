@@ -437,6 +437,9 @@ async def lifespan(app: FastAPI):
         ("paquetes_adres", "catalogo_centros", "TEXT"),
         ("glosas_adres", "cuenta_valor", "BOOLEAN DEFAULT 1"),
         ("facturas_adres", "valor_glosado_oficial", "DOUBLE PRECISION"),
+        # Pre-auditoría (07-09-2026): devoluciones extra autorizadas por
+        # coordinación por encima del tope de 3 (excepción con testigo).
+        ("preaud_facturas", "devoluciones_extra", "INTEGER DEFAULT 0"),
     ]
     for tabla, col_name, col_ddl in _ADRES_MISSING_COLUMNS:
         try:

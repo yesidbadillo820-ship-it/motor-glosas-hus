@@ -810,6 +810,25 @@ async function cargarConsolidado(page){
 function exportarConsolidado(){ verPdf('/preauditoria/consolidado/export.xlsx', true); }
 function descargarInforme(){ verPdf('/preauditoria/estadisticas/informe.xlsx', true); }
 
+// Excepción al tope de 3 devoluciones (solo coordinación/admin). Sube el cupo
+// de ESA factura en uno, con motivo obligatorio que queda en el historial.
+// Al volver se recarga la ventana: el botón Devolver queda habilitado.
+async function autorizarDevolucionExtra(id){
+  var motivo = prompt('Excepción al tope de 3 devoluciones.\n\n'+
+    'Escriba por qué se autoriza UNA devolución más para esta factura. '+
+    'Quedará en el historial con su nombre.');
+  if(motivo === null) return;
+  motivo = motivo.trim();
+  if(!motivo){ alert('Debe escribir el motivo: es el testigo de la excepción.'); return; }
+  try{
+    var d = await api('/preauditoria/facturas/'+id+'/autorizar-devolucion-extra',
+      {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({motivo:motivo})});
+    alert('Listo: '+d.factura+' queda con cupo para '+d.max_devoluciones+' devoluciones '+
+      '(se autorizó 1 extra). Ya puede devolverla.');
+    abrirAuditar(id);
+  }catch(e){ alert(e.message); }
+}
+
 async function abrirAuditar(id){
   var cont=document.getElementById('ma-cuerpo');
   cont.innerHTML='<p class="leyenda">Cargando…</p>'; abrirModal('m-auditar');
@@ -831,6 +850,9 @@ async function abrirAuditar(id){
       '<div id="au-botones" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+
         '<button class="btn btn-verde" '+(sinFE?'disabled title="Sin facturación electrónica no se puede radicar"':'')+' onclick="auditar('+f.id+',\'RADICAR\')">✔ Soportes completos — radicar</button>'+
         '<button class="btn btn-rojo" '+(limite?'disabled':'')+' onclick="auditar('+f.id+',\'DEVUELTA\')">✖ Devolver</button>'+
+        // Excepción al tope de 3 (solo coordinación/admin, y solo cuando ya se
+        // agotó el cupo): autoriza UNA devolución más, con testigo. 07-09-2026.
+        ((limite && ES_ADMIN)?'<button class="btn btn-borde" style="border-color:var(--rojo);color:var(--rojo)" title="Excepción: autorizar una devolución más allá del tope (queda en el historial)" onclick="autorizarDevolucionExtra('+f.id+')">➕ Autorizar devolución extra</button>':'')+
         // Revertir una auditoría YA DECIDIDA es solo de coordinación/admin:
         // cambia lo que ya se reportó. El backend lo exige igual (403).
         '<button class="btn btn-borde" '+(puedeRevertir(f)?'':'disabled title="'+(f.oficio_devolucion_id?'Esta factura ya salió en un oficio de devolución entregado: solo coordinación o administración puede deshacerla':'La auditó '+esc(f.auditor||'otra persona')+': solo esa persona o coordinación puede deshacerla')+'"')+' onclick="auditar('+f.id+',\'PENDIENTE\')">Dejar pendiente</button></div>';
