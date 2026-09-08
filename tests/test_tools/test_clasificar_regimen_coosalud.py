@@ -349,6 +349,10 @@ class TestSoportesRadicacion:
         assert cr._canon_raiz(r"Y:\3. MARZO 2026") == cr._canon_raiz(
             "\\\\Prime\\radicacion_2026\\3. MARZO 2026"
         )
+        # Lo mismo para X: ≡ \\Prime\servidor_radicación (con tilde).
+        assert cr._canon_raiz(r"X:\RADICACION DIGITAL") == cr._canon_raiz(
+            "\\\\Prime\\servidor_radicación\\RADICACION DIGITAL"
+        )
         # Con rutas reales (tmp) el resolver deja pasar las accesibles y avisa
         # (sin reventar) las inexistentes.
         existente = tmp_path / "raiz_ok"
