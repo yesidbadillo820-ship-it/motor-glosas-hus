@@ -2916,6 +2916,94 @@ def _paciente_honesto(pac) -> str:
 # Las marcas que el propio motor deja en el texto cuando decide que el
 # dictamen NO está listo para radicar, y el motivo en una línea. La pantalla
 # las usa para no estampar el sello verde encima.
+# ── El escrito contra la ficha del propio motor (08-09-2026) ──────────
+# Prueba del caso 1, glosa TA0701 de COOSALUD. El motor TIENE el contrato
+# cargado —«68001C00060340-24 · SOAT -15 %», vigente hasta 2027— y lo imprime
+# en el recuadro del dictamen. Y en el mismo documento, la argumentación
+# decía:
+#
+#   «EL VALOR LIQUIDADO COINCIDE CON LA TARIFA SOAT PLENO […] COOSALUD NO HA
+#    APORTADO ELEMENTOS DE PRUEBA QUE DEMUESTREN LA EXISTENCIA DE UNA TARIFA
+#    PACTADA DISTINTA O INFERIOR.»
+#
+# Sí existe, y la tiene el hospital. En una glosa de TARIFA eso es concederle
+# a la entidad justo lo que objetó: le basta abrir el contrato —o leer el
+# recuadro de nuestro propio dictamen— para tumbar la respuesta sin discutir
+# el fondo.
+#
+# La red que ya existía solo miraba el caso del contrato VENCIDO. Con un
+# contrato vigente nadie cruzaba el texto contra la ficha. Y el aviso de
+# «plata que el motor no calculó» sí lo vio, pero solo avisaba: el dictamen
+# salió sellado en verde.
+#
+# Acá NO se reescribe el argumento —redactarle la defensa jurídica al modelo
+# es peor— : se BLOQUEA y se le dice al gestor qué contradice a qué.
+
+# «SOAT PLENO», «SOAT PLENA», «TARIFA SOAT PLENO».
+_RE_DICE_SOAT_PLENO = re.compile(r"\bSOAT\s+PLEN[AO]\b", re.IGNORECASE)
+# «NO EXISTE CONTRATO PACTADO», «SIN CONTRATO PACTADO», «no media contrato».
+_RE_DICE_SIN_CONTRATO = re.compile(
+    r"\b(?:NO\s+EXISTE|SIN|NO\s+MEDIA|NO\s+SE\s+SUSCRIBI[ÓO])\s+"
+    r"(?:NING[ÚU]N\s+)?(?:ACUERDO|CONTRATO)\s+(?:PACTAD[OA]|SUSCRITO|VIGENTE)?",
+    re.IGNORECASE,
+)
+# «NO HA APORTADO … TARIFA PACTADA DISTINTA O INFERIOR» — la entidad no tiene
+# que aportar lo que el hospital ya tiene guardado.
+_RE_EXIGE_PRUEBA_DEL_PACTO = re.compile(
+    r"NO\s+HA\s+(?:APORTADO|ACREDITADO|DEMOSTRADO|PROBADO)"
+    r"(?:(?!\.).){0,120}?TARIFA\s+PACTADA",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _hay_tarifa_pactada_de_verdad(ficha) -> bool:
+    """¿La ficha del motor trae un pacto con descuento, cierto y vigente?
+
+    Las tres puertas son estrechas a propósito. Sin contrato, con la vigencia
+    terminada o con la tarifa indeterminada, el escrito PUEDE decir SOAT pleno
+    —es justo lo que se aplica a falta de pacto— y marcarlo sería un falso
+    positivo en la mitad de los dictámenes.
+    """
+    if not isinstance(ficha, dict):
+        return False
+    if ficha.get("_vigencia_vencida") or ficha.get("_tarifa_indeterminada"):
+        return False
+    numero = str(ficha.get("numero") or "").upper()
+    if not numero or "SIN CONTRATO" in numero or "VIGENCIA TERMINADA" in numero:
+        return False
+    tarifa = str(ficha.get("tarifa") or "").upper()
+    if not tarifa or "NO DETERMINADA" in tarifa:
+        return False
+    # Un pacto A SOAT pleno no contradice a un escrito que diga SOAT pleno.
+    try:
+        factor = float(ficha.get("factor") or 0)
+    except (TypeError, ValueError):
+        factor = 0.0
+    return bool(0 < factor < 1) or bool(re.search(r"-\s*\d+\s*%", tarifa))
+
+
+def _contradice_la_ficha_contractual(argumento: str, ficha) -> list[str]:
+    """Frases del escrito que se dan de bruces con el contrato del motor.
+
+    Lista vacía = no hay contradicción, o no hay pacto contra el cual
+    contradecirse. Solo se leen frases del argumento, no del recuadro: el
+    recuadro es dato del motor y ya está bien.
+    """
+    if not argumento or not _hay_tarifa_pactada_de_verdad(ficha):
+        return []
+    texto = _solo_texto_argumento(argumento)
+    pactada = str(ficha.get("tarifa") or "").strip()
+    hallazgos: list[str] = []
+    if _RE_DICE_SOAT_PLENO.search(texto):
+        hallazgos.append(f"dice «SOAT PLENO» y lo pactado es «{pactada}»")
+    if _RE_DICE_SIN_CONTRATO.search(texto):
+        numero = str(ficha.get("numero") or "").strip()
+        hallazgos.append(f"dice que no hay contrato pactado y el motor tiene el {numero}")
+    if _RE_EXIGE_PRUEBA_DEL_PACTO.search(texto):
+        hallazgos.append("le exige a la entidad probar una tarifa pactada que el hospital ya tiene")
+    return hallazgos
+
+
 _MARCAS_DE_BLOQUEO = (
     ("NO RADICAR TODAVÍA", "Falta el soporte de la causal en el expediente"),
     ("NO SE IDENTIFICÓ LA ENTIDAD PAGADORA", "No se sabe a qué entidad se le responde"),
@@ -2926,6 +3014,10 @@ _MARCAS_DE_BLOQUEO = (
     (
         "DICE QUÉ CONTIENE UN DOCUMENTO QUE NO SE APORTÓ",
         "Afirma lo que dice un documento que no se aportó",
+    ),
+    (
+        "CONTRADICE LA TARIFA PACTADA QUE TIENE EL MOTOR",
+        "El escrito contradice el contrato que el motor tiene cargado",
     ),
 )
 
@@ -11395,6 +11487,39 @@ class GlosaService:
                     logger.warning(f"[PLATA-INVENTADA] el modelo escribió: {_plata}")
             except Exception as _e_pi2:
                 logger.debug(f"[PLATA-INVENTADA] red no aplicada: {_e_pi2}")
+
+            # 08-09-2026 (caso 1, TA0701 COOSALUD) — EL ESCRITO CONTRA LA
+            # FICHA DEL PROPIO MOTOR. Esto BLOQUEA, no avisa: el aviso de
+            # «plata que el motor no calculó» ya había visto algo y el
+            # dictamen salió igual con el sello verde.
+            try:
+                _contra = _contradice_la_ficha_contractual(
+                    _solo_texto_argumento(dictamen) or "", locals().get("_ficha_vig")
+                )
+                if _contra:
+                    _detalle = "; ".join(_contra)
+                    dictamen = dictamen.rstrip() + (
+                        '<div style="background:#fee2e2;border-left:4px solid #dc2626;'
+                        'padding:16px;margin:15px 0;border-radius:8px;">'
+                        '<h4 style="color:#991b1b;margin:0 0 8px 0;">EL ESCRITO '
+                        "CONTRADICE LA TARIFA PACTADA QUE TIENE EL MOTOR</h4>"
+                        '<p style="font-size:13px;line-height:1.7;color:#7f1d1d;margin:0;">'
+                        f"La argumentación {_detalle}. El contrato está cargado en el "
+                        "motor y sale impreso en el recuadro de este mismo dictamen: a "
+                        "la entidad le basta leerlo —o abrir su copia del contrato— "
+                        "para tumbar la respuesta sin discutir el fondo. En una glosa "
+                        "de tarifa, eso es concederle lo que objetó. <b>Corrija la "
+                        "argumentación para que hable de la tarifa pactada real antes "
+                        "de radicar.</b></p></div>"
+                    )
+                    _correcciones.append(
+                        "OJO: la argumentación contradice el contrato que el motor "
+                        f"tiene cargado ({_detalle}). El dictamen quedó marcado como "
+                        "NO listo para radicar."
+                    )
+                    logger.warning(f"[CONTRADICE-FICHA] {_detalle}")
+            except Exception as _e_cf3:
+                logger.debug(f"[CONTRADICE-FICHA] red no aplicada: {_e_cf3}")
 
             # 02-09-2026 — TRIAGE, CIE-10 O FECHAS QUE NINGÚN PDF TRAE.
             try:
