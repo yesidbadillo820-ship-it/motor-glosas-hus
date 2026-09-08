@@ -58,6 +58,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _dinero import a_entero  # noqa: E402
 
+# Motor del cruce contra el DGH, común a todos los bots.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _cruce_dgh import (  # noqa: E402
+    escribir_reporte_cruce,
+    leer_servicios_dgh,
+    resolver_servicio,
+    traza,
+    verificar_reglas,
+)
+
 logger = logging.getLogger("organizar_saludtotal")
 
 
@@ -347,11 +357,22 @@ def construir_registros(
     consecutivo: int,
     prefijo_factura: str = PREFIJO_FACTURA_DEFAULT,
     maestro: dict[str, str] | None = None,
+    servicios_dgh: dict | None = None,
+    trazas: list[dict] | None = None,
 ) -> list[dict]:
     """Lee el Excel de SALUD TOTAL y devuelve una lista de dicts, uno por
-    objeción, con las 16 columnas del formato de trabajo. Si `maestro` viene,
-    llena SLNSERPRO homologando el NOMBRE del servicio (match exacto
-    normalizado — sin inventar); sin maestro, SLNSERPRO queda vacío."""
+    objeción, con las 16 columnas del formato de trabajo.
+
+    SALUD TOTAL no manda el código del servicio, sólo el NOMBRE. Hay dos formas
+    de llegar al código, y el cruce manda sobre el maestro:
+
+    - `servicios_dgh` (el export de servicios facturados): busca el servicio
+      **dentro de esa factura** por nombre y valor. Es lo mejor, porque el
+      código que sale es el que DGH tiene en ESA cuenta.
+    - `maestro`: homologa por nombre normalizado contra un listado de
+      referencia. Sirve cuando no hay export del DGH a mano.
+
+    Sin ninguno de los dos, SLNSERPRO queda vacío. Nunca se inventa un código."""
     try:
         from openpyxl import load_workbook
     except ImportError:
@@ -389,7 +410,34 @@ def construir_registros(
         nombre_serv = reparar_texto(str(_cell(r, idx, "servicio") or "").strip())
 
         cod_servicio = ""
-        if maestro:
+        if servicios_dgh is not None:
+            cantidad = _num(_cell(r, idx, "cantidad"))
+            cruce = resolver_servicio(
+                servicios_dgh.get(crncxc, []),
+                descripcion=nombre_serv,
+                valor=valor,
+                valor_unitario=int(valor // cantidad) if cantidad else 0,
+                cantidad=int(cantidad),
+            )
+            cod_servicio = cruce.linea.codigo if cruce.linea is not None else ""
+            if cod_servicio:
+                con_codigo += 1
+            else:
+                sin_codigo[nombre_serv] += 1
+            if trazas is not None:
+                trazas.append(
+                    traza(
+                        factura=crncxc,
+                        codigo_objecion=motivo,
+                        valor=valor,
+                        cod_entidad="",
+                        desc_entidad=nombre_serv,
+                        unitario_entidad=int(valor // cantidad) if cantidad else 0,
+                        observacion=observacion,
+                        cruce=cruce,
+                    )
+                )
+        elif maestro:
             cod_servicio = maestro.get(_norm_nombre(nombre_serv), "")
             if cod_servicio:
                 con_codigo += 1
@@ -581,6 +629,21 @@ def main(argv: list[str] | None = None) -> int:
         f"(464306 → {PREFIJO_FACTURA_DEFAULT}0000464306). Default: {PREFIJO_FACTURA_DEFAULT}.",
     )
     parser.add_argument(
+        "--servicios-dgh",
+        type=Path,
+        default=None,
+        help="Export de servicios facturados del DGH. SALUD TOTAL sólo manda el "
+        "nombre del servicio; con esto se busca dentro de esa factura y SLNSERPRO "
+        "queda con el código que el DGH tiene en esa cuenta. Manda sobre --maestro.",
+    )
+    parser.add_argument(
+        "--reporte-cruce",
+        type=Path,
+        default=None,
+        help="Excel de trabajo con el detalle del cruce (hojas CRUCE, REVISAR y "
+        "RESUMEN). Requiere --servicios-dgh.",
+    )
+    parser.add_argument(
         "--maestro",
         type=Path,
         default=None,
@@ -615,6 +678,10 @@ def main(argv: list[str] | None = None) -> int:
         logger.error(f"No existe el archivo de entrada: {args.entrada}")
         return 1
 
+    if args.reporte_cruce is not None and args.servicios_dgh is None:
+        logger.error("--reporte-cruce necesita --servicios-dgh (es el detalle de ese cruce).")
+        return 1
+
     fecha = _parse_fecha(args.fecha)
     maestro: dict[str, str] = {}
     if args.maestro is not None:
@@ -625,12 +692,31 @@ def main(argv: list[str] | None = None) -> int:
     maestro.update(_cargar_mapa_json(args.mapa_servicios))
 
     logger.info(f"Leyendo glosas de SALUD TOTAL: {args.entrada.name}")
+    servicios_dgh = None
+    if args.servicios_dgh is not None:
+        if not args.servicios_dgh.is_file():
+            logger.error(f"No existe el export del DGH: {args.servicios_dgh}")
+            return 1
+        logger.info(f"Leyendo servicios facturados del DGH: {args.servicios_dgh.name}")
+        try:
+            servicios_dgh = leer_servicios_dgh(args.servicios_dgh, avisar=logger.warning)
+        except ValueError as e:
+            logger.error(str(e))
+            return 1
+        logger.info(
+            f"  {sum(len(v) for v in servicios_dgh.values())} renglones de servicio "
+            f"en {len(servicios_dgh)} facturas."
+        )
+
+    trazas: list[dict] = []
     registros = construir_registros(
         args.entrada,
         fecha=fecha,
         consecutivo=args.consecutivo,
         prefijo_factura=args.prefijo_factura,
         maestro=maestro or None,
+        servicios_dgh=servicios_dgh,
+        trazas=trazas,
     )
     if not registros:
         logger.error("No se encontró ninguna objeción en el archivo de entrada.")
@@ -644,6 +730,43 @@ def main(argv: list[str] | None = None) -> int:
             registros, args.salida, prefijo=args.prefijo, consecutivo=args.consecutivo
         )
         logger.info(f"\n{len(generados)} archivo(s) de SALUD TOTAL en: {args.salida}")
+
+    if servicios_dgh is not None:
+        cuenta = {
+            k: sum(1 for t in trazas if t["confianza"] == k)
+            for k in ("ALTA", "MEDIA", "BAJA", "SIN CRUCE")
+        }
+        ubicados = cuenta["ALTA"] + cuenta["MEDIA"]
+        logger.info(
+            f"  Cruce contra los servicios del DGH: {ubicados} de {len(trazas)} servicios "
+            f"ubicados con confianza alta/media ({ubicados / (len(trazas) or 1):.0%})."
+        )
+        logger.info(
+            f"    ALTA={cuenta['ALTA']}  MEDIA={cuenta['MEDIA']}  BAJA={cuenta['BAJA']}  "
+            f"SIN CRUCE={cuenta['SIN CRUCE']}  → revisar {cuenta['BAJA'] + cuenta['SIN CRUCE']}."
+        )
+
+    verificar_reglas(
+        [
+            {
+                "factura": r["CRNCXC"],
+                "slnserpro": r["SLNSERPRO"],
+                "ctncencos": r["CTNCENCOS"],
+                "crotipobj": r["CROTIPOBJ"],
+                "codigo_glosa": r["CRNCONOBJ"],
+            }
+            for r in registros
+        ],
+        servicios_dgh,
+        avisar=logger.info,
+    )
+
+    if args.reporte_cruce is not None:
+        escribir_reporte_cruce(trazas, args.reporte_cruce, entidad="SALUD TOTAL")
+        pendientes = sum(1 for t in trazas if t["aviso"] or t["confianza"] in ("BAJA", "SIN CRUCE"))
+        logger.info(
+            f"Detalle del cruce: {args.reporte_cruce} ({pendientes} renglón(es) en REVISAR)."
+        )
 
     _resumen(registros)
     return 0

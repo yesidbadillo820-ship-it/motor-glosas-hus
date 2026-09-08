@@ -71,6 +71,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _dinero import a_entero  # noqa: E402
 
+# Motor del cruce contra el DGH, común a todos los bots (ver `_cruce_dgh.py`).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _cruce_dgh import (  # noqa: E402
+    escribir_reporte_cruce,
+    leer_servicios_dgh,
+    resolver_servicio,
+    traza,
+    verificar_reglas,
+)
+
 logger = logging.getLogger("objeciones_emssanar")
 
 # ─── Layout de la tabla del PDF (bandas X por columna, calibradas del PDF real) ──────
@@ -623,6 +633,26 @@ def armar_crdobserv(renglon: dict) -> str:
     return "\n".join(lineas)
 
 
+GRUPO_CLINICO = "CL"
+
+
+def crotipobj_factura(grupos: set[str]) -> int:
+    """Solo administrativos (TA/FA/SO/AU/CO…) → 0; solo CL → 1; mezcla → 2.
+
+    Se decide POR FACTURA, no por renglón: es una de las reglas fijas del
+    archivo de OBJECIONES (ver `CLAUDE.md`). Ojo: no es lo mismo que el
+    «Tipo objeción» del encabezado del PDF (Glosa/Devolución) — para forzar
+    ese valor está `--tipobj`.
+    """
+    tiene_cl = GRUPO_CLINICO in grupos
+    tiene_admin = any(g and g != GRUPO_CLINICO for g in grupos)
+    if tiene_cl and tiene_admin:
+        return 2
+    if tiene_cl:
+        return 1
+    return 0
+
+
 def renglon_a_fila(
     renglon: dict,
     consec: int,
@@ -631,10 +661,48 @@ def renglon_a_fila(
     usuario: str,
     tipobj: int,
     aplicar_sufijo_h: bool = True,
+    servicios_dgh: dict | None = None,
+    trazas: list[dict] | None = None,
 ) -> dict:
-    """Renglón consolidado → dict con las 16 columnas del lote OBJECIONES."""
+    """Renglón consolidado → dict con las 16 columnas del lote OBJECIONES.
+
+    Con `servicios_dgh` (el export de servicios facturados) SLNSERPRO sale del
+    cruce contra los servicios de ESA factura, que es la regla de no inventar
+    códigos; lo que no se identifique queda vacío para completarlo a mano. Sin
+    el export se usa la tabla `CUPS_A_DGH`, como venía.
+    """
     comps = renglon["componentes"]
     principal = comps[0] if comps else {"codigo": "", "texto": "", "observacion": ""}
+    valor = renglon["valor_objetado"] or 0
+    cantidad = a_entero(str(renglon.get("cantidad") or "")) or 0
+    unitario = a_entero(str(renglon.get("valor_tecnologia") or "")) or 0
+
+    if servicios_dgh is None:
+        slnserpro = homologar_servicio(renglon["tec_codigo"], aplicar_sufijo_h)
+    else:
+        cruce = resolver_servicio(
+            servicios_dgh.get(factura, []),
+            codigo=renglon["tec_codigo"],
+            descripcion=renglon["tec_desc"],
+            valor=valor,
+            valor_unitario=unitario,
+            cantidad=cantidad,
+        )
+        slnserpro = cruce.linea.codigo if cruce.linea else ""
+        if trazas is not None:
+            trazas.append(
+                traza(
+                    factura=factura,
+                    codigo_objecion=principal["codigo"],
+                    valor=valor,
+                    cod_entidad=renglon["tec_codigo"],
+                    desc_entidad=renglon["tec_desc"],
+                    unitario_entidad=unitario,
+                    observacion=principal.get("observacion", ""),
+                    cruce=cruce,
+                )
+            )
+
     return {
         "CDCONSEC": str(consec),
         "CDFECDOC": fecha,
@@ -646,13 +714,23 @@ def renglon_a_fila(
         "CRNCLAOBJ": None,
         "GENUSUARIO4": usuario,
         "CRNCONOBJ": principal["codigo"],
-        "SLNSERPRO": homologar_servicio(renglon["tec_codigo"], aplicar_sufijo_h),
+        "SLNSERPRO": slnserpro,
         "IDRIPS": None,
         "CTNCENCOS": None,
-        "CROVALOBJ": renglon["valor_objetado"] or 0,
+        "CROVALOBJ": valor,
         "CRDOBSERV": armar_crdobserv(renglon),
         "CROTIPOBJ": tipobj,
     }
+
+
+def aplicar_crotipobj_por_factura(filas: list[dict]) -> list[dict]:
+    """Regla fija: CROTIPOBJ se decide por FACTURA según sus grupos de glosa."""
+    grupos: dict[str, set[str]] = defaultdict(set)
+    for f in filas:
+        grupos[f["CRNCXC"]].add(str(f["CRNCONOBJ"] or "")[:2].upper())
+    for f in filas:
+        f["CROTIPOBJ"] = crotipobj_factura(grupos[f["CRNCXC"]])
+    return filas
 
 
 # ─── Procesamiento de un PDF completo ────────────────────────────────────────────────
@@ -786,6 +864,21 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Rechazar los PDFs cuya suma no cuadre con el Valor Objetado del encabezado",
     )
+    ap.add_argument(
+        "--servicios-dgh",
+        type=Path,
+        default=None,
+        help="Export de servicios facturados del DGH. Con esto SLNSERPRO sale del "
+        "cruce contra los servicios de ESA factura en vez de la tabla CUPS_A_DGH; "
+        "lo que no se identifique queda vacío para completar a mano.",
+    )
+    ap.add_argument(
+        "--reporte-cruce",
+        type=Path,
+        default=None,
+        help="Excel de trabajo con el detalle del cruce (hojas CRUCE, REVISAR y "
+        "RESUMEN). Requiere --servicios-dgh.",
+    )
     args = ap.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
@@ -798,6 +891,26 @@ def main(argv: list[str] | None = None) -> int:
         except ValueError:
             sys.stderr.write(f"ERROR: --fecha inválida: {args.fecha} (esperaba DD-MM-AAAA)\n")
             return 2
+
+    if args.reporte_cruce is not None and args.servicios_dgh is None:
+        sys.stderr.write("ERROR: --reporte-cruce necesita --servicios-dgh.\n")
+        return 2
+
+    servicios_dgh = None
+    if args.servicios_dgh is not None:
+        if not args.servicios_dgh.is_file():
+            sys.stderr.write(f"ERROR: no existe el export del DGH: {args.servicios_dgh}\n")
+            return 2
+        logger.info(f"Leyendo servicios facturados del DGH: {args.servicios_dgh.name}")
+        try:
+            servicios_dgh = leer_servicios_dgh(args.servicios_dgh, avisar=logger.warning)
+        except ValueError as e:
+            sys.stderr.write(f"ERROR: {e}\n")
+            return 2
+        logger.info(
+            f"  {sum(len(v) for v in servicios_dgh.values())} renglones de servicio "
+            f"en {len(servicios_dgh)} facturas."
+        )
 
     pdfs = buscar_pdfs(args.pdf)
     if not pdfs:
@@ -855,13 +968,11 @@ def main(argv: list[str] | None = None) -> int:
     resultados.sort(key=_clave_factura)
 
     filas: list[dict] = []
+    trazas: list[dict] = []
     for i, res in enumerate(resultados):
         consec = args.consec_inicial + i
         enc = res["encabezado"]
         fecha = fecha_forzada or enc.get("fecha_objecion") or datetime.now()
-        tipobj = args.tipobj
-        if tipobj is None:
-            tipobj = tipobj_desde_encabezado(enc.get("tipo_objecion", ""))
         for renglon in res["renglones"]:
             filas.append(
                 renglon_a_fila(
@@ -870,13 +981,60 @@ def main(argv: list[str] | None = None) -> int:
                     factura=res["factura"],
                     fecha=fecha,
                     usuario=args.usuario,
-                    tipobj=tipobj,
+                    tipobj=0,  # provisional: se decide por factura abajo
                     aplicar_sufijo_h=not args.sin_sufijo_h,
+                    servicios_dgh=servicios_dgh,
+                    trazas=trazas,
                 )
             )
 
+    # CROTIPOBJ por factura (regla fija). --tipobj sigue mandando si se pasa a
+    # propósito: es el «Tipo objeción» del encabezado del PDF, otra cosa.
+    if args.tipobj is None:
+        aplicar_crotipobj_por_factura(filas)
+    else:
+        for f in filas:
+            f["CROTIPOBJ"] = args.tipobj
+
     salida = Path(args.salida)
     escribir_excel(filas, salida)
+
+    if servicios_dgh is not None:
+        cuenta = {
+            k: sum(1 for t in trazas if t["confianza"] == k)
+            for k in ("ALTA", "MEDIA", "BAJA", "SIN CRUCE")
+        }
+        ubicados = cuenta["ALTA"] + cuenta["MEDIA"]
+        logger.info(
+            f"  Cruce contra los servicios del DGH: {ubicados} de {len(trazas)} servicios "
+            f"ubicados con confianza alta/media ({ubicados / (len(trazas) or 1):.0%})."
+        )
+        logger.info(
+            f"    ALTA={cuenta['ALTA']}  MEDIA={cuenta['MEDIA']}  BAJA={cuenta['BAJA']}  "
+            f"SIN CRUCE={cuenta['SIN CRUCE']}  → revisar {cuenta['BAJA'] + cuenta['SIN CRUCE']}."
+        )
+
+    verificar_reglas(
+        [
+            {
+                "factura": f["CRNCXC"],
+                "slnserpro": f["SLNSERPRO"],
+                "ctncencos": f["CTNCENCOS"],
+                "crotipobj": f["CROTIPOBJ"],
+                "codigo_glosa": f["CRNCONOBJ"],
+            }
+            for f in filas
+        ],
+        servicios_dgh,
+        avisar=logger.info,
+    )
+
+    if args.reporte_cruce is not None:
+        escribir_reporte_cruce(trazas, args.reporte_cruce, entidad="EMSSANAR")
+        pendientes = sum(1 for t in trazas if t["aviso"] or t["confianza"] in ("BAJA", "SIN CRUCE"))
+        logger.info(
+            f"Detalle del cruce: {args.reporte_cruce} ({pendientes} renglón(es) en REVISAR)."
+        )
     total = sum(f["CROVALOBJ"] for f in filas)
     logger.info(
         f"\nListo: {salida} — {len(filas)} filas, {len(resultados)} facturas, "

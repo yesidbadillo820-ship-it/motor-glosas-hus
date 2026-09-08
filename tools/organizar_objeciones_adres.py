@@ -218,10 +218,10 @@ class Resolucion:
     candidato_desc: str = ""
     tope_servicio: float = 0.0
     saldo: float = 0.0
-    # El centro de costo de la línea de DGH con la que se emparejó. La pantalla
-    # de Recepción de Objeción lo muestra en su propia columna, así que el
-    # archivo tiene que traerlo: antes salía siempre vacío aunque el cruce sí
-    # hubiera acertado el servicio.
+    # El centro de costo de la línea de DGH con la que se emparejó. NO va al
+    # archivo de OBJECIONES —la regla fija de Cartera dice que CTNCENCOS sale
+    # vacía siempre, sin excepciones— pero sí se muestra en el reporte de
+    # revisión, como pista para el auditor.
     centro_costo: str = ""
 
 
@@ -1019,6 +1019,12 @@ class Conversion:
     """Lo que salió de convertir el ADRES: los registros y lo que hay que mirar."""
 
     registros: list[dict] = field(default_factory=list)
+    # Cómo se resolvió cada registro, en el mismo orden: con qué método cruzó
+    # y con qué línea de DGH. La pantalla lo usa para su resumen de confianza.
+    resoluciones: list[Resolucion] = field(default_factory=list)
+    # Grupo de glosa de cada factura (CL / administrativas), para comprobar
+    # CROTIPOBJ: el ADRES usa códigos de 4 dígitos que no dicen el grupo.
+    grupos: dict[str, set[str]] = field(default_factory=dict)
     revisiones: list[Revision] = field(default_factory=list)
     metodos: dict[str, int] = field(default_factory=dict)
     recorte: float = 0.0  # lo que le quitó el guardián de valores de DGH
@@ -1176,12 +1182,17 @@ def construir_registros(
                 "CRNCONOBJ": codigo or None,
                 "SLNSERPRO": _codigo_servicio(codigo_servicio, fila, resolucion),
                 "IDRIPS": None,
-                "CTNCENCOS": resolucion.centro_costo or None,
+                # Regla fija: CTNCENCOS va vacía siempre, aunque el cruce sepa
+                # el centro de costo (el DGH trae el nombre y la columna es de
+                # código). El dato queda en el reporte de revisión.
+                "CTNCENCOS": None,
                 "CROVALOBJ": valor,
                 "CRDOBSERV": construir_crdobserv(codigo, fila, valor),
                 "CROTIPOBJ": crotipobj_factura(clasificaciones[crncxc]),
             }
         )
+        salida.resoluciones.append(resolucion)
+        salida.grupos.setdefault(crncxc, {grupo_dgh(c) for c in clasificaciones[crncxc]})
 
         if asignado:
             salida.revisiones.append(

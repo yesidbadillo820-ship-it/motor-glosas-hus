@@ -2529,6 +2529,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 14l2 2 4-4"/></svg>
           <span class="sn-item-label">Glosas ADRES</span>
         </button>
+        <button class="sn-item" data-tip="Objeciones DGH: subí las glosas y el export del DGH y salen los dos archivos" onclick="sidebarTab(this,'objeciones-dgh')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          <span class="sn-item-label">Objeciones DGH</span>
+        </button>
         <button id="sn-pre-auditoria" class="sn-item" data-tip="Pre-Auditoría: lo que el HIS consulta antes de timbrar" onclick="sidebarTab(this,'pre-auditoria')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 22S20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
           <span class="sn-item-label">Pre-Auditoría</span>
@@ -3318,6 +3322,52 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
       </div>
     </div>
 
+
+    <!-- Objeciones DGH: los dos Excel entran, los dos archivos salen -->
+    <div class="panel" id="p-objeciones-dgh">
+      <div class="dash-area">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700;color:var(--text)">Objeciones DGH</div>
+            <div style="font-size:.78rem;color:var(--text3)">Subí las glosas que mandó la entidad y el export de servicios del DGH: salen el archivo para cargar y el respaldo con lo que hay que revisar</div>
+          </div>
+        </div>
+
+        <!-- Los dos archivos -->
+        <div class="chart-card" style="padding:1.1rem;margin-bottom:1rem">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem">
+            <div>
+              <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:.25rem">1. Glosas de la entidad</label>
+              <div style="font-size:.72rem;color:var(--text3);margin-bottom:.35rem">El Excel que mandó la entidad (FAMISANAR, Dispensario, SAVIA, SALUD TOTAL, SANITAS, ADRES o el acta del portal VCO). Se reconoce solo. De EMSSANAR son los PDF: se pueden marcar varios. Del ADRES se puede agregar el homologador CUPS↔SOAT.</div>
+              <input type="file" id="obj-file-entidad" accept=".xlsx,.xlsm,.pdf" multiple onchange="objArchivoElegido()" style="width:100%;font-size:.8rem">
+              <div id="obj-cuantos" style="font-size:.72rem;color:var(--text3);margin-top:.3rem"></div>
+            </div>
+            <div>
+              <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:.25rem">2. Servicios facturados del DGH</label>
+              <div style="font-size:.72rem;color:var(--text3);margin-bottom:.35rem">El export con <code>FACTURA</code>, <code>SERVICIOS DGH</code> y <code>Vr_SERVICIO</code>. Sin él no hay cruce.</div>
+              <input type="file" id="obj-file-dgh" accept=".xlsx,.xlsm" onchange="objArchivoElegido()" style="width:100%;font-size:.8rem">
+            </div>
+          </div>
+          <div style="display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap;margin-top:1rem">
+            <div>
+              <label style="display:block;font-size:.78rem;font-weight:600;margin-bottom:.25rem">Entidad</label>
+              <select id="obj-entidad" style="padding:.42rem .6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.8rem">
+                <option value="">Reconocerla sola</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;font-size:.78rem;font-weight:600;margin-bottom:.25rem">Fecha de la objeción</label>
+              <input type="date" id="obj-fecha" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.8rem">
+            </div>
+            <button class="btn btn-primary" id="obj-btn" onclick="objProcesar()" disabled>Armar el archivo</button>
+            <div id="obj-estado" style="font-size:.8rem;color:var(--text3)"></div>
+          </div>
+        </div>
+
+        <!-- Resultado -->
+        <div id="obj-resultado"></div>
+      </div>
+    </div>
 
     <!-- Glosas ADRES: el gestor escribe una factura y trae todo -->
     <div class="panel" id="p-glosas-adres">
@@ -8440,6 +8490,7 @@ document.addEventListener('keydown', function(e){
       'p-mis-glosas': 'loadMisGlosas', 'p-historial': 'loadHist',
       'p-alertas': 'loadAlertas', 'p-resumen-mes': 'loadResumenMes',
       'p-glosas-adres': 'loadGlosasAdres',
+      'p-objeciones-dgh': 'objCargar',
       'p-usuarios': 'loadUsuarios',
       'p-conciliacion': 'loadConciliaciones', 'p-audit': 'loadAudit',
       'p-mi-desempeno': 'cargarMiDesempeno', 'p-papelera': 'cargarPapelera',
@@ -8864,6 +8915,7 @@ function tab(btn,id){
   }
   if(id==='dashboard') loadDash();
   if(id==='glosas-adres') loadGlosasAdres();
+  if(id==='objeciones-dgh') objCargar();
   if(id==='resumen-mes') loadResumenMes();
   if(id==='pre-auditoria') preAudCargar();
   if(id==='mando'){ loadMando(); loadOperacion(); }
@@ -20509,6 +20561,210 @@ async function loadDashCobranza(){
         '</tbody></table>'
       : '<div style="color:var(--text3);font-size:.78rem;text-align:center;padding:1rem">Sin facturas pendientes</div>';
   } catch(e){ avisarNoCargo('el tablero de cobranza', e); }
+}
+
+// ─── Objeciones DGH ───────────────────────────────────────────────────────
+// Las glosas de la entidad y el export del DGH entran, los dos archivos salen.
+// (EMSSANAR no manda Excel sino un PDF por factura: por eso se aceptan varios.)
+// El cruce lo hace el servidor
+// con los mismos bots de tools/, así que lo que se descarga acá es idéntico a
+// lo que sale por consola.
+var OBJ = { resultado: null, entidades: [] };
+
+async function objCargar(){
+  var sel = document.getElementById('obj-entidad');
+  var fecha = document.getElementById('obj-fecha');
+  if(fecha && !fecha.value) fecha.value = new Date().toISOString().slice(0,10);
+  if(!sel || OBJ.entidades.length) return;
+  try{
+    var r = await fetch('/objeciones-dgh/entidades', {headers: authH()});
+    if(!r.ok) return;
+    OBJ.entidades = await r.json();
+    OBJ.entidades.forEach(function(e){
+      var o = document.createElement('option');
+      o.value = e.id; o.textContent = e.nombre; o.title = e.ayuda;
+      sel.appendChild(o);
+    });
+  }catch(e){ /* el selector queda en «reconocerla sola», que es el caso normal */ }
+}
+
+function objArchivoElegido(){
+  var ent = document.getElementById('obj-file-entidad');
+  var dgh = document.getElementById('obj-file-dgh');
+  var btn = document.getElementById('obj-btn');
+  var listo = !!(ent && ent.files.length && dgh && dgh.files.length);
+  if(btn) btn.disabled = !listo;
+  var cuantos = document.getElementById('obj-cuantos');
+  if(cuantos) cuantos.textContent = (ent && ent.files.length > 1)
+    ? (ent.files.length + ' archivos marcados (uno por factura).') : '';
+  var estado = document.getElementById('obj-estado');
+  if(estado && !listo) estado.textContent = 'Faltan los archivos.';
+  else if(estado) estado.textContent = '';
+}
+
+async function objProcesar(){
+  var ent = document.getElementById('obj-file-entidad');
+  var dgh = document.getElementById('obj-file-dgh');
+  var btn = document.getElementById('obj-btn');
+  var estado = document.getElementById('obj-estado');
+  var caja = document.getElementById('obj-resultado');
+  if(!ent.files.length || !dgh.files.length){ estado.textContent = 'Faltan los archivos.'; return; }
+
+  btn.disabled = true;
+  estado.textContent = 'Cruzando… en archivos grandes puede tardar medio minuto.';
+  caja.innerHTML = '<div class="chart-card" style="padding:1.2rem;text-align:center;color:var(--text3);font-size:.85rem">Armando el archivo…</div>';
+  try{
+    var fd = new FormData();
+    // EMSSANAR manda un PDF por factura: van todos los que se hayan marcado.
+    for(var i = 0; i < ent.files.length; i++) fd.append('archivo_entidad', ent.files[i]);
+    fd.append('archivo_dgh', dgh.files[0]);
+    fd.append('entidad', document.getElementById('obj-entidad').value || '');
+    fd.append('fecha', document.getElementById('obj-fecha').value || '');
+    var r = await fetch('/objeciones-dgh/procesar', {method:'POST', headers: authH(), body: fd});
+    var d = await r.json();
+    if(!r.ok) throw new Error(d.detail || ('HTTP '+r.status));
+    OBJ.resultado = d;
+    estado.textContent = '';
+    objPintar(d);
+    toast('Archivo armado', d.objeciones+' objeciones de '+d.entidad, 'success');
+  }catch(e){
+    estado.textContent = '';
+    caja.innerHTML = '<div class="chart-card" style="padding:1.1rem;border-left:3px solid var(--c-red)">'
+      + '<div style="font-weight:700;margin-bottom:.3rem">No se pudo armar el archivo</div>'
+      + '<div style="font-size:.85rem;color:var(--text2)">' + objEsc(e.message) + '</div></div>';
+  }finally{ btn.disabled = false; }
+}
+
+async function objDescargar(btn, cual){
+  if(!OBJ.resultado) return;
+  var previo = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Bajando…';
+  try{
+    var url = '/objeciones-dgh/' + encodeURIComponent(OBJ.resultado.id) + '/' + cual;
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok){
+      var d = await r.json().catch(function(){ return {}; });
+      throw new Error(d.detail || ('HTTP '+r.status));
+    }
+    var blob = await r.blob();
+    var nombre = cual;
+    var cd = r.headers.get('Content-Disposition') || '';
+    var m = cd.match(/filename="?([^";]+)"?/);
+    if(m) nombre = m[1];
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = nombre;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+  }catch(e){
+    toast('No se pudo descargar', e.message, 'error');
+  }finally{ btn.disabled = false; btn.textContent = previo; }
+}
+
+function objEsc(t){
+  return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function objChip(texto, color){
+  return '<span style="display:inline-block;padding:.12rem .5rem;border-radius:999px;font-size:.7rem;'
+    + 'font-weight:700;background:' + color + '22;color:' + color + '">' + objEsc(texto) + '</span>';
+}
+
+var OBJ_COLOR = {'ALTA':'var(--c-green)','MEDIA':'var(--c-amber)','BAJA':'var(--c-red)','SIN CRUCE':'var(--c-red)'};
+
+function objPintar(d){
+  var caja = document.getElementById('obj-resultado');
+
+  var reglas = d.reglas_ok
+    ? '<div style="font-size:.8rem;color:var(--c-green)">✓ Reglas verificadas: CTNCENCOS vacía, ningún código inventado y CROTIPOBJ correcto en todas las facturas.</div>'
+    : '<div style="font-size:.8rem;color:var(--c-red)"><b>Reglas incumplidas:</b><br>' + d.fallas_reglas.map(objEsc).join('<br>') + '</div>';
+
+  var tarjetas = ['ALTA','MEDIA','BAJA','SIN CRUCE'].map(function(k){
+    return '<div style="text-align:center;padding:.5rem .8rem;border:1px solid var(--border);border-radius:10px;min-width:82px">'
+      + '<div style="font-size:1.3rem;font-weight:800;color:' + OBJ_COLOR[k] + '">' + (d.confianza[k]||0) + '</div>'
+      + '<div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.03em">' + k + '</div></div>';
+  }).join('');
+
+  var html = '<div class="chart-card" style="padding:1.1rem;margin-bottom:1rem">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.8rem;margin-bottom:.9rem">'
+    +   '<div>'
+    +     '<div style="font-size:1.05rem;font-weight:700">' + objEsc(d.entidad) + ' · ' + objEsc(d.fecha) + '</div>'
+    +     '<div style="font-size:.82rem;color:var(--text3)">' + d.objeciones + ' objeciones · '
+    +       d.facturas + ' factura(s) · ' + fmtCOP(d.valor_total) + '</div>'
+    +   '</div>'
+    +   '<div style="display:flex;gap:.45rem;flex-wrap:wrap">' + tarjetas + '</div>'
+    + '</div>'
+    + reglas
+    + '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem">'
+    +   '<button class="btn btn-primary" onclick="objDescargar(this,\'objeciones.xlsx\')" style="font-size:.82rem">⬇ ' + objEsc(d.nombre_objeciones) + '</button>'
+    +   '<button class="btn btn-ghost" onclick="objDescargar(this,\'cruce.xlsx\')" style="font-size:.82rem">⬇ ' + objEsc(d.nombre_cruce) + '</button>'
+    +   '<button class="btn btn-ghost" onclick="objDescargar(this,\'paquete.zip\')" style="font-size:.82rem">📦 Los dos (ZIP)</button>'
+    + '</div>'
+    + '<div style="font-size:.72rem;color:var(--text3);margin-top:.5rem">El archivo lleva los ' + d.objeciones
+    +   ' renglones: los que no cruzaron van con la celda del servicio vacía para completarlos a mano.</div>'
+    + '</div>';
+
+  // Lo que hay que mirar antes de subir
+  if(d.revisar && d.revisar.length){
+    html += '<div class="chart-card" style="padding:1.1rem;margin-bottom:1rem">'
+      + '<div style="font-weight:700;margin-bottom:.2rem">Para revisar (' + d.revisar.length + ')</div>'
+      + '<div style="font-size:.76rem;color:var(--text3);margin-bottom:.7rem">Cruce débil, sin cruce o con alerta. Todo esto está también en la hoja REVISAR del respaldo.</div>'
+      + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">'
+      + '<thead><tr style="text-align:left;color:var(--text3)">'
+      + '<th style="padding:.35rem .5rem">Factura</th><th style="padding:.35rem .5rem">Glosa</th>'
+      + '<th style="padding:.35rem .5rem;text-align:right">Valor</th>'
+      + '<th style="padding:.35rem .5rem">Dice la entidad</th><th style="padding:.35rem .5rem">Encontrado en el DGH</th>'
+      + '<th style="padding:.35rem .5rem">Confianza</th><th style="padding:.35rem .5rem">Qué revisar</th>'
+      + '</tr></thead><tbody>';
+    d.revisar.slice(0, 200).forEach(function(f){
+      html += '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:.35rem .5rem;white-space:nowrap">' + objEsc(f.factura) + '</td>'
+        + '<td style="padding:.35rem .5rem">' + objEsc(f.codigo_glosa) + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right;white-space:nowrap">' + fmtCOP(f.valor) + '</td>'
+        + '<td style="padding:.35rem .5rem">' + objEsc(f.servicio_entidad || f.codigo_entidad || '—') + '</td>'
+        + '<td style="padding:.35rem .5rem">' + objEsc(f.codigo_dgh ? (f.codigo_dgh + ' · ' + f.servicio_dgh) : '(sin cruce)') + '</td>'
+        + '<td style="padding:.35rem .5rem">' + objChip(f.confianza, OBJ_COLOR[f.confianza] || 'var(--text3)') + '</td>'
+        + '<td style="padding:.35rem .5rem;color:var(--text2)">' + objEsc(f.aviso) + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div>';
+    if(d.revisar.length > 200){
+      html += '<div style="font-size:.74rem;color:var(--text3);margin-top:.5rem">Se muestran las primeras 200; están todas en el archivo de respaldo.</div>';
+    }
+    html += '</div>';
+  }else{
+    html += '<div class="chart-card" style="padding:1.1rem;margin-bottom:1rem;font-size:.85rem;color:var(--c-green)">'
+      + '✓ No quedó nada por revisar: las ' + d.objeciones + ' objeciones tienen su servicio identificado.</div>';
+  }
+
+  // Por factura
+  if(d.por_factura && d.por_factura.length){
+    html += '<div class="chart-card" style="padding:1.1rem">'
+      + '<div style="font-weight:700;margin-bottom:.7rem">Por factura</div>'
+      + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">'
+      + '<thead><tr style="text-align:left;color:var(--text3)">'
+      + '<th style="padding:.35rem .5rem">Factura</th><th style="padding:.35rem .5rem;text-align:right">Objeciones</th>'
+      + '<th style="padding:.35rem .5rem;text-align:right">Valor</th>'
+      + '<th style="padding:.35rem .5rem;text-align:right">Sin código</th>'
+      + '<th style="padding:.35rem .5rem;text-align:right">Por revisar</th>'
+      + '<th style="padding:.35rem .5rem">Tipo</th></tr></thead><tbody>';
+    var TIPO = {0:'Administrativa', 1:'Médica', 2:'Mixta'};
+    d.por_factura.forEach(function(f){
+      html += '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:.35rem .5rem">' + objEsc(f.factura) + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + f.objeciones + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right;white-space:nowrap">' + fmtCOP(f.valor) + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + (f.sin_codigo || 0) + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + (f.revisar || 0) + '</td>'
+        + '<td style="padding:.35rem .5rem">' + objEsc(TIPO[f.tipo] || f.tipo) + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  caja.innerHTML = html;
 }
 
 // ─── Glosas ADRES ─────────────────────────────────────────────────────────

@@ -437,20 +437,6 @@ def _crear_dgh(ruta: Path, filas: list[list]) -> Path:
     return ruta
 
 
-def _linea(codigo, descripcion, cant, valor, centro="URGENCIAS", cups="", cod_med=""):
-    return org.LineaDgh(
-        codigo=codigo,
-        descripcion=descripcion,
-        desc_cups="",
-        nombre_med="",
-        cups=cups,
-        cod_med=cod_med,
-        centro=centro,
-        cant=cant,
-        valor=valor,
-    )
-
-
 class TestLecturaDelTexto:
     def test_codigo_pegado_adelante_del_nombre(self):
         # La etiqueta CÓDIGO va vacía: el código está delante del nombre.
@@ -476,114 +462,6 @@ class TestLecturaDelTexto:
         assert org.codigo_servicio_del_texto("") == ""
         assert org.descripcion_del_texto("") == ""
         assert org.valor_unitario_del_texto("") == 0
-
-
-class TestVariantesCodigo:
-    def test_letra_que_antepone_famisanar(self):
-        assert org.variantes_codigo("P32606-02") & org.variantes_codigo("32606-2")
-        assert org.variantes_codigo("U211363-03") & org.variantes_codigo("211363-3")
-
-    def test_h_que_agrega_el_dgh_al_cups(self):
-        assert org.variantes_codigo("903437H") & org.variantes_codigo("903437")
-
-    def test_codigos_distintos_no_se_cruzan(self):
-        assert not (org.variantes_codigo("FMQ0113") & org.variantes_codigo("FMQ0115"))
-
-    def test_vacio(self):
-        assert org.variantes_codigo("") == set()
-        assert org.variantes_codigo(None) == set()
-
-
-class TestParecidoDescripcion:
-    def test_numero_y_unidad_pegados(self):
-        r = org.parecido_desc(
-            org.norm_desc("LINEA INFUSION E INYECCION - JERINGA 1 ML CON AGUJA 27GA"),
-            org.norm_desc("JERINGA DESECHABLE 1ML"),
-        )
-        assert r >= 0.55
-
-    def test_sin_palabras_en_comun_no_se_parecen(self):
-        r = org.parecido_desc(
-            org.norm_desc("VITAMINA D3 CAP X 1.000 U.I"), org.norm_desc("JERINGA 1ML 25G")
-        )
-        assert r <= 0.30
-
-    def test_formas_alternativas_del_nombre(self):
-        formas = org.formas_descripcion("LINEA CIRUGIA GENERAL - CATETER PREMICATH 28G")
-        assert "CATETER PREMICATH 28G" in formas
-
-
-class TestResolverServicio:
-    def test_codigo_y_valor_dan_confianza_alta(self):
-        lineas = [_linea("32606-2", "SOLUCION LACTATO DE RINGER BOLSA X 500ML", 3, 12600)]
-        obs = (
-            "SERVICIO SIN COBERTURA   LACTATO DE RINGER (BXT) SOLUCION INYECTABLE "
-            "BOLSA POR 500ML  CÓDIGO   P32606-02 VALOR UNITARIO FACTURADO POR IPS $ 4,200"
-        )
-        cruce = org.resolver_servicio("P32606-02", obs, 12600, lineas)
-        assert cruce.confianza == "ALTA"
-        assert cruce.linea.codigo == "32606-2"
-
-    def test_valor_unico_identifica_aunque_el_nombre_sea_otro(self):
-        lineas = [
-            _linea("FMQ9001", "SET BABYFLOW NEONATAL", 1, 270400, "UCI PEDIATRICA"),
-            _linea("FMQ0113", "CATETER INTRAVENOSO 20", 1, 5800),
-        ]
-        obs = (
-            "SERVICIO SIN COBERTURA   LINEA RESPIRATORIA - KIT BABYFLOW MASCARA NASAL "
-            "CÓDIGO   91018078 VALOR UNITARIO FACTURADO POR IPS $ 270,400"
-        )
-        cruce = org.resolver_servicio("91018078", obs, 270400, lineas)
-        assert cruce.linea.codigo == "FMQ9001"
-        assert cruce.linea.centro_costo == "UCI PEDIATRICA"
-        assert "valor único en la factura" in cruce.motivos
-
-    def test_valor_repetido_lo_desempata_el_nombre(self):
-        lineas = [
-            _linea("VIT-1", "VITAMINA D3 CAP X 1.000 U.I", 1, 1300),
-            _linea("FMQ3616-1", "JERINGA 1ML + TAPON PARA DOSIS UNITARIA", 1, 1300),
-        ]
-        cruce = org.resolver_servicio("91022534", OBS_IUM, 1300, lineas)
-        assert cruce.linea.codigo == "FMQ3616-1"
-
-    def test_sin_datos_del_servicio_no_se_inventa(self):
-        lineas = [_linea("FMQ0113", "CATETER INTRAVENOSO 20", 1, 5800)]
-        cruce = org.resolver_servicio("", OBS_AUD_EXTRA, 4638000, lineas)
-        assert cruce.linea is None
-        assert cruce.confianza == "SIN CRUCE"
-        assert "completar a mano" in cruce.aviso
-
-    def test_factura_sin_servicios_en_el_export(self):
-        cruce = org.resolver_servicio("FMQ0113", OBS_COD_ADELANTE, 5800, [])
-        assert cruce.linea is None
-        assert "no está en el export del DGH" in cruce.aviso
-
-    def test_nombre_en_conflicto_cruza_pero_se_marca(self):
-        # FAMISANAR busca el código en el catálogo CUPS y no en el del hospital:
-        # 150101 es en el DGH una fórmula enteral, no una biopsia. El valor
-        # confirma que es la misma línea.
-        lineas = [_linea("150101", "ENSURE CLINICAL BOTELLA X 220 ml", 1, 16200)]
-        obs = (
-            "POS   BIOPSIA DE MUSCULO O TENDON EXTRAOCULAR CÓDIGO   150101DE   1   "
-            "UNIDAD(ES), A UN VALOR FACTURADO POR LA IPS   16,200"
-        )
-        cruce = org.resolver_servicio("150101", obs, 16200, lineas)
-        assert cruce.linea is not None
-        assert cruce.confianza != "ALTA"
-        assert "no coincide" in cruce.aviso
-
-    def test_objeciones_repetidas_se_reparten_entre_renglones(self):
-        lineas = [
-            _linea("FMQ0177", "JERINGA DESECHABLES 5ML", 2, 1400),
-            _linea("FMQ0177", "JERINGA DESECHABLES 5ML", 2, 1400),
-        ]
-        obs = (
-            "SERVICIO SIN COBERTURA   FMQ0177 JERINGA DESECHABLES 5ML  CÓDIGO   "
-            "VALOR UNITARIO FACTURADO POR IPS $ 700"
-        )
-        primero = org.resolver_servicio("FMQ0177", obs, 1400, lineas)
-        segundo = org.resolver_servicio("FMQ0177", obs, 1400, lineas)
-        assert primero.linea is not segundo.linea
 
 
 class TestConstruirRegistrosConCruce:
@@ -692,58 +570,6 @@ class TestConstruirRegistrosConCruce:
         malo = _crear_famisanar(tmp_path / "otro.xlsx", [["HUS1", "CO0601", 100, "x"]])
         with pytest.raises(ValueError, match="export de servicios del DGH"):
             org.leer_servicios_dgh(malo)
-
-
-class TestReporteCruce:
-    def test_escribe_las_tres_hojas(self, tmp_path):
-        trazas = [
-            {
-                "factura": "HUS0000549272",
-                "codigo_objecion": "CO0601",
-                "valor": 5800,
-                "cod_famisanar": "FMQ0113",
-                "desc_famisanar": "CATETER INTRAVENOSO 20",
-                "unitario_famisanar": 5800,
-                "cod_dgh": "FMQ0113",
-                "servicio_dgh": "CATETER INTRAVENOSO 20",
-                "unitario_dgh": 5800,
-                "centro_costo": "URGENCIAS ADULTOS",
-                "confianza": "ALTA",
-                "motivos": "código, valor unitario",
-                "puntaje": 8.0,
-                "aviso": "",
-                "observacion": OBS_COD_ADELANTE,
-            },
-            {
-                "factura": "HUS0000549272",
-                "codigo_objecion": "CL0801",
-                "valor": 279900,
-                "cod_famisanar": "",
-                "desc_famisanar": "",
-                "unitario_famisanar": 0,
-                "cod_dgh": "",
-                "servicio_dgh": "",
-                "unitario_dgh": "",
-                "centro_costo": "",
-                "confianza": "SIN CRUCE",
-                "motivos": "",
-                "puntaje": 0.0,
-                "aviso": "no se identificó el servicio: completar a mano",
-                "observacion": OBS_AUD_EXTRA,
-            },
-        ]
-        salida = tmp_path / "CRUCE.xlsx"
-        org.escribir_reporte_cruce(trazas, salida)
-        wb = openpyxl.load_workbook(str(salida))
-        assert wb.sheetnames == ["CRUCE", "REVISAR", "RESUMEN"]
-        assert wb["CRUCE"].max_row == 3
-        assert wb["REVISAR"].max_row == 2  # sólo la que hay que revisar
-        resumen = list(wb["RESUMEN"].iter_rows(min_row=2, values_only=True))
-        assert resumen[0][0] == "HUS0000549272"
-        assert resumen[0][1] == 2
-        assert resumen[0][2] == 285700
-        assert "Revisar" in resumen[0][7]
-        assert resumen[-1][0] == "TOTAL"
 
 
 class TestCliCruce:

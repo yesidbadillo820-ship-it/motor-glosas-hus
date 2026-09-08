@@ -542,3 +542,143 @@ def test_buscar_pdfs(tmp_path):
     assert org.buscar_pdfs([str(otro)]) == [otro]
     # sin duplicados si se pasa carpeta + archivo
     assert org.buscar_pdfs([str(tmp_path), str(a)]) == [a, b]
+
+
+# ─── Las reglas fijas del archivo de OBJECIONES (ver CLAUDE.md) ──────────────────────
+
+
+def _servicios_dgh(tmp_path, filas):
+    """Export de servicios facturados del DGH, con los encabezados reales."""
+    from openpyxl import Workbook
+
+    ruta = tmp_path / "dgh.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.append(
+        [
+            "FACTURA",
+            "SERVICIOS DGH",
+            "DESCRIPCION INSTITUCIONAL",
+            "CAT SERVICIOS",
+            "VR_SERVICIO",
+        ]
+    )
+    for f in filas:
+        ws.append(f)
+    wb.save(str(ruta))
+    from _cruce_dgh import leer_servicios_dgh
+
+    return leer_servicios_dgh(ruta)
+
+
+class TestCrotipobjPorFactura:
+    """Regla 2: 0 administrativa, 1 médica, 2 mixta — por factura, no por renglón."""
+
+    def test_los_tres_valores(self):
+        assert org.crotipobj_factura({"TA", "FA"}) == 0
+        assert org.crotipobj_factura({"CL"}) == 1
+        assert org.crotipobj_factura({"CL", "TA"}) == 2
+
+    def test_toda_la_factura_lleva_el_mismo_tipo(self):
+        filas = [
+            {"CRNCXC": "HUS0000000001", "CRNCONOBJ": "TA0801", "CROTIPOBJ": 0},
+            {"CRNCXC": "HUS0000000001", "CRNCONOBJ": "CL0801", "CROTIPOBJ": 0},
+            {"CRNCXC": "HUS0000000002", "CRNCONOBJ": "FA0205", "CROTIPOBJ": 0},
+        ]
+        org.aplicar_crotipobj_por_factura(filas)
+        assert [f["CROTIPOBJ"] for f in filas] == [2, 2, 0]
+
+    def test_no_es_lo_mismo_que_glosa_o_devolucion(self):
+        """El «Tipo objeción» del PDF (Glosa/Devolución) es otra cosa: una
+        devolución de puras administrativas es 0, no 2."""
+        assert org.tipobj_desde_encabezado("Devolución") == 2
+        filas = [{"CRNCXC": "HUS0000000001", "CRNCONOBJ": "TA0801", "CROTIPOBJ": 2}]
+        org.aplicar_crotipobj_por_factura(filas)
+        assert filas[0]["CROTIPOBJ"] == 0
+
+
+class TestCruceContraElDgh:
+    """Regla 3: todo SLNSERPRO escrito existe en el export del DGH de ESA factura."""
+
+    def test_el_cruce_manda_sobre_la_tabla_cups(self, tmp_path):
+        servicios = _servicios_dgh(
+            tmp_path,
+            [["HUS0000515948", "876802H", "DESC 876802", 1, 20300]],
+        )
+        fila = org.renglon_a_fila(
+            _renglon("876802", "--", 20300, "TA0801"),
+            consec=1,
+            factura="HUS0000515948",
+            fecha=datetime(2026, 7, 9),
+            usuario="999",
+            tipobj=0,
+            servicios_dgh=servicios,
+        )
+        assert fila["SLNSERPRO"] == "876802H"
+
+    def test_lo_que_no_esta_en_esa_factura_queda_vacio(self, tmp_path):
+        """Sin el export la tabla CUPS_A_DGH inventaría 876802H igual."""
+        servicios = _servicios_dgh(tmp_path, [["HUS0000999999", "111111", "OTRA COSA", 1, 999]])
+        fila = org.renglon_a_fila(
+            _renglon("876802", "--", 20300, "TA0801"),
+            consec=1,
+            factura="HUS0000515948",
+            fecha=datetime(2026, 7, 9),
+            usuario="999",
+            tipobj=0,
+            servicios_dgh=servicios,
+        )
+        assert fila["SLNSERPRO"] == ""
+
+    def test_el_renglon_no_se_borra_aunque_no_cruce(self, tmp_path):
+        servicios = _servicios_dgh(tmp_path, [])
+        fila = org.renglon_a_fila(
+            _renglon("876802", "--", 20300, "TA0801"),
+            consec=1,
+            factura="HUS0000515948",
+            fecha=datetime(2026, 7, 9),
+            usuario="999",
+            tipobj=0,
+            servicios_dgh=servicios,
+        )
+        assert fila["CROVALOBJ"] == 20300 and fila["CRNCONOBJ"] == "TA0801"
+
+    def test_deja_traza_para_la_hoja_revisar(self, tmp_path):
+        servicios = _servicios_dgh(
+            tmp_path,
+            [["HUS0000515948", "876802H", "DESC 876802", 1, 20300]],
+        )
+        trazas: list[dict] = []
+        org.renglon_a_fila(
+            _renglon("876802", "--", 20300, "TA0801"),
+            consec=1,
+            factura="HUS0000515948",
+            fecha=datetime(2026, 7, 9),
+            usuario="999",
+            tipobj=0,
+            servicios_dgh=servicios,
+            trazas=trazas,
+        )
+        assert len(trazas) == 1
+        assert trazas[0]["factura"] == "HUS0000515948"
+        assert trazas[0]["confianza"] in ("ALTA", "MEDIA", "BAJA", "SIN CRUCE")
+
+
+class TestCentroDeCostoVacio:
+    """Regla 1: CTNCENCOS va vacía siempre (EMSSANAR ya la dejaba así)."""
+
+    def test_sale_vacia(self, tmp_path):
+        servicios = _servicios_dgh(
+            tmp_path,
+            [["HUS0000515948", "876802H", "DESC 876802", 1, 20300]],
+        )
+        fila = org.renglon_a_fila(
+            _renglon("876802", "--", 20300, "TA0801"),
+            consec=1,
+            factura="HUS0000515948",
+            fecha=datetime(2026, 7, 9),
+            usuario="999",
+            tipobj=0,
+            servicios_dgh=servicios,
+        )
+        assert fila["CTNCENCOS"] is None
