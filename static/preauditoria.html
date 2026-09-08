@@ -855,6 +855,7 @@ async function abrirAuditar(id){
       '<label class="campo" style="margin:10px 0">Observación — se guarda siempre; si devuelve, este texto sale en el oficio de devolución'+
         '<textarea id="au-obs" rows="4" maxlength="4000" style="width:100%">'+esc(f.motivo_devolucion||f.observaciones||'')+'</textarea></label>'+
       avisoFirma()+
+      '<div id="au-atencion"></div>'+
       '<div id="au-msg"></div>'+
       '<div id="au-botones" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'+
         '<button class="btn btn-verde" '+(sinFE?'disabled title="Sin facturación electrónica no se puede radicar"':'')+' onclick="auditar('+f.id+',\'RADICAR\')">✔ Soportes completos — radicar</button>'+
@@ -865,7 +866,56 @@ async function abrirAuditar(id){
         // Revertir una auditoría YA DECIDIDA es solo de coordinación/admin:
         // cambia lo que ya se reportó. El backend lo exige igual (403).
         '<button class="btn btn-borde" '+(puedeRevertir(f)?'':'disabled title="'+(f.oficio_devolucion_id?'Esta factura ya salió en un oficio de devolución entregado: solo coordinación o administración puede deshacerla':'La auditó '+esc(f.auditor||'otra persona')+': solo esa persona o coordinación puede deshacerla')+'"')+' onclick="auditar('+f.id+',\'PENDIENTE\')">Dejar pendiente</button></div>';
+    cargarAtencion(f.id);
   }catch(e){ document.getElementById('ma-cuerpo').innerHTML='<div class="aviso aviso-err">'+esc(e.message)+'</div>'; }
+}
+
+// ── FECHAS DE ATENCIÓN Y PLAZO DEL ADRES (08-09-2026) ────────────────────
+// Se pide APARTE de la factura y sin esperarla: leer el RIPS toca el servidor
+// de facturación electrónica, y la ventana de auditar tiene que abrir ya.
+// Solo aplica a las facturas del ADRES; en las demás no se pinta nada.
+async function cargarAtencion(id){
+  var caja=document.getElementById('au-atencion');
+  if(!caja) return;
+  caja.innerHTML='<p class="leyenda">Revisando fechas de atención en el RIPS…</p>';
+  try{
+    var a=await api('/preauditoria/facturas/'+id+'/atencion');
+    // La ventana pudo cerrarse o cambiar de factura mientras respondía.
+    caja=document.getElementById('au-atencion');
+    if(caja) caja.innerHTML=atencionHtml(a);
+  }catch(e){
+    caja=document.getElementById('au-atencion');
+    if(caja) caja.innerHTML='<div class="aviso aviso-warn">No se pudieron revisar las fechas de atención: '+esc(e.message)+'</div>';
+  }
+}
+
+function atencionHtml(a){
+  if(!a || !a.aplica) return '';
+  var h='';
+  var p=a.prescripcion;
+  if(p){
+    if(p.estado==='PRESCRITA'){
+      h+='<div class="aviso aviso-err">⛔ <b>Cuenta prescrita.</b> '+esc(p.resumen)+
+         ' Antes de radicar, verifique con coordinación.</div>';
+    }else if(p.estado==='POR_VENCER'){
+      h+='<div class="aviso aviso-warn">⏳ <b>Por vencer.</b> '+esc(p.resumen)+'</div>';
+    }else{
+      h+='<div class="aviso aviso-ok">🗓️ '+esc(p.resumen)+'</div>';
+    }
+  }
+  // Los reparos de fechas: primero los graves.
+  var graves=(a.hallazgos||[]).filter(function(x){ return x.gravedad==='GRAVE'; });
+  var otros=(a.hallazgos||[]).filter(function(x){ return x.gravedad!=='GRAVE'; });
+  graves.forEach(function(x){ h+='<div class="aviso aviso-err">⚠️ '+esc(x.mensaje)+'</div>'; });
+  otros.forEach(function(x){
+    var clase=(x.gravedad==='ADVIERTE')?'aviso-warn':'';
+    h+='<div class="aviso '+clase+'">'+esc(x.mensaje)+'</div>';
+  });
+  if(a.fechas && a.fechas.completas){
+    h+='<p class="leyenda">Según el RIPS ('+esc(a.fechas.tipo_atencion||'')+'): ingreso <b>'+
+       fDia(a.fechas.fecha_ingreso)+'</b> · egreso <b>'+fDia(a.fechas.fecha_egreso)+'</b></p>';
+  }
+  return h;
 }
 // Evita que un doble clic (o clics repetidos porque el servidor va lento)
 // mande la misma decisión varias veces y duplique el historial.

@@ -133,13 +133,44 @@ un cambio de pre-auditoría: queda anotado para decidirlo aparte.
    así que la alerta **no cita ningún artículo**: el plazo quedó como un
    parámetro del hospital. El sistema cuenta; la norma la escribe el gestor.
 
-**Lo que falta.** Enganchar la marca en la pantalla de pre-auditoría. Para
-eso hacen falta dos datos que solo se ven desde el hospital: cómo está
-organizada la carpeta compartida de facturación electrónica (para eso quedó
-el ayudante `tools\EXPLORAR_RIPS_ADRES.ps1`, de solo lectura, que no muestra
-datos del paciente), y **de dónde salen hoy las fechas de ingreso y egreso
-declaradas** — porque el sistema no las guarda en ninguna tabla: ni el
-oficio ni el Excel de Radicación las traen.
+**Lo que ya quedó enganchado (segunda parte, el mismo día).** Al abrir una
+factura del ADRES en «Auditar», la ventana muestra sola:
+
+- si la cuenta está **vigente, por vencer o prescrita**, con la fecha en que
+  vence y cuántos días hábiles quedan;
+- los **reparos de fechas** (en rojo los imposibles);
+- el **ingreso y el egreso** que dice el RIPS.
+
+El sistema busca el RIPS **yendo directo a la carpeta de la factura** en el
+servidor de facturación electrónica (`<AAAAMM>\FACTURAS_SALUD\<HUSxxxx>`),
+mirando también el mes anterior y el siguiente. No recorre el servidor
+entero: eso tardaría horas. Y se calcula **cuando el gestor abre la
+factura**, no al cargar el envío, para no volver lenta la carga de todos los
+días.
+
+Solo aplica a las facturas del **ADRES** (se reconocen por NIT o por nombre,
+con el mismo criterio que ya usaba el resto del sistema). En las demás no se
+pinta nada.
+
+**Antes de usarlo hay que decirle dónde está el servidor.** En el PC del
+motor, crear el archivo `config\facturacion_electronica_root.txt` con una
+sola línea:
+
+```
+\\172.16.32.83\factura_electronica_net22
+```
+
+Mientras no exista, la pantalla lo dice con todas sus letras («no está
+configurado el servidor de facturación electrónica») en vez de quedarse
+callada.
+
+**Lo que sigue pendiente.** Las fechas de ingreso y egreso **declaradas por
+el hospital**: hoy el sistema no las guarda en ninguna tabla, así que el
+cotejo compara el RIPS contra la fecha de la factura y la del oficio, y
+avisa que nadie contrastó las de atención. Buscando se encontró de dónde
+podrían salir: el **detallado de DGH sí trae las columnas FECHA_INGRESO y
+FECHA_EGRESO**, pero el lector del sistema no las mapea (le faltan dos
+líneas). Queda para confirmarlo con Yesid y engancharlo.
 
 ---
 
