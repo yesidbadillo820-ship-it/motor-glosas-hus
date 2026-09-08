@@ -932,6 +932,40 @@ class TestExcepcionAlTope:
         assert evento.motivo == "motivo que debe quedar grabado"
         assert evento.auditor or ""
 
+    def test_la_excepcion_tambien_abre_el_cuarto_oficio_del_envio(self, client, db_session):
+        """El caso completo de Yesid (08-09-2026): Facturación reenvía la
+        factura con el MISMO número de envío en un oficio nuevo. La excepción
+        subía el cupo de devoluciones, pero el tope gemelo —«un envío en máximo
+        3 oficios»— seguía bloqueando la carga («aún no me deja meter ese
+        envío»). Una vuelta más es un oficio más."""
+        _subir_dgreport(client, [F1])
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        # Tres vueltas con el MISMO envío: 3 oficios y 3 devoluciones.
+        for n, fecha in ((1, "2026-07-20T08:00"), (2, "2026-07-22T08:00"), (3, "2026-07-24T08:00")):
+            o = _crear_oficio(client, f"FHUS-ENV-{n}", fecha)
+            _escribir(client, o["id"], ENV)
+            assert _devolver(client, _factura_id(client, F1)).status_code == 200
+        fid = _factura_id(client, F1)
+        # El 4.º oficio con el mismo envío: bloqueado por el tope de 3 oficios.
+        o4 = _crear_oficio(client, "FHUS-ENV-4", "2026-07-26T08:00")
+        r = _escribir(client, o4["id"], ENV)
+        assert r.json()["ya_cargado"] is True and "máximo 3" in r.json()["mensaje"]
+        # Coordinación autoriza la devolución extra → también abre el 4.º oficio.
+        _autoriza_coordinacion(db_session)
+        r_aut = client.post(
+            f"/preauditoria/facturas/{fid}/autorizar-devolucion-extra",
+            json={"motivo": "HUS315614: cuarta vuelta autorizada"},
+        )
+        assert r_aut.status_code == 200, r_aut.text
+        r4 = _escribir(client, o4["id"], ENV)
+        assert r4.json().get("ya_cargado") is not True, r4.json()
+        assert r4.json()["reingresos"] == 1
+        # La 4.ª devolución pasa, y el 5.º oficio vuelve a quedar bloqueado.
+        assert _devolver(client, _factura_id(client, F1)).status_code == 200
+        o5 = _crear_oficio(client, "FHUS-ENV-5", "2026-07-28T08:00")
+        r5 = _escribir(client, o5["id"], ENV)
+        assert r5.json()["ya_cargado"] is True and "máximo 4" in r5.json()["mensaje"]
+
 
 # ------------------------------------------------------------------
 # Auto-sync: corregir la fuente se refleja en el consolidado

@@ -60,6 +60,25 @@ def tope_devoluciones(canon: "FacturaPreauditoriaRecord") -> int:
 # MISMO número de envío dentro de un oficio nuevo — caso real 30-07-2026).
 MAX_OFICIOS_POR_ENVIO = 3
 
+
+def tope_cargas_envio(db: Session, envio: str) -> int:
+    """El máximo de oficios en que puede cargarse ESTE envío.
+
+    Es el tope del proceso (3) más las devoluciones extra que coordinación haya
+    autorizado a alguna factura del envío. Las dos reglas son gemelas: una
+    devolución más es una vuelta más, y cada vuelta trae el envío en un oficio
+    nuevo (caso HUS315614, 08-09-2026: la excepción subía el cupo de
+    devoluciones pero este tope seguía bloqueando la carga). Sin excepción,
+    devuelve 3.
+    """
+    extra = (
+        db.query(sa_func.max(FacturaPreauditoriaRecord.devoluciones_extra))
+        .filter(FacturaPreauditoriaRecord.envio_actual == str(envio).strip())
+        .scalar()
+    )
+    return MAX_OFICIOS_POR_ENVIO + int(extra or 0)
+
+
 # Plazo para auditar un oficio: 3 días hábiles (lunes a viernes),
 # contados a partir del día siguiente al recibo.
 PLAZO_DIAS_HABILES = 3
@@ -1165,7 +1184,7 @@ def preview_envio(db: Session, oficio: OficioRecepcionRecord, envio: str) -> dic
             else ("otro oficio" if otro else None)
         ),
         "veces_cargado": len(cargas),
-        "max_cargas_envio": MAX_OFICIOS_POR_ENVIO,
+        "max_cargas_envio": tope_cargas_envio(db, envio),
         "oficios_donde_cargado": _radicados_de_cargas(db, cargas),
         "total_en_fuente": len(src),
         "nuevas": nuevas,
@@ -1221,13 +1240,14 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
             "envio": envio,
             "cargado_en": a_utc(aqui.cargado_en).isoformat() if aqui.cargado_en else None,
         }
-    if len(cargas) >= MAX_OFICIOS_POR_ENVIO:
+    tope_envio = tope_cargas_envio(db, envio)
+    if len(cargas) >= tope_envio:
         radicados = ", ".join(_radicados_de_cargas(db, cargas))
         return {
             "ya_cargado": True,
             "mensaje": (
                 f"El envío {envio} ya fue cargado en {len(cargas)} oficios ({radicados}): "
-                f"el proceso acepta máximo {MAX_OFICIOS_POR_ENVIO}."
+                f"el proceso acepta máximo {tope_envio}."
             ),
             "envio": envio,
         }
@@ -1401,12 +1421,12 @@ def escribir_envio(db: Session, oficio: OficioRecepcionRecord, envio: str, usuar
         total_cargas = (
             db.query(EnvioCargadoRecord).filter(EnvioCargadoRecord.envio == envio).count()
         )
-        if total_cargas > MAX_OFICIOS_POR_ENVIO:
+        if total_cargas > tope_envio:
             db.rollback()
             return {
                 "ya_cargado": True,
                 "mensaje": (
-                    f"El envío {envio} ya alcanzó el máximo de {MAX_OFICIOS_POR_ENVIO} "
+                    f"El envío {envio} ya alcanzó el máximo de {tope_envio} "
                     "oficios (otra carga entró al mismo tiempo). Actualice la página."
                 ),
                 "envio": envio,

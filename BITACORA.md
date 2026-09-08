@@ -91,6 +91,54 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (tarde, 2) — La excepción de las 3 devoluciones también abre el cuarto oficio del envío
+
+**Lo que mostró Yesid.** Con la excepción ya autorizada para la HUS315614
+(quedó **3/4**), Facturación reenvió la factura con el **mismo número de
+envío (228254)** en un oficio nuevo, y al cargarlo el sistema seguía diciendo:
+«ya fue cargado en 3 oficios: el proceso acepta máximo 3». Es una regla
+**gemela** de la de las devoluciones: un envío solo puede cargarse en 3
+oficios — y la excepción solo había abierto una de las dos.
+
+**Lo que quedó.** Las dos reglas van de la mano: una devolución más es **una
+vuelta más**, y cada vuelta trae el envío en un oficio nuevo. Ahora, cuando
+coordinación autoriza la devolución extra, el envío de esa factura también
+puede cargarse **una vez más** (el máximo pasa a 4). Al usarse, todo se
+vuelve a bloquear solo. Sin excepción, ambos topes siguen en 3.
+
+Con la prueba del caso completo: tres vueltas con el mismo envío, el cuarto
+oficio bloqueado, coordinación autoriza, el cuarto oficio entra, la cuarta
+devolución pasa, y el quinto oficio vuelve a quedar bloqueado.
+
+---
+
+### 08-09-2026 (tarde) — El motivo del oficio de devolución sale numerado y legible
+
+**Lo que mostró Yesid.** En el PDF del oficio de devolución (el
+DEV-PRE-AUD-0149-2026), el MOTIVO salía como **un bloque corrido**: las
+observaciones que el gestor separa con «//» quedaban pegadas unas con otras,
+ilegibles para Facturación. Tanto, que al área le habían dado un *prompt* de
+IA para numerarlas a mano cada vez.
+
+**Lo que quedó.** Eso lo hace el sistema solo, con las mismas reglas que usaba
+el área: cada «//» es un corte; la primera observación arranca con «1- », la
+siguiente con «2- », «3- »…; un renglón en blanco entre una y otra; el «//»
+no se imprime; y **no se cambia ni una palabra** del texto. Con una sola
+observación no se toca nada. Si el gestor ya había numerado a mano, no se
+duplica el número.
+
+- Aplica en el **PDF del oficio de devolución** y en el **historial** de la
+  factura en pantalla (donde se lee). La caja donde se **escribe** el motivo
+  sigue tal cual, con sus «//», que es lo que el gestor necesita conservar.
+- De paso se cerró un riesgo: un «<» o un «&» dentro del motivo rompía el
+  PDF. Ya no.
+
+Los gestores siguen escribiendo igual (separando con «//»); solo dejan de
+pasar el texto por una IA aparte. 17 pruebas nuevas (incluida una que genera
+el PDF real y lee que salga «1- … 2- … 3- …»).
+
+---
+
 ### 08-09-2026 (tarde) — La rama del hospital quedó blindada
 
 Ya está puesta la protección de `motor-glosas`, la rama de la que el PC de
@@ -116,7 +164,6 @@ diez segundos: en la siguiente pull request, el botón verde de fusionar tiene
 que salir **gris** hasta que los cuatro terminen.
 
 ---
-
 
 ### 08-09-2026 — Cuatro cosas que estaban flojas por debajo
 

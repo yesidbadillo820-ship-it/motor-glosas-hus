@@ -417,6 +417,15 @@ function cuentaEnvio(e){
   return hay===traia ? String(traia) : hay+'/'+traia;
 }
 function esc(t){ return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+// Las observaciones que el gestor separa con «//» se MUESTRAN numeradas y una
+// por renglón (misma regla que el PDF del oficio de devolución, 08-09-2026).
+// Solo para leer: la caja donde se escribe el motivo sigue cruda, con sus «//».
+function formatearMotivo(t){
+  var partes = String(t==null?'':t).split('//').map(function(p){ return p.trim(); }).filter(Boolean);
+  if(!partes.length) return '—';
+  if(partes.length === 1) return esc(partes[0]);
+  return partes.map(function(p, i){ return (i+1)+'- '+esc(p.replace(/^\d+\s*-\s*/, '')); }).join('<br><br>');
+}
 // Delega en el formato único del portal (sinac-ux.js). Antes esta página
 // escribía "$ 1.234.567" y el portal "$1.234.567" para la misma cifra.
 function cop(v){ return window.SDS_FMT ? window.SDS_FMT.cop(v) : ('$ '+Math.round(v||0).toLocaleString('es-CO')); }
@@ -903,7 +912,7 @@ async function verHist(numero){
       return '<tr><td><span class="chip chip-ronda">R'+e.ronda+'</span></td><td>'+esc(e.tipo)+'</td>'+
         '<td class="mono">'+esc(e.oficio_fhus||'—')+'</td><td>'+esc(e.envio||'—')+'</td>'+
         '<td>'+esc(e.auditor||'—')+'</td><td>'+fBog(e.fecha)+'</td>'+
-        '<td style="max-width:220px">'+esc(e.motivo||'—')+'</td>'+
+        '<td style="max-width:220px">'+formatearMotivo(e.motivo)+'</td>'+
         '<td style="max-width:220px">'+esc(e.observaciones||'—')+'</td></tr>';
     }).join('');
     // En una devuelta, la observación que manda es el motivo (lo que salió o
