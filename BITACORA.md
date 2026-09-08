@@ -91,6 +91,27 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (tarde, 2) — La excepción de las 3 devoluciones también abre el cuarto oficio del envío
+
+**Lo que mostró Yesid.** Con la excepción ya autorizada para la HUS315614
+(quedó **3/4**), Facturación reenvió la factura con el **mismo número de
+envío (228254)** en un oficio nuevo, y al cargarlo el sistema seguía diciendo:
+«ya fue cargado en 3 oficios: el proceso acepta máximo 3». Es una regla
+**gemela** de la de las devoluciones: un envío solo puede cargarse en 3
+oficios — y la excepción solo había abierto una de las dos.
+
+**Lo que quedó.** Las dos reglas van de la mano: una devolución más es **una
+vuelta más**, y cada vuelta trae el envío en un oficio nuevo. Ahora, cuando
+coordinación autoriza la devolución extra, el envío de esa factura también
+puede cargarse **una vez más** (el máximo pasa a 4). Al usarse, todo se
+vuelve a bloquear solo. Sin excepción, ambos topes siguen en 3.
+
+Con la prueba del caso completo: tres vueltas con el mismo envío, el cuarto
+oficio bloqueado, coordinación autoriza, el cuarto oficio entra, la cuarta
+devolución pasa, y el quinto oficio vuelve a quedar bloqueado.
+
+---
+
 ### 08-09-2026 (tarde) — El motivo del oficio de devolución sale numerado y legible
 
 **Lo que mostró Yesid.** En el PDF del oficio de devolución (el
