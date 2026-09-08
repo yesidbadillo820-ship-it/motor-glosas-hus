@@ -110,6 +110,46 @@ factura, y el log dice cuántas aportó cada una. Con 5 pruebas nuevas.
 viejos, bajar el ZIP del portal para las 45 vigentes y correr el trámite
 completo.
 
+### 08-09-2026 — FAMISANAR 4 de septiembre (lote chico) y las reglas ya se verifican solas
+
+**El lote.** 65 objeciones de 4 facturas por **$7.219.290**, contra 122
+renglones del DGH. Resultado: **60 con el servicio identificado** (55 ALTA, 5
+MEDIA), 4 en BAJA y 1 sin cruce. Cinco renglones en REVISAR. Ninguna factura
+trae glosas de calidad, así que `CROTIPOBJ` quedó en 0 en las cuatro.
+
+**Lo que hay que mirar en REVISAR (5 renglones):**
+
+- **SO0101 de HUS0000548207, $1.315.200** — la epicrisis de la estancia, con el
+  texto cortado otra vez. Candidato con el valor exacto: **`129A02H`**
+  INTERNACION ADULTOS COMPLEJIDAD ALTA, 3 × $438.400 (la factura trae 4
+  unidades por $1.753.600).
+- **Dos AU5701 de $309.000**, uno en HUS0000549133 y otro en HUS0000549334, con
+  el mismo texto cortado y sin nombrar servicio. El cruce los llevó a `662201`
+  ABLACION U OCLUSION DE TROMPA DE FALOPIO porque ese valor es único en cada
+  factura, **pero el código de glosa no cuadra con el servicio**: AU5701 es
+  «apoyos terapéuticos con diferencia respecto a lo autorizado» y una ablación
+  de trompas es un procedimiento quirúrgico. Hay que confirmarlo con FAMISANAR
+  antes de subirlo.
+- **FA0701 de $51.800** — el cruce es correcto (`20099563-3` PARACETAMOL) y el
+  texto sí lo dice: «SE GLOSA ACETAMINOFEN 1000MG/100ML». Quedó en BAJA sólo
+  porque el lector de texto reconoce «SE OBJETA» y «SE RECONOCE» pero no «SE
+  GLOSA», así que no le extrajo el nombre y cruzó únicamente por valor. Es una
+  mejora chica y acotada al lector; queda propuesta, sin aplicar, porque las
+  reglas del motor no se tocan sin visto bueno.
+- **CO0601 de $21.600** — el caso conocido de nomenclatura IUM (`91026647`
+  contra `FMQ3607`).
+
+**Las reglas ya no dependen de la memoria.** Quedaron escritas en `CLAUDE.md`
+(sección «REGLAS FIJAS DEL ARCHIVO DE OBJECIONES PARA DGH») y el bot las
+comprueba **sobre el archivo terminado** en cada corrida con
+`verificar_reglas()`: `CTNCENCOS` vacía, ningún `SLNSERPRO` que no exista en el
+export del DGH de esa factura, y `CROTIPOBJ` bien clasificada. Este lote pasó
+la verificación en verde. Se probó también contra los cuatro lotes anteriores:
+salen idénticos celda por celda.
+
+**Archivos entregados:** `OBJECIONES_FAMISANAR_04092026.xlsx` y
+`CRUCE_FAMISANAR_04092026.xlsx`.
+
 ### 07-09-2026 — Clasificador por régimen para re-radicar COOSALUD (Excel «PARA BRAYAN»)
 
 Llegó un Excel con **356 facturas** que hay que volver a radicar a COOSALUD,
@@ -11156,6 +11196,15 @@ valor leido del PDF o con el objetado.
 - **Agendar** geriatría, nefrología, fisiatría y los laboratorios a domicilio
   (con ayuno de 8–10 horas, menos la creatinina), y **confirmar el inicio**
   de las terapias de deglución y respiratoria ya autorizadas.
+
+### FAMISANAR — objeciones del 4 de septiembre (08-09)
+- **Confirmar con FAMISANAR los dos AU5701 de $309.000**: el código de glosa
+  (apoyos terapéuticos) no cuadra con el servicio al que apunta el valor
+  (ablación de trompas). Es lo único raro del lote.
+- **Completar la SO0101 de HUS0000548207**: candidato `129A02H`, 3 unidades.
+- **Decidir si el lector de texto debe reconocer «SE GLOSA»** además de «SE
+  OBJETA» y «SE RECONOCE». Hoy no lo hace y por eso algunos renglones cruzan
+  sólo por valor y quedan en BAJA aunque el nombre esté en el texto.
 
 ### FAMISANAR — objeciones del 3 de septiembre (07-09)
 - **Completar las 3 sin cruce** (tabla en la entrada del 07-09): la SO0101 de
