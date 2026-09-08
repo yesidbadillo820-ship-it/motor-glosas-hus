@@ -1,5 +1,35 @@
 # Registro de cambios
 
+## Sesión 08-sep-2026 (noche, 4) — Lo que destapó la segunda corrida
+
+Los cinco casos, vueltos a correr tras los arreglos. Lo anterior quedó bien;
+salieron cuatro cosas nuevas.
+
+- **Un hallazgo de severidad ALTA bloquea.** `_bloqueos_para_radicar()` ahora
+  recibe `verificacion_citas`: una cita ALTA es bloqueo aunque no haya dejado
+  marca en el texto. En la pantalla, el pie del recuadro deja de decir «solo
+  orientativo» cuando hay graves. Caso 2: el verificador marcó
+  AFIRMACION_SIN_SOPORTE en ALTA y el dictamen salió sin sello verde pero sin
+  bloquear.
+- **`_cifra_del_escrito_no_es_la_de_la_glosa()`** — caso 1: la glosa objetaba
+  $19.500 y el texto radicable decía «POR UN VALOR OBJETADO DE $ 19.». Compara
+  solo las cifras que el escrito PRESENTA como valor objetado (topes, UVB y
+  valores de contrato tienen sus propias redes) con tolerancia del 1 %.
+  Bloquea.
+- **`_RE_NORMA_DEL_VACIO_TARIFARIO`** — la contradicción con la ficha, en otra
+  forma: invocar el art. 87 del Decreto 2423/1996 (servicios SIN tarifa
+  asignada) teniendo pacto. Sin pacto esa norma es legítima y no se marca.
+- **Telemetría**: `float(re.sub(r"[^\d.]", ...))` leía el punto de miles como
+  decimal — «$ 19.500» → 19.5 — y con dos puntos lanzaba `ValueError` y caía al
+  `except` con 0.0. Toda glosa ≥ $1M iba al bucket «<100K». Ahora usa
+  `parse_valor_cop`, que existe justo para esto.
+- **`_MARCAS_DE_BLOQUEO`** += «AFIRMA SIN PROBAR» (el escrito enumera los
+  soportes con los que se radicó sin señalar un folio).
+
+32 pruebas nuevas + 4 de pantalla. Comprobado en navegador: con ALTA, sello
+rojo y pie «no es opcional»; con MEDIA, sello verde y pie orientativo.
+
+
 ## Sesión 08-sep-2026 (noche, 3) — El escrito no puede contradecir la ficha del motor
 
 Caso 1 de la prueba del botón Analizar (TA0701, COOSALUD). El motor tiene el

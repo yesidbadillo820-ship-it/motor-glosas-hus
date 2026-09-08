@@ -74,3 +74,30 @@ class TestElMarcadorNoSeImprime:
         assert "OTRA" in cuerpo[i : i + 400], (
             "la sustitución tiene que ir pegada a la lectura del desplegable"
         )
+
+
+class TestUnHallazgoGraveNoEsUnConsejo:
+    """Caso 2 de la segunda corrida (08-09-2026). Debajo de un hallazgo que el
+    propio motor acababa de llamar GRAVE, el pie decía «El gestor decide si
+    corrige o ignora — esto es solo orientativo»."""
+
+    def test_con_hallazgos_graves_el_pie_cambia(self):
+        cuerpo = HTML[HTML.index("Verificación de citas legales: ") :][:3000]
+        assert "Esto NO es opcional" in cuerpo
+
+    def test_y_dice_que_el_dictamen_queda_bloqueado(self):
+        i = HTML.index("Esto NO es opcional")
+        assert "no listo para radicar" in HTML[i : i + 260]
+
+    def test_sin_graves_se_conserva_el_pie_de_siempre(self):
+        i = HTML.index("Esto NO es opcional")
+        trozo = HTML[i : i + 600]
+        assert "solo orientativo" in trozo, "las observaciones menores sí son orientativas"
+
+    def test_las_dos_ramas_cuelgan_del_mismo_condicional(self):
+        """Un `if` con dos salidas, no dos bloques sueltos que puedan
+        desincronizarse."""
+        fin = HTML.index("Esto NO es opcional")
+        i = HTML.rindex("+(graves>0", 0, fin)
+        trozo = HTML[i : fin + 700]
+        assert "Esto NO es opcional" in trozo and "solo orientativo" in trozo
