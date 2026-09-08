@@ -104,6 +104,11 @@ Y_DATOS_MAX = 592.0
 # Código de glosa al inicio de la columna CONCEPTO: "CL03 01", "SO08 01", ...
 RE_CODIGO_GLOSA = re.compile(r"^([A-Z]{2}\d{2})\s+(\d{2})\b\s*(.*)$", re.DOTALL)
 
+# La misma, pero sin mirar mayúsculas: el Excel de glosa inicial a veces trae
+# el código en minúscula ('ta01 01 TARIFAS-…'). El PDF sigue usando la de
+# arriba, que es estricta a propósito.
+RE_CODIGO_GLOSA_TEXTO = re.compile(r"^([A-Za-z]{2}\d{2})\s+(\d{2})\b\s*(.*)$", re.DOTALL)
+
 # Prefijo de factura en la primera columna: "HUS" (2 a 5 letras).
 RE_PREFIJO = re.compile(r"^[A-ZÑ]{2,5}$")
 
@@ -352,15 +357,21 @@ def codigo_y_concepto(texto: str) -> tuple[str, str]:
 
     El Excel del Dispensario pega el código (con un espacio en la mitad) y el
     texto del concepto en una sola columna.
+
+    Algunos lotes traen el código en MINÚSCULA ('ta01 01 TARIFAS-…'). Se lee
+    igual y sale en mayúscula, que es como lo recibe el DGH: en el lote del 7
+    de septiembre esto dejaba 19 objeciones con CRNCONOBJ vacío y, de paso,
+    una factura marcada como administrativa cuando era mixta (el `cl03 02`
+    tampoco se leía).
     """
     t = _limpiar(texto)
-    m = RE_CODIGO_GLOSA.match(t)
+    m = RE_CODIGO_GLOSA_TEXTO.match(t)
     if m:
-        return m.group(1) + m.group(2), _limpiar(m.group(3))
+        return (m.group(1) + m.group(2)).upper(), _limpiar(m.group(3))
     # Sin el espacio: 'TA0801 TARIFAS-…'
-    m2 = re.match(r"^([A-Z]{2}\d{4})\b\s*(.*)$", t, re.DOTALL)
+    m2 = re.match(r"^([A-Za-z]{2}\d{4})\b\s*(.*)$", t, re.DOTALL)
     if m2:
-        return m2.group(1), _limpiar(m2.group(2))
+        return m2.group(1).upper(), _limpiar(m2.group(2))
     return "", t
 
 

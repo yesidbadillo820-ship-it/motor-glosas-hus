@@ -288,6 +288,20 @@ class TestCodigoYConcepto:
     def test_sin_codigo_reconocible(self):
         assert org.codigo_y_concepto("TEXTO SUELTO") == ("", "TEXTO SUELTO")
 
+    def test_codigo_en_minuscula_se_lee_igual(self):
+        """Lote del 7 de septiembre: el Dispensario mandó 19 códigos en
+        minúscula y salían con CRNCONOBJ vacío."""
+        assert org.codigo_y_concepto("ta01 01 TARIFAS-ESTANCIA U OBSERVACIÓN")[0] == "TA0101"
+        assert org.codigo_y_concepto("cl03 02 CALIDAD-HONORARIOS")[0] == "CL0302"
+        assert org.codigo_y_concepto("fa08 02 FACTURACION-APOYO")[0] == "FA0802"
+        assert org.codigo_y_concepto("ta0801 TARIFAS")[0] == "TA0801"
+
+    def test_una_factura_con_el_cl_en_minuscula_sigue_siendo_mixta(self):
+        """El bug no sólo vaciaba el código: dejaba la factura en tipo 0
+        (administrativa) porque el 'cl' tampoco se leía."""
+        grupos = {org.codigo_y_concepto(t)[0][:2] for t in ("ta01 01 TARIFAS", "cl03 02 CALIDAD")}
+        assert org.crotipobj_factura(grupos) == 2
+
 
 class TestCrotipobjDispensario:
     def test_los_tres_valores(self):
