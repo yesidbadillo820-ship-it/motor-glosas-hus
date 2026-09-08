@@ -1,5 +1,36 @@
 # Registro de cambios
 
+## Sesión 08-sep-2026 (noche, 3) — El escrito no puede contradecir la ficha del motor
+
+Caso 1 de la prueba del botón Analizar (TA0701, COOSALUD). El motor tiene el
+contrato cargado y lo imprime en el recuadro del dictamen; la argumentación del
+mismo documento decía «EL VALOR LIQUIDADO COINCIDE CON LA TARIFA SOAT PLENO» y
+«COOSALUD NO HA APORTADO ELEMENTOS DE PRUEBA QUE DEMUESTREN LA EXISTENCIA DE
+UNA TARIFA PACTADA DISTINTA O INFERIOR».
+
+- **`_contradice_la_ficha_contractual(argumento, ficha)`** — cruza el texto del
+  argumento contra la ficha de `get_contrato`. Detecta tres cosas: decir «SOAT
+  PLENO» con descuento pactado, negar el contrato que el motor tiene, y
+  exigirle a la entidad probar una tarifa pactada que el hospital ya tiene.
+  Devuelve las frases con ambos valores nombrados, para que el gestor lea qué
+  contradice a qué.
+- **`_hay_tarifa_pactada_de_verdad(ficha)`** — las tres puertas que evitan el
+  falso positivo: sin contrato, con `_vigencia_vencida` o con
+  `_tarifa_indeterminada` no se marca, porque ahí decir «SOAT pleno» es
+  correcto. Y un pacto A SOAT pleno (factor 1.0) tampoco contradice.
+- **Bloquea, no avisa.** Nueva marca en `_MARCAS_DE_BLOQUEO`, así que el sello
+  sale rojo por la vía de la PR anterior. El aviso de `[PLATA-INVENTADA]` ya
+  existía y solo avisaba: el caso 1 salió sellado en verde encima de la
+  contradicción.
+- **No reescribe el argumento.** Redactarle la defensa jurídica al modelo es
+  peor que marcarlo.
+
+La red anterior (`_vigencia_vencida`) solo cubría el contrato vencido; con uno
+vigente nadie cruzaba el texto contra la ficha.
+
+28 pruebas nuevas, incluido el párrafo del caso real palabra por palabra.
+
+
 ## Sesión 08-sep-2026 (noche, 2) — Cuatro señales del dictamen que se contradecían
 
 Prueba de cinco casos desde `/analizar` (TA0701, SO3401, CL0101, FA1605,

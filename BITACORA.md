@@ -91,6 +91,45 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (noche, 3) — El dictamen ya no puede contradecir el contrato del propio motor
+
+**El caso.** En la prueba del botón Analizar, la glosa de tarifas de COOSALUD
+salió así: el recuadro del dictamen decía —bien— «Contrato 68001C00060340-24 ·
+Tarifa pactada SOAT −15 %», que es lo que el motor tiene cargado. Y dos
+párrafos más arriba, en el texto que se radica, decía que el valor liquidado
+«coincide con la tarifa **SOAT PLENO**» y que **COOSALUD no había probado que
+existiera una tarifa pactada distinta o inferior**.
+
+Sí existe. La tiene el hospital, y sale impresa en el mismo papel.
+
+**Por qué es grave.** A la EPS le basta leer el recuadro de nuestro propio
+dictamen —o abrir su copia del contrato— para tumbar la respuesta sin discutir
+el fondo. Y en una glosa de tarifas, decir «SOAT pleno» cuando lo pactado es
+un 15 % menos es concederle a la entidad justo lo que objetó.
+
+**Por qué no lo atrapó nada.** Había una red que corregía esto, pero solo
+cuando el contrato estaba **vencido**. Con un contrato vigente, nadie cruzaba
+el texto contra la ficha. El aviso de «plata que el motor no calculó» sí vio
+algo raro, pero solo **avisaba**: el dictamen salió con el sello verde.
+
+**Cómo queda.** Ahora, cuando el motor tiene un contrato vigente con descuento
+pactado, se revisa que el escrito no diga lo contrario. Si lo dice, el dictamen
+queda **bloqueado** —sello rojo, no verde— y se le nombra al gestor qué
+contradice a qué: «dice SOAT PLENO y lo pactado es SOAT −15 %».
+
+**Lo que NO hace, a propósito:** no reescribe el argumento. Redactarle la
+defensa jurídica al modelo es peor que marcarlo; el gestor corrige y radica.
+
+Y para que el aviso no salga siempre —un aviso que sale siempre se aprende a
+ignorar—, solo actúa cuando hay pacto de verdad: sin contrato, con la vigencia
+terminada o con la tarifa indeterminada, decir «SOAT pleno» es correcto y no
+se marca.
+
+28 pruebas nuevas.
+
+---
+
+
 ### 08-09-2026 (noche, 2) — Cinco casos por el botón Analizar: el motor se contradecía a sí mismo
 
 **Lo que se hizo.** Se probaron cinco glosas inventadas para eso —tarifas,
@@ -11651,12 +11690,10 @@ valor leido del PDF o con el objetado.
 ## 3) PENDIENTE
 
 ### Motor de Glosas — lo que destapó la prueba de cinco casos (08-09)
-- **Tarifas: el dictamen contradice el contrato del propio motor.** Con
-  COOSALUD en SOAT -15 % guardado, el escrito dijo «SOAT PLENO» y que la EPS
-  «no ha aportado prueba de tarifa pactada distinta». Cuando el motor TIENE
-  la tarifa pactada, el texto la tiene que usar, y el Quality Gate tiene que
-  **bloquear** —no avisar— si el texto la contradice. También trató un
-  medicamento (CUM) como procedimiento (CUPS).
+- **Tarifas: trató un medicamento (CUM) como procedimiento (CUPS).** Lo de la
+  contradicción con el contrato ya quedó resuelto (08-09, noche 3); falta esta
+  parte: el acetaminofén tiene CUM, y el escrito habló del «código homologado
+  del CUPS facturado».
 - **Ratificación sin respuesta inicial.** El texto fijo dice «se mantiene la
   respuesta dada en la glosa inicial» aunque la factura no tenga ninguna
   respuesta previa registrada. Hay que detectarlo y avisar. Y no mostrar
