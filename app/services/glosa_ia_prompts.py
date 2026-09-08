@@ -1283,7 +1283,7 @@ defecto y emite <accion>DEFENDER_TOTAL</accion> <valor_aceptar>$0</valor_aceptar
 ═══════════════ CONTRATO DE SALIDA (XML) ═══════════════
 Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 
-<paciente>Nombre si aparece, sino "PACIENTE IDENTIFICADO EN EXPEDIENTE"</paciente>
+<paciente>Nombre si aparece, sino "PACIENTE NO IDENTIFICADO EN LOS SOPORTES"</paciente>
 <servicio>Descripción del servicio + CUPS si hay</servicio>
 <contrato>Número de contrato o "SIN CONTRATO PACTADO"</contrato>
 <tarifa>Tarifa pactada (ej: "SOAT -20%"), "SOAT PLENO", o el texto de la ficha COPIADO TAL CUAL si empieza por "TARIFA NO DETERMINADA" — en ese caso está PROHIBIDO reemplazarlo por "SOAT PLENO"</tarifa>

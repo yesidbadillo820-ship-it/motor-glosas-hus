@@ -1,5 +1,41 @@
 # Registro de cambios
 
+## Sesión 08-sep-2026 (noche, 2) — Cuatro señales del dictamen que se contradecían
+
+Prueba de cinco casos desde `/analizar` (TA0701, SO3401, CL0101, FA1605,
+CO4601). La IA no fallaba de fondo; fallaba lo que el motor decía de sí mismo.
+
+- **`GlosaResult.bloqueado_para_radicar` + `motivos_bloqueo`** — el motor ya
+  escribía «⛔ NO RADICAR TODAVÍA» en el texto pero no se lo decía a la
+  pantalla, que estampaba «✓ VALIDADO POR QUALITY GATE» encima.
+  `_bloqueos_para_radicar()` lee las marcas que el propio motor deja
+  (falta de soporte de la causal, entidad sin identificar, afirmar contenido
+  de documentos no aportados). En `renderResult`, si viene bloqueado el sello
+  es rojo (`.qg-bloqueado`, «⛔ NO LISTO PARA RADICAR») con los motivos en el
+  `title`; el verde solo cuando no. Respuestas sin el campo (caminos de
+  salida temprana, historial viejo) se comportan como antes.
+- **`_neutralizar_eps_generica_en_dictamen()`** — con la EPS en «OTRA / SIN
+  DEFINIR», el escrito radicable decía «INTERPUESTA POR OTRA / SIN DEFINIR» y
+  «SE SOLICITA A OTRA / SIN DEFINIR PRECISAR». Se sustituye por «LA ENTIDAD
+  RESPONSABLE DE PAGO» **solo la forma suelta**: la del aviso al gestor
+  («quedó como «OTRA / SIN DEFINIR»») se conserva. `_parrafo_cobertura_soat`
+  deja de usar el marcador como nombre. En los dos impresos (`imprimirDictamen`
+  e `imprimirLoteConsolidado`) el marcador sale como «ENTIDAD PAGADORA SIN
+  IDENTIFICAR».
+- **`_paciente_honesto()`** — el prompt daba por defecto «PACIENTE
+  IDENTIFICADO EN EXPEDIENTE» y la cabecera lo mostraba sobre facturas sin
+  expediente. Ahora el prompt, `dictamen_directo` y el post-proceso dicen
+  «PACIENTE NO IDENTIFICADO EN LOS SOPORTES» cuando no hay nombre.
+- **`_avisos_de_soportes_no_leidos()`** — los avisos «no se adjuntó ningún
+  soporte» y «sí se adjuntaron, pero ninguno de ese tipo» salían juntos con
+  cero PDF: el segundo se calculaba contra un texto vacío y todo le parecía
+  faltante. Ahora la decisión se toma una vez: sin soportes va el de cero; con
+  soportes, la revisión por tipo.
+
+63 pruebas nuevas (51 de servicio, 10 de pantalla, 2 actualizadas). Chequeo
+en navegador de `renderResult` con resultado simulado en los tres estados.
+
+
 ## Sesión 08-sep-2026 (noche) — Los soportes de mesa van a disco, en flujo
 
 El auditor reportó que sus escaneos pesan **25–40 MB**. El tope era de 15 MB

@@ -184,7 +184,7 @@ def generar_dictamen_directo(
     valor_facturado: float,
     valor_pactado: float,
     numero_contrato: str,
-    paciente: str = "PACIENTE IDENTIFICADO EN EXPEDIENTE",
+    paciente: str = "PACIENTE NO IDENTIFICADO EN LOS SOPORTES",
 ) -> Optional[str]:
     """Genera XML completo siguiendo el contrato del system prompt.
 

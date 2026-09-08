@@ -6742,11 +6742,14 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     pointer-events:none;
   }
   .card-doc.qg-ok .qg-seal{display:inline-block}
+  /* 08-09-2026: cuando el propio motor dice «NO RADICAR», el sello es rojo y
+     dice eso. Antes salía el verde en la misma card que la prohibición. */
+  .card-doc.qg-bloqueado .qg-seal{display:inline-block;background:#b91c1c;box-shadow:0 2px 8px rgba(185,28,28,.35)}
   /* En el dictamen el sello vive SOBRE la franja navy del hdr; se reserva
      espacio a la derecha para no tapar la fecha (el ID pesa más, por eso
      la regla va con #p-analizar). */
   .res-dictamen.card-doc .qg-seal{top:11px;border:1px solid rgba(255,255,255,.35)}
-  #p-analizar .res-dictamen.qg-ok .res-dictamen-hdr{padding-right:200px !important}
+  #p-analizar .res-dictamen.qg-ok .res-dictamen-hdr,#p-analizar .res-dictamen.qg-bloqueado .res-dictamen-hdr{padding-right:200px !important}
   /* Login en modo oscuro: pane derecho no debe quedar blanco brillante */
   body.dark .login-form-pane{background:var(--bg)}
   body.dark .login-hero{box-shadow:inset 0 0 0 100vmax rgba(0,0,0,.12)}
@@ -6959,6 +6962,8 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     .qg-seal{display:none}
     .card-doc.qg-ok .qg-seal{position:static;display:inline-block;float:right;background:#fff;
       color:#2E7D32;border:1.5px solid #2E7D32;box-shadow:none}
+    .card-doc.qg-bloqueado .qg-seal{position:static;display:inline-block;float:right;background:#fff;
+      color:#b91c1c;border:1.5px solid #b91c1c;box-shadow:none}
     .doc-membrete,.doc-footer{background:#fff !important}
     .doc-sello{color:#2E7D32 !important}
     #p-analizar .res-dictamen .res-dictamen-body{font-size:10pt !important;line-height:1.65 !important}
@@ -17930,6 +17935,13 @@ function renderResult(d){
   var _vc = d.verificacion_citas;
   var _seRevisó = !!(_vc && _vc.verificado !== false);
   var qgOk = !!(_vc && _seRevisó && !_qgIssues.some(function(i){ return i.severidad === 'ALTA'; }));
+  // 08-09-2026 — EL SELLO Y EL «⛔ NO RADICAR» NO PUEDEN CONVIVIR. En la
+  // prueba de cinco casos, cuatro salieron con el sello verde y, dos renglones
+  // abajo, la prohibición. El motor ahora manda `bloqueado_para_radicar` con
+  // sus motivos: si viene, el sello es rojo y dice lo que pasa.
+  var qgBloqueado = !!(d.bloqueado_para_radicar);
+  var qgMotivos = (d.motivos_bloqueo || []).join(' · ');
+  if(qgBloqueado) qgOk = false;
 
   var fechaLarga = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
 
@@ -17985,8 +17997,10 @@ function renderResult(d){
          + 'que haga nada.</div>'
          + '</div>'
        : '')
-    +'<div class="res-dictamen card-doc'+(qgOk?' qg-ok':'')+'">'
-    +'<span class="qg-seal" title="Verificación de citas legales sin hallazgos graves">✓ VALIDADO POR QUALITY GATE</span>'
+    +'<div class="res-dictamen card-doc'+(qgOk?' qg-ok':'')+(qgBloqueado?' qg-bloqueado':'')+'">'
+    +(qgBloqueado
+        ? '<span class="qg-seal" title="'+escHtml(qgMotivos || 'El motor marcó este dictamen como no listo para radicar')+'">⛔ NO LISTO PARA RADICAR</span>'
+        : '<span class="qg-seal" title="Verificación de citas legales sin hallazgos graves">✓ VALIDADO POR QUALITY GATE</span>')
     +'<div class="res-dictamen-hdr"><span>Dictamen Jurídico — ESE HUS</span>'
     +'<span style="opacity:.85;font-weight:500;white-space:nowrap">'+fechaLarga+'</span>'
     +'</div>'
@@ -18236,6 +18250,9 @@ function imprimirLoteConsolidado(){
   var factura = (document.getElementById('f-factura') && document.getElementById('f-factura').value) || '—';
   var radicado = (document.getElementById('f-radicado') && document.getElementById('f-radicado').value) || '—';
   var eps = (document.getElementById('eps-sel') && document.getElementById('eps-sel').value) || '—';
+  // 08-09-2026: «OTRA / SIN DEFINIR» es el marcador del desplegable, no una
+  // entidad. En el documento impreso salía como si lo fuera.
+  if(/^OTRA(\s*[\/\-]\s*SIN\s+DEFINIR)?$/i.test(String(eps).trim())) eps = 'ENTIDAD PAGADORA SIN IDENTIFICAR';
   var etapa = (document.getElementById('etapa-v') && document.getElementById('etapa-v').value) || 'RESPUESTA A GLOSA';
   var fecha = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
   var fechaCorta = new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
@@ -19755,6 +19772,9 @@ function imprimirDictamen(){
   var fechaCorta=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
   var hora=new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
   var eps = (document.getElementById('eps-sel') && document.getElementById('eps-sel').value) || '—';
+  // 08-09-2026: «OTRA / SIN DEFINIR» es el marcador del desplegable, no una
+  // entidad. En el documento impreso salía como si lo fuera.
+  if(/^OTRA(\s*[\/\-]\s*SIN\s+DEFINIR)?$/i.test(String(eps).trim())) eps = 'ENTIDAD PAGADORA SIN IDENTIFICAR';
   var factura = (document.getElementById('f-factura') && document.getElementById('f-factura').value) || '—';
   var radicado = (document.getElementById('f-radicado') && document.getElementById('f-radicado').value) || '—';
   var etapa = (document.getElementById('etapa-v') && document.getElementById('etapa-v').value) || 'RESPUESTA A GLOSA';
