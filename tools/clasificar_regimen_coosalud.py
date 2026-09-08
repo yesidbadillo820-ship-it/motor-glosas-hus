@@ -35,6 +35,7 @@ USO tipico (PowerShell, desde C:\\temp-notas):
         --piloto 5
 
     * quitar --piloto para procesar todas las facturas.
+    * --solo HUS472660 procesa SOLO esa factura (sin Excel): ideal para probar.
     * --sin-copiar genera solo el informe (no copia carpetas ni busca soportes).
     * --sin-soportes procesa y copia la factura electronica pero NO busca en
       las rutas de radicacion (mas rapido).
@@ -541,6 +542,56 @@ def regimen_de_hint(hint: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+# En los PC del hospital la unidad Y: es el mapeo de \\Prime\radicacion_2026
+# (con credenciales guardadas). Si una ruta UNC no abre, se prueba su
+# equivalente por letra — y al reves — antes de darla por inaccesible.
+_EQUIV_RADICACION: tuple[tuple[str, str], ...] = (("\\\\prime\\radicacion_2026", "y:"),)
+
+
+def _canon_raiz(ruta: str) -> str:
+    """Forma canonica para no escanear dos veces la misma carpeta
+    (Y:\\3. MARZO... y \\\\Prime\\radicacion_2026\\3. MARZO... son la misma)."""
+    low = str(ruta).lower().rstrip("\\/")
+    for unc, letra in _EQUIV_RADICACION:
+        if low.startswith(unc):
+            low = letra + low[len(unc) :]
+    return low
+
+
+def resolver_raices(rutas: list[str]) -> list[Path]:
+    """Devuelve las raices ACCESIBLES, sin duplicados (Y: ≡ \\\\Prime\\...).
+
+    Para cada ruta prueba la escrita y su equivalente mapeada; avisa las que
+    no abren por ninguna de las dos."""
+    accesibles: list[Path] = []
+    vistas: set[str] = set()
+    for original in rutas:
+        clave = _canon_raiz(original)
+        if clave in vistas:
+            continue
+        vistas.add(clave)
+        candidatas = [str(original)]
+        low = str(original).lower()
+        for unc, letra in _EQUIV_RADICACION:
+            if low.startswith(unc):
+                candidatas.append("Y:" + str(original)[len(unc) :])
+            elif low.startswith(letra):
+                candidatas.append("\\\\Prime\\radicacion_2026" + str(original)[len(letra) :])
+        elegida: Path | None = None
+        for cand in candidatas:
+            p = Path(cand)
+            if p.is_dir():
+                elegida = p
+                break
+        if elegida is None:
+            logger.warning(f"  ruta de soportes NO accesible (se omite): {original}")
+        else:
+            if str(elegida) != str(original):
+                logger.info(f"  ruta {original} no abrio: se usa su equivalente {elegida}")
+            accesibles.append(elegida)
+    return accesibles
+
+
 def indexar_radicacion(raices: list[Path], objetivos: set[str]) -> dict[str, list[Path]]:
     """Recorre cada raiz UNA vez y devuelve {clave_numerica: [hallazgos]}.
 
@@ -556,6 +607,10 @@ def indexar_radicacion(raices: list[Path], objetivos: set[str]) -> dict[str, lis
         hits = 0
         for root, dirs, files in os.walk(str(raiz), onerror=lambda _e: None):
             vistos += 1
+            if vistos % 2000 == 0:
+                logger.info(
+                    f"    ... {vistos} carpetas revisadas en {raiz.name} ({hits} hallazgos)"
+                )
             conservar = []
             for d in dirs:
                 m = _RE_NUM_FACTURA.search(d)
@@ -579,7 +634,13 @@ def indexar_radicacion(raices: list[Path], objetivos: set[str]) -> dict[str, lis
 
     with ThreadPoolExecutor(max_workers=max(1, min(len(raices), 12))) as pool:
         for raiz, vistos, hits in pool.map(_explorar, raices):
-            logger.info(f"  soportes: {raiz} — {vistos} carpetas revisadas, {hits} hallazgos")
+            if hits == 0:
+                logger.warning(
+                    f"  soportes: {raiz} — {vistos} carpetas revisadas y NINGUN hallazgo "
+                    f"(¿la ruta es la correcta para estas facturas?)"
+                )
+            else:
+                logger.info(f"  soportes: {raiz} — {vistos} carpetas revisadas, {hits} hallazgos")
     return hallados
 
 
@@ -873,7 +934,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--excel", type=Path, required=True, help="Excel con la columna FACTURA.")
+    parser.add_argument("--excel", type=Path, default=None, help="Excel con la columna FACTURA.")
+    parser.add_argument(
+        "--solo",
+        type=str,
+        default="",
+        help="Procesar SOLO estas facturas por coma (p.ej. --solo HUS472660). "
+        "Con este flag el Excel es opcional: sirve para probar una factura puntual.",
+    )
     parser.add_argument("--hoja", type=str, default=None, help="Hoja a leer (default: la primera).")
     parser.add_argument("--columna", type=str, default="FACTURA", help="Columna de facturas.")
     parser.add_argument(
@@ -916,14 +984,21 @@ def main() -> int:
         sys.stderr.write("ERROR: falta openpyxl. Instalalo con: py -m pip install openpyxl\n")
         return 2
 
-    if not args.excel.is_file():
-        logger.error(f"No existe el Excel: {args.excel}")
-        return 1
-    try:
-        facturas = leer_facturas_excel(args.excel, args.hoja, args.columna)
-    except ValueError as exc:
-        logger.error(str(exc))
-        return 1
+    if args.solo.strip():
+        facturas = [f.strip() for f in args.solo.split(",") if f.strip()]
+        logger.info(f"SOLO estas facturas (sin leer Excel): {', '.join(facturas)}")
+    else:
+        if args.excel is None:
+            logger.error("Falta --excel (o use --solo HUS<n> para probar facturas puntuales).")
+            return 1
+        if not args.excel.is_file():
+            logger.error(f"No existe el Excel: {args.excel}")
+            return 1
+        try:
+            facturas = leer_facturas_excel(args.excel, args.hoja, args.columna)
+        except ValueError as exc:
+            logger.error(str(exc))
+            return 1
     if args.piloto > 0:
         facturas = facturas[: args.piloto]
         logger.info(f"PILOTO: solo las primeras {len(facturas)} facturas")
@@ -942,13 +1017,7 @@ def main() -> int:
     soportes_idx: dict[str, list[Path]] = {}
     buscar_soportes = not args.sin_copiar and not args.sin_soportes
     if buscar_soportes:
-        raices = [Path(p) for p in (args.raiz_soportes or RUTAS_RADICACION_DEFECTO)]
-        accesibles = []
-        for raiz in raices:
-            if raiz.is_dir():
-                accesibles.append(raiz)
-            else:
-                logger.warning(f"  ruta de soportes NO accesible (se omite): {raiz}")
+        accesibles = resolver_raices(list(args.raiz_soportes or RUTAS_RADICACION_DEFECTO))
         if accesibles:
             logger.info(
                 f"Buscando soportes de radicacion de {len(facturas)} facturas "
