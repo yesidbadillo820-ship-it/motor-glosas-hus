@@ -10,6 +10,8 @@ formato (CTNCENCOS vacía, CROTIPOBJ por factura, SLNSERPRO sin inventar y el
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from app.services import objeciones_dgh_service as svc
@@ -200,6 +202,57 @@ def _vco() -> bytes:
     )
 
 
+reportlab = pytest.importorskip("reportlab")
+pdfplumber = pytest.importorskip("pdfplumber")
+
+
+def _pdf_emssanar(ruta, factura: str, renglones: list[tuple], valor_obj: int) -> bytes:
+    """Un PDF de objeción de ripslink como los que manda EMSSANAR.
+
+    Se arma con las mismas bandas de columna que calibró el bot contra el PDF
+    real: Tecnología | Cantidad | Valor Tec. | Cant. Objetada | Valor Objetado |
+    Código Objeción | Observación.
+    """
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
+    c = canvas.Canvas(str(ruta), pagesize=letter)
+    c.setFont("Helvetica", 8)
+    y = 750
+    for linea in (
+        f"Objeción a Factura N° {factura}",
+        "Tipo objeción: Glosa",
+        "Fecha de Objeción: 04-09-2026",
+        "Valor Factura: $1.000.000",
+        f"Valor Objetado: ${valor_obj:,}".replace(",", "."),
+    ):
+        c.drawString(50, y, linea)
+        y -= 14
+    y -= 12
+    for x, txt in (
+        (60, "Tecnología"),
+        (150, "Cantidad"),
+        (200, "Valor"),
+        (290, "Cantidad"),
+        (340, "Valor"),
+        (420, "Código"),
+        (600, "Observación"),
+    ):
+        c.drawString(x, y, txt)
+    y -= 18
+    for tec, valor, cod, obs in renglones:
+        c.drawString(60, y, tec)
+        c.drawString(150, y, "1")
+        c.drawString(200, y, f"${valor:,}".replace(",", "."))
+        c.drawString(290, y, "1")
+        c.drawString(340, y, f"${valor:,}".replace(",", "."))
+        c.drawString(420, y, cod)
+        c.drawString(600, y, obs)
+        y -= 26
+    c.save()
+    return Path(ruta).read_bytes()
+
+
 # ─── De quién es el archivo ─────────────────────────────────────────────────
 
 
@@ -222,6 +275,17 @@ class TestDetectarEntidad:
     def test_vco(self):
         assert svc.detectar_entidad(_vco()).id == "vco"
 
+    def test_un_pdf_es_de_emssanar(self, tmp_path):
+        """Es la única entidad que no manda Excel."""
+        datos = _pdf_emssanar(
+            tmp_path / "o.pdf",
+            "HUS 548556",
+            [("FMQ0113 - CATETER 20", 5800, "TA0801 - X", "n")],
+            5800,
+        )
+        assert svc.detectar_entidad(datos).id == "emssanar"
+        assert svc.es_pdf(datos) and not svc.es_pdf(_vco())
+
     def test_archivo_desconocido_no_se_procesa_a_ciegas(self):
         otro = _excel("Hoja1", ["COSA", "OTRA COSA"], [["a", "b"]])
         with pytest.raises(svc.ErrorObjeciones, match="No reconozco"):
@@ -238,7 +302,15 @@ class TestDetectarEntidad:
 
     def test_catalogo(self):
         ids = {e["id"] for e in svc.catalogo_entidades()}
-        assert {"famisanar", "dispensario", "savia", "saludtotal", "sanitas", "vco"} <= ids
+        assert {
+            "famisanar",
+            "dispensario",
+            "savia",
+            "saludtotal",
+            "sanitas",
+            "vco",
+            "emssanar",
+        } <= ids
 
 
 # ─── El armado ──────────────────────────────────────────────────────────────
@@ -308,6 +380,58 @@ class TestProcesar:
     def test_vco_mezcla_clinica_y_administrativa_es_tipo_2(self):
         r = svc.procesar(_vco(), _dgh(), fecha="2026-09-04")
         assert r.por_factura[0]["tipo"] == 2
+
+    def test_emssanar_de_punta_a_punta(self, tmp_path):
+        """EMSSANAR manda PDF, uno por factura: se suben todos de una vez."""
+        pdfs = [
+            _pdf_emssanar(
+                tmp_path / "a.pdf",
+                "HUS 548556",
+                [("FMQ0113 - CATETER 20", 5800, "TA0801 - EL CARGO", "tarifa")],
+                5800,
+            ),
+            _pdf_emssanar(
+                tmp_path / "b.pdf",
+                "HUS 548557",
+                [("903883 - GLUCOMETRIA", 4700, "CL0801 - NO PERTINENTE", "sin")],
+                4700,
+            ),
+        ]
+        dgh = _dgh(
+            [
+                ["FMQ0113", "CATETER 20", "FMQ0113", "", "", "HUS0000548556", 1, 5800, 90000],
+                ["903883H", "GLUCOMETRIA", "903883", "", "", "HUS0000548557", 1, 4700, 90000],
+            ]
+        )
+        r = svc.procesar(pdfs, dgh, fecha="2026-09-04")
+        assert r.entidad_id == "emssanar"
+        assert r.objeciones == 2 and r.facturas == 2
+        assert r.valor_total == 10500
+        assert r.reglas_ok and not r.fallas_reglas
+        assert r.nombre_objeciones == "OBJECIONES_EMSSANAR_04092026.xlsx"
+        # Una factura sólo administrativa (0) y otra sólo clínica (1).
+        assert sorted(f["tipo"] for f in r.por_factura) == [0, 1]
+
+    def test_emssanar_no_inventa_el_codigo_con_la_tabla_cups(self, tmp_path):
+        """Sin el export, la tabla CUPS_A_DGH escribiría 876802H igual."""
+        pdf = _pdf_emssanar(
+            tmp_path / "a.pdf",
+            "HUS 548556",
+            [("876802 - RX TORAX", 20300, "TA0801 - EL CARGO", "tarifa")],
+            20300,
+        )
+        r = svc.procesar([pdf], _dgh(), fecha="2026-09-04")
+        assert r.objeciones == 1  # el renglón NO se borra
+        assert r.pendientes == 1  # pero queda en REVISAR
+        assert r.reglas_ok
+
+    def test_un_pdf_que_no_es_una_objecion(self, tmp_path):
+        with pytest.raises(svc.ErrorObjeciones, match="PDF"):
+            svc.procesar([b"%PDF-1.4 cualquier cosa"], _dgh(), fecha="2026-09-04")
+
+    def test_las_entidades_de_excel_no_aceptan_dos_archivos(self):
+        with pytest.raises(svc.ErrorObjeciones, match="un solo Excel"):
+            svc.procesar([_famisanar(), _famisanar()], _dgh(), fecha="2026-09-04")
 
     def test_vco_no_acepta_un_archivo_ya_armado(self):
         """Si suben el OBJECIONES de 16 columnas en vez del acta, se avisa."""

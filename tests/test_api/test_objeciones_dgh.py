@@ -182,14 +182,36 @@ def test_entidad_forzada_a_mano(client):
 # ─── Lo que el auditor puede corregir ───────────────────────────────────────
 
 
-def test_archivo_que_no_es_excel(client):
+def test_archivo_que_no_es_ni_excel_ni_pdf(client):
     archivos = {
-        "archivo_entidad": ("glosas.pdf", b"%PDF-1.4"),
+        "archivo_entidad": ("glosas.txt", b"no soy un excel"),
         "archivo_dgh": ("dgh.xlsx", _dgh()),
     }
     r = client.post("/objeciones-dgh/procesar", files=archivos)
     assert r.status_code == 400
     assert "Excel" in r.json()["detail"]
+
+
+def test_el_dgh_sigue_teniendo_que_ser_excel(client):
+    """El export del DGH nunca llega en PDF, aunque las glosas sí puedan."""
+    archivos = {
+        "archivo_entidad": ("glosas.xlsx", _famisanar()),
+        "archivo_dgh": ("dgh.pdf", b"%PDF-1.4"),
+    }
+    r = client.post("/objeciones-dgh/procesar", files=archivos)
+    assert r.status_code == 400
+    assert "Excel" in r.json()["detail"]
+
+
+def test_un_pdf_que_no_es_una_objecion_de_emssanar(client):
+    """Se acepta el .pdf (es el formato de EMSSANAR) pero se avisa claro."""
+    archivos = {
+        "archivo_entidad": ("cualquiera.pdf", b"%PDF-1.4 esto no es una objecion"),
+        "archivo_dgh": ("dgh.xlsx", _dgh()),
+    }
+    r = client.post("/objeciones-dgh/procesar", files=archivos)
+    assert r.status_code == 400
+    assert "PDF" in r.json()["detail"]
 
 
 def test_archivo_vacio(client):

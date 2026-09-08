@@ -1,9 +1,12 @@
 """Objeciones para DGH — armar el archivo de cargue desde la pantalla.
 
-El auditor sube dos Excel —las glosas que mandó la entidad y el export de
-servicios facturados del DGH— y recibe los dos archivos de siempre: el que se
-sube al DGH y el respaldo con la hoja REVISAR. Antes de descargar nada ve el
-resumen del cruce, para decidir con datos y no a ciegas.
+El auditor sube las glosas que mandó la entidad y el export de servicios
+facturados del DGH, y recibe los dos archivos de siempre: el que se sube al
+DGH y el respaldo con la hoja REVISAR. Antes de descargar nada ve el resumen
+del cruce, para decidir con datos y no a ciegas.
+
+Casi todas las entidades mandan un Excel; EMSSANAR manda PDF, uno por
+factura, y por eso el archivo de la entidad admite varios.
 
 El trabajo lo hacen los bots de `tools/` a través de
 `app/services/objeciones_dgh_service.py`: acá no hay reglas de negocio, solo
@@ -11,7 +14,7 @@ recibir, validar y responder.
 
 Rutas:
     GET  /objeciones-dgh/entidades          las entidades que sabe leer
-    POST /objeciones-dgh/procesar           sube los dos Excel y devuelve el resumen
+    POST /objeciones-dgh/procesar           sube los archivos y devuelve el resumen
     GET  /objeciones-dgh/{id}/objeciones.xlsx   el archivo que se sube al DGH
     GET  /objeciones-dgh/{id}/cruce.xlsx        el respaldo con la hoja REVISAR
     GET  /objeciones-dgh/{id}/paquete.zip       los dos, juntos
@@ -44,6 +47,10 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 # para no dejar datos de pacientes en memoria más de lo necesario.
 _RESULTADOS: TTLCache = TTLCache(maxsize=32, ttl=30 * 60)
 
+# EMSSANAR manda un PDF por factura. 300 es el tope de facturas que recibe el
+# DGH en un archivo, así que más que eso tampoco serviría.
+MAX_ARCHIVOS_ENTIDAD = 300
+
 
 class EntidadFicha(BaseModel):
     """Una entidad del catálogo, para el selector de la pantalla."""
@@ -53,6 +60,8 @@ class EntidadFicha(BaseModel):
     corto: str
     columnas: int
     ayuda: str
+    # "xlsx" (un Excel) o "pdf" (uno o varios PDF, como EMSSANAR).
+    formato: str = "xlsx"
 
 
 class RespuestaProceso(BaseModel):
@@ -83,12 +92,14 @@ def listar_entidades(current_user: UsuarioRecord = Depends(get_auditor_o_superio
     return svc.catalogo_entidades()
 
 
-async def _leer(archivo: UploadFile | None, cual: str) -> bytes:
+async def _leer(archivo: UploadFile | None, cual: str, *, admite_pdf: bool = False) -> bytes:
     if archivo is None:
         raise HTTPException(400, f"Falta el archivo {cual}.")
     nombre = (archivo.filename or "").lower()
-    if not nombre.endswith((".xlsx", ".xlsm")):
-        raise HTTPException(400, f"El archivo {cual} debe ser un Excel (.xlsx).")
+    permitidas = (".xlsx", ".xlsm", ".pdf") if admite_pdf else (".xlsx", ".xlsm")
+    if not nombre.endswith(permitidas):
+        que = "un Excel (.xlsx) o un PDF" if admite_pdf else "un Excel (.xlsx)"
+        raise HTTPException(400, f"El archivo {cual} debe ser {que}.")
     datos = await archivo.read()
     if not datos:
         raise HTTPException(400, f"El archivo {cual} llegó vacío.")
@@ -101,14 +112,25 @@ async def _leer(archivo: UploadFile | None, cual: str) -> bytes:
 
 @router.post("/procesar", response_model=RespuestaProceso)
 async def procesar(
-    archivo_entidad: UploadFile = File(..., description="Excel de glosas de la entidad"),
+    archivo_entidad: list[UploadFile] = File(
+        ...,
+        description="Glosas de la entidad: un Excel, o los PDF de EMSSANAR (uno por factura)",
+    ),
     archivo_dgh: UploadFile = File(..., description="Export de servicios facturados del DGH"),
     entidad: str = Form("", description="id de la entidad; vacío = detectarla sola"),
     fecha: str = Form("", description="Fecha de la objeción (AAAA-MM-DD); vacío = hoy"),
     current_user: UsuarioRecord = Depends(get_auditor_o_superior),
 ):
-    """Cruza los dos archivos y deja listos los dos Excel para descargar."""
-    datos_entidad = await _leer(archivo_entidad, "de la entidad")
+    """Cruza los archivos y deja listos los dos Excel para descargar."""
+    if not archivo_entidad:
+        raise HTTPException(400, "Falta el archivo de glosas de la entidad.")
+    if len(archivo_entidad) > MAX_ARCHIVOS_ENTIDAD:
+        raise HTTPException(
+            400,
+            f"Son demasiados archivos ({len(archivo_entidad)}). El tope es "
+            f"{MAX_ARCHIVOS_ENTIDAD} por lote.",
+        )
+    datos_entidad = [await _leer(a, "de la entidad", admite_pdf=True) for a in archivo_entidad]
     datos_dgh = await _leer(archivo_dgh, "del DGH")
 
     try:

@@ -26,6 +26,7 @@ el detalle por factura.
 | **SALUD TOTAL** | Export NotificacionGLS de 6 columnas. No manda código: el servicio se ubica por nombre y valor. |
 | **SANITAS** | Hoja «Glosa» de 7 columnas. Ojo: la 2ª dice «NUMERO DE FACTURA» pero trae el código de glosa. |
 | **VCO** (COOSALUD, Fiduprevisora, SAVIA…) | Consolidado del acta del portal VCO, 10 columnas, con el acta en la primera. |
+| **EMSSANAR** | No manda Excel: son los **PDF** de ripslink («Objeción a Factura N° HUS…»), uno por factura. Se marcan varios de una vez (hasta 300, que es el tope del DGH). |
 
 Si el formato cambió y no la reconoce, se elige a mano en el selector; si no la
 reconoce **no procesa a ciegas**, avisa qué encabezados leyó.
@@ -34,7 +35,6 @@ reconoce **no procesa a ciegas**, avisa qué encabezados leyó.
 
 | Entidad | Qué pasa |
 |---|---|
-| **EMSSANAR** | Su entrada son **PDF** de objeción, no un Excel. La pantalla pide dos Excel, así que necesita aceptar PDF además. |
 | **ADRES** | Tiene flujo propio: homologa códigos SOAT ↔ CUPS con el Homologador Gold Standard, aplica el tope de valor de cada servicio y parte la salida en lotes de 300 facturas. Entra a la pantalla con un tercer archivo opcional (el homologador). |
 
 ## 2) Por qué hacen falta los dos archivos

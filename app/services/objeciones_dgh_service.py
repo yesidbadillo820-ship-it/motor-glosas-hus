@@ -20,6 +20,8 @@ Entidades que sabe leer hoy:
                  el código de glosa
     VCO          consolidado del acta del portal VCO (COOSALUD, FIDUPREVISORA,
                  SAVIA…): 10 columnas, con el acta en la primera
+    EMSSANAR     no manda Excel: son los PDF de objeción de ripslink, uno por
+                 factura. Se pueden subir varios de una vez.
 
 Las reglas fijas del formato (CTNCENCOS vacía, CROTIPOBJ por factura,
 SLNSERPRO sin códigos inventados, el 100% de los renglones) están en CLAUDE.md
@@ -32,6 +34,7 @@ import importlib
 import sys
 import tempfile
 from dataclasses import dataclass, field
+from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -79,6 +82,8 @@ class Entidad:
     senas: tuple[str, ...]
     columnas: int
     ayuda: str
+    # "xlsx" (un Excel) o "pdf" (uno o varios PDF, como EMSSANAR).
+    formato: str = "xlsx"
 
     def como_dict(self) -> dict[str, Any]:
         return {
@@ -87,6 +92,7 @@ class Entidad:
             "corto": self.corto,
             "columnas": self.columnas,
             "ayuda": self.ayuda,
+            "formato": self.formato,
         }
 
 
@@ -145,6 +151,17 @@ ENTIDADES: tuple[Entidad, ...] = (
         columnas=10,
         ayuda="Consolidado del acta del portal VCO (COOSALUD, FIDUPREVISORA, SAVIA…).",
     ),
+    Entidad(
+        id="emssanar",
+        nombre="EMSSANAR",
+        corto="EMSSANAR",
+        modulo="organizar_objeciones_emssanar",
+        # No se reconoce por encabezados: llega en PDF y se detecta por eso.
+        senas=(),
+        columnas=0,
+        ayuda="PDF de objeción de ripslink («Objeción a Factura N° HUS…»), uno por factura.",
+        formato="pdf",
+    ),
 )
 
 
@@ -177,13 +194,23 @@ def _encabezados(datos: bytes) -> list[str]:
             wb.close()
 
 
+def es_pdf(datos: bytes) -> bool:
+    """Un PDF empieza por %PDF: es lo único que no llega en Excel."""
+    return datos[:4] == b"%PDF"
+
+
 def detectar_entidad(datos: bytes) -> Entidad:
     """Adivina de quién es el archivo por sus encabezados.
 
     Gana la entidad que tenga más señas presentes; si ninguna llega a dos, se
     devuelve un error que dice qué se leyó, en vez de procesar a ciegas con el
     lector equivocado (que es como salen los archivos malos sin que se note).
+
+    Un PDF es de EMSSANAR: es la única entidad que no manda Excel.
     """
+    if es_pdf(datos):
+        return entidad_por_id("emssanar")
+
     cabecera = set(_encabezados(datos))
     if not cabecera:
         raise ErrorObjeciones("El archivo de la entidad está vacío.")
@@ -281,9 +308,22 @@ class Resultado:
 
 
 # ─── El armado, entidad por entidad ──────────────────────────────────────────
+#
+# Todos reciben la LISTA de archivos que subió el auditor: casi todas las
+# entidades mandan uno solo, pero EMSSANAR manda un PDF por factura.
 
 
-def _filas_famisanar(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[dict]:
+def _uno(rutas: list[Path]) -> Path:
+    """El único archivo esperado; si vienen varios se avisa en vez de ignorarlos."""
+    if len(rutas) > 1:
+        raise ValueError(
+            f"Esta entidad manda un solo Excel por lote. Subiste {len(rutas)} archivos: dejá uno."
+        )
+    return rutas[0]
+
+
+def _filas_famisanar(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+    ruta = _uno(rutas)
     return bot.construir_registros(
         ruta,
         fecha=fecha,
@@ -295,14 +335,16 @@ def _filas_famisanar(bot, ruta: Path, fecha: datetime, servicios, trazas) -> lis
     )
 
 
-def _filas_dispensario(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[dict]:
+def _filas_dispensario(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+    ruta = _uno(rutas)
     objeciones = bot.leer_excel_glosa_inicial(ruta)
     filas = bot.filas_desde_excel(objeciones, fecha, servicios, trazas)
     # Ese bot devuelve listas posicionales; acá se usan dicts como los demás.
     return [dict(zip(bot.ENCABEZADOS, f, strict=True)) for f in filas]
 
 
-def _filas_savia(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[dict]:
+def _filas_savia(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+    ruta = _uno(rutas)
     return bot.construir_registros(
         ruta,
         fecha=fecha,
@@ -314,13 +356,15 @@ def _filas_savia(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[di
     )
 
 
-def _filas_saludtotal(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[dict]:
+def _filas_saludtotal(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+    ruta = _uno(rutas)
     return bot.construir_registros(
         ruta, fecha=fecha, consecutivo=1, servicios_dgh=servicios, trazas=trazas
     )
 
 
-def _filas_sanitas(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[dict]:
+def _filas_sanitas(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+    ruta = _uno(rutas)
     return bot.construir_filas(bot.leer_sanitas(ruta), fecha, servicios, trazas)
 
 
@@ -344,7 +388,8 @@ class _ConfigVco:
     detalle_servicio: bool = False
 
 
-def _filas_vco(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[dict]:
+def _filas_vco(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+    ruta = _uno(rutas)
     formato, filas, idx = bot.leer_entrada(ruta, None)
     if formato != "consolidado":
         raise ValueError(
@@ -356,6 +401,40 @@ def _filas_vco(bot, ruta: Path, fecha: datetime, servicios, trazas) -> list[dict
     return bot.consolidado_a_registros(filas, idx, cfg, servicios_dgh=servicios, trazas=trazas)
 
 
+def _filas_emssanar(bot, rutas: list[Path], fecha: datetime, servicios, trazas) -> list[dict]:
+    """EMSSANAR manda un PDF por factura; se procesan todos de una vez."""
+    filas: list[dict] = []
+    vistas: set[str] = set()
+    for consec, ruta in enumerate(sorted(rutas), start=1):
+        try:
+            res = bot.procesar_pdf(ruta)
+        except Exception as exc:
+            raise ValueError(
+                f"No pude leer el PDF «{ruta.name}»: ¿es una objeción de ripslink "
+                f"(«Objeción a Factura N° HUS…»)? ({exc})"
+            ) from exc
+        factura = res["encabezado"].get("factura") or bot.normalizar_factura(
+            ruta.stem.split("_")[-1]
+        )
+        if factura in vistas:  # el mismo PDF subido dos veces
+            continue
+        vistas.add(factura)
+        for renglon in res["renglones"]:
+            filas.append(
+                bot.renglon_a_fila(
+                    renglon,
+                    consec=consec,
+                    factura=factura,
+                    fecha=res["encabezado"].get("fecha_objecion") or fecha,
+                    usuario=GENUSUARIO4_PANTALLA,
+                    tipobj=0,  # provisional: la regla lo decide por factura
+                    servicios_dgh=servicios,
+                    trazas=trazas,
+                )
+            )
+    return bot.aplicar_crotipobj_por_factura(filas)
+
+
 _ARMADORES = {
     "famisanar": _filas_famisanar,
     "dispensario": _filas_dispensario,
@@ -363,28 +442,39 @@ _ARMADORES = {
     "saludtotal": _filas_saludtotal,
     "sanitas": _filas_sanitas,
     "vco": _filas_vco,
+    "emssanar": _filas_emssanar,
 }
 
 
 def procesar(
-    archivo_entidad: bytes,
+    archivo_entidad: bytes | Sequence[bytes],
     archivo_dgh: bytes,
     entidad_id: str | None = None,
     fecha: str | date | datetime | None = None,
 ) -> Resultado:
-    """Arma los dos archivos a partir de los dos Excel que subió el auditor."""
-    if not archivo_entidad:
+    """Arma los dos archivos a partir de lo que subió el auditor.
+
+    `archivo_entidad` es el Excel de glosas de la entidad; EMSSANAR manda PDF
+    en vez de Excel, y uno por factura, así que también se acepta una lista.
+    """
+    crudos = (
+        [archivo_entidad]
+        if isinstance(archivo_entidad, (bytes, bytearray))
+        else list(archivo_entidad)
+    )
+    archivos = [bytes(a) for a in crudos if a]
+    if not archivos:
         raise ErrorObjeciones("Falta el archivo de glosas de la entidad.")
     if not archivo_dgh:
         raise ErrorObjeciones(
             "Falta el export de servicios facturados del DGH. Sin él no se puede "
             "saber a qué servicio va cada objeción y el archivo saldría sin códigos."
         )
-    for datos, cual in ((archivo_entidad, "de la entidad"), (archivo_dgh, "del DGH")):
+    for datos, cual in [(a, "de la entidad") for a in archivos] + [(archivo_dgh, "del DGH")]:
         if len(datos) > MAX_BYTES:
             raise ErrorObjeciones(f"El archivo {cual} pesa más de {MAX_BYTES // (1024 * 1024)} MB.")
 
-    entidad = entidad_por_id(entidad_id) if entidad_id else detectar_entidad(archivo_entidad)
+    entidad = entidad_por_id(entidad_id) if entidad_id else detectar_entidad(archivos[0])
     momento = _fecha(fecha)
     cruce = _cargar("_cruce_dgh")
     bot = _cargar(entidad.modulo)
@@ -395,11 +485,16 @@ def procesar(
     with tempfile.TemporaryDirectory(prefix="objeciones-") as carpeta:
         base = Path(carpeta)
         ruta_dgh = base / "servicios_dgh.xlsx"
-        ruta_entidad = base / "glosas_entidad.xlsx"
         salida_obj = base / "objeciones.xlsx"
         salida_cruce = base / "cruce.xlsx"
         ruta_dgh.write_bytes(archivo_dgh)
-        ruta_entidad.write_bytes(archivo_entidad)
+        rutas_entidad = []
+        for n, datos in enumerate(archivos, start=1):
+            # El nombre importa: el bot de EMSSANAR saca la factura del PDF,
+            # pero si el encabezado no la trae cae al nombre del archivo.
+            ruta = base / f"glosas_{n:03d}{'.pdf' if es_pdf(datos) else '.xlsx'}"
+            ruta.write_bytes(datos)
+            rutas_entidad.append(ruta)
 
         try:
             servicios = cruce.leer_servicios_dgh(ruta_dgh, avisar=avisos.append)
@@ -408,7 +503,7 @@ def procesar(
 
         trazas: list[dict] = []
         try:
-            filas = _ARMADORES[entidad.id](bot, ruta_entidad, momento, servicios, trazas)
+            filas = _ARMADORES[entidad.id](bot, rutas_entidad, momento, servicios, trazas)
         except ValueError as exc:
             raise ErrorObjeciones(str(exc)) from exc
         if not filas:
@@ -465,6 +560,8 @@ def _escribir_objeciones(bot, entidad_id: str, filas: list[dict], salida: Path) 
         bot.escribir_objeciones(filas, salida)
     elif entidad_id == "vco":
         bot.escribir_cargue([[f[c] for c in bot.COLUMNAS_CARGUE] for f in filas], salida)
+    elif entidad_id == "emssanar":
+        bot.escribir_excel(filas, salida)
     else:
         bot.escribir_consolidado(filas, salida)
 
