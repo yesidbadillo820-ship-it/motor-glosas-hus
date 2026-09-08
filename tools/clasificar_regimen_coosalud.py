@@ -84,6 +84,12 @@ RUTAS_RADICACION_DEFECTO: tuple[str, ...] = (
     r"\\Prime\radicacion_2026\5. MAYO 2026 - SOPORTES RADICACION",
     r"\\Prime\radicacion_2026\6. JUNIO 2026 - SOPORTES RADICACION",
     r"\\Prime\radicacion_2026\7. JULIO 2026 - SOPORTES RADICACION",
+    # Radicacion DIGITAL (portal): aqui viven los soportes electronicos por
+    # EPS de los años viejos — Carpeta 2 trae 2024 y 2025 (p.ej.
+    # ...\2025\01. ENERO\COOSALUD\...), y la carpeta del servidor de
+    # radicacion trae RADICACIÓN 2023 / RADICACION 2024.
+    "\\\\Prime\\radicacion_2026\\Radicacion Digital - Carpeta 2\\RADICACION\\RADICACION DIGITAL",
+    "\\\\Prime\\servidor_radicación\\RADICACION DIGITAL",
 )
 
 # Numero de factura dentro de nombres de carpeta/archivo del share de
@@ -542,10 +548,14 @@ def regimen_de_hint(hint: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-# En los PC del hospital la unidad Y: es el mapeo de \\Prime\radicacion_2026
-# (con credenciales guardadas). Si una ruta UNC no abre, se prueba su
-# equivalente por letra — y al reves — antes de darla por inaccesible.
-_EQUIV_RADICACION: tuple[tuple[str, str], ...] = (("\\\\prime\\radicacion_2026", "y:"),)
+# En los PC del hospital las unidades Y: (\\Prime\radicacion_2026) y
+# X: (\\Prime\servidor_radicación) son mapeos con credenciales guardadas.
+# Si una ruta UNC no abre, se prueba su equivalente por letra — y al
+# reves — antes de darla por inaccesible.
+_EQUIV_RADICACION: tuple[tuple[str, str], ...] = (
+    (r"\\Prime\radicacion_2026", "Y:"),
+    ("\\\\Prime\\servidor_radicación", "X:"),
+)
 
 
 def _canon_raiz(ruta: str) -> str:
@@ -553,13 +563,13 @@ def _canon_raiz(ruta: str) -> str:
     (Y:\\3. MARZO... y \\\\Prime\\radicacion_2026\\3. MARZO... son la misma)."""
     low = str(ruta).lower().rstrip("\\/")
     for unc, letra in _EQUIV_RADICACION:
-        if low.startswith(unc):
-            low = letra + low[len(unc) :]
+        if low.startswith(unc.lower()):
+            low = letra.lower() + low[len(unc) :]
     return low
 
 
 def resolver_raices(rutas: list[str]) -> list[Path]:
-    """Devuelve las raices ACCESIBLES, sin duplicados (Y: ≡ \\\\Prime\\...).
+    """Devuelve las raices ACCESIBLES, sin duplicados (Y:/X: ≡ \\\\Prime\\...).
 
     Para cada ruta prueba la escrita y su equivalente mapeada; avisa las que
     no abren por ninguna de las dos."""
@@ -573,10 +583,10 @@ def resolver_raices(rutas: list[str]) -> list[Path]:
         candidatas = [str(original)]
         low = str(original).lower()
         for unc, letra in _EQUIV_RADICACION:
-            if low.startswith(unc):
-                candidatas.append("Y:" + str(original)[len(unc) :])
-            elif low.startswith(letra):
-                candidatas.append("\\\\Prime\\radicacion_2026" + str(original)[len(letra) :])
+            if low.startswith(unc.lower()):
+                candidatas.append(letra + str(original)[len(unc) :])
+            elif low.startswith(letra.lower()):
+                candidatas.append(unc + str(original)[len(letra) :])
         elegida: Path | None = None
         for cand in candidatas:
             p = Path(cand)

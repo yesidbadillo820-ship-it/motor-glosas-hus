@@ -110,6 +110,18 @@ factura, y el log dice cuántas aportó cada una. Con 5 pruebas nuevas.
 viejos, bajar el ZIP del portal para las 45 vigentes y correr el trámite
 completo.
 
+**Cacería de los 159 soportes faltantes (con el auditor, misma tarde):** la
+corrida con el bot corregido dejó 19 alertas reales (antes 200 falsas) y 197
+de 356 con soportes. Explorando los servidores con comandos guiados se
+descubrió el porqué: el lote trae 164 facturas de ene–ago 2025 y 3 de 2024,
+y esas épocas no estaban en ninguna de las 11 rutas — los soportes viejos
+viven en **RADICACION DIGITAL** (la radicación electrónica por EPS:
+`...\Radicacion Digital - Carpeta 2\RADICACION\RADICACION DIGITAL\2025\01. ENERO\COOSALUD\...`
+y `X:\RADICACION DIGITAL` con 2023/2024). Se agregaron esas dos rutas a la
+lista fija del bot y la equivalencia X: ≡ \\Prime\servidor_radicación
+(además de la Y: que ya existía). Queda listo el script final para la corrida
+unificada de las 356.
+
 ### 08-09-2026 — FAMISANAR 4 de septiembre (lote chico) y las reglas ya se verifican solas
 
 **El lote.** 65 objeciones de 4 facturas por **$7.219.290**, contra 122
