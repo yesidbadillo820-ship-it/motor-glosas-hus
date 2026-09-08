@@ -33,6 +33,14 @@ USO (sin argumentos pregunta todo; acepta rutas arrastradas):
         --carpeta "D:\\USUARIO CARTERA\\Desktop\\CARGUE MASIVO COOSALUD" ^
         --fecha-cargue 14/07/2026
 
+    Las fechas de radicacion pueden venir de VARIAS fuentes a la vez (gana la
+    primera que traiga cada factura) — util cuando la recepcion de DGH mezcla
+    facturas de varios cargues viejos cuyas cabeceras estan repartidas:
+        --carpeta se puede repetir (varios "CARGUE MASIVO ...")
+        --radicaciones acepta un CONSOLIDADO FACTURAS.xlsx, un CONSOLIDADO
+          RESPUESTAS (hoja con FACTURA y FECHA RADICACION), cabeceras sueltas
+          o una carpeta con esos xlsx (tambien repetible)
+
 Requiere consolidar_coosalud.py en la misma carpeta (comparten textos y motor
 de días hábiles).
 """
@@ -114,17 +122,90 @@ def cargar_radicaciones(carpeta: Path) -> dict[str, object]:
     return radicacion
 
 
+def _hdr_squash(valor: object) -> str:
+    """'fecha_radicacion' / 'FECHA RADICACION ' / 'FechaRadicacion' -> 'FECHARADICACION'."""
+    import re as _re
+
+    return _re.sub(r"[^A-Z]", "", str(valor or "").upper())
+
+
+def leer_radicaciones_archivo(ruta: Path) -> dict[str, object]:
+    """factura_norm -> fecha_radicacion desde CUALQUIER xlsx que traiga las dos
+    columnas: cabecera del portal (numero_factura/fecha_radicacion), CONSOLIDADO
+    FACTURAS.xlsx, o la hoja BASE/FACTURAS de un CONSOLIDADO RESPUESTAS (FACTURA
+    + FECHA RADICACION). Las columnas se ubican por el texto del encabezado."""
+    out: dict[str, object] = {}
+    try:
+        wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+    except Exception:
+        return out
+    try:
+        for ws in wb.worksheets:
+            filas = ws.iter_rows(values_only=True)
+            hdr = next(filas, None)
+            if not hdr:
+                continue
+            hs = [_hdr_squash(c) for c in hdr]
+            idx_f = next((i for i, h in enumerate(hs) if h in ("NUMEROFACTURA", "FACTURA")), None)
+            idx_r = next((i for i, h in enumerate(hs) if "FECHA" in h and "RADICACION" in h), None)
+            if idx_f is None or idx_r is None:
+                continue
+            for r in filas:
+                if idx_f >= len(r) or idx_r >= len(r):
+                    continue
+                f = norm_factura(r[idx_f])
+                fec = a_fecha(r[idx_r])
+                if f and fec and f not in out:
+                    out[f] = fec
+            if out:
+                break  # con la primera hoja util alcanza
+    finally:
+        wb.close()
+    return out
+
+
+def cargar_radicaciones_fuentes(carpetas: list[Path], extras: list[Path]) -> dict[str, object]:
+    """Une radicaciones de VARIAS fuentes (gana la primera que traiga la factura):
+    - carpetas de cargue masivo (con subcarpeta FACTURAS\\ de cabeceras),
+    - archivos o carpetas extra (--radicaciones): consolidados o cabeceras sueltas."""
+    radicacion: dict[str, object] = {}
+    for c in carpetas:
+        try:
+            parte = cargar_radicaciones(c)
+        except ValueError as exc:
+            print(f"  OJO: {exc}")
+            continue
+        nuevas = sum(1 for k in parte if k not in radicacion)
+        for k, v in parte.items():
+            radicacion.setdefault(k, v)
+        print(f"  {c}: {len(parte)} facturas ({nuevas} nuevas)")
+    for x in extras:
+        if x.is_file():
+            archivos = [x]
+        elif x.is_dir():
+            archivos = sorted(p for p in x.rglob("*.xlsx") if not p.name.startswith(("~$", ".")))
+        else:
+            print(f"  OJO: no existe la fuente de radicaciones: {x}")
+            continue
+        parte = {}
+        for a in archivos:
+            for k, v in leer_radicaciones_archivo(a).items():
+                parte.setdefault(k, v)
+        nuevas = sum(1 for k in parte if k not in radicacion)
+        for k, v in parte.items():
+            radicacion.setdefault(k, v)
+        print(f"  {x}: {len(parte)} facturas ({nuevas} nuevas)")
+    return radicacion
+
+
 def procesar(
     plantilla: Path,
-    carpeta: Path,
+    radicacion: dict[str, object],
     fecha_cargue,
     salida: Path | None,
     max_facturas: int = 499,
     omitir: set[str] | None = None,
 ) -> int:
-    print(f"\nLeyendo radicaciones del masivo: {carpeta} ...")
-    radicacion = cargar_radicaciones(carpeta)
-    print(f"  {len(radicacion)} facturas con fecha de radicación.")
     omitir = omitir or set()
 
     print(f"Leyendo el export de trámites: {plantilla.name} ...")
@@ -316,7 +397,21 @@ def main(argv: list[str] | None = None) -> int:
         description="Llena el export de trámites de DGH con la respuesta de cada glosa."
     )
     p.add_argument("--plantilla", default=None, help="Export de DGH (PARA CARGUE DE TRAMITES...).")
-    p.add_argument("--carpeta", default=None, help='Carpeta "CARGUE MASIVO COOSALUD" del masivo.')
+    p.add_argument(
+        "--carpeta",
+        action="append",
+        default=None,
+        help='Carpeta "CARGUE MASIVO COOSALUD" con cabeceras (repetible: varios cargues).',
+    )
+    p.add_argument(
+        "--radicaciones",
+        action="append",
+        default=None,
+        metavar="XLSX_O_CARPETA",
+        help="Fuente EXTRA de fechas de radicación (repetible): CONSOLIDADO "
+        "FACTURAS.xlsx, un CONSOLIDADO RESPUESTAS (hoja con FACTURA y FECHA "
+        "RADICACION), cabeceras sueltas, o una carpeta con esos xlsx.",
+    )
     p.add_argument("--fecha-cargue", default=None, help="Fecha del cargue DD/MM/AAAA (def: hoy).")
     p.add_argument(
         "--salida", default=None, help="Ruta del archivo final (def: MASIVO COOSALUD <fecha>.xlsx)."
@@ -348,16 +443,23 @@ def main(argv: list[str] | None = None) -> int:
     if not plantilla or not plantilla.is_file():
         print("  Sin el export de DGH no puedo continuar.")
         return 1
-    carpeta = (
-        Path(args.carpeta)
-        if args.carpeta
-        else preguntar_archivo(
+    if args.carpeta:
+        carpetas = [Path(c) for c in args.carpeta]
+    elif args.radicaciones:
+        carpetas = []  # con fuentes extra alcanza; la carpeta del masivo es opcional
+    else:
+        c = preguntar_archivo(
             'PASO B: la carpeta "CARGUE MASIVO COOSALUD" del masivo', "CARGUE MASIVO*"
         )
-    )
-    if not carpeta or not carpeta.is_dir():
-        print("  Sin la carpeta del masivo no puedo continuar.")
+        carpetas = [c] if c else []
+    for c in carpetas:
+        if not c.is_dir():
+            print(f"  ERROR: no es una carpeta: {c}")
+            return 1
+    if not carpetas and not args.radicaciones:
+        print("  Sin la carpeta del masivo (o --radicaciones) no puedo continuar.")
         return 1
+    extras = [Path(x) for x in (args.radicaciones or [])]
     if args.fecha_cargue:
         try:
             fecha_cargue = datetime.strptime(args.fecha_cargue, "%d/%m/%Y").date()
@@ -383,9 +485,15 @@ def main(argv: list[str] | None = None) -> int:
             with p_omit.open(encoding="utf-8", errors="replace") as fh:
                 omitir = {norm_factura(lin) for lin in fh if lin.strip()}
             print(f"  Se omitirán {len(omitir)} facturas ya subidas a DGH ({p_omit.name}).")
+        print("\nLeyendo fechas de radicación:")
+        radicacion = cargar_radicaciones_fuentes(carpetas, extras)
+        print(f"  TOTAL: {len(radicacion)} facturas con fecha de radicación.")
+        if not radicacion:
+            print("  Sin radicaciones no se puede calcular la extemporaneidad.")
+            return 1
         return procesar(
             plantilla,
-            carpeta,
+            radicacion,
             fecha_cargue,
             Path(args.salida) if args.salida else None,
             max_facturas=max(1, args.max_facturas_lote),
