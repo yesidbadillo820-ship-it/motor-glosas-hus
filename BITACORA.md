@@ -91,6 +91,33 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (tarde) — La rama del hospital quedó blindada
+
+Ya está puesta la protección de `motor-glosas`, la rama de la que el PC de
+cartera baja el código cada 5 minutos. **Ya no se puede fusionar nada sin que
+los cuatro chequeos terminen bien**: formato, pruebas, escaneo de seguridad y
+la casilla que exige los tres. Tampoco se puede empujar directo sin pull
+request, ni borrar la rama, ni reescribir su historia.
+
+**Ojo con esto si algún día hay que rehacerlo:** al importar el archivo de
+reglas, GitHub **NO trajo la lista de chequeos exigidos** — quedó vacía. Hubo
+que agregar los cuatro a mano, buscándolos por su nombre exacto:
+
+```
+Lint (ruff)
+Tests (pytest)
+Security scan (pip-audit)
+CI OK
+```
+
+Sin ese paso la regla queda puesta pero no exige nada, que es peor que no
+tenerla: uno cree que está protegido y no lo está. La forma de comprobarlo en
+diez segundos: en la siguiente pull request, el botón verde de fusionar tiene
+que salir **gris** hasta que los cuatro terminen.
+
+---
+
+
 ### 08-09-2026 — Cuatro cosas que estaban flojas por debajo
 
 **1. Las doce pruebas que «siempre fallaban» sí eran un problema.**
@@ -11342,11 +11369,6 @@ valor leido del PDF o con el objetado.
 ## 3) PENDIENTE
 
 ### Lo que quedó de la revisión del 08-09
-- **APLICAR LA PROTECCIÓN DE LA RAMA — es un clic suyo.** Está todo listo en
-  `.github/rulesets/`; hay que importarlo en
-  Settings → Rules del repositorio. Claude no puede: cambiar la
-  configuración del repositorio necesita permisos de dueño. Mientras no se
-  haga, `motor-glosas` se sigue pudiendo fusionar con el CI en rojo.
 - **Las 22 vulnerabilidades de las librerías.** Están anotadas en
   `seguridad/vulnerabilidades_conocidas.txt`. Ninguna se ha mirado una por
   una todavía: son la foto de lo que el `|| true` venía tapando. Subir de
@@ -12262,13 +12284,6 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
   son para que el área los mire, no se unieron por parecido.
 
 ## 4) PARA MAÑANA
-
-**Lo primero, y son dos minutos: aplicar la protección de la rama.** Abrir
-Settings → Rules del repositorio, importar
-`.github/rulesets/motor-glosas-protegida.json` y darle Create. Con eso
-`motor-glosas` deja de aceptar fusiones con el CI en rojo o todavía
-corriendo. El paso a paso y la tabla de qué queda exigido están en
-`.github/rulesets/README.md`. Ese clic no lo puede dar Claude.
 
 
 **Mesa de conciliación — probarla de verdad.** Abrir una mesa con una lista de
