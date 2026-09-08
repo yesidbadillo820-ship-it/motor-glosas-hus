@@ -91,6 +91,58 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (tarde, 3) — Las cuentas del ADRES ya avisan cuándo se están venciendo
+
+**Lo que pidió Yesid.** Que el sistema mire, para las facturas que van al
+ADRES, la fecha de ingreso y de egreso del paciente; que las lea del archivo
+RIPS que está en el servidor de facturación electrónica; que las compare con
+las de la factura y avise si no cuadran; y que cuente los **18 meses** desde
+el egreso para marcar la cuenta si ya se pasó del plazo.
+
+**Lo que quedó listo (primera parte).** Cuatro piezas, todas con prueba:
+
+- **El calendario colombiano ya se calcula solo.** Los festivos venían
+  escritos a mano en una lista. Ahora salen de la fórmula (la ley que corre
+  los festivos al lunes, más la Semana Santa) y sirven para cualquier año.
+- **La cuenta de los 18 meses**, con la parte fina que es donde se equivocan
+  las cuentas hechas a mano: un egreso del **31 de agosto** vence el **28 de
+  febrero**, no el 3 de marzo.
+- **La lectura del RIPS**: abre el `Rips_HUSxxxx.json` y saca ingreso y
+  egreso. Si el archivo no está, llegó a medias o no trae egreso, **dice el
+  motivo y no inventa la fecha**.
+- **El cotejo**: marca como error grave un egreso anterior al ingreso, una
+  factura hecha antes de que el paciente saliera, o un egreso posterior al
+  día en que Facturación entregó la cuenta. Y cuando no hay con qué
+  comparar, lo dice — no da por bueno lo que nadie revisó.
+
+**Un problema que apareció de paso.** Los festivos de **2027 y 2028** que
+tenía el motor escritos a mano **están equivocados**: los que se corren al
+lunes quedaron en el lunes *anterior* en vez del *siguiente* (el Día de la
+Raza de 2027 quedó el 11 de octubre y va el 18), y la Semana Santa de 2027
+está una semana adelante. Eso afecta los conteos de días hábiles del motor
+de glosas. **No se tocó la lista vieja** para no meter el motor de glosas en
+un cambio de pre-auditoría: queda anotado para decidirlo aparte.
+
+**Dos cosas que quedaron dichas, no supuestas.**
+
+1. Un plazo de **meses** se cuenta por calendario: los festivos **no mueven**
+   la fecha de corte de los 18 meses. Donde sí sirven es para decir cuál es
+   el **último día en que de verdad se puede radicar** (si el corte cae
+   domingo o festivo) y cuántos **días hábiles** quedan.
+2. El término de 18 meses **no aparece en el corpus de normas del sistema**,
+   así que la alerta **no cita ningún artículo**: el plazo quedó como un
+   parámetro del hospital. El sistema cuenta; la norma la escribe el gestor.
+
+**Lo que falta.** Enganchar la marca en la pantalla de pre-auditoría. Para
+eso hacen falta dos datos que solo se ven desde el hospital: cómo está
+organizada la carpeta compartida de facturación electrónica (para eso quedó
+el ayudante `tools\EXPLORAR_RIPS_ADRES.ps1`, de solo lectura, que no muestra
+datos del paciente), y **de dónde salen hoy las fechas de ingreso y egreso
+declaradas** — porque el sistema no las guarda en ninguna tabla: ni el
+oficio ni el Excel de Radicación las traen.
+
+---
+
 ### 08-09-2026 (tarde, 2) — La excepción de las 3 devoluciones también abre el cuarto oficio del envío
 
 **Lo que mostró Yesid.** Con la excepción ya autorizada para la HUS315614
