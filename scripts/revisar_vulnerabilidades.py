@@ -47,8 +47,16 @@ def conocidas() -> set[str]:
     return ids
 
 
-def encontradas(requisitos: str) -> list[tuple[str, str, str]]:
-    """(paquete, versión, id) de todo lo que reporta pip-audit."""
+def encontradas(requisitos: str) -> list[tuple[str, str, str, set[str]]]:
+    """(paquete, versión, id, todos-sus-identificadores) de lo que reporta pip-audit.
+
+    La misma vulnerabilidad tiene varios nombres: `PYSEC-2026-1471`,
+    `CVE-2025-27516` y `GHSA-cpwx-vrp4-4pq7` son la misma. Cuál sale como
+    principal depende de la versión de pip-audit y de la base de datos que
+    consulte. Si solo se comparara el principal, una actualización de la
+    herramienta pondría el CI en rojo con vulnerabilidades que ya estaban
+    anotadas — y un gate que se pone rojo solo se acaba ignorando.
+    """
     proc = subprocess.run(
         ["pip-audit", "-r", requisitos, "-f", "json"],
         capture_output=True,
@@ -71,7 +79,10 @@ def encontradas(requisitos: str) -> list[tuple[str, str, str]]:
     fuera = []
     for dep in deps:
         for vuln in dep.get("vulns", []) or []:
-            fuera.append((dep.get("name", "?"), dep.get("version", "?"), vuln.get("id", "?")))
+            ident = vuln.get("id", "?")
+            nombres = {ident.upper()}
+            nombres.update(str(a).upper() for a in (vuln.get("aliases") or []))
+            fuera.append((dep.get("name", "?"), dep.get("version", "?"), ident, nombres))
     return fuera
 
 
@@ -80,8 +91,12 @@ def main(argv: list[str]) -> int:
     ya_sabidas = conocidas()
     todas = encontradas(requisitos)
 
-    nuevas = sorted({(p, v, i) for p, v, i in todas if i.upper() not in ya_sabidas})
-    vigentes = {i.upper() for _, _, i in todas}
+    # Una vulnerabilidad es «conocida» si CUALQUIERA de sus nombres está en
+    # la lista: así da igual con cuál la reporte la herramienta.
+    nuevas = sorted({(p, v, i) for p, v, i, nombres in todas if not (nombres & ya_sabidas)})
+    vigentes = set()
+    for _, _, _, nombres in todas:
+        vigentes |= nombres
 
     print(f"Vulnerabilidades encontradas: {len(todas)}")
     print(f"Ya revisadas y anotadas:      {len(ya_sabidas)}")
