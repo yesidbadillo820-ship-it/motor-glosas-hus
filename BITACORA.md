@@ -91,6 +91,58 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde) — Por qué SURA, SALUD TOTAL, EMSSANAR, SAVIA y MUTUAL SER siempre salían como «OTRA»
+
+**Lo que preguntó Yesid.** Por qué hay EPS que glosan pero no tienen
+contrato, y por qué todos sus dictámenes salen genéricos con la entidad en
+«OTRA / SIN DEFINIR».
+
+**Ya se sabía la causa (quedó anotada ayer)**, hoy se corrigió. El
+desplegable «EPS / Entidad Pagadora» del botón Analizar se llenaba
+**solamente** con las entidades que tienen un contrato cargado en la
+pantalla Contratos. SURA, SALUD TOTAL, EMSSANAR, SAVIA y MUTUAL SER son
+entidades reales —cada una tiene su propio bot de portal y su propia lógica
+en el motor desde hace meses— pero como nadie les había subido un PDF de
+contrato, **nunca aparecían como opción**. El auditor solo podía elegir
+«OTRA / SIN DEFINIR», y a partir de ahí el motor hacía lo correcto —no podía
+inventar un contrato que no tenía— pero el dictamen salía sin el nombre de
+la entidad y con el aviso de «no se identificó quién es».
+
+**Cómo queda.** El desplegable ahora junta tres listas: las entidades con
+contrato, las que ya aparecen en el historial aunque no lo tengan, y una
+lista fija de entidades reales conocidas (para las que, como estas cinco,
+**nunca** habían podido quedar guardadas con su nombre real — no podían
+aparecer solas). El resto del motor no cambió: cuando la entidad no tiene
+contrato, el dictamen sigue diciendo «SIN CONTRATO PACTADO, tarifa SOAT
+plena» — eso ya estaba bien resuelto —, pero ahora **con el nombre real de
+la entidad**, no con el marcador de la pantalla.
+
+**Lo que esto NO arregla, y hay que decirlo:** subir el contrato de estas
+cinco entidades sigue pendiente si se quiere que el motor cite tarifa
+pactada y cláusulas literales. Lo de hoy es que dejen de estar invisibles;
+la calidad del dictamen para ellas sigue limitada mientras no tengan
+contrato cargado, igual que cualquier otra EPS sin contrato.
+
+39 pruebas nuevas y comprobación en navegador: las cinco aparecen en el
+desplegable con la base vacía.
+
+### 09-09-2026 (tarde) — Diagnóstico de fondo: por qué la confianza no sube de ~40%
+
+Yesid pidió la realidad completa, no otra ronda de parches. Se armó
+`scripts/diagnostico_calidad_ia.py`: un reporte que se corre EN EL SERVIDOR
+del hospital (acá no se puede ver esa base) y contesta con números reales
+—no supuestos— cuatro preguntas: qué tan generalizada está la EPS
+«OTRA», si el catálogo de tarifas pactadas por CUPS tiene algo cargado, qué
+tan al día está el veredicto final de la EPS en las glosas viejas, y el
+promedio de confianza real por modelo de IA.
+
+Se detallan las cuatro causas de fondo encontradas revisando el código (con
+evidencia, no opinión) en la respuesta larga de ese chat — quedan resumidas
+en PENDIENTE.
+
+---
+
+
 ### 09-09-2026 — «Credenciales inválidas o token expirado»: ahora dice qué pasó
 
 **Lo que vio el auditor.** Abrió el motor a las 8:15 de la mañana, en la
@@ -12151,6 +12203,58 @@ valor leido del PDF o con el objetado.
 
 ## 3) PENDIENTE
 
+### Diagnóstico de fondo del 09-09 — las cuatro causas reales de la confianza baja
+Encontradas revisando el código con evidencia (no son opiniones). Ordenadas
+de la que más cuesta a la que menos:
+
+1. **El modelo que redacta casi todo es un modelo abierto pequeño/mediano
+   (Groq), no Claude.** Decisión de junio-2026 para no gastar tokens pagos:
+   `primary_ai = "groq"`, y Claude/Anthropic solo entra si Groq **falla
+   técnicamente** (error, límite de tasa) — nunca por calidad. Esto explica
+   frases rotas, contradicciones y argumentos flojos. **Decisión pendiente
+   del auditor** (tiene costo): correr un experimento cabeza a cabeza esta
+   semana con `scripts/diagnostico_calidad_ia.py` (sección 6) para ver la
+   diferencia real de confianza por modelo, con datos propios.
+2. **La tabla de tarifas pactadas por CUPS (`tarifas_contratadas`) estaba
+   vacía** (medido 13-ago-2026: 0 filas). Para una glosa de TARIFAS —la más
+   simple, comparar cifra contra cifra— el motor no tiene con qué comparar
+   por ítem exacto. La pantalla **Tarifas** ya acepta cargar esto por Excel
+   (incluido el formato de 3 hojas de FAMISANAR); es una tarea de **cargar
+   datos**, no de programar.
+3. **El desplegable de EPS solo listaba entidades con contrato — CORREGIDO
+   HOY** (ver «lo ya hecho», 09-09 tarde). SURA, SALUD TOTAL, EMSSANAR, SAVIA
+   y MUTUAL SER ya se pueden elegir por su nombre real.
+4. **El veredicto final de la EPS (LEVANTADA/RATIFICADA) no se actualiza en
+   todas las glosas viejas.** De ahí se alimentan DOS cosas a la vez: el
+   «precedente interno» del puntaje de confianza, Y el banco de argumentos
+   ganadores que se le muestra a la IA como ejemplo (`few_shot_gold`). Si
+   esto se queda atrás, las dos cosas se quedan sin combustible aunque el
+   número de glosas siga creciendo. Revisar con
+   `scripts/diagnostico_calidad_ia.py` (sección 5) cuántas glosas de hace
+   semanas ya tienen respuesta de la EPS y siguen sin marcarse.
+
+### Motor de Glosas — lo que destapó la prueba de cinco casos (08-09), lo que falta
+- **Tarifas: trató un medicamento (CUM) como procedimiento (CUPS).** Lo de la
+  contradicción con el contrato ya quedó resuelto (08-09, noche 3); falta esta
+  parte: el acetaminofén tiene CUM, y el escrito habló del «código homologado
+  del CUPS facturado».
+- **Ratificación sin respuesta inicial.** El texto fijo dice «se mantiene la
+  respuesta dada en la glosa inicial» aunque la factura no tenga ninguna
+  respuesta previa registrada. Hay que detectarlo y avisar. Y no mostrar
+  «la IA recomienda» cuando la IA no corrió.
+- **Una corrección automática dejó una frase rota** («…LEY 1438 DE 2011 ART.
+  EL DECRETO 780…») y una nota de corrección con basura. Revisar el corte.
+- **Citas mal usadas pasan el verificador:** el Art. 5 de la Res. 2284/2023
+  salió explicado de dos formas distintas en dos dictámenes. El verificador
+  comprueba que la norma existe, no que diga lo que se le atribuye. Esto es
+  del modelo, no del verificador — se relaciona directo con el punto 1 de
+  arriba.
+- **Indicadores que se contradicen:** «riesgo BAJO» junto a «NO RADICAR»;
+  «DEFENDER 100 %» junto a «riesgo ALTO, preparar conciliación».
+- **Volver a correr el caso 3 (pertinencia) en etapa Inicial:** en
+  Ratificación no usa la IA, así que la prueba de si inventa hallazgos
+  clínicos quedó sin hacer.
+
 ### Objeciones DGH — pantalla (08-09)
 - **Probar la pantalla con un lote real de EMSSANAR** (varios PDF a la vez).
   Se probó con PDF armados a propósito, no con los de ripslink.
@@ -12164,34 +12268,6 @@ valor leido del PDF o con el objetado.
 - **FAMISANAR:** el lector del texto de la glosa entiende «SE OBJETA» y
   «SE RECONOCE», pero no «SE GLOSA». Se propuso agregarlo; **falta que el
   auditor autorice** el cambio.
-
-
-### Motor de Glosas — lo que destapó la prueba de cinco casos (08-09)
-- **Tarifas: trató un medicamento (CUM) como procedimiento (CUPS).** Lo de la
-  contradicción con el contrato ya quedó resuelto (08-09, noche 3); falta esta
-  parte: el acetaminofén tiene CUM, y el escrito habló del «código homologado
-  del CUPS facturado».
-- **Ratificación sin respuesta inicial.** El texto fijo dice «se mantiene la
-  respuesta dada en la glosa inicial» aunque la factura no tenga ninguna
-  respuesta previa registrada. Hay que detectarlo y avisar. Y no mostrar
-  «la IA recomienda» cuando la IA no corrió.
-- **Una corrección automática dejó una frase rota** («…LEY 1438 DE 2011 ART.
-  EL DECRETO 780…») y una nota de corrección con basura. Revisar el corte.
-- **Citas mal usadas pasan el verificador:** el Art. 5 de la Res. 2284/2023
-  salió explicado de dos formas distintas en dos dictámenes. El verificador
-  comprueba que la norma existe, no que diga lo que se le atribuye.
-- **Indicadores que se contradicen:** «riesgo BAJO» junto a «NO RADICAR»;
-  «DEFENDER 100 %» junto a «riesgo ALTO, preparar conciliación».
-- **SURA, SALUD TOTAL y MUTUAL SER no están en la lista de entidades** del
-  botón Analizar. Ya se sabe por qué: el desplegable se llena con las EPS que
-  tienen **contrato cargado** en la pantalla Contratos — es a propósito, sin
-  contrato el motor no puede citar tarifas. Para que aparezcan hay que cargar
-  su contrato ahí. Mientras tanto, si se analiza una glosa de esas EPS con
-  «OTRA / SIN DEFINIR», el dictamen sale sin contrato ni tarifa y con el
-  aviso de entidad sin identificar.
-- **Volver a correr el caso 3 (pertinencia) en etapa Inicial:** en
-  Ratificación no usa la IA, así que la prueba de si inventa hallazgos
-  clínicos quedó sin hacer.
 
 
 ### Lo que quedó de la revisión del 08-09
