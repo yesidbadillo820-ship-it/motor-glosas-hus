@@ -65,7 +65,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "sonidos",
         "Primer contacto",
-        "🔤",
+        "alfabeto",
         Nivel.CERO,
         "Antes de la primera palabra: los sonidos que el español no tiene.",
         (
@@ -119,7 +119,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "saludos",
         "Saludos y presentaciones",
-        "👋",
+        "saludo",
         Nivel.CERO,
         "Lo primero que vas a decir y a oír.",
         (
@@ -177,7 +177,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "pronombres",
         "Personas y el verbo ser",
-        "🧑",
+        "persona",
         Nivel.CERO,
         "Los pronombres y el verbo más usado del idioma.",
         (
@@ -227,7 +227,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "sustantivos",
         "Los sustantivos y sus géneros",
-        "🧩",
+        "pieza",
         Nivel.A1,
         "El artículo pegado al final: lo que más diferencia al noruego del español.",
         (
@@ -277,7 +277,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "numeros",
         "Números y hora",
-        "🔢",
+        "numeros",
         Nivel.A1,
         "Contar, decir la hora y entender precios.",
         (
@@ -323,7 +323,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "familia",
         "Familia y personas",
-        "👨‍👩‍👧",
+        "familia",
         Nivel.A1,
         "Hablar de los tuyos y describir a la gente.",
         (
@@ -370,7 +370,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "verbos",
         "Verbos y el orden de la frase",
-        "⚙️",
+        "engranaje",
         Nivel.A1,
         "El verbo en segundo lugar: la regla que más delata a un extranjero.",
         (
@@ -420,7 +420,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "comida",
         "Comida y restaurante",
-        "🍞",
+        "pan",
         Nivel.A1,
         "Comprar, pedir y hablar de lo que te gusta.",
         (
@@ -468,7 +468,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "casa",
         "La casa",
-        "🏠",
+        "casa",
         Nivel.A2,
         "Tu vivienda, y las preposiciones que más cuestan.",
         (
@@ -517,7 +517,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "ciudad",
         "Ciudad y transporte",
-        "🚌",
+        "bus",
         Nivel.A2,
         "Moverte por la ciudad y viajar.",
         (
@@ -564,7 +564,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "compras",
         "Compras y dinero",
-        "🛒",
+        "carrito",
         Nivel.A2,
         "Precios, pagos y el supermercado.",
         (
@@ -610,7 +610,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "pasado",
         "Hablar del pasado",
-        "⏪",
+        "atras",
         Nivel.A2,
         "Los cuatro grupos de verbos y el perfecto.",
         (
@@ -658,7 +658,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "trabajo",
         "Trabajo",
-        "💼",
+        "maletin",
         Nivel.A2,
         "Buscar empleo y desenvolverte en la oficina.",
         (
@@ -705,7 +705,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "salud",
         "Salud y cuerpo",
-        "🩺",
+        "salud",
         Nivel.A2,
         "Explicar qué te pasa y entender al médico.",
         (
@@ -751,7 +751,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "clima",
         "Clima y naturaleza",
-        "🌦️",
+        "clima",
         Nivel.A2,
         "El tema de conversación favorito de Noruega.",
         (
@@ -788,7 +788,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "opiniones",
         "Opiniones y frases largas",
-        "💬",
+        "charla",
         Nivel.B1,
         "Decir lo que piensas y encadenar ideas.",
         (
@@ -836,7 +836,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "sociedad",
         "Trámites y vida en Noruega",
-        "🏛️",
+        "columnas",
         Nivel.B1,
         "Papeles, oficinas públicas y derechos.",
         (
@@ -883,7 +883,7 @@ MODULOS: tuple[Modulo, ...] = (
     Modulo(
         "avanzado",
         "Noruego profesional",
-        "🎓",
+        "birrete",
         Nivel.B2,
         "Precisión, matiz y lenguaje de trabajo.",
         (
