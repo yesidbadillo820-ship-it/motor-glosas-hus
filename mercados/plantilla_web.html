@@ -25,9 +25,23 @@
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   color-scheme:light;
+  /* PUENTE al sistema de diseño común (ver el bloque del final del CSS).
+     Cada aplicación conserva sus propios nombres de color y solo los
+     traduce aquí; de ahí para abajo, el acabado es el mismo en las tres. */
+  --ds-sup:var(--papel); --ds-linea:var(--linea); --ds-tinta3:var(--tinta3);
+  --ds-acento:var(--acento); --ds-acento-hondo:#1B5AA8;
+  --ds-vidrio:color-mix(in srgb, var(--papel) 80%, transparent);
+  --ds-luz1:color-mix(in srgb, #2a78d6 13%, transparent);
+  --ds-luz2:color-mix(in srgb, #8a6100 9%, transparent);
+  --ds-r2:var(--r); --ds-r3:calc(var(--r) + 6px); --ds-hueco:var(--s6);
+  --ds-e2:0 1px 2px rgba(16,24,32,.06), 0 8px 24px -14px rgba(16,24,32,.28);
+  --ds-e3:0 8px 30px -10px rgba(16,24,32,.32);
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
+  --ds-luz1:color-mix(in srgb, #86b6ef 19%, transparent);
+  --ds-luz2:color-mix(in srgb, #f0b429 13%, transparent);
+
     --fondo:#0f1620; --papel:#161f2b; --papel2:#1e2938;
     --tinta:#eef2f7; --tinta2:#a9b5c4; --tinta3:#7a8797;
     --linea:#26313f; --linea2:#37455a;
@@ -38,6 +52,9 @@
   }
 }
 :root[data-theme="dark"]{
+  --ds-luz1:color-mix(in srgb, #86b6ef 19%, transparent);
+  --ds-luz2:color-mix(in srgb, #f0b429 13%, transparent);
+
   --fondo:#0f1620; --papel:#161f2b; --papel2:#1e2938;
   --tinta:#eef2f7; --tinta2:#a9b5c4; --tinta3:#7a8797;
   --linea:#26313f; --linea2:#37455a;
@@ -189,16 +206,141 @@ svg.grafico{display:block;width:100%;height:auto;touch-action:pan-y}
 
 .vacio{text-align:center;color:var(--tinta2);padding:var(--s6) var(--s4)}
 .vacio .ic{font-size:2rem;display:block;margin-bottom:var(--s2)}
+
+/* ===========================================================================
+   SISTEMA DE DISEÑO COMÚN — una sola fuente de verdad para las tres
+   aplicaciones (ICFES, noruego, velas japonesas).
+   ---------------------------------------------------------------------------
+   Este bloque es IDÉNTICO, carácter por carácter, en las tres plantillas, y
+   hay una prueba que lo comprueba. Antes cada aplicación traía su propio
+   acabado y las tres se veían como tres productos de tres autores distintos.
+
+   Cada aplicación conserva sus nombres de color y solo declara el «puente»
+   (los tokens --ds-*) en su :root, arriba, junto a los demás. De ahí para
+   abajo, todo lo que sigue funciona igual en las tres.
+
+   Lo que NO hace: tocar la rejilla, los estados ni el contraste que cada
+   aplicación ya tenía resueltos. Es una capa, no un reemplazo.
+   =========================================================================== */
+
+/* --- 1. Tipografía: una escala, no tamaños sueltos ------------------------ */
+h1{font-size:clamp(1.6rem, 1.28rem + 1.6vw, 2.1rem); font-weight:800;
+   letter-spacing:-.035em; line-height:1.12; text-wrap:balance}
+h2{font-size:clamp(1.12rem, 1.02rem + .5vw, 1.3rem); font-weight:750;
+   letter-spacing:-.025em; line-height:1.22; text-wrap:balance}
+h3{letter-spacing:-.015em}
+p{text-wrap:pretty}
+/* Las cifras alineadas en columna: sin esto, «11» ocupa menos que «88» y las
+   listas de números quedan temblorosas. */
+.num, .dato b, .kpi b, .v, td, th, time{font-variant-numeric:tabular-nums}
+
+/* --- 2. La luz del fondo -------------------------------------------------- */
+/* Va DETRÁS de todo con z-index:-1. Levantar el contenido con
+   `position:relative` sería un error: le pisaría el `position:fixed` a la
+   barra de abajo y dejaría de quedarse pegada a la pantalla. */
+body::before{
+  content:""; position:fixed; inset:0 0 auto 0; height:48vh; z-index:-1;
+  pointer-events:none;
+  background:
+    radial-gradient(118% 60% at 14% 0%, var(--ds-luz1), transparent 62%),
+    radial-gradient(108% 56% at 88% 3%, var(--ds-luz2), transparent 66%);
+}
+
+/* --- 3. Superficies: tres niveles, no quince ----------------------------- */
+.tarjeta, .mod-cab, .bloque{
+  border-radius:var(--ds-r3);
+  border-color:color-mix(in srgb, var(--ds-linea) 68%, transparent);
+  background:var(--ds-vidrio);
+  backdrop-filter:blur(7px) saturate(1.05);
+  box-shadow:var(--ds-e2);
+}
+.dato, .kpi, .nodo, .op, .logro{border-radius:var(--ds-r2)}
+
+/* --- 4. Interacción: todo lo que se toca responde ------------------------ */
+button, .op, .nodo, [role="button"]{
+  transition:transform .13s cubic-bezier(.2,.8,.3,1),
+             box-shadow .18s ease, background .18s ease, border-color .18s ease;
+}
+button:active:not(:disabled), .op:active:not([disabled]), .nodo:active{transform:scale(.978)}
+@media (hover:hover){
+  .tarjeta:hover{box-shadow:var(--ds-e3)}
+  .op:not([disabled]):hover, .nodo:not(.bloqueada):hover{
+    border-color:color-mix(in srgb, var(--ds-acento) 55%, transparent)}
+}
+/* El anillo de foco: visible siempre, para quien navega con teclado. */
+:focus-visible{outline:3px solid var(--ds-acento); outline-offset:2px; border-radius:4px}
+
+/* --- 5. El botón principal ----------------------------------------------- */
+.pri{
+  background:linear-gradient(177deg, color-mix(in srgb, var(--ds-acento) 88%, #fff), var(--ds-acento));
+  box-shadow:0 3px 0 var(--ds-acento-hondo),
+             0 10px 22px -13px color-mix(in srgb, var(--ds-acento) 92%, transparent);
+  letter-spacing:-.012em;
+}
+.pri:active:not(:disabled){box-shadow:0 1px 0 var(--ds-acento-hondo); transform:translateY(2px) scale(1)}
+
+/* --- 6. Iconos ------------------------------------------------------------ */
+.ic{width:1.25em; height:1.25em; flex:none; display:inline-block; vertical-align:-.22em}
+.ic.g{width:1.55em; height:1.55em} .ic.gg{width:2.2em; height:2.2em}
+.ic.xl{width:3.2em; height:3.2em; stroke-width:1.35}
+
+/* --- 7. Barra de navegación ---------------------------------------------- */
+.nav{background:color-mix(in srgb, var(--ds-sup) 86%, transparent);
+     backdrop-filter:blur(18px) saturate(1.4)}
+.nav button{gap:4px; position:relative}
+.nav button .ic{width:23px; height:23px; transition:transform .18s cubic-bezier(.2,.8,.3,1)}
+.nav button[aria-current="page"] .ic{transform:translateY(-1px)}
+.nav button[aria-current="page"]::before{
+  content:""; position:absolute; top:5px; left:50%; translate:-50% 0;
+  width:42px; height:29px; border-radius:99px;
+  background:color-mix(in srgb, var(--ds-acento) 13%, transparent); z-index:-1}
+
+/* --- 8. Avisos y estados vacíos ------------------------------------------ */
+.aviso{border-radius:var(--ds-r2); align-items:flex-start}
+.aviso > .ic{margin-top:1px; flex:none}
+.vacio{padding-block:var(--ds-hueco)}
+.vacio > .ic{color:var(--ds-tinta3); display:block; margin:0 auto .75rem}
+
+/* --- 9. Movimiento: uno solo, y se apaga si el sistema lo pide ----------- */
+@media (prefers-reduced-motion:no-preference){
+  .entra{animation:ds-entra .34s cubic-bezier(.2,.8,.3,1) both}
+  @keyframes ds-entra{from{opacity:0; transform:translateY(13px) scale(.988)} to{opacity:1; transform:none}}
+  .entra:nth-of-type(2){animation-delay:.045s}
+  .entra:nth-of-type(3){animation-delay:.09s}
+  .entra:nth-of-type(4){animation-delay:.13s}
+}
+@media (prefers-reduced-motion:reduce){
+  *, *::before, *::after{animation-duration:.01ms !important; transition-duration:.01ms !important}
+}
+
+/* --- 10. Impresión: que salga legible en papel --------------------------- */
+@media print{
+  body::before, .nav{display:none}
+  .tarjeta{box-shadow:none; border:1px solid #ccc; break-inside:avoid}
+}
 </style>
 </head>
 <body>
+<!-- Los iconos. Antes eran emoji: se dibujaban distinto en cada aparato, no tomaban el color del texto y no se alineaban con la letra. Van incrustados; la aplicacion sigue sin necesitar internet. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-portapapeles" viewBox="0 0 24 24"><path d="M9 4.6H6.8a2 2 0 0 0-2 2v12.2a2 2 0 0 0 2 2h10.4a2 2 0 0 0 2-2V6.6a2 2 0 0 0-2-2H15"/><rect x="8.8" y="2.8" width="6.4" height="3.6" rx="1.3"/><path d="M8.8 11.4h6.4M8.8 15.2h4.2"/></symbol>
+<symbol id="i-vela" viewBox="0 0 24 24"><rect x="8.4" y="7.2" width="7.2" height="9.6" rx="1.3"/><path d="M12 2.9v4.3M12 16.8v4.3"/></symbol>
+<symbol id="i-regla" viewBox="0 0 24 24"><rect x="2.6" y="8.4" width="18.8" height="7.2" rx="1.8"/><path d="M6.6 8.4v2.8M10.2 8.4v3.9M13.8 8.4v2.8M17.4 8.4v3.9"/></symbol>
+<symbol id="i-tendencia" viewBox="0 0 24 24"><path d="M3.4 19.4h17.2"/><path d="m5.4 15.6 4.2-4.8 3.4 2.8 6.2-6.6"/><path d="M15.4 6.6h4v4"/></symbol>
+<symbol id="i-balanza" viewBox="0 0 24 24"><path d="M12 4.2v15.4M7.6 19.6h8.8M4.4 7.2h15.2"/><path d="M4.4 7.2 1.9 13a2.9 2.9 0 0 0 5 0Z"/><path d="M19.6 7.2 17.1 13a2.9 2.9 0 0 0 5 0Z"/><circle cx="12" cy="4.2" r="1.3"/></symbol>
+<symbol id="i-lupa" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.5 15.5 4 4"/></symbol>
+<symbol id="i-alerta" viewBox="0 0 24 24"><path d="M12 3.6 21.2 19.6H2.8Z"/><path d="M12 9.8v4.2"/><circle cx="12" cy="16.9" r="1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-sin-datos" viewBox="0 0 24 24"><rect x="3.4" y="6.6" width="17.2" height="13.4" rx="2.4"/><path d="M3.4 11.4h17.2"/><path d="m9.6 15.4 4.8 0" stroke-dasharray="1.6 2.4"/><path d="M7.2 3.4 9 6.6M16.8 3.4 15 6.6"/></symbol>
+<symbol id="i-sol" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.6M12 18.8v2.6M4.4 4.4l1.9 1.9M17.7 17.7l1.9 1.9M2.6 12h2.6M18.8 12h2.6M4.4 19.6l1.9-1.9M17.7 6.3l1.9-1.9"/></symbol>
+<symbol id="i-luna" viewBox="0 0 24 24"><path d="M20.4 13.9A8.6 8.6 0 0 1 10.1 3.6a8.6 8.6 0 1 0 10.3 10.3Z"/></symbol>
+</defs></svg>
 
 <header class="barra">
   <div class="quien">
     <b id="titulo">Velas</b>
     <span id="subtitulo">—</span>
   </div>
-  <button class="tema" id="btema" aria-label="Cambiar entre claro y oscuro">◐</button>
+  <button class="tema" id="btema" aria-label="Cambiar entre claro y oscuro"></button>
 </header>
 
 <main id="app" class="envoltorio"></main>
@@ -207,14 +349,28 @@ svg.grafico{display:block;width:100%;height:auto;touch-action:pan-y}
 
 <script>
 "use strict";
+
+/* ---------------------------------------------------------------------------
+   Los iconos. `ic("casa")` devuelve el SVG que apunta al juego incrustado en
+   el <body>. Los atributos de trazo van en el <svg> que hace el <use>, y el
+   contenido del <symbol> los hereda: un solo juego sirve para cualquier color
+   y cualquier tamano. Antes esto eran emoji, que se dibujan distinto en cada
+   aparato, no toman el color del texto y no se alinean con la letra.
+   --------------------------------------------------------------------------- */
+function ic(nombre, clase){
+  return `<svg class="ic${clase ? " " + clase : ""}" aria-hidden="true" focusable="false"`
+    + ` fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"`
+    + ` stroke-linejoin="round"><use href="#i-${nombre}"></use></svg>`;
+}
+
 /* Los datos los calcula Python y los inyecta aquí. La pantalla solo dibuja:
    si el detector estuviera además escrito en JavaScript, tarde o temprano las
    dos versiones dirían cosas distintas y nadie sabría cuál creer. */
 const D = /*<DATOS>*/{"titulo":"—","fuente":{},"horizontes":[1],"casosMinimos":30,"resumen":{"sesiones":0,"apariciones":0},"catalogo":[],"medicion":[],"grafico":[],"graficoDesde":0,"apariciones":[]}/*</DATOS>*/;
 
 const POR_CLAVE = Object.fromEntries(D.catalogo.map(p => [p.clave, p]));
-const VISTAS = [["resumen","📋","Resumen"],["patrones","🕯️","Patrones"],
-                ["medicion","📏","Medición"],["historial","📈","Histórico"]];
+const VISTAS = [["resumen","portapapeles","Resumen"],["patrones","vela","Patrones"],
+                ["medicion","regla","Medición"],["historial","tendencia","Histórico"]];
 
 let vista = "resumen";
 let horizonte = D.horizontes[0];
@@ -258,7 +414,7 @@ function vResumen(){
 
   let h = `
   <div class="aviso">
-    <span aria-hidden="true">⚖️</span>
+    ${ic("balanza")}
     <span><b>Esto mide lo que ya pasó; no predice lo que va a pasar.</b>
     Un porcentaje alto sobre pocos casos no significa nada, y ningún patrón
     por sí solo es una razón para comprar o vender.</span>
@@ -292,7 +448,7 @@ function vResumen(){
       <div class="rot">Lo que dice su histórico</div>
       <div class="cifra">${contradicen.length} de ${concluyentes.length}
         <small>patrones con muestra suficiente que el libro vende como fiables
-        y estos datos NO respaldan, a ${horizonte} sesión(es)</small></div>`;
+        y estos datos NO respaldan, a ${horizonte === 1 ? "la sesión siguiente" : horizonte + " sesiones"}</small></div>`;
     if(contradicen.length){
       h += `<div style="margin-top:var(--s4)">`;
       for(const m of contradicen.slice(0,6)){
@@ -337,7 +493,7 @@ function vPatrones(){
 
   const lista = D.catalogo.filter(p =>
     filtro === "todos" || p.sentimiento === filtro || p.familia === filtro);
-  if(!lista.length) return h + `<div class="vacio"><span class="ic">🔍</span>
+  if(!lista.length) return h + `<div class="vacio">${ic("lupa","xl")}
     Ningún patrón con ese filtro.</div>`;
 
   for(const p of lista){
@@ -356,11 +512,11 @@ function vPatrones(){
         <div class="rot">Significado</div>
         <p class="mini">${esc(p.significado)}</p>`;
     if(p.revisar){
-      h += `<div class="aviso"><span aria-hidden="true">⚠️</span>
+      h += `<div class="aviso">${ic("alerta")}
         <span><b>Para revisar.</b> ${esc(p.revisar)}</span></div>`;
     }
     if(m){
-      h += `<div class="rot">En su histórico, a ${horizonte} sesión(es)</div>
+      h += `<div class="rot">En su histórico, a ${horizonte === 1 ? "la sesión siguiente" : horizonte + " sesiones"}</div>
         ${m.medible ? `<div class="medida">
             <div class="arriba"><span class="n num">${pct(m.tasa)}</span>
               <span class="mini tenue num">${m.casos} apariciones</span></div>
@@ -410,7 +566,7 @@ function dibujoPatron(p){
 
 /* ============================================================== LA MEDICIÓN */
 function vMedicion(){
-  let h = `<div class="aviso"><span aria-hidden="true">📏</span>
+  let h = `<div class="aviso">${ic("regla")}
     <span>La <b>base</b> es cuántas veces el precio fue en esa dirección
     <em>en todas las sesiones</em>, patrón o no. Si un patrón no le gana a su
     base, no está diciendo nada: en un mercado que sube, cualquier señal
@@ -427,7 +583,7 @@ function vMedicion(){
     .filter(m => m.sesiones === horizonte && m.medible && m.casos > 0)
     .sort((a,b) => b.casos - a.casos);
 
-  if(!filas.length) return h + `<div class="vacio"><span class="ic">🤷</span>
+  if(!filas.length) return h + `<div class="vacio">${ic("sin-datos","xl")}
     Ningún patrón con dirección apareció en este histórico.</div>`;
 
   h += `<div class="tarjeta">`;
@@ -486,7 +642,7 @@ function barra(m){
 /* ============================================================== EL GRÁFICO */
 function vHistorial(){
   const velas = D.grafico;
-  if(!velas.length) return `<div class="vacio"><span class="ic">📈</span>
+  if(!velas.length) return `<div class="vacio">${ic("tendencia","xl")}
     No hay sesiones para dibujar.</div>`;
 
   let h = `<div class="tarjeta">
@@ -583,9 +739,11 @@ function pintar(){
   document.getElementById("subtitulo").textContent =
     r.sesiones ? `${r.sesiones.toLocaleString("es-CO")} sesiones · ${fecha(r.desde)} → ${fecha(r.hasta)}`
                : "sin datos";
-  document.getElementById("nav").innerHTML = VISTAS.map(([id,ic,t]) =>
+  // Ojo: la variable del icono NO puede llamarse `ic` — taparia a la funcion
+  // ic() que dibuja el SVG, y la barra saldria con el nombre en vez del dibujo.
+  document.getElementById("nav").innerHTML = VISTAS.map(([id,icono,rotulo]) =>
     `<button ${id===vista?'aria-current="page"':""} onclick="ir('${id}')">
-      <span class="ic" aria-hidden="true">${ic}</span>${t}</button>`).join("");
+      ${ic(icono)}<span>${rotulo}</span></button>`).join("");
   const cual = {resumen:vResumen, patrones:vPatrones,
                 medicion:vMedicion, historial:vHistorial}[vista] || vResumen;
   document.getElementById("app").innerHTML = cual();
@@ -601,6 +759,18 @@ function ponerTema(t){
   else document.documentElement.removeAttribute("data-theme");
   try{ t ? localStorage.setItem("velas-tema", t) : localStorage.removeItem("velas-tema"); }
   catch(e){}
+  dibujarBotonTema();
+}
+/* El boton muestra el tema al que se va a cambiar, no el que esta puesto: en
+   claro se ve la luna («pasar a oscuro») y en oscuro el sol. */
+function dibujarBotonTema(){
+  const boton = document.getElementById("btema");
+  if(!boton) return;
+  const elegido = document.documentElement.getAttribute("data-theme");
+  const oscuro = elegido ? elegido === "dark"
+    : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  boton.innerHTML = ic(oscuro ? "sol" : "luna");
+  boton.setAttribute("aria-label", oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro");
 }
 document.getElementById("btema").addEventListener("click", () => {
   const actual = document.documentElement.getAttribute("data-theme");
