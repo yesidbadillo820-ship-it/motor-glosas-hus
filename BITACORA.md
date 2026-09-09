@@ -91,6 +91,41 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde, 10) — El arranque se ahogaba solo y el «pulso» del motor mentía
+
+Segunda tanda de los análisis de código de Yesid. Tres cosas, todas del
+mismo tipo: el motor se comportaba distinto de como decía comportarse.
+
+**1 · El arranque se quedaba mudo hasta medio minuto.** Cuando el motor
+arranca intenta conectarse a la base, y si no puede reintenta cinco veces
+esperando cada vez más (2, 4, 8, 16 segundos). Esa espera estaba hecha con
+una instrucción que **congela el programa entero**: durante esos 30 segundos
+el motor no contestaba absolutamente nada — ni siquiera para decir «estoy
+arrancando». Desde afuera parecía muerto. Ahora espera igual, pero dejando
+respirar al resto.
+
+**2 · El «pulso» del motor decía que estaba sano con la base caída.** Hay
+una dirección que el sistema consulta cada pocos segundos para saber si el
+motor está vivo (`/health`). Contestaba «ok» **sin mirar la base de datos**.
+O sea que con la base caída seguía diciendo que todo bien, y el sistema le
+seguía mandando trabajo a un motor que no podía guardar ni leer una glosa —
+el auditor veía errores sueltos sin entender por qué. Ahora hace la pregunta
+más barata que existe a la base y, si no contesta, avisa que está caído y
+dice cuál de las dos cosas falló.
+
+**3 · Cuatro pantallas quedarían rotas el día que el portal se mude.** La
+lista de permisos del navegador no incluía uno de los tipos de petición que
+el motor usa en cuatro sitios (metadatos de contrato, notas privadas de una
+glosa, filtros guardados y estado de las sugerencias). Hoy no se nota porque
+la pantalla se sirve desde el mismo servidor; el día que salga de otro
+dominio, esos cuatro dejarían de funcionar sin dar explicación. Se agregó, y
+además se dejó una prueba que **compara la lista de permisos contra lo que
+el motor de verdad ofrece**: si mañana alguien agrega una pantalla con un
+tipo nuevo, la prueba avisa sola.
+
+15 pruebas nuevas, 8 fallan sin el arreglo.
+
+
 ### 09-09-2026 (tarde, 8) — Los soportes también se ven al analizar (lo que quedó a medias)
 
 **Yesid preguntó qué había pasado con esto, y tenía razón.** Cuando pidió que
