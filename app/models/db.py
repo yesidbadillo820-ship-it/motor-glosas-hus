@@ -44,6 +44,21 @@ class GlosaRecord(Base):
     modelo_ia = Column(String(100))
     workflow_state = Column(String(50), default="RADICADA")
     score = Column(Float, default=0.0)
+    # 09-09-2026. OJO: `score` de arriba NO es la «Confianza» que el auditor ve
+    # en pantalla. `score` es la fórmula vieja de probabilidad de éxito
+    # (`_calcular_score`: 99 si es extemporánea, 92 ratificación, 90 urgencia,
+    # 75 tarifa, 85 el resto, +5 con PDF). La Confianza es otra cosa: los siete
+    # factores de `confidence_scorer.calcular_confianza` —cláusula, precedente,
+    # soportes, citas, cálculo…— y hasta hoy se calculaba, se mostraba y se
+    # botaba.
+    #
+    # Por eso, con 397 glosas analizadas, la pregunta que el área necesitaba
+    # responder —«¿un modelo de IA da mejor Confianza que otro?»— no se podía
+    # contestar con datos: el número no estaba guardado en ninguna parte. Se
+    # guarda de 0 a 100 (no de 0 a 1) para que se lea igual que en pantalla.
+    confianza_score = Column(Float)
+    # «alto» | «medio» | «bajo» — el nivel que acompaña al número.
+    confianza_nivel = Column(String(10))
     prioridad = Column(String(50), default="NORMAL")
     responsable = Column(String(200))
     fecha_vencimiento = Column(DateTime(timezone=True))

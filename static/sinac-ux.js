@@ -194,11 +194,25 @@
   // ──────────────────────────────────────────────────────────────────
   function installShortcuts() {
     document.addEventListener('keydown', (e) => {
+      // 09-09-2026. `e.key` puede llegar VACÍO, y entonces `.toLowerCase()`
+      // reventaba con «Cannot read properties of undefined». Salía de verdad
+      // en la consola del auditor, dos veces seguidas al entrar al portal: lo
+      // dispara el gestor de contraseñas del navegador, que al autocompletar
+      // usuario y clave lanza eventos de tecla sin la tecla. También pasa con
+      // los teclados que componen caracteres (acentos, emoji).
+      //
+      // El error no tumbaba la pantalla, pero apagaba TODOS los atajos en ese
+      // evento y dejaba dos errores rojos en la consola — que es justo donde
+      // uno mira cuando algo va mal, y ahí estorban para encontrar lo de
+      // verdad.
+      const tecla = typeof e.key === 'string' ? e.key.toLowerCase() : '';
+      if (!tecla) return;
+
       // No capturar si el usuario está escribiendo en un input/textarea
       const enInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
 
       // ⌘K / Ctrl+K — Command Palette
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      if ((e.metaKey || e.ctrlKey) && tecla === 'k') {
         e.preventDefault();
         paletteState.open ? cerrarPalette() : abrirPalette();
         return;
@@ -213,7 +227,7 @@
       // Si está en input, no procesar atajos de una sola letra
       if (enInput) return;
 
-      switch (e.key.toLowerCase()) {
+      switch (tecla) {
         case '?':
           e.preventDefault();
           mostrarAtajos();

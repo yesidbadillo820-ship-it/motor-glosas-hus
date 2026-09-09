@@ -105,7 +105,17 @@ def diagnostico_calidad(
         ),
     }
 
-    # ── Confianza por modelo: la comparación que decide el cambio ───────
+    # ── LA COMPARACIÓN QUE DECIDE EL CAMBIO DE MODELO ───────────────────
+    # 09-09-2026, corrección. Esto devolvía el promedio de `GlosaRecord.score`
+    # con el rótulo «confianza_promedio», y NO es la Confianza: `score` es la
+    # fórmula vieja de probabilidad de éxito (99 extemporánea / 92 ratificación
+    # / 90 urgencia / 75 tarifa / 85 el resto, +5 con PDF). Daba 77% de
+    # promedio mientras el auditor veía 51% en pantalla, y con eso se habría
+    # concluido «el modelo está bien» sobre un número que no medía el modelo.
+    #
+    # Las dos van, cada una con su nombre. La Confianza empieza a guardarse
+    # HOY: las glosas anteriores la tienen en NULL —de ellas no se guardó— y
+    # eso se dice en vez de disimularlo con un cero.
     por_modelo = (
         db.query(
             GlosaRecord.modelo_ia,
@@ -116,17 +126,53 @@ def diagnostico_calidad(
         .group_by(GlosaRecord.modelo_ia)
         .all()
     )
-    out["confianza_por_modelo"] = sorted(
+    out["probabilidad_exito_por_modelo"] = sorted(
         (
-            {
-                "modelo": m or "sin registrar",
-                "glosas": n,
-                "confianza_promedio": round(avg or 0, 1),
-            }
+            {"modelo": m or "sin registrar", "glosas": n, "promedio": round(avg or 0, 1)}
             for m, n, avg in por_modelo
         ),
         key=lambda x: -x["glosas"],
     )
+
+    conf_por_modelo = (
+        db.query(
+            GlosaRecord.modelo_ia,
+            func.count(GlosaRecord.id),
+            func.avg(GlosaRecord.confianza_score),
+            func.min(GlosaRecord.confianza_score),
+            func.max(GlosaRecord.confianza_score),
+        )
+        .filter(GlosaRecord.confianza_score.isnot(None))
+        .group_by(GlosaRecord.modelo_ia)
+        .all()
+    )
+    con_confianza = db.query(GlosaRecord).filter(GlosaRecord.confianza_score.isnot(None)).count()
+    out["confianza_por_modelo"] = {
+        "glosas_con_confianza_guardada": con_confianza,
+        "de_un_total_de": total,
+        "detalle": sorted(
+            (
+                {
+                    "modelo": m or "sin registrar",
+                    "glosas": n,
+                    "confianza_promedio": round(avg or 0, 1),
+                    "peor": round(mn or 0, 1),
+                    "mejor": round(mx or 0, 1),
+                }
+                for m, n, avg, mn, mx in conf_por_modelo
+            ),
+            key=lambda x: -x["glosas"],
+        ),
+        "diagnostico": (
+            "Todavía no hay ninguna glosa con la Confianza guardada. Se empezó "
+            "a guardar el 09-09-2026; las anteriores no la tienen y no se puede "
+            "reconstruir hacia atrás. Con unas cuantas glosas nuevas ya se puede "
+            "comparar un modelo contra otro."
+            if con_confianza == 0
+            else "Esta es la comparación buena: la misma Confianza que sale en "
+            "pantalla al pie de cada dictamen."
+        ),
+    }
 
     # ── Costo real por proveedor: ya está calculado, solo se lee ────────
     por_proveedor = (

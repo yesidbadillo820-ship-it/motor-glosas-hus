@@ -91,6 +91,71 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde, 4) — Los números REALES, y dos sorpresas (una es un error mío)
+
+Yesid abrió el botón nuevo y por fin salieron los datos de verdad del
+hospital. **Dos de las cuatro causas que yo había señalado eran falsas**, y
+apareció una que no esperaba. Queda escrito para que nadie vuelva a
+suponerlo:
+
+| Lo que yo dije | Lo que dice la base |
+|---|---|
+| «La tabla de tarifas está vacía» | **Falso.** Tiene **19.051 filas**. Alguien las cargó después del 13-ago. |
+| «Muchas EPS quedan como OTRA» | **Falso.** Solo el **4,3%**. FAMISANAR es el 89% del volumen (353 de 397) y está bien identificada. |
+| «Falta registrar el veredicto de la EPS» | **Cierto, y peor: es CERO.** 0 de 397. |
+| «El modelo de IA se queda corto» | **No se puede saber todavía** — ver abajo. |
+
+**LA SORPRESA MALA, Y ES UN ERROR MÍO.** El panel decía «Confianza promedio
+por modelo: 77%». Ese 77% **no es la Confianza**. Son dos números distintos
+que se estaban llamando igual:
+
+- El **77%** sale del campo `score`, que es una **fórmula fija por tipo de
+  glosa**: 99 si es extemporánea, 92 ratificación, 90 urgencia, 75 tarifa, 85
+  el resto, +5 si hay PDF. **No mira el escrito.** No mide la IA por ningún
+  lado.
+- La **Confianza** —el 51% que Yesid ve al pie de cada dictamen, el que
+  llevaba semanas diciendo que no le sube— sale de los siete factores:
+  cláusula del contrato, precedente interno, soportes, citas verificadas,
+  cálculo numérico…
+
+Y lo grave: **la Confianza no se estaba guardando en ninguna parte.** Se
+calculaba, se pintaba en pantalla y se botaba. O sea que la pregunta que
+motivó todo esto —«¿vale la pena cambiar el modelo de IA?»— **no se podía
+responder con datos**, y no por falta de glosas: porque el número nunca se
+escribió en la base. Leyendo el 77% mal rotulado, la conclusión habría sido
+«el modelo está bien, no lo toquemos» — sobre un número que no mide el modelo.
+
+**Lo que se hizo hoy con eso:**
+
+1. **La Confianza ahora se guarda.** Columna nueva en el historial, y se
+   escribe en los dos caminos (glosa nueva y re-análisis de una que ya
+   existía). Se guarda de 0 a 100, igual que se ve en pantalla. Las 397
+   glosas viejas quedan en blanco: de ellas no se guardó y no se puede
+   inventar hacia atrás.
+2. **El panel dejó de mentir.** Ahora salen los dos números con su nombre:
+   «Confianza real por modelo» primero, y «Probabilidad de éxito (fórmula
+   antigua)» después, con la advertencia de que **no** sirve para comparar
+   modelos de IA y con la fórmula escrita para que se vea por qué.
+3. **Se arregló un error de JavaScript real** que salía en la consola del
+   auditor al entrar al portal («Cannot read properties of undefined»). Lo
+   disparaba el gestor de contraseñas del navegador: al autocompletar usuario
+   y clave manda eventos de tecla sin la tecla. Salía dos veces —una por
+   campo— y apagaba todos los atajos en ese evento.
+
+**EL CUELLO DE BOTELLA DE VERDAD, con número: 0 de 397.** Ninguna glosa tiene
+registrado qué contestó la EPS. Las 397 están en «RESPONDIDA» y ahí se
+quedaron. Eso apaga dos cosas a la vez:
+
+- el **precedente interno**, que vale 0,15 de la Confianza, no se puede
+  activar nunca: no hay ni una glosa levantada contra la cual comparar;
+- el **banco de argumentos ganadores** que se le muestra a la IA como ejemplo
+  está **vacío**: la IA nunca ha visto un argumento que de verdad haya ganado.
+
+No cuesta un peso ni exige cambiar de modelo: es un hueco de proceso. El
+motor ya tiene el botón para marcar el veredicto; nadie lo usa cuando la EPS
+responde semanas después.
+
+
 ### 09-09-2026 (tarde, 3) — La pantalla del diagnóstico, y dos afirmaciones que el motor no podía probar
 
 **Tres cosas, todas del mismo tipo: el motor decía algo que no le constaba.**
@@ -12316,15 +12381,21 @@ Encontradas revisando el código con evidencia (no son opiniones). Ordenadas
 de la que más cuesta a la que menos:
 
 1. **El modelo que redacta casi todo es un modelo abierto pequeño/mediano
-   (Groq), no Claude.** Decisión de junio-2026 para no gastar tokens pagos:
+   (Groq), no Claude.** **09-09-2026: esto TODAVÍA NO SE PUEDE MEDIR, y por
+   una razón que no era la que creíamos.** La Confianza no se guardaba en la
+   base (se calculaba, se mostraba y se botaba), así que no había con qué
+   comparar un modelo contra otro. Desde hoy sí se guarda. Con unas cuantas
+   glosas nuevas analizadas, el botón del diagnóstico ya responde la pregunta
+   con datos del hospital. Decisión de junio-2026 para no gastar tokens pagos:
    `primary_ai = "groq"`, y Claude/Anthropic solo entra si Groq **falla
    técnicamente** (error, límite de tasa) — nunca por calidad. Esto explica
    frases rotas, contradicciones y argumentos flojos. **Decisión pendiente
    del auditor** (tiene costo): correr un experimento cabeza a cabeza esta
    semana con `scripts/diagnostico_calidad_ia.py` (sección 6) para ver la
    diferencia real de confianza por modelo, con datos propios.
-2. **La tabla de tarifas pactadas por CUPS (`tarifas_contratadas`) estaba
-   vacía** (medido 13-ago-2026: 0 filas). Para una glosa de TARIFAS —la más
+2. ~~**La tabla de tarifas pactadas por CUPS estaba vacía**~~ — **YA NO.
+   Medido el 09-09-2026 contra la base real: 19.051 filas cargadas.** Este
+   frente está resuelto; queda el texto abajo solo como historia. Para una glosa de TARIFAS —la más
    simple, comparar cifra contra cifra— el motor no tiene con qué comparar
    por ítem exacto. La pantalla **Tarifas** ya acepta cargar esto por Excel
    (incluido el formato de 3 hojas de FAMISANAR); es una tarea de **cargar
@@ -12332,8 +12403,10 @@ de la que más cuesta a la que menos:
 3. **El desplegable de EPS solo listaba entidades con contrato — CORREGIDO
    HOY** (ver «lo ya hecho», 09-09 tarde). SURA, SALUD TOTAL, EMSSANAR, SAVIA
    y MUTUAL SER ya se pueden elegir por su nombre real.
-4. **El veredicto final de la EPS (LEVANTADA/RATIFICADA) no se actualiza en
-   todas las glosas viejas.** De ahí se alimentan DOS cosas a la vez: el
+4. **⛔ EL CUELLO DE BOTELLA REAL — medido el 09-09-2026: 0 de 397 glosas
+   tienen veredicto.** No es «no se actualiza en todas»: es que **no se
+   actualiza en ninguna**. Las 397 están en «RESPONDIDA».
+   **Es lo primero que hay que arreglar y no cuesta nada.** De ahí se alimentan DOS cosas a la vez: el
    «precedente interno» del puntaje de confianza, Y el banco de argumentos
    ganadores que se le muestra a la IA como ejemplo (`few_shot_gold`). Si
    esto se queda atrás, las dos cosas se quedan sin combustible aunque el
@@ -13369,6 +13442,27 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ## 4) PARA MAÑANA
 
+
+### ⛔ Motor de Glosas — lo PRIMERO, y no cuesta nada
+
+**Empezar a marcar el veredicto de la EPS.** Es el hallazgo del 09-09: **0 de
+397 glosas** tienen registrado si la EPS levantó, ratificó o aceptó. Todas
+quedaron en «RESPONDIDA». Mientras eso siga así, el motor no puede aprender de
+su propio trabajo por más glosas que se le metan: ni el «precedente interno»
+ni el banco de argumentos ganadores tienen de dónde salir.
+
+Qué hacer, en concreto:
+1. Buscar las glosas de semanas pasadas cuya respuesta de la EPS **ya se
+   conoce** (las que llegaron levantadas, ratificadas o aceptadas).
+2. Marcarlas en el motor con su veredicto. Se puede de a varias a la vez.
+3. Decidir **quién** lo hace de aquí en adelante y **cuándo** — cuando llega
+   la respuesta de la EPS, no «algún día». Si eso no queda con dueño, se
+   vuelve a llenar de «RESPONDIDA».
+
+**Analizar unas cuantas glosas nuevas y volver al botón del diagnóstico.**
+Desde el 09-09 la Confianza sí se guarda. Con unas 20 o 30 glosas nuevas ya
+sale el promedio por modelo de verdad, y con eso —no antes— se decide si vale
+la pena cambiar el modelo de IA. Antes de eso cualquier decisión sería a ojo.
 
 **Motor de Glosas — abrir el diagnóstico y decidir el modelo.** Entrar al motor
 con el usuario administrador, ir a **Usuarios**, y darle al botón azul «Ver el
