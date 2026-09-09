@@ -44,7 +44,16 @@ dato real que se conserva es el nombre.
 
 ## Progreso
 
+**COMPLETA — 9 libros.**
+
 | Libro | Estado |
 |---|---|
-| I — Génesis | ✅ (muestra entregada) |
-| II — IX | ⏳ pendiente |
+| I — Génesis | ✅ |
+| II — Éxodo | ✅ |
+| III — Cantar de Danny | ✅ |
+| IV — Proverbios | ✅ |
+| V — Los Mandamientos | ✅ |
+| VI — Evangelio Según Yesid | ✅ |
+| VII — Las Epístolas | ✅ |
+| VIII — Profecías | ✅ |
+| IX — Apocalipsis | ✅ |
