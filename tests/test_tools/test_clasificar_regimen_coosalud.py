@@ -20,6 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 
 import clasificar_regimen_coosalud as cr  # noqa: E402
+import pytest  # noqa: E402
 from openpyxl import Workbook, load_workbook  # noqa: E402
 
 # InvoicePeriod real del HUS: EndDate = fecha de facturacion (07/05), NO el
@@ -415,6 +416,49 @@ class TestSoportesRadicacion:
         existente.mkdir()
         out = cr.resolver_raices([str(existente), str(tmp_path / "no_existe")])
         assert out == [existente]
+
+
+class TestRutasLargas:
+    """El limite de 260 caracteres de Windows (MAX_PATH) hacia que os.walk se
+    comiera carpetas enteras del arbol de radicacion digital sin avisar."""
+
+    def test_ruta_larga_unc_en_windows(self, monkeypatch):
+        monkeypatch.setattr(cr.os, "name", "nt")
+        monkeypatch.setattr(cr.os.path, "abspath", lambda s: s)  # en Linux abspath no entiende UNC
+        assert cr.ruta_larga(r"\\Prime\radicacion_2026\X") == r"\\?\UNC\Prime\radicacion_2026\X"
+        assert cr.ruta_larga(r"D:\USUARIO\X") == r"\\?\D:\USUARIO\X"
+        # No se duplica el prefijo.
+        assert cr.ruta_larga(r"\\?\UNC\Prime\X") == r"\\?\UNC\Prime\X"
+
+    def test_ruta_larga_no_toca_linux(self):
+        assert cr.ruta_larga("/mnt/soportes/HUS1") == "/mnt/soportes/HUS1"
+
+    def test_ruta_legible_deshace_el_prefijo(self):
+        assert cr.ruta_legible(r"\\?\UNC\Prime\radicacion_2026\X") == r"\\Prime\radicacion_2026\X"
+        assert cr.ruta_legible(r"\\?\D:\USUARIO\X") == r"D:\USUARIO\X"
+        assert cr.ruta_legible(r"D:\USUARIO\X") == r"D:\USUARIO\X"
+
+    def test_carpeta_ilegible_se_avisa_y_no_se_silencia(self, tmp_path, caplog):
+        raiz = tmp_path / "radicacion"
+        (raiz / "COOSALUD").mkdir(parents=True)
+        real_walk = cr.os.walk
+
+        def walk_con_fallo(top, onerror=None, **kw):
+            # Simula la carpeta que Windows niega por ruta larga.
+            if onerror is not None:
+                exc = OSError(5, "Acceso denegado")
+                exc.filename = str(raiz / "COOSALUD" / "ENV-1" / "IMG")
+                onerror(exc)
+            yield from real_walk(top, onerror=onerror, **kw)
+
+        import logging as _log
+
+        with caplog.at_level(_log.WARNING):
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setattr(cr.os, "walk", walk_con_fallo)
+                cr.indexar_radicacion([raiz], {"349680"})
+        assert "NO se pudieron leer" in caplog.text
+        assert "Acceso denegado" in caplog.text
 
 
 class TestPiezas:

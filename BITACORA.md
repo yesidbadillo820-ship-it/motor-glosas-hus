@@ -91,6 +91,27 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 — Por qué no llegaban los soportes: el límite de 260 caracteres de Windows
+
+La corrida de las 178 facturas para radicar trajo soportes de **solo 3**. La
+causa no era la lista de rutas (ya estaban todas) sino dos fallas del buscador:
+**(1)** los errores al leer carpetas se estaban **silenciando** — si Windows
+negaba el acceso, el bot seguía como si la carpeta estuviera vacía, sin dejar
+rastro; **(2)** las rutas de radicación digital anidan
+`año\mes\EPS\envío\IMG\factura\archivo.pdf` y se pasan del **límite de 260
+caracteres** de Windows (MAX_PATH), así que el sistema negaba el acceso a las
+carpetas más profundas — justo donde están los PDF. Es lo mismo que hacía
+fallar los `Get-ChildItem -Recurse` en la consola.
+
+Se corrigió: el bot ahora usa el formato de **ruta extendida** de Windows para
+recorrer y para copiar (sin límite de longitud), y **avisa** cuántas carpetas
+no pudo leer y por qué, en vez de callarlo. Además se agregó
+`--explorar-soportes <ruta>`, un diagnóstico que recorre una carpeta y dice qué
+hay adentro (cuántos archivos, cuántos traen número de factura, hasta qué
+profundidad, qué no se pudo leer y ejemplos de nombres) — para entender un
+servidor nuevo sin ir a ciegas. Van 23 pruebas del clasificador.
+
+
 ### 09-09-2026 — Las carpetas ya salen con el formato del cargue de COOSALUD
 
 El auditor pidió los soportes de ~176 facturas para re-radicar, y mostró cómo
