@@ -2266,7 +2266,25 @@ def _no_afirmar_contrato_vencido(dictamen: str, eps: str = "") -> str:
     except Exception:
         return dictamen
 
+    # 09-09-2026 — EL ORDEN IMPORTA: DE MÁS ESPECÍFICO A MÁS GENERAL.
+    # «EL CONTRATO VIGENTE HASTA EL 30 DE JULIO ENTRE LAS PARTES» lo cazaba
+    # primero el patrón general («CONTRATO VIGENTE»), que lo dejaba en
+    # «…RIGIÓ LA RELACIÓN ENTRE LAS PARTES **HASTA EL 30 DE JULIO** ENTRE LAS
+    # PARTES»: la fecha colgando y la coletilla dos veces. Con el específico
+    # primero, se come la fecha y queda una sola frase.
+    #
+    # Todos llevan la coletilla «entre las partes» como OPCIONAL al final,
+    # porque el texto de reemplazo ya termina así y la frase original muchas
+    # veces la traía. Salió duplicada en un dictamen real del Dispensario.
+    _COLETILLA = r"(?:\s+(?:ENTRE|SUSCRITO\s+ENTRE)\s+LAS\s+PARTES)?"
     reemplazos = [
+        (
+            re.compile(
+                r"\bCONTRATO\s+VIGENTE\s+HASTA\s+[^.,;]{0,40}" + _COLETILLA,
+                re.IGNORECASE,
+            ),
+            "CONTRATO QUE RIGIÓ LA RELACIÓN ENTRE LAS PARTES",
+        ),
         (
             # OJO: solo la AFIRMACIÓN, nunca el número del contrato. La primera
             # versión de este patrón se comía «440-DIGSA/DMBUG-2025» al pasar
@@ -2275,22 +2293,24 @@ def _no_afirmar_contrato_vencido(dictamen: str, eps: str = "") -> str:
             # «sigue vigente». Lo cazó la prueba antes de que llegara a
             # producción.
             re.compile(
-                r"\bPERMANECE\s+VIGENTE(?:\s+HASTA\s+[^.,;]{0,40})?",
+                r"\bPERMANECE\s+VIGENTE(?:\s+HASTA\s+[^.,;]{0,40})?" + _COLETILLA,
                 re.IGNORECASE,
             ),
             "RIGIÓ LA RELACIÓN ENTRE LAS PARTES",
         ),
         (
-            re.compile(r"\bCONTRATO\s+(?:SE\s+ENCUENTRA\s+)?VIGENTE\b", re.IGNORECASE),
+            re.compile(
+                r"\bCONTRATO\s+(?:SE\s+ENCUENTRA\s+)?VIGENTE\b" + _COLETILLA,
+                re.IGNORECASE,
+            ),
             "CONTRATO QUE RIGIÓ LA RELACIÓN ENTRE LAS PARTES",
         ),
         (
-            re.compile(r"\bSE\s+ENCUENTRA\s+EN\s+EJECUCI[ÓO]N\b", re.IGNORECASE),
+            re.compile(
+                r"\bSE\s+ENCUENTRA\s+EN\s+EJECUCI[ÓO]N\b" + _COLETILLA,
+                re.IGNORECASE,
+            ),
             "RIGIÓ LA RELACIÓN ENTRE LAS PARTES",
-        ),
-        (
-            re.compile(r"\bCONTRATO\s+VIGENTE\s+HASTA\s+[^.,;]{0,40}", re.IGNORECASE),
-            "CONTRATO QUE RIGIÓ LA RELACIÓN ENTRE LAS PARTES",
         ),
     ]
     resultado, total = dictamen, 0

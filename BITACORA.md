@@ -91,6 +91,36 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde, 13) — «…ENTRE LAS PARTES ENTRE LAS PARTES»
+
+Yesid lo vio en un dictamen real del Dispensario (factura HUS0000541440).
+
+Cuando el contrato de una entidad ya venció, el motor **no borra** su
+mención —nombrarlo es correcto y muchas veces necesario— sino que quita la
+afirmación de que «sigue vigente»: cambia «EL CONTRATO VIGENTE» por «EL
+CONTRATO QUE RIGIÓ LA RELACIÓN ENTRE LAS PARTES».
+
+El problema: ese reemplazo **termina** en «entre las partes», y la frase
+original muchas veces ya la traía. Quedaba la coletilla dos veces, en el
+documento que se radica. No cambia el fondo del argumento, pero es de las
+cosas que le dicen al auditor de la entidad que nadie leyó el escrito antes
+de mandarlo — y a partir de ahí lo lee con otra disposición.
+
+Se arregló haciendo que el reemplazo **se coma** la coletilla que ya
+estaba. Y salió un segundo defecto del mismo sitio: los patrones estaban
+ordenados de general a específico, así que «EL CONTRATO VIGENTE HASTA EL 30
+DE JULIO» lo cazaba primero el general y dejaba la fecha colgando. Ahora van
+de más específico a más general.
+
+10 pruebas nuevas, 6 fallan sin el arreglo. Incluyen que **el número del
+contrato siga intacto**: borrarlo es el error contrario, y ya se cometió una
+vez.
+
+**Dos hallazgos de esas mismas corridas quedan SIN arreglar, a propósito.**
+Uno porque no lo pude reproducir y no se arregla a ciegas; el otro porque es
+del modelo y necesita su propio trabajo. Están en PENDIENTE.
+
+
 ### 09-09-2026 (tarde, 9) — El motor podía negarse a responder una glosa que SÍ tenía el servicio
 
 Yesid mandó dos análisis del código con ~136 hallazgos. Se verificaron uno
