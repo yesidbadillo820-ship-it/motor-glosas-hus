@@ -1752,6 +1752,79 @@ def _confianza_para_guardar(resultado) -> tuple:
     return valor, nivel
 
 
+def _evidencia_de_la_tarifa(info_tarifa: Optional[dict]) -> Optional[dict]:
+    """La fila del catálogo de tarifas pactadas, lista para pintar en pantalla.
+
+    09-09-2026, pedido de Yesid: que al analizar una glosa de TARIFAS el
+    auditor vea **el renglón del Excel pactado** —el que él mismo cargó— junto
+    a lo facturado y lo objetado, para poder revisarlo con sus propios ojos en
+    vez de creerle al dictamen.
+
+    Todo esto ya se calculaba para armar el prompt; lo único que faltaba era
+    entregarlo como dato en vez de como HTML pegado dentro del escrito.
+
+    Devuelve `None` cuando no hay nada que probar: la glosa no es de tarifas,
+    o el CUPS no está en el catálogo. Eso NO se disfraza — que el motor no
+    tenga con qué comparar es justamente lo que el auditor necesita saber
+    antes de radicar.
+    """
+    if not info_tarifa or not info_tarifa.get("encontrada"):
+        return None
+    t = info_tarifa.get("tarifa") or {}
+    pactado = float(info_tarifa.get("valor_pactado_calc") or 0.0)
+    facturado = float(info_tarifa.get("valor_facturado") or 0.0)
+    objetado = float(info_tarifa.get("valor_objetado") or 0.0)
+    reconocido = float(info_tarifa.get("valor_reconocido") or 0.0)
+
+    # La diferencia solo se calcula con las DOS cifras presentes. En este
+    # motor el 0 no es «cero pesos», es «no se pudo leer»: restar contra un
+    # cero daría una diferencia inventada del tamaño de la factura.
+    diferencia = round(facturado - pactado, 2) if (facturado > 0 and pactado > 0) else None
+
+    homolog = info_tarifa.get("homologacion_2641") or {}
+    return {
+        # La fila tal como está en el catálogo que cargó el hospital.
+        "fila_del_catalogo": {
+            "codigo_cups": t.get("codigo_cups"),
+            "codigo_ips": t.get("codigo_ips"),
+            "descripcion": t.get("descripcion"),
+            "valor_pactado": pactado,
+            "tipo_tarifa": t.get("tipo_tarifa"),
+            "factor_ajuste": t.get("factor_ajuste"),
+            "modalidad": t.get("modalidad"),
+            "contrato_numero": t.get("contrato_numero"),
+            "vigencia_desde": t.get("vigencia_desde"),
+            "vigencia_hasta": t.get("vigencia_hasta"),
+            # De qué archivo salió: es lo que le permite al auditor ir a
+            # buscarlo y comprobarlo por su cuenta.
+            "fuente_archivo": t.get("fuente_archivo"),
+        },
+        "las_cifras_del_caso": {
+            "facturado": facturado or None,
+            "pactado": pactado or None,
+            "objetado": objetado or None,
+            "reconocido": reconocido or None,
+            "diferencia": diferencia,
+            # Qué falta, dicho con todas las letras. Un valor en cero es un
+            # dato que no se pudo leer, y el auditor tiene que saberlo antes
+            # de darle la razón al cálculo.
+            "no_se_pudo_leer": [
+                nombre
+                for nombre, valor in (
+                    ("el valor facturado", facturado),
+                    ("el valor objetado", objetado),
+                    ("la tarifa pactada", pactado),
+                )
+                if not valor
+            ],
+        },
+        "recomendacion": info_tarifa.get("recomendacion") or None,
+        # Si el código del contrato no es el mismo que el facturado, se dice:
+        # el auditor tiene que saber que el cruce pasó por una homologación.
+        "homologacion": homolog if homolog.get("aplicada") else None,
+    }
+
+
 async def _analizar_impl(
     *,
     eps: str,
@@ -2026,6 +2099,13 @@ async def _analizar_impl(
             info_tarifa=info_tarifa_pre,
             pdfs_raw_para_multimodal=pdfs_raw,
         )
+        # La evidencia de la tarifa, como dato para la pantalla. Va aquí y no
+        # dentro del dictamen: el escrito que se radica no lleva cuadros de
+        # trabajo interno, y la pantalla necesita el dato para pintar la tabla.
+        try:
+            resultado.evidencia_tarifa = _evidencia_de_la_tarifa(info_tarifa_pre)
+        except Exception as _e_ev:
+            logger.debug(f"[{req_id}] evidencia de tarifa no armada: {_e_ev}")
         _publicar_progreso(
             _tid,
             "ia_completada",

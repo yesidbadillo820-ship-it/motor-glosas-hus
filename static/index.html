@@ -18166,6 +18166,133 @@ function renderRiesgoRatificacion(r){
 //   A = 0 issues · B = solo MEDIA · C = alguna ALTA.
 // CONFIANZA: % real de confianza.score*100 + recomendación del backend.
 // La prob. de éxito histórica queda como dato secundario (.exito-mini).
+// ─── LA EVIDENCIA DE LA TARIFA ───────────────────────────────────────
+// 09-09-2026, pedido de Yesid: «que cuando analicen una glosa vean qué van a
+// auditar, y si es por tarifas que aparezca el Excel de la tarifa pactada y
+// el valor para que ellos lo analicen».
+//
+// El motor ya cruzaba la factura contra las 19.051 filas del catálogo que
+// cargó el hospital, pero el resultado se pegaba como HTML DENTRO del
+// dictamen: la pantalla no podía pintarlo como tabla, y ese cuadro de trabajo
+// interno terminaba metido en el escrito que se radica ante la entidad.
+//
+// Acá se pinta como lo que es: el renglón exacto del contrato, con el archivo
+// de donde salió para que el auditor pueda ir a comprobarlo por su cuenta.
+function renderEvidenciaTarifa(ev){
+  if(!ev || !ev.fila_del_catalogo) return '';
+  var f = ev.fila_del_catalogo;
+  var c = ev.las_cifras_del_caso || {};
+  var faltan = c.no_se_pudo_leer || [];
+
+  // Cómo se pactó: un valor fijo, o un porcentaje sobre el SOAT.
+  var comoSePacto = f.valor_pactado ? fmtCOP(f.valor_pactado) : '—';
+  if(f.tipo_tarifa === 'SOAT_PORCENTAJE'){
+    var fa = Number(f.factor_ajuste || 0);
+    comoSePacto = 'SOAT ' + (fa > 0 ? '+' : '') + fa.toFixed(0) + '%'
+      + (f.valor_pactado ? ' → ' + fmtCOP(f.valor_pactado) : '');
+  }
+
+  var vigencia = '';
+  if(f.vigencia_desde || f.vigencia_hasta){
+    vigencia = (f.vigencia_desde ? fmtFechaCorta(f.vigencia_desde) : '—')
+             + ' a ' + (f.vigencia_hasta ? fmtFechaCorta(f.vigencia_hasta) : '—');
+  }
+
+  // El renglón del contrato: lo que el auditor va a mirar primero.
+  var ficha = [
+    ['Código en el contrato', escHtml(f.codigo_cups || f.codigo_ips || '—')],
+    ['Servicio', escHtml(f.descripcion || '—')],
+    ['Tarifa pactada', '<b style="color:#047857">' + comoSePacto + '</b>'],
+    ['Contrato', escHtml(f.contrato_numero || '—')],
+  ];
+  if(vigencia) ficha.push(['Vigencia', escHtml(vigencia)]);
+  if(f.modalidad) ficha.push(['Modalidad', escHtml(f.modalidad)]);
+  if(f.fuente_archivo) ficha.push(['Sale del archivo', '<span style="font-family:var(--font-mono);font-size:.76rem">' + escHtml(f.fuente_archivo) + '</span>']);
+
+  var fichaHtml = ficha.map(function(x){
+    return '<tr>'
+      + '<td style="padding:.3rem .6rem;color:var(--text3);white-space:nowrap;vertical-align:top">' + x[0] + '</td>'
+      + '<td style="padding:.3rem .6rem;color:var(--text)">' + x[1] + '</td>'
+      + '</tr>';
+  }).join('');
+
+  // Las cifras, una al lado de la otra. Lo que no se pudo leer se dice.
+  var _NO = '<span style="color:#b45309;font-weight:600">no se pudo leer</span>';
+  var cifras = [
+    ['Facturado por el HUS', c.facturado, '#0f172a'],
+    ['Pactado en el contrato', c.pactado, '#047857'],
+    ['Objetado por la entidad', c.objetado, '#b91c1c'],
+  ];
+  if(c.reconocido) cifras.push(['Reconocido por la entidad', c.reconocido, '#0369a1']);
+
+  var cifrasHtml = cifras.map(function(x){
+    return '<div style="flex:1 1 150px;min-width:0;background:#fff;border:1px solid var(--border);'
+      + 'border-radius:8px;padding:.55rem .7rem">'
+      + '<div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);'
+      + 'font-weight:700;margin-bottom:.2rem">' + x[0] + '</div>'
+      + '<div style="font-size:1.05rem;font-weight:800;color:' + (x[1] ? x[2] : '#b45309') + '">'
+      + (x[1] ? fmtCOP(x[1]) : _NO) + '</div>'
+      + '</div>';
+  }).join('');
+
+  // La diferencia: solo cuando se pudo calcular de verdad.
+  var difHtml = '';
+  if(c.diferencia !== null && c.diferencia !== undefined){
+    var d = Number(c.diferencia);
+    var sobra = d > 0;
+    difHtml = '<div style="margin-top:.6rem;padding:.55rem .8rem;border-radius:8px;'
+      + 'background:' + (sobra ? '#fef3c7' : '#ecfdf5') + ';border:1px solid '
+      + (sobra ? '#d97706' : '#10b981') + ';font-size:.85rem;color:'
+      + (sobra ? '#92400e' : '#065f46') + '">'
+      + (sobra
+          ? '<b>Se facturó ' + fmtCOP(Math.abs(d)) + ' por encima de lo pactado.</b> '
+            + 'Ese excedente es lo que la entidad puede sostener; el resto no.'
+          : (d === 0
+              ? '<b>Lo facturado coincide exactamente con lo pactado.</b> La objeción no tiene sustento tarifario.'
+              : '<b>Se facturó ' + fmtCOP(Math.abs(d)) + ' por DEBAJO de lo pactado.</b> '
+                + 'Revise: el hospital pudo estar cobrando de menos.'))
+      + '</div>';
+  } else {
+    difHtml = '<div style="margin-top:.6rem;padding:.55rem .8rem;border-radius:8px;background:#fffbeb;'
+      + 'border:1px solid #d97706;font-size:.85rem;color:#92400e">'
+      + '<b>No se puede calcular la diferencia</b> porque falta ' + escHtml(faltan.join(' y ') || 'un dato')
+      + '. Compruébelo en la factura antes de radicar: sin esa cifra, el cálculo del motor no se sostiene.'
+      + '</div>';
+  }
+
+  var homolog = '';
+  if(ev.homologacion){
+    homolog = '<div style="margin-top:.5rem;padding:.5rem .75rem;background:#eff6ff;border-left:3px solid #3b82f6;'
+      + 'border-radius:6px;font-size:.8rem;color:#1e3a8a">'
+      + '<b>Ojo: el cruce pasó por una homologación.</b> Se facturó '
+      + escHtml(ev.homologacion.codigo_entrada || '—') + ' y en el contrato el ítem figura como '
+      + escHtml(ev.homologacion.cups_oficial || ev.homologacion.codigo_ips_contrato || '—')
+      + '. ' + escHtml(ev.homologacion.norma || '') + '</div>';
+  }
+
+  return (
+    '<div class="card-premium" style="margin-top:1rem;padding:1rem 1.3rem;border:2px solid #10b981;'
+    + 'background:linear-gradient(135deg,#f0fdf4,#ecfdf5)">'
+    + '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.7rem">'
+    + '<div style="font-size:1.4rem;line-height:1">📑</div>'
+    + '<div>'
+    + '<div style="font-weight:800;color:#047857;letter-spacing:.04em;font-size:.78rem;text-transform:uppercase">'
+    + 'Lo que usted va a auditar</div>'
+    + '<div style="font-size:.8rem;color:#065f46">El renglón del contrato que cargó el hospital, contra lo facturado.</div>'
+    + '</div></div>'
+    + '<div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.7rem">' + cifrasHtml + '</div>'
+    + difHtml
+    + homolog
+    + '<details style="margin-top:.7rem;border-top:1px dashed #a7f3d0;padding-top:.6rem">'
+    + '<summary style="cursor:pointer;font-size:.8rem;color:#047857;font-weight:700;outline:none">'
+    + 'Ver el renglón exacto del contrato</summary>'
+    + '<table style="width:100%;font-size:.82rem;border-collapse:collapse;margin-top:.5rem;'
+    + 'background:#fff;border-radius:6px;overflow:hidden">' + fichaHtml + '</table>'
+    + '</details>'
+    + '</div>'
+  );
+}
+
 function renderMedallasDictamen(d, scoreColor){
   var v = d.verificacion_citas;
   var issues = (v && v.issues) || [];
@@ -18293,6 +18420,11 @@ function renderResult(d){
     +'</div></div>'
 
     + renderMedallasDictamen(d, scoreColor)
+    // 09-09-2026 — LA EVIDENCIA, ANTES QUE EL VEREDICTO. Va arriba del riesgo
+    // y de la recomendación a propósito: el auditor tiene que poder mirar el
+    // renglón del contrato y las cifras ANTES de leer qué concluyó el motor.
+    // Al revés, lee la conclusión y ya no revisa.
+    + renderEvidenciaTarifa(d.evidencia_tarifa)
     + (d.riesgo_ratificacion ? renderRiesgoRatificacion(d.riesgo_ratificacion) : '')
     + (d.accion_ia ? renderAccionIA(d) : '')
 

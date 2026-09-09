@@ -91,6 +91,89 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde, 6) — El motor confundía lo FACTURADO con lo PACTADO (lo destapó la prueba de Yesid)
+
+Probando las 20 glosas, en el primer caso el motor recomendó **aceptar
+$105.350** y Yesid le dio a «Aplicar recomendación». **Esa cifra estaba mal.**
+
+La glosa decía: «VALOR FACTURADO **$185.000** SUPERIOR AL PACTADO
+**$157.250**». El motor leyó **$157.250 como el valor facturado** — o sea, el
+pactado. Con esa cifra al revés comparó contra la tarifa real del contrato
+($51.900) y sacó una recomendación de aceptar $105.350. La cuenta correcta es
+$185.000 − $51.900 = **$133.100**.
+
+**En una glosa de verdad eso es plata regalada**, y calculada sobre un número
+leído al revés.
+
+**Por qué pasaba, y no era un descuido.** La función que busca el valor está
+hecha para leer FILAS DE FACTURA, donde los montos son columnas mudas
+(«1,00 $247.663,00 $0,00 $247.663,00») y el último es el valor de la línea.
+Esa regla es correcta ahí y nació de un incidente real de abril: en una
+factura de nueve conceptos el motor le pasaba a la IA el TOTAL de la factura
+como valor de cada línea.
+
+Lo que nadie había visto es que la MISMA función recibe también el texto de
+la glosa, donde la entidad le pone nombre a cada cifra. Ahí «el último monto»
+no es lo facturado: es lo que la entidad escribió de último.
+
+**La regla que queda:** si las cifras vienen con nombre —pactado, contratado,
+reconocido, objetado, glosado, diferencia—, no es una fila de factura y se
+leen las etiquetas. Si son columnas mudas, sigue mandando la regla de la
+línea del CUPS, intacta (comprobado: las 8 pruebas del incidente de abril
+siguen pasando).
+
+Con sus 20 pruebas, comprobadas contra el código anterior: 7 fallan sin el
+arreglo.
+
+
+### 09-09-2026 (tarde, 5) — Al analizar una glosa de tarifas ya se ve el renglón del contrato
+
+Yesid pidió: «que cuando analicen una glosa vean qué van a auditar, y si es
+por tarifas que aparezca el Excel de la tarifa pactada y el valor para que
+ellos lo analicen».
+
+**Y el dato ya lo tenía el motor.** Cruzaba cada factura contra las 19.051
+filas del catálogo de tarifas que cargó el hospital… pero pegaba el resultado
+como un cuadro HTML **dentro del texto del dictamen**. Dos problemas de una:
+la pantalla no podía pintarlo como una tabla de verdad, y ese cuadro de
+trabajo interno terminaba metido en el escrito que se radica ante la EPS,
+donde no pinta nada.
+
+Ahora, al analizar una glosa de tarifas, aparece un recuadro verde
+**«📑 Lo que usted va a auditar»** con:
+
+- **las tres cifras juntas**: lo facturado por el HUS, lo pactado en el
+  contrato y lo objetado por la entidad;
+- **la diferencia explicada en castellano** («se facturó $27.750 por encima
+  de lo pactado; ese excedente es lo que la entidad puede sostener, el resto
+  no»), o el aviso de que no se puede calcular y por qué;
+- y, desplegando, **el renglón exacto del contrato**: el código, el servicio,
+  cómo se pactó (por ejemplo «SOAT -15% → $157.250», que se puede discutir con
+  el contrato en la mano, no un número pelado), el contrato, su vigencia, la
+  modalidad y **de qué archivo Excel salió** — para que el auditor vaya y lo
+  compruebe por su cuenta en vez de creerle al motor.
+
+Tres decisiones que valen la pena dejar escritas:
+
+1. **El recuadro va ARRIBA del veredicto.** Si el auditor lee primero
+   «DEFENDER 100%», ya no revisa la evidencia. Hay una prueba que vigila ese
+   orden.
+2. **Lo que no se pudo leer se dice.** Si falta el valor facturado NO sale
+   «$0» —que se leería como una cifra real del caso— sino «no se pudo leer», y
+   la diferencia **no se inventa**: restar contra un cero daría un sobrecosto
+   falso del tamaño de toda la tarifa.
+3. **Si el cruce pasó por una homologación se avisa**: cuando el código
+   facturado no es el mismo que figura en el contrato, el auditor tiene que
+   saber que hubo una traducción de por medio.
+
+En las glosas que no son de tarifas el recuadro no sale: la mayoría no lo son
+y un cuadro vacío en todas ellas sería ruido.
+
+Con sus 38 pruebas, todas comprobadas contra el código anterior. Las de
+pantalla **ejecutan** el pintor de verdad: una prueba de texto diría que todo
+está bien aunque en pantalla saliera «undefined» donde va la tarifa.
+
+
 ### 09-09-2026 (tarde, 4) — Los números REALES, y dos sorpresas (una es un error mío)
 
 Yesid abrió el botón nuevo y por fin salieron los datos de verdad del
