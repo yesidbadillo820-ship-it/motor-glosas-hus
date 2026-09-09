@@ -29,6 +29,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from app.core.cabeceras_seguridad import CabecerasDeSeguridad
 from app.core.correlation import CorrelationIdMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
@@ -38,7 +39,7 @@ from app.database import engine, Base, SessionLocal
 from app.models.db import ContratoRecord, UsuarioRecord
 from app.core.config import get_settings, check_security_config
 from app.auth import get_password_hash
-from app.core.logging_utils import logger
+from app.core.logging_utils import clave_para_log, logger
 from app.core.sentry_init import init_sentry
 from app.services.posthog_service import init_posthog
 
@@ -1445,11 +1446,15 @@ async def lifespan(app: FastAPI):
         _gem = os.getenv("GEMINI_API_KEY", "")
         _grq = os.getenv("GROQ_API_KEY", "")
         _prim = os.getenv("PRIMARY_AI", "groq")
+        # 09-09-2026: antes se logueaban los 10 primeros caracteres de cada
+        # clave. No alcanzan para usarla, pero sí dicen de qué proveedor y de
+        # qué tipo es, y le ahorran la mitad del trabajo a quien tenga una
+        # copia parcial. Lo único que hace falta saber acá es si está.
         logger.info(
             f"[IA-PROVIDERS] primary={_prim} (dictamen: groq+anthropic) | "
-            f"groq={'OK ' + _grq[:10] + '...' if _grq else 'AUSENTE'} | "
-            f"anthropic={'OK ' + _ant[:10] + '...' if _ant else 'AUSENTE'} | "
-            f"gemini(solo OCR)={'OK ' + _gem[:10] + '...' if _gem else 'AUSENTE'}"
+            f"groq={clave_para_log(_grq)} | "
+            f"anthropic={clave_para_log(_ant)} | "
+            f"gemini(solo OCR)={clave_para_log(_gem)}"
         )
     except Exception as _e_diag:
         logger.warning(f"[IA-PROVIDERS] no se pudo loguear estado: {_e_diag}")
@@ -1606,8 +1611,10 @@ Obtener token en `/api/auth/login`.
     """,
     version="5.5.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    # Ver `Settings.docs_publicos`: apagadas salvo que se pidan expresamente.
+    docs_url="/docs" if cfg.docs_publicos else None,
+    redoc_url="/redoc" if cfg.docs_publicos else None,
+    openapi_url="/openapi.json" if cfg.docs_publicos else None,
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -1627,6 +1634,10 @@ app.add_middleware(
 # de CPU supera el ahorro de bytes.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(CorrelationIdMiddleware)
+# 09-09-2026: el motor no enviaba NINGUNA cabecera de seguridad. Ver
+# app/core/cabeceras_seguridad.py — cada una tapa una forma concreta de
+# atacar a quien tiene la sesión abierta.
+app.add_middleware(CabecerasDeSeguridad)
 
 
 # Ronda 50 Paso 10: middleware de tenant.

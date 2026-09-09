@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
+from app.core.logging_utils import clave_para_log, huella_de_clave
 from app.api.deps import get_admin
 from app.core.config import get_settings
 from app.models.db import (
@@ -297,7 +298,7 @@ def diagnostico_completo(
                         },
                     )
                 if resp.status_code == 200:
-                    return "ok", f"API key OK · ping Haiku exitoso · {anthropic_key[:10]}…", {}
+                    return "ok", "API key OK · ping Haiku exitoso", {}
                 if resp.status_code == 400:
                     err_msg = ""
                     try:
@@ -321,7 +322,7 @@ def diagnostico_completo(
             except Exception as e:
                 return "warning", f"No se pudo hacer ping: {e}", {}
 
-        cache_key = f"anthropic::{anthropic_key[:6]}"
+        cache_key = f"anthropic::{huella_de_clave(anthropic_key)}"
         ping_estado, ping_msg, _ = _ping_cached(cache_key, _do_ping_anthropic)
 
         out["secciones"]["anthropic"] = {
@@ -332,7 +333,7 @@ def diagnostico_completo(
                 "modelo_default": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5"),
                 "tool_use_habilitado": os.getenv("TOOL_USE_HABILITADO", "0") == "1",
                 "multi_agent_habilitado": os.getenv("MULTI_AGENT_HABILITADO", "0") == "1",
-                "key_prefix": anthropic_key[:12],
+                "clave": clave_para_log(anthropic_key),
             },
         }
 
@@ -361,7 +362,7 @@ def diagnostico_completo(
         out["secciones"]["groq"] = {
             "estado": "ok",
             "mensaje": (
-                f"API key configurada (fallback de Anthropic, prefijo {groq_key[:10]}…) · "
+                f"API key configurada (fallback de Anthropic: {clave_para_log(groq_key)}) · "
                 + " · ".join(partes_cadena)
             ),
             "data": {
@@ -415,7 +416,7 @@ def diagnostico_completo(
                 if rg.status_code == 200:
                     return (
                         "ok",
-                        f"API key OK · ping {gemini_modelo} exitoso · {gemini_key[:10]}…",
+                        f"API key OK · ping {gemini_modelo} exitoso",
                         {},
                     )
                 if rg.status_code in (400, 401, 403):
@@ -430,14 +431,14 @@ def diagnostico_completo(
             except Exception as _eg:
                 return "warning", f"No se pudo hacer ping: {str(_eg)[:120]}", {}
 
-        cache_key = f"gemini::{gemini_modelo}::{gemini_key[:6]}"
+        cache_key = f"gemini::{gemini_modelo}::{huella_de_clave(gemini_key)}"
         ping_estado, ping_msg, _ = _ping_cached(cache_key, _do_ping_gemini)
         out["secciones"]["gemini"] = {
             "estado": ping_estado,
             "mensaje": ping_msg,
             "data": {
                 "modelo": gemini_modelo,
-                "key_prefix": gemini_key[:10],
+                "clave": clave_para_log(gemini_key),
                 "rol": "solo OCR de PDFs escaneados (no genera dictámenes)",
                 "free_tier_info": "15 RPM / 1500 RPD para Flash · 2 RPM / 50 RPD para Pro",
             },
@@ -516,7 +517,7 @@ def diagnostico_completo(
                 else "POSTHOG_API_KEY configurada pero cliente no quedó activo"
             ),
             "data": {
-                "key_prefix": posthog_key[:10],
+                "clave": clave_para_log(posthog_key),
                 "host": os.getenv("POSTHOG_HOST", "https://us.posthog.com"),
             },
         }

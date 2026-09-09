@@ -299,7 +299,7 @@ async def auditar_forense(
     if not bypass_cache:
         cached = _buscar_cache_forense(cache_key)
         if cached:
-            logger.info(f"[AUDITOR-FORENSE] CACHE HIT factura={factura} key={cache_key[:12]}")
+            logger.info(f"[AUDITOR-FORENSE] CACHE HIT factura={factura} entrada={cache_key[:12]}")
             return {
                 "html": cached["html"],
                 "modelo": cached["modelo"],

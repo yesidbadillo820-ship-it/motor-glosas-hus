@@ -20,6 +20,7 @@ import httpx
 from fastapi import APIRouter, Depends
 
 from app.api.deps import get_usuario_actual
+from app.core.logging_utils import clave_para_log
 from app.core.config import get_settings
 from app.models.db import UsuarioRecord
 
@@ -112,11 +113,11 @@ def listar_proveedores(
         if clave == "anthropic":
             info["api_key_configurada"] = bool(cfg.anthropic_api_key)
             info["modelo_actual"] = cfg.anthropic_model
-            info["api_key_prefix"] = cfg.anthropic_api_key[:10] if cfg.anthropic_api_key else ""
+            info["clave"] = clave_para_log(cfg.anthropic_api_key)
         elif clave == "gemini":
             info["api_key_configurada"] = bool(cfg.gemini_api_key)
             info["modelo_actual"] = cfg.gemini_model
-            info["api_key_prefix"] = cfg.gemini_api_key[:10] if cfg.gemini_api_key else ""
+            info["clave"] = clave_para_log(cfg.gemini_api_key)
         else:  # groq
             info["api_key_configurada"] = bool(cfg.groq_api_key)
             info["modelo_actual"] = cfg.groq_model
@@ -128,7 +129,7 @@ def listar_proveedores(
                 if m and m not in cadena:
                     cadena.append(m)
             info["modelos_cadena"] = cadena
-            info["api_key_prefix"] = cfg.groq_api_key[:10] if cfg.groq_api_key else ""
+            info["clave"] = clave_para_log(cfg.groq_api_key)
         info["es_primary"] = clave == primary
         info["clave"] = clave
         estado.append(info)
