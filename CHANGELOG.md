@@ -1,5 +1,32 @@
 # Registro de cambios
 
+## Sesión 09-sep-2026 (tarde, 7) — `_detectar_pagador_en_texto` no conocía los regímenes especiales
+
+Detectado en la prueba del auditor. Glosa «DISPENSARIO MEDICO · FA0801
+$275.000…» con `eps_dropdown="FAMISANAR EPS"`: `resolver_eps_efectiva`
+devolvió `("FAMISANAR EPS", False, "")` y el dictamen salió con el contrato
+S-13-1-03-1-04958 y la tarifa SOAT UVB −5 % de FAMISANAR sobre una factura de
+sanidad militar.
+
+`_TOKENS_PAGADOR_EN_TEXTO` tenía `DMBUG` y `DISPENSARIO MEDICO BUCARAMANGA`,
+pero no la forma corta ni DIGSA / SANIDAD EJÉRCITO / SANIDAD MILITAR, y no
+tenía la Policía Nacional ni FIDUPREVISORA.
+
+- **`app/services/glosa_ia_prompts.py`** — entradas nuevas en
+  `_TOKENS_PAGADOR_EN_TEXTO`, todas con **el canónico que ya existía**
+  (`DMBUG`, `FOMAG`): devolver uno distinto haría que `get_contrato()` buscara
+  con un nombre que la malla no conoce. En `_RE_EPS_SOLA`, CAJACOPI, SAVIA
+  SALUD, COMFENALCO y SUMIMEDICAL.
+
+### Pruebas (21, con 10 que fallan sin el arreglo)
+
+- `tests/test_services/test_el_dictamen_no_sale_con_el_contrato_de_otra_entidad.py`
+  — el caso exacto, las siete formas de nombrar la sanidad militar, y la
+  comprobación de que tres regímenes distintos resuelven a **tres contratos
+  distintos** y ninguno al de FAMISANAR. Más una clase entera de no-regresión
+  para las EPS del contributivo.
+
+
 ## Sesión 09-sep-2026 (tarde, 6) — `_facturado_linea_cups` leía el pactado como facturado
 
 Detectado en la prueba del auditor. Sobre «VALOR FACTURADO $185.000 SUPERIOR AL

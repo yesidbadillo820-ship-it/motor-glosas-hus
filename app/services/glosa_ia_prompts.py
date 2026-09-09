@@ -1963,6 +1963,26 @@ _TOKENS_PAGADOR_EN_TEXTO: tuple[tuple[str, str], ...] = (
     ("MALLAMAS", "MALLAMAS EPS"),
     ("DMBUG", "DMBUG"),
     ("DISPENSARIO MEDICO BUCARAMANGA", "DMBUG"),
+    # 09-09-2026 — EL DICTAMEN QUE SALIÓ CON EL CONTRATO DE OTRA ENTIDAD.
+    # Prueba del auditor: una glosa que empezaba «DISPENSARIO MEDICO ·
+    # FA0801 …» con el desplegable en FAMISANAR. Acá arriba solo estaba el
+    # nombre LARGO —con «BUCARAMANGA»— y el corto no cruzaba, así que el
+    # motor no corrigió nada: el dictamen se firmó a nombre de FAMISANAR,
+    # citando el contrato S-13-1-03-1-04958 y la tarifa SOAT UVB −5 % de
+    # FAMISANAR para una factura de sanidad militar.
+    #
+    # Es el mismo desastre que esta función vino a evitar en junio, pero al
+    # revés: entonces el desplegable decía Dispensario y el texto una EPS.
+    ("DISPENSARIO MEDICO", "DMBUG"),
+    ("DISPENSARIO MÉDICO", "DMBUG"),
+    ("DIGSA", "DMBUG"),
+    ("SANIDAD EJERCITO", "DMBUG"),
+    ("SANIDAD EJÉRCITO", "DMBUG"),
+    ("SANIDAD MILITAR", "DMBUG"),
+    ("POLICIA NACIONAL", "POLICIA NACIONAL"),
+    ("POLICÍA NACIONAL", "POLICIA NACIONAL"),
+    ("SANIDAD POLICIA", "POLICIA NACIONAL"),
+    ("FIDUPREVISORA", "FOMAG"),
     ("FOMAG", "FOMAG"),
     ("MAGISTERIO", "FOMAG"),
 )
@@ -1987,6 +2007,14 @@ _RE_EPS_SOLA = (
     (re.compile(r"\bASMET\s+SALUD\b"), "ASMET SALUD"),
     (re.compile(r"\bMEDIM[ÁA]S\b"), "MEDIMÁS"),
     (re.compile(r"\bSURA\b"), "SURA EPS"),
+    # 09-09-2026 — Los que faltaban y no son EPS del contributivo. Van con
+    # el MISMO nombre canónico que ya usa la lista de tokens de arriba: si
+    # aquí se devolviera otro, el contrato se buscaría con un nombre que la
+    # malla contractual no conoce.
+    (re.compile(r"\bCAJACOPI\b"), "CAJACOPI"),
+    (re.compile(r"\bSAVIA\s+SALUD\b"), "SAVIA SALUD"),
+    (re.compile(r"\bCOMFENALCO\b"), "COMFENALCO"),
+    (re.compile(r"\bSUMIMEDICAL\b"), "SUMIMEDICAL"),
 )
 
 
