@@ -1827,8 +1827,10 @@ app.include_router(soportes_auto_router)
 app.include_router(validador_adres_router)
 
 from app.api.routers.diagnostico import router as diagnostico_router
+from app.api.routers.diagnostico_calidad import router as diagnostico_calidad_router
 
 app.include_router(diagnostico_router)
+app.include_router(diagnostico_calidad_router)
 # OJO: auditor_forense (analiza soportes) y auditoria_forense (busca por IP)
 # son DOS cosas distintas. La limpieza de mayo los confundió y dejó la
 # pantalla del Auditor Forense llamando a una ruta que no existía.
