@@ -140,3 +140,39 @@ def calcular_riesgo(
         "icon": icon,
         "factores": factores,
     }
+
+
+# Piso del nivel ALTO. El mismo corte que usa `calcular_riesgo` arriba.
+_PISO_ALTO = 61
+
+
+def elevar_por_bloqueo(riesgo: Optional[dict], motivos_bloqueo) -> Optional[dict]:
+    """Sube el riesgo cuando el propio motor no deja radicar el dictamen.
+
+    09-09-2026, prueba del auditor. En la misma pantalla salía «Indicador de
+    riesgo de ratificación: BAJO — alta probabilidad de levantamiento» y, dos
+    renglones más abajo, el sello rojo de «NO RADICAR». Los dos números los
+    calcula el motor, y se contradicen: si el motor encontró un defecto tan
+    serio que prefiere no radicar el escrito, la entidad va a encontrar ese
+    mismo defecto y ratificar. El auditor, entre los dos, le cree al verde.
+
+    Por eso el bloqueo manda: el riesgo no puede quedar por debajo de ALTO, y
+    cada motivo del bloqueo entra como factor a la vista, para que se sepa por
+    qué subió y no parezca un número caprichoso.
+
+    Sin bloqueo no toca nada: `calcular_riesgo` sigue mandando.
+    """
+    if not riesgo or not motivos_bloqueo:
+        return riesgo
+    elevado = dict(riesgo)
+    factores = list(elevado.get("factores") or [])
+    for motivo in motivos_bloqueo:
+        factores.append(f"El motor no deja radicar el escrito: {motivo}")
+    elevado["factores"] = factores
+    if int(elevado.get("score") or 0) < _PISO_ALTO:
+        elevado["score"] = _PISO_ALTO
+    elevado["nivel"] = "ALTO"
+    elevado["color"] = "#dc2626"
+    elevado["icon"] = "🔴"
+    elevado["etiqueta"] = "El escrito no está listo para radicar — corríjalo antes"
+    return elevado

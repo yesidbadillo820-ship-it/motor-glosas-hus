@@ -1,5 +1,109 @@
 # Registro de cambios
 
+## Sesión 09-sep-2026 (tarde, 3) — El diagnóstico en pantalla, y dos afirmaciones sin respaldo
+
+Las tres del mismo tipo: el motor decía algo que no le constaba.
+
+### 1. El diagnóstico de calidad, dentro del motor
+
+`GET /admin/diagnostico-calidad` se publicó por la mañana y resultó
+inalcanzable: escrita en la barra del navegador, la ruta responde
+`{"detail":"Token de autenticación requerido"}` — correctamente, porque el
+navegador no manda el Bearer. La ruta existía y nadie podía usarla.
+
+- **`static/index.html`** — panel `#admin-diagnostico-card` en la pantalla de
+  Usuarios, visible solo con rol `SUPER_ADMIN` (nace con `display:none` y lo
+  destapa `loadUsuarios()`, igual que los otros dos paneles de administrador).
+  `cargarDiagnosticoCalidad()` pide la ruta con `authH()` y `_diagPintar()`
+  la renderiza en español —cada cifra con la frase que dice qué significa—
+  en vez del JSON crudo. Falla visible en pantalla tanto por red caída como
+  por respuesta de error (`r.ok`), nunca solo en consola.
+
+### 2. La ratificación no afirma una respuesta previa que no consta
+
+`TEXTO_RATIFICADA` abre con «SE MANTIENE LA RESPUESTA DADA EN TRÁMITE DE LA
+GLOSA INICIAL». En el caso 4 de la prueba salió sobre una factura sin
+ninguna respuesta anterior en el historial.
+
+- **`app/services/glosa_service.py`** — `_hay_respuesta_inicial_registrada()`
+  consulta `historial` por número de factura y devuelve `True` / `False` /
+  `None`. `None` («no se sabe»: factura ausente del historial, sin número, o
+  base no disponible) **no** dispara nada, igual que el aviso de soportes con
+  el índice a medio construir. Solo `False` agrega el aviso `⛔ NO RADICAR
+  TODAVÍA: NO HAY RESPUESTA INICIAL REGISTRADA`, y la marca entra en
+  `_MARCAS_DE_BLOQUEO` para que `bloqueado_para_radicar` lo impida — un
+  hallazgo grave bloquea, no aconseja. La propia ratificación no se cuenta a
+  sí misma como la respuesta que mantiene.
+
+### 3. No se le atribuye a la IA lo que la IA no hizo
+
+Con `modelo_ia = "texto_fijo"` la IA nunca corrió y `accion_ia` sale de
+`_mapa_accion` (Python), pero el recuadro decía «💡 La IA recomienda
+DEFENDER 100%»: una segunda opinión inexistente, con autoridad prestada.
+
+- **`static/index.html`** — `renderAccionIA()` deriva la atribución de
+  `d.modelo_ia`: «📋 Regla fija del área» para `texto_fijo`, `plantilla`,
+  `abstencion` y `directo_auditor`; «💡 La IA recomienda» solo cuando la IA
+  analizó. Las cuatro frases del panel también salen de esa variable.
+
+### 4. Un CUM no se rotula CUPS en la ficha del prompt
+
+La regla 4 del system prompt ya prohibía escribir «CUPS» sobre un CUM. Pero
+el BLOQUE 1 —declarado AUTORITATIVO— rotulaba `• CUPS : 20123-1` y remataba
+con «USA ESTE CUPS». Entre una regla general y un dato concreto con una orden
+al lado, gana el dato: salió «el código homologado del CUPS facturado» sobre
+acetaminofén.
+
+- **`app/services/glosa_ia_prompts.py`** — `_es_codigo_cum()` (forma
+  `\d{4,9}-\d{1,3}`, la misma de `citation_verifier._FORMA_CUM`, duplicada
+  adrede porque este módulo arma el prompt y no puede depender del que revisa
+  el resultado). La fila usa la etiqueta real y, con un CUM, `_nota_cups`
+  prohíbe explícitamente «CUPS X», «el CUPS facturado» y «código homologado
+  del CUPS», más el Manual Tarifario SOAT (no rige precios de medicamentos).
+  Un CUPS con anexo (`39147B-18`) sigue siendo CUPS.
+
+### 5. Una corrección automática ya no deja una cita rota
+
+Salió publicado «…LEY 1438 DE 2011 ART. EL DECRETO 780…». Perseguir cuál de
+las decenas de redes cortó mal es interminable; se valida el resultado.
+
+- **`app/services/glosa_service.py`** — `_quitar_articulo_huerfano()` exige
+  las dos orillas: a la izquierda el final de una cita completa (`(?<=\d)`), a
+  la derecha el arranque de otra norma (`EL|DEL|LA|…` + `DECRETO|LEY|
+  RESOLUCIÓN|…`). Corre después de todas las redes que reescriben citas y
+  registra la corrección en `_correcciones` — el artículo perdido puede
+  hacerle falta al gestor. La prosa vaga pero correcta («el artículo del
+  decreto») no la dispara.
+
+### 6. El riesgo de ratificación no contradice al sello de bloqueo
+
+Salía «riesgo BAJO — alta probabilidad de levantamiento» junto a «⛔ NO
+RADICAR». Ambos los calcula el motor.
+
+- **`app/services/riesgo_ratificacion.py`** — `elevar_por_bloqueo(riesgo,
+  motivos)`: con bloqueo, piso en 61 (ALTO), color/icono/etiqueta coherentes y
+  cada motivo añadido a `factores`. No muta el dict original y sin bloqueo
+  devuelve el mismo objeto — `calcular_riesgo` sigue mandando.
+- **`app/services/glosa_service.py`** — se aplica justo después de calcular
+  `_motivos_bloqueo`, antes de armar el `GlosaResult`.
+
+No se tocó «DEFENDER 100%» junto a «riesgo ALTO»: no es contradicción — uno
+dice qué responde el hospital, el otro qué se espera de la entidad.
+
+### Pruebas (75, todas comprobadas contra el código anterior)
+
+- `tests/test_frontend/test_el_diagnostico_de_calidad_se_ve_en_pantalla.py` (4)
+- `tests/test_frontend/test_el_diagnostico_pinta_los_numeros_de_verdad.py` (11),
+  que EJECUTA el pintor con Node contra la forma real de la respuesta: las
+  otras leen el HTML como texto y no verían un «undefined» en pantalla.
+- `tests/test_frontend/test_no_dice_que_la_ia_recomienda_si_la_ia_no_corrio.py` (5)
+- `tests/test_services/test_no_se_mantiene_una_respuesta_que_no_existe.py` (15),
+  con SQLite en memoria, los tres desenlaces del helper y tres de extremo a
+  extremo por `GlosaService.analizar` (probadas contra el cableado desactivado).
+- `tests/test_services/test_un_medicamento_no_se_llama_cups.py` (17)
+- `tests/test_services/test_una_correccion_no_puede_dejar_una_cita_rota.py` (14)
+- `tests/test_services/test_el_riesgo_no_contradice_al_sello.py` (9)
+
 ## Sesión 09-sep-2026 (tarde, 2) — `GET /admin/diagnostico-calidad`
 
 Los números detrás de la confianza baja solo se ven en la base real del

@@ -705,6 +705,23 @@ def get_contrato(eps: str, fecha_hecho=None) -> dict:
 # su Cláusula 4.2; FOMAG mezcló cláusulas del ACTA 012). Un número de
 # contrato ajeno es verificable por la EPS en segundos y destruye el
 # dictamen completo.
+# Forma de un CUM: el código del medicamento con su consecutivo («20123-1»,
+# «19953856-3»). Misma expresión que usa el verificador de citas
+# (`citation_verifier._FORMA_CUM`) — duplicada a propósito: este módulo arma
+# el prompt y no puede depender del que revisa el resultado.
+_FORMA_CUM_EN_LA_FICHA = re.compile(r"^\d{4,9}-\d{1,3}$")
+
+
+def _es_codigo_cum(codigo: str | None) -> bool:
+    """¿El código de la ficha es un CUM (medicamento) y no un CUPS?
+
+    09-09-2026. Un medicamento se factura con CUM; un procedimiento, con
+    CUPS. Son tablas distintas del Ministerio: la entidad cruza el CUPS
+    contra la suya, no encuentra el CUM y ratifica la glosa entera.
+    """
+    return bool(_FORMA_CUM_EN_LA_FICHA.match(str(codigo or "").strip()))
+
+
 _PAT_TOKEN_CONTRATO = re.compile(r"[A-Z0-9][A-Z0-9./\-]{4,40}")
 _PAT_TOKEN_NUM_ANIO = re.compile(
     r"\b(\d{3,4})\s+DE\s+(\d{4})\b|\b(\d{3,4})/(\d{4})\b",
@@ -3236,6 +3253,16 @@ def build_user_prompt(
     # Datos del PDF (si hay)
     datos = extraer_datos_soporte(contexto_pdf)
     cups = cups_verificado or datos["cups"]
+    # 09-09-2026 (caso 1 de la prueba, acetaminofén). Un medicamento no se
+    # factura con CUPS sino con CUM, y esta ficha rotulaba «CUPS» cualquier
+    # código —CUM incluido— y encima le ordenaba al modelo «USA ESTE CUPS».
+    # La regla 4 del prompt de sistema dice lo contrario («NUNCA escribas
+    # CUPS cuando el número viene de un CUM»), así que el prompt se
+    # contradecía a sí mismo y ganaba el dato, que es lo concreto. Salió un
+    # dictamen hablando del «código homologado del CUPS facturado» sobre un
+    # medicamento — y la entidad cruza ese código contra su tabla de CUPS,
+    # no lo encuentra, y ratifica la glosa completa.
+    _etiqueta_codigo = "CUM (medicamento)" if _es_codigo_cum(cups) else "CUPS"
     _nota_cups = ""
     if cups == "NO IDENTIFICADO":
         # Antes: "CUPS INDICADO EN EL EXPEDIENTE" -- aparecia literal en el
@@ -3259,6 +3286,19 @@ def build_user_prompt(
                 f"\n  ⚠ El número {numero_factura} es el NÚMERO DE FACTURA, "
                 "no un código CUPS — nunca lo presentes como CUPS."
             )
+    elif _etiqueta_codigo != "CUPS":
+        # No basta con rotular bien la fila: el resto del prompt está lleno de
+        # ejemplos y frases hechas con la palabra CUPS, y el modelo las copia.
+        _nota_cups = (
+            f"\n  ⚠ {cups} es un CUM (código del MEDICAMENTO), NO un CUPS. En "
+            "todo el dictamen llámalo CUM: «el medicamento facturado con CUM "
+            f"{cups}». PROHIBIDO escribir «CUPS {cups}», «el CUPS facturado» o "
+            "«código homologado del CUPS»: son tablas distintas del Ministerio "
+            "y la entidad cruza el CUPS contra la suya, no encuentra este "
+            "código y ratifica la glosa completa. La norma de precios de "
+            "medicamentos tampoco es la de procedimientos: no cites el Manual "
+            "Tarifario SOAT ni la homologación CUPS para un medicamento."
+        )
 
     paciente = datos.get("paciente", "NO IDENTIFICADO")
     medico = datos.get("medico", "NO IDENTIFICADO")
@@ -3941,7 +3981,7 @@ def build_user_prompt(
 • {_etiqueta_contrato} : {numero_contrato}{_nota_contrato}
 • Vigencia contrato : {contrato.get("vigencia", "—")}
 • Tarifa pactada    : {tarifa}
-• CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa{_nota_cups}
+• {_etiqueta_codigo:<18}: {cups}  ← USA ESTE CÓDIGO, no el que la EPS mencione como alternativa{_nota_cups}
   ⚠ DOS LETRAS + 4 DÍGITOS (TA, SO, FA, CO, CL, PE, AU, IN, ME, SE, EX, SA, RE
     y DE de devoluciones — Res. 2284/2023) es SIEMPRE un código de glosa o de
     devolución, NUNCA un CUPS. Si aparece en el texto, no lo escribas como CUPS
