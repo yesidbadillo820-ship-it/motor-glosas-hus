@@ -91,6 +91,43 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde, 8) — Los soportes también se ven al analizar (lo que quedó a medias)
+
+**Yesid preguntó qué había pasado con esto, y tenía razón.** Cuando pidió que
+al analizar una glosa se viera «qué van a auditar», pidió DOS cosas en el
+mismo mensaje: la tarifa pactada y los soportes. Se entregó la primera y la
+segunda quedó sin hacer, sin avisarle. Ya está.
+
+Y era el mismo caso exacto que las tarifas: el motor **ya sabía las tres
+cosas** y las horneaba dentro del texto del dictamen, donde la pantalla no
+puede pintarlas como una lista de verdad.
+
+Ahora, al analizar, salen tres columnas:
+
+| Lo que la causal exige | Lo que hay en el expediente | Lo que se adjuntó ahora |
+|---|---|---|
+| la epicrisis | la epicrisis (EPICRISIS_549713.pdf) | epicrisis_firmada.pdf |
+| la hoja de urgencias | los RIPS (RIPS_549713.json) | |
+
+Y debajo lo único que hay que decidir. Si falta: «**Falta la epicrisis o la
+hoja de atención de urgencias.** Este dictamen argumenta, pero no prueba: a la
+entidad le basta pedir el documento para ratificar la glosa». Si está:
+«**Está el soporte que la causal exige.** Nómbrelo en el escrito con su folio
+y su fecha: la entidad no discute lo que está señalado».
+
+**Lo que exige cada causal no se inventó**: sale del catálogo de la
+Resolución 2284 que el motor ya tenía. SO0101 pide epicrisis u hoja de
+urgencias; ME0101, la hoja de administración de medicamentos; TA0201, la
+factura electrónica.
+
+**El cuidado que valía la pena.** Si el buscador de soportes está a medio
+reconstruir, el panel NO dice «no hay»: dice «todavía no se sabe» y explica
+que espere. Ese defecto ya costó una vez — un dictamen sacado en mitad de una
+reindexación acusaba de faltar documentos de facturas que sí tenían el
+expediente completo, y encima bloqueaba la radicación.
+
+35 pruebas nuevas, todas comprobadas contra el código anterior.
+
 ### 09-09-2026 (cierre) — Un solo sistema de diseño para las tres aplicaciones
 
 **Lo que pidió Yesid:** «Hazlo mejor, como si realmente fuera algo profesional
