@@ -1,5 +1,39 @@
 # Registro de cambios
 
+## Sesión 09-sep-2026 (tarde, 5) — La evidencia de la tarifa, como dato y no como texto
+
+Pedido del área: al analizar una glosa de TARIFAS, ver el renglón del catálogo
+pactado y las cifras, para poder auditarlo. El cruce contra las 19.051 filas de
+`tarifas_contratadas` ya existía (`_pre_lookup_tarifa` → `evaluar_glosa_tarifa`),
+pero su salida se **prepend-eaba como HTML al `dictamen`**: no renderizable como
+tabla, y contaminando el escrito radicable.
+
+- **`app/models/schemas.py`** — `GlosaResult.evidencia_tarifa: Optional[dict]`.
+- **`app/api/routers/analizar.py`** — `_evidencia_de_la_tarifa(info_tarifa)`
+  estructura la fila del catálogo (CUPS, `codigo_ips`, descripción,
+  `valor_pactado`, `tipo_tarifa`/`factor_ajuste`, modalidad, contrato, vigencia
+  y `fuente_archivo`) más las cifras del caso. **La diferencia solo se calcula
+  con las dos cifras presentes** — en este motor `0` significa «no se pudo
+  leer», y restar contra él produciría un sobrecosto ficticio del tamaño de la
+  tarifa; los ceros se entregan como `None` y se enumeran en `no_se_pudo_leer`.
+  Devuelve `None` cuando no hay fila que mostrar. Se asigna al resultado tras
+  `service.analizar`.
+- **`static/index.html`** — `renderEvidenciaTarifa()` pinta las tres cifras, la
+  diferencia explicada en castellano (tres desenlaces: por encima, exacta, por
+  debajo), el aviso de homologación cuando `aplicada`, y un `<details>` con el
+  renglón del contrato. Se invoca **antes** de `renderRiesgoRatificacion` y
+  `renderAccionIA`: leído después del veredicto, nadie revisa la evidencia.
+
+### Pruebas (38, todas comprobadas contra el código anterior)
+
+- `tests/test_api/test_la_evidencia_de_la_tarifa.py` (21) — incluye los casos
+  de cifra ausente, diferencia cero legítima vs. incalculable, y homologación.
+- `tests/test_frontend/test_el_auditor_ve_la_tarifa_pactada.py` (17) — ejecuta
+  el pintor con Node contra las formas reales; comprueba sobre el texto plano
+  que no aparezca `$0` donde falta el dato, y que el orden en pantalla ponga la
+  evidencia antes del veredicto.
+
+
 ## Sesión 09-sep-2026 (tarde, 4) — La Confianza se guarda; el panel dejó de confundir dos métricas
 
 El diagnóstico corrió contra la base real (397 glosas) y devolvió

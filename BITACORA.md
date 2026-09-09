@@ -91,6 +91,54 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde, 5) — Al analizar una glosa de tarifas ya se ve el renglón del contrato
+
+Yesid pidió: «que cuando analicen una glosa vean qué van a auditar, y si es
+por tarifas que aparezca el Excel de la tarifa pactada y el valor para que
+ellos lo analicen».
+
+**Y el dato ya lo tenía el motor.** Cruzaba cada factura contra las 19.051
+filas del catálogo de tarifas que cargó el hospital… pero pegaba el resultado
+como un cuadro HTML **dentro del texto del dictamen**. Dos problemas de una:
+la pantalla no podía pintarlo como una tabla de verdad, y ese cuadro de
+trabajo interno terminaba metido en el escrito que se radica ante la EPS,
+donde no pinta nada.
+
+Ahora, al analizar una glosa de tarifas, aparece un recuadro verde
+**«📑 Lo que usted va a auditar»** con:
+
+- **las tres cifras juntas**: lo facturado por el HUS, lo pactado en el
+  contrato y lo objetado por la entidad;
+- **la diferencia explicada en castellano** («se facturó $27.750 por encima
+  de lo pactado; ese excedente es lo que la entidad puede sostener, el resto
+  no»), o el aviso de que no se puede calcular y por qué;
+- y, desplegando, **el renglón exacto del contrato**: el código, el servicio,
+  cómo se pactó (por ejemplo «SOAT -15% → $157.250», que se puede discutir con
+  el contrato en la mano, no un número pelado), el contrato, su vigencia, la
+  modalidad y **de qué archivo Excel salió** — para que el auditor vaya y lo
+  compruebe por su cuenta en vez de creerle al motor.
+
+Tres decisiones que valen la pena dejar escritas:
+
+1. **El recuadro va ARRIBA del veredicto.** Si el auditor lee primero
+   «DEFENDER 100%», ya no revisa la evidencia. Hay una prueba que vigila ese
+   orden.
+2. **Lo que no se pudo leer se dice.** Si falta el valor facturado NO sale
+   «$0» —que se leería como una cifra real del caso— sino «no se pudo leer», y
+   la diferencia **no se inventa**: restar contra un cero daría un sobrecosto
+   falso del tamaño de toda la tarifa.
+3. **Si el cruce pasó por una homologación se avisa**: cuando el código
+   facturado no es el mismo que figura en el contrato, el auditor tiene que
+   saber que hubo una traducción de por medio.
+
+En las glosas que no son de tarifas el recuadro no sale: la mayoría no lo son
+y un cuadro vacío en todas ellas sería ruido.
+
+Con sus 38 pruebas, todas comprobadas contra el código anterior. Las de
+pantalla **ejecutan** el pintor de verdad: una prueba de texto diría que todo
+está bien aunque en pantalla saliera «undefined» donde va la tarifa.
+
+
 ### 09-09-2026 (tarde, 4) — Los números REALES, y dos sorpresas (una es un error mío)
 
 Yesid abrió el botón nuevo y por fin salieron los datos de verdad del

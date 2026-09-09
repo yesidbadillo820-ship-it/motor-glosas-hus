@@ -200,6 +200,22 @@ class GlosaResult(BaseModel):
     # no emitió el bloque (degradación elegante). Opcional para no romper
     # consumidores que no lo esperan.
     campos_estructurados: Optional[dict] = None
+    # 09-09-2026 — LA EVIDENCIA, COMO DATO Y NO COMO TEXTO.
+    # Pedido de Yesid: «que cuando analicen una glosa vean qué van a auditar, y
+    # si es por tarifas que aparezca el Excel de la tarifa pactada y el valor».
+    #
+    # El motor YA cruzaba la factura contra las 19.051 filas del catálogo de
+    # tarifas pactadas — pero el resultado se pegaba como HTML DENTRO del
+    # dictamen. Eso tiene dos problemas: la pantalla no puede pintarlo como
+    # una tabla de verdad, y ese cuadro termina metido en el escrito que se
+    # radica ante la entidad, donde no pinta nada.
+    #
+    # Acá va el mismo dato, estructurado: la fila exacta del catálogo (CUPS,
+    # descripción, valor pactado, contrato, vigencia y de qué archivo salió),
+    # más las cifras del caso y la diferencia. `None` cuando la glosa no es de
+    # tarifas o el CUPS no está en el catálogo — que también es información:
+    # significa que el motor no tuvo con qué comparar.
+    evidencia_tarifa: Optional[dict] = None
     # 08-09-2026 — EL SELLO Y EL «⛔ NO RADICAR» NO PUEDEN CONVIVIR.
     # En la prueba de cinco casos, cuatro dictámenes salieron con el sello
     # verde «VALIDADO POR QUALITY GATE» y, dos renglones abajo, «⛔ NO RADICAR
