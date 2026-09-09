@@ -1752,6 +1752,116 @@ def _confianza_para_guardar(resultado) -> tuple:
     return valor, nivel
 
 
+# Nombres en cristiano de cada tipo de soporte. Los mismos que ya usa el
+# aviso de «falta el soporte de la causal», para que el auditor no lea dos
+# vocabularios distintos para la misma cosa.
+_NOMBRE_DEL_SOPORTE = {
+    "historia_clinica": "la historia clínica",
+    "epicrisis": "la epicrisis",
+    "hoja_atencion_urgencias": "la hoja de atención de urgencias",
+    "hoja_administracion_medicamentos": "la hoja de administración de medicamentos",
+    "descripcion_quirurgica": "la descripción quirúrgica",
+    "registro_anestesia": "el registro de anestesia",
+    "factura_electronica": "la factura electrónica",
+    "rips": "los RIPS",
+    "cuv": "el CUV",
+    "autorizacion": "la autorización",
+}
+
+
+def _evidencia_de_los_soportes(
+    servicio, numero_factura: Optional[str], codigo_glosa: str, contexto_pdf: Optional[str]
+) -> Optional[dict]:
+    """Qué soportes pide esta causal, cuáles hay y cuáles faltan.
+
+    09-09-2026, la otra mitad del pedido de Yesid: «que cuando analicen una
+    glosa vean qué van a auditar». Para una glosa de TARIFAS eso es el renglón
+    del contrato; para una de SOPORTES —que es donde más plata se pierde— es
+    esta lista.
+
+    Las tres columnas salen de sitios distintos y ninguna se inventa:
+
+      · **pide la causal** — `catalogo_glosas.soportes_que_pide`, o sea lo que
+        la Resolución 2284 exige para responder ESE código.
+      · **hay en el expediente** — el índice del servidor de radicación.
+      · **se adjuntó ahora** — los PDF que el gestor subió en este análisis.
+
+    Y de ahí sale lo único que el auditor necesita decidir: **qué falta**.
+
+    Devuelve `None` sin número de factura. Y cuando el índice se está
+    reconstruyendo devuelve la lista de lo que se pide con
+    `no_se_pudo_consultar=True` en vez de una lista vacía: «todavía no sé» no
+    es «no hay», y con las dos cosas iguales un dictamen sacado en mitad de una
+    reindexación acusaba de faltar soportes que sí estaban.
+    """
+    if not numero_factura or not str(numero_factura).strip():
+        return None
+
+    try:
+        from app.services.catalogo_glosas import soportes_que_pide
+
+        pide = list(soportes_que_pide(codigo_glosa) or ())
+    except Exception as e:  # noqa: BLE001 — sin catálogo no se exige nada
+        logger.debug(f"[EVIDENCIA-SOPORTES] catálogo no disponible: {e}")
+        pide = []
+
+    hay: list[dict] = []
+    construyendo = False
+    try:
+        from app.services.soportes_autodiscovery_service import get_indexer
+
+        _idx = get_indexer()
+        encontrados = _idx.lookup(str(numero_factura).strip()) or []
+        if not encontrados:
+            try:
+                construyendo = bool(_idx.stats().get("construyendo"))
+            except Exception:  # noqa: BLE001 — sin estado se trata como «no hay»
+                construyendo = False
+        for s in encontrados:
+            if not isinstance(s, dict):
+                continue
+            hay.append(
+                {
+                    "tipo": s.get("tipo") or "otro",
+                    "nombre": _NOMBRE_DEL_SOPORTE.get(s.get("tipo") or "", s.get("tipo") or "otro"),
+                    "archivo": s.get("nombre_archivo") or "",
+                }
+            )
+    except Exception as e:  # noqa: BLE001 — sin índice se avisa, no se inventa
+        logger.debug(f"[EVIDENCIA-SOPORTES] índice no consultable: {e}")
+        construyendo = True
+
+    adjuntos: list[str] = []
+    try:
+        from app.services.glosa_service import GlosaService
+
+        adjuntos = GlosaService._documentos_adjuntos(contexto_pdf) or []
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"[EVIDENCIA-SOPORTES] adjuntos no leídos: {e}")
+
+    # Lo que falta solo se puede afirmar si el índice contestó. Basta UNO de
+    # los soportes que sirven para la causal: la epicrisis y la hoja de
+    # urgencias prueban lo mismo según el caso.
+    tipos_presentes = {s["tipo"] for s in hay}
+    if construyendo or not pide:
+        faltan: list[str] = []
+    elif tipos_presentes & set(pide):
+        faltan = []
+    else:
+        faltan = [_NOMBRE_DEL_SOPORTE.get(x, x) for x in pide]
+
+    return {
+        "factura": str(numero_factura).strip(),
+        "codigo_glosa": codigo_glosa or "",
+        "pide_la_causal": [{"tipo": x, "nombre": _NOMBRE_DEL_SOPORTE.get(x, x)} for x in pide],
+        "hay_en_el_expediente": hay,
+        "se_adjunto_en_este_analisis": adjuntos,
+        "faltan": faltan,
+        # El «no se sabe», dicho con todas las letras.
+        "no_se_pudo_consultar": bool(construyendo),
+    }
+
+
 def _evidencia_de_la_tarifa(info_tarifa: Optional[dict]) -> Optional[dict]:
     """La fila del catálogo de tarifas pactadas, lista para pintar en pantalla.
 
@@ -2106,6 +2216,12 @@ async def _analizar_impl(
             resultado.evidencia_tarifa = _evidencia_de_la_tarifa(info_tarifa_pre)
         except Exception as _e_ev:
             logger.debug(f"[{req_id}] evidencia de tarifa no armada: {_e_ev}")
+        try:
+            resultado.evidencia_soportes = _evidencia_de_los_soportes(
+                service, numero_factura, resultado.codigo_glosa or "", contexto_pdf
+            )
+        except Exception as _e_es:
+            logger.debug(f"[{req_id}] evidencia de soportes no armada: {_e_es}")
         _publicar_progreso(
             _tid,
             "ia_completada",

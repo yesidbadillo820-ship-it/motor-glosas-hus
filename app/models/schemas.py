@@ -216,6 +216,20 @@ class GlosaResult(BaseModel):
     # tarifas o el CUPS no está en el catálogo — que también es información:
     # significa que el motor no tuvo con qué comparar.
     evidencia_tarifa: Optional[dict] = None
+    # 09-09-2026 — LA OTRA MITAD DE «QUE VEAN QUÉ VAN A AUDITAR».
+    # Pedido de Yesid junto con el de tarifas; se entregó primero el tarifario
+    # y este quedó pendiente. Mismo problema y misma solución: el motor YA
+    # sabía qué soportes exige cada causal, qué hay en el expediente del
+    # servidor de radicación y qué PDF se adjuntaron en este análisis — pero
+    # todo eso se horneaba como HTML DENTRO del dictamen. La pantalla no podía
+    # pintarlo como una lista de verdad.
+    #
+    # Va lo mismo, estructurado: lo que la causal PIDE, lo que HAY, lo que se
+    # ADJUNTÓ y —lo que de verdad importa— lo que FALTA. `None` cuando no hay
+    # número de factura o el índice no pudo consultarse: en este motor «no se
+    # sabe» no es «no hay», y presentar un expediente vacío que nadie miró es
+    # justo lo que hace que la entidad ratifique.
+    evidencia_soportes: Optional[dict] = None
     # 08-09-2026 — EL SELLO Y EL «⛔ NO RADICAR» NO PUEDEN CONVIVIR.
     # En la prueba de cinco casos, cuatro dictámenes salieron con el sello
     # verde «VALIDADO POR QUALITY GATE» y, dos renglones abajo, «⛔ NO RADICAR

@@ -18166,6 +18166,96 @@ function renderRiesgoRatificacion(r){
 //   A = 0 issues · B = solo MEDIA · C = alguna ALTA.
 // CONFIANZA: % real de confianza.score*100 + recomendación del backend.
 // La prob. de éxito histórica queda como dato secundario (.exito-mini).
+// ─── LA EVIDENCIA DE LOS SOPORTES ────────────────────────────────────
+// 09-09-2026, la otra mitad del pedido de Yesid: «que cuando analicen una
+// glosa vean qué van a auditar». Para una glosa de TARIFAS eso es el renglón
+// del contrato; para una de SOPORTES —donde más plata se pierde— es esta
+// lista: qué exige la causal, qué hay en el expediente, qué se adjuntó ahora
+// y, sobre todo, qué falta.
+//
+// Igual que con las tarifas, el motor ya tenía los tres datos y los horneaba
+// como HTML dentro del dictamen. Acá se pintan como lo que son.
+function renderEvidenciaSoportes(ev){
+  if(!ev) return '';
+  var pide = ev.pide_la_causal || [];
+  var hay = ev.hay_en_el_expediente || [];
+  var adj = ev.se_adjunto_en_este_analisis || [];
+  var faltan = ev.faltan || [];
+  // Sin nada que decir, no se estorba: una glosa de tarifas sin requisitos
+  // de soporte y sin expediente indexado no necesita este recuadro.
+  if(!pide.length && !hay.length && !adj.length && !ev.no_se_pudo_consultar) return '';
+
+  var falta = faltan.length > 0;
+  var borde = ev.no_se_pudo_consultar ? '#3b82f6' : (falta ? '#dc2626' : '#10b981');
+  var fondo = ev.no_se_pudo_consultar ? 'linear-gradient(135deg,#eff6ff,#dbeafe)'
+            : (falta ? 'linear-gradient(135deg,#fef2f2,#fee2e2)'
+                     : 'linear-gradient(135deg,#f0fdf4,#ecfdf5)');
+  var titColor = ev.no_se_pudo_consultar ? '#1e40af' : (falta ? '#b91c1c' : '#047857');
+
+  function _lista(items, vacio){
+    if(!items.length) return '<div style="color:var(--text3);font-size:.8rem">' + vacio + '</div>';
+    return '<ul style="margin:0;padding-left:1.1rem;font-size:.82rem;line-height:1.6">'
+      + items.map(function(x){ return '<li>' + escHtml(x) + '</li>'; }).join('') + '</ul>';
+  }
+
+  var col = function(titulo, cuerpo){
+    return '<div style="flex:1 1 190px;min-width:0;background:#fff;border:1px solid var(--border);'
+      + 'border-radius:8px;padding:.6rem .75rem">'
+      + '<div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;'
+      + 'color:var(--text3);font-weight:700;margin-bottom:.35rem">' + titulo + '</div>'
+      + cuerpo + '</div>';
+  };
+
+  var columnas =
+      col('La causal ' + escHtml(ev.codigo_glosa || '') + ' exige',
+          _lista(pide.map(function(x){ return x.nombre; }), 'Esta causal no exige un soporte concreto.'))
+    + col('Hay en el expediente',
+          ev.no_se_pudo_consultar
+            ? '<div style="color:#1e40af;font-size:.8rem;font-weight:600">Todavía no se sabe</div>'
+            : _lista(hay.map(function(x){ return x.nombre + (x.archivo ? ' (' + x.archivo + ')' : ''); }),
+                     'Ninguno encontrado en el servidor.'))
+    + col('Se adjuntó en este análisis',
+          _lista(adj, 'Ningún PDF adjunto.'));
+
+  var remate = '';
+  if(ev.no_se_pudo_consultar){
+    remate = '<div style="margin-top:.6rem;padding:.55rem .8rem;border-radius:8px;background:#dbeafe;'
+      + 'border:1px solid #3b82f6;font-size:.85rem;color:#1e3a8a">'
+      + '<b>El buscador de soportes está a medio armar.</b> Que no aparezcan '
+      + 'documentos <b>no</b> quiere decir que la factura no tenga expediente. '
+      + 'Espere a que la pantalla de <b>Soportes</b> diga que terminó y vuelva a analizar.'
+      + '</div>';
+  } else if(falta){
+    remate = '<div style="margin-top:.6rem;padding:.55rem .8rem;border-radius:8px;background:#fee2e2;'
+      + 'border:1px solid #dc2626;font-size:.85rem;color:#7f1d1d">'
+      + '<b>Falta ' + escHtml(faltan.join(' o ')) + '.</b> '
+      + 'Este dictamen argumenta, pero no prueba: a la entidad le basta pedir el '
+      + 'documento para ratificar la glosa. Anéxelo antes de radicar.'
+      + '</div>';
+  } else if(pide.length){
+    remate = '<div style="margin-top:.6rem;padding:.55rem .8rem;border-radius:8px;background:#ecfdf5;'
+      + 'border:1px solid #10b981;font-size:.85rem;color:#065f46">'
+      + '<b>Está el soporte que la causal exige.</b> Nómbrelo en el escrito con su '
+      + 'folio y su fecha: la entidad no discute lo que está señalado.'
+      + '</div>';
+  }
+
+  return (
+    '<div class="card-premium" style="margin-top:1rem;padding:1rem 1.3rem;border:2px solid '
+    + borde + ';background:' + fondo + '">'
+    + '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.7rem">'
+    + '<div style="font-size:1.4rem;line-height:1">📎</div>'
+    + '<div><div style="font-weight:800;color:' + titColor + ';letter-spacing:.04em;'
+    + 'font-size:.78rem;text-transform:uppercase">Los soportes de esta glosa</div>'
+    + '<div style="font-size:.8rem;color:' + titColor + '">Factura '
+    + escHtml(ev.factura || '') + ' · lo que se exige, lo que hay y lo que falta.</div>'
+    + '</div></div>'
+    + '<div style="display:flex;gap:.6rem;flex-wrap:wrap">' + columnas + '</div>'
+    + remate
+    + '</div>'
+  );
+}
+
 // ─── LA EVIDENCIA DE LA TARIFA ───────────────────────────────────────
 // 09-09-2026, pedido de Yesid: «que cuando analicen una glosa vean qué van a
 // auditar, y si es por tarifas que aparezca el Excel de la tarifa pactada y
@@ -18425,6 +18515,7 @@ function renderResult(d){
     // renglón del contrato y las cifras ANTES de leer qué concluyó el motor.
     // Al revés, lee la conclusión y ya no revisa.
     + renderEvidenciaTarifa(d.evidencia_tarifa)
+    + renderEvidenciaSoportes(d.evidencia_soportes)
     + (d.riesgo_ratificacion ? renderRiesgoRatificacion(d.riesgo_ratificacion) : '')
     + (d.accion_ia ? renderAccionIA(d) : '')
 

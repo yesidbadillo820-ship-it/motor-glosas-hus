@@ -1,5 +1,40 @@
 # Registro de cambios
 
+## Sesión 09-sep-2026 (tarde, 8) — `evidencia_soportes`: la mitad que faltaba del panel de análisis
+
+El pedido original («que vean qué van a auditar, o también si es por tarifas
+que aparezca el Excel de la tarifa pactada») tenía dos partes. Se entregó la
+tarifaria en la sesión anterior; esta es la de soportes.
+
+Mismo patrón que `evidencia_tarifa`: los tres datos existían y se
+concatenaban como HTML dentro del dictamen (`_soportes_reales`,
+`_documentos_adjuntos`, `catalogo_glosas.soportes_que_pide`), fuera del
+alcance de la pantalla.
+
+- **`app/models/schemas.py`** — `GlosaResult.evidencia_soportes`.
+- **`app/api/routers/analizar.py`** — `_evidencia_de_los_soportes()` cruza las
+  tres fuentes: lo que la causal exige (Res. 2284), lo que el índice del
+  servidor de radicación reporta, y los PDF de este análisis. Deriva `faltan`
+  con la regla de que **basta uno** de los soportes válidos para la causal.
+  `None` sin número de factura.
+- **`static/index.html`** — `renderEvidenciaSoportes()` en tres columnas, con
+  remate accionable según el caso. Se pinta junto a `renderEvidenciaTarifa`,
+  antes del riesgo y de la recomendación.
+
+**`no_se_pudo_consultar`**: cuando el índice está reconstruyéndose (o revienta),
+`faltan` queda vacío y el panel dice «todavía no se sabe». Es el defecto que
+ya se pagó una vez — expedientes completos reportados como ausentes durante
+una reindexación, con bloqueo de radicación incluido.
+
+### Pruebas (35, todas comprobadas contra el código anterior)
+
+- `tests/test_api/test_la_evidencia_de_los_soportes.py` (18) — las tres
+  fuentes por separado, la regla de «basta uno», y los cuatro estados del
+  índice (con datos / vacío al día / reconstruyéndose / caído).
+- `tests/test_frontend/test_el_auditor_ve_que_soporte_le_falta.py` (17) —
+  ejecuta el pintor con Node contra las tres formas reales.
+
+
 ## Sesión 09-sep-2026 (tarde, 7) — `_detectar_pagador_en_texto` no conocía los regímenes especiales
 
 Detectado en la prueba del auditor. Glosa «DISPENSARIO MEDICO · FA0801
