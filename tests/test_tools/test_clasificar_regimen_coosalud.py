@@ -302,6 +302,34 @@ class TestSoportesRadicacion:
         # La que no tiene soportes lo dice en observaciones.
         assert "sin soportes en las rutas" not in str(filas["HUS0000349680"][16] or "")
 
+    def test_formato_lote_para_el_cargue_de_coosalud(self, tmp_path):
+        """Con --lote la salida queda como la pide el portal:
+        <Regimen>\\<lote>\\RIPS\\HUS<n>.json (+CUV) y \\IMG\\HUS<n>\\<soportes>."""
+        r1, r2 = _armar_radicacion(tmp_path)
+        destino = _correr(
+            tmp_path,
+            "--raiz-soportes",
+            str(r1),
+            "--raiz-soportes",
+            str(r2),
+            "--lote",
+            "605505_20260908_135357",
+            soportes=True,
+        )
+        lote = destino / "Subsidiado" / "605505_20260908_135357"
+        # RIPS planos y renombrados al nombre que espera el portal.
+        assert (lote / "RIPS" / "HUS349680.json").is_file()
+        assert (lote / "RIPS" / "CUV_HUS349680.json").is_file()
+        # Soportes del servicio en IMG\<factura>\ (aplanados).
+        img = lote / "IMG" / "HUS349680"
+        assert (img / "FEV_900006037_HUS349680.pdf").is_file()
+        assert (img / "HEV_900006037_HUS349680.pdf").is_file()
+        # La contributiva arma su propio lote bajo su regimen.
+        lote_c = destino / "Contributivo" / "605505_20260908_135357"
+        assert (lote_c / "IMG" / "HUS352629" / "900006037_HUS352629_FACTURA.pdf").is_file()
+        # Ya NO se crea la carpeta por factura del formato viejo.
+        assert not (destino / "Subsidiado" / "HUS349680").exists()
+
     def test_indexar_radicacion_no_desciende_a_facturas_ajenas(self, tmp_path):
         r1, _ = _armar_radicacion(tmp_path)
         idx = cr.indexar_radicacion([r1], {"349680"})
@@ -320,6 +348,34 @@ class TestSoportesRadicacion:
         assert [p.name for p in idx["472660"]] == ["HUS472660"]
         copiados, obs = cr.copiar_soportes(idx["472660"], tmp_path / "out")
         assert copiados == 5 and obs == []
+
+    def test_lista_txt_procesa_facturas_sin_excel(self, tmp_path):
+        share = _armar_share(tmp_path)
+        destino = tmp_path / "CLASIFICADO"
+        # TXT como lo deja PowerShell (`>` = UTF-16 con BOM), con duplicada,
+        # comillas, linea vacia y comentario.
+        lista = tmp_path / "facturas.txt"
+        lista.write_bytes(
+            '﻿HUS0000349680\n\n# comentario\n"HUS352629"\nHUS349680\n'.encode("utf-16")
+        )
+        argv = [
+            "clasificar_regimen_coosalud.py",
+            "--lista",
+            str(lista),
+            "--share",
+            str(share),
+            "--destino",
+            str(destino),
+            "--sin-soportes",
+        ]
+        viejo = sys.argv
+        sys.argv = argv
+        try:
+            assert cr.main() == 0
+        finally:
+            sys.argv = viejo
+        filas = _filas(destino)
+        assert set(filas) == {"HUS0000349680", "HUS352629"}  # deduplicada
 
     def test_solo_procesa_facturas_puntuales_sin_excel(self, tmp_path):
         share = _armar_share(tmp_path)

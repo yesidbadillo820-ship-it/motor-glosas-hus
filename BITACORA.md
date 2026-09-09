@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 08-09-2026
+**Última actualización:** 09-09-2026
 
 ---
 
@@ -90,6 +90,20 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 09-09-2026 — Las carpetas ya salen con el formato del cargue de COOSALUD
+
+El auditor pidió los soportes de ~176 facturas para re-radicar, y mostró cómo
+deben quedar: no una carpeta por factura con todo revuelto, sino el **formato
+que pide el portal** — `<Régimen>\<lote>\RIPS\` con los JSON planos
+(`HUS<n>.json` y `CUV_HUS<n>.json`, renombrados desde el share) y
+`<Régimen>\<lote>\IMG\HUS<n>\` con los soportes del servicio. Se agregó al
+bot la opción **`--lote`** que arma justamente eso (con el nombre del radicado
+o con fecha y hora), y la opción **`--lista`** para pasarle un TXT con las
+facturas (un listado de 176 no cabe en la línea de comandos). Verificado
+contra la carpeta real de la HUS349680: los 10 soportes quedaron en su IMG y
+los dos JSON en RIPS con el nombre correcto. Van 19 pruebas.
+
 
 ### 08-09-2026 (cierre 3) — la pantalla Objeciones DGH ya sirve para TODAS las entidades
 
