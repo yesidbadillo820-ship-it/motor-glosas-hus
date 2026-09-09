@@ -1,5 +1,34 @@
 # Registro de cambios
 
+## Sesión 09-sep-2026 (tarde, 6) — `_facturado_linea_cups` leía el pactado como facturado
+
+Detectado en la prueba del auditor. Sobre «VALOR FACTURADO $185.000 SUPERIOR AL
+PACTADO $157.250» con `cups="890201"`, `_extraer_valores_glosa` devolvía
+`facturado: 157250.0`. La recomendación resultante fue aceptar $105.350 en vez
+de $133.100 — y se aplicó.
+
+`_facturado_linea_cups` toma `valores[-1]` de la ventana posterior al CUPS,
+correcto para una fila de factura (`CANT VR_UNIT VR_PAC VR_ENT`) e incorrecto
+para prosa etiquetada. La guarda existente (`len(todos_montos) < 2 → 0.0`) no
+lo cubría: aquí hay dos montos.
+
+- **`app/utils/parsers_glosa.py`** — `_las_cifras_vienen_con_nombre(chunk)`
+  detecta las etiquetas que asignan significado a un monto (PACTADO,
+  CONTRATADO, RECONOCIDO, OBJETADO, GLOSADO, ACEPTA(DO), TARIFA
+  PACTADA/CONTRATADA/VIGENTE, DIFERENCIA). Cuando aparecen,
+  `_facturado_linea_cups` devuelve `0.0` y `_extraer_valores_glosa` cae a
+  `patrones_fact`, que lee por etiqueta. La regla estricta del CUPS (incidente
+  27-abr-2026) queda intacta para columnas mudas. Se añadió también
+  `\bFACTUR(?:Ó|O)\b` a `patrones_fact` («SE FACTURÓ $90.000»).
+
+### Pruebas (20, con 7 que fallan sin el arreglo)
+
+- `tests/test_services/test_no_confundir_lo_facturado_con_lo_pactado.py` —
+  el caso exacto del auditor, cuatro variantes de redacción, y la verificación
+  de que las filas de factura no se marcan como prosa. Las 8 de
+  `test_parser_facturado_cups.py` (incidente de abril) siguen pasando.
+
+
 ## Sesión 09-sep-2026 (tarde, 5) — La evidencia de la tarifa, como dato y no como texto
 
 Pedido del área: al analizar una glosa de TARIFAS, ver el renglón del catálogo

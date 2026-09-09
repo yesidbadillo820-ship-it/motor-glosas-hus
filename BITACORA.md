@@ -91,6 +91,41 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde, 6) — El motor confundía lo FACTURADO con lo PACTADO (lo destapó la prueba de Yesid)
+
+Probando las 20 glosas, en el primer caso el motor recomendó **aceptar
+$105.350** y Yesid le dio a «Aplicar recomendación». **Esa cifra estaba mal.**
+
+La glosa decía: «VALOR FACTURADO **$185.000** SUPERIOR AL PACTADO
+**$157.250**». El motor leyó **$157.250 como el valor facturado** — o sea, el
+pactado. Con esa cifra al revés comparó contra la tarifa real del contrato
+($51.900) y sacó una recomendación de aceptar $105.350. La cuenta correcta es
+$185.000 − $51.900 = **$133.100**.
+
+**En una glosa de verdad eso es plata regalada**, y calculada sobre un número
+leído al revés.
+
+**Por qué pasaba, y no era un descuido.** La función que busca el valor está
+hecha para leer FILAS DE FACTURA, donde los montos son columnas mudas
+(«1,00 $247.663,00 $0,00 $247.663,00») y el último es el valor de la línea.
+Esa regla es correcta ahí y nació de un incidente real de abril: en una
+factura de nueve conceptos el motor le pasaba a la IA el TOTAL de la factura
+como valor de cada línea.
+
+Lo que nadie había visto es que la MISMA función recibe también el texto de
+la glosa, donde la entidad le pone nombre a cada cifra. Ahí «el último monto»
+no es lo facturado: es lo que la entidad escribió de último.
+
+**La regla que queda:** si las cifras vienen con nombre —pactado, contratado,
+reconocido, objetado, glosado, diferencia—, no es una fila de factura y se
+leen las etiquetas. Si son columnas mudas, sigue mandando la regla de la
+línea del CUPS, intacta (comprobado: las 8 pruebas del incidente de abril
+siguen pasando).
+
+Con sus 20 pruebas, comprobadas contra el código anterior: 7 fallan sin el
+arreglo.
+
+
 ### 09-09-2026 (tarde, 5) — Al analizar una glosa de tarifas ya se ve el renglón del contrato
 
 Yesid pidió: «que cuando analicen una glosa vean qué van a auditar, y si es

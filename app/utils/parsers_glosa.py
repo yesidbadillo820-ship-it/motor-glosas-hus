@@ -216,6 +216,40 @@ def _concepto_glosa(codigo_glosa: str) -> str:
     return fallbacks.get(prefijo, "Glosa sin concepto específico asignado")
 
 
+# 09-09-2026 — LAS CIFRAS QUE VIENEN CON NOMBRE.
+# En una FILA DE FACTURA los montos son columnas mudas
+# («1,00  $247.663,00  $0,00  $247.663,00») y el último es el valor de la
+# línea. En el TEXTO DE UNA GLOSA, en cambio, la entidad le pone nombre a
+# cada cifra: «VALOR FACTURADO $185.000 SUPERIOR AL PACTADO $157.250». Ahí
+# el último monto NO es lo facturado — es lo pactado, que es lo contrario.
+_ETIQUETAS_DE_CIFRA = re.compile(
+    r"\bPACTAD[OA]S?\b|\bCONTRATAD[OA]S?\b|\bRECONOCID[OA]S?\b|"
+    r"\bOBJETAD[OA]S?\b|\bGLOSAD[OA]S?\b|\bACEPTA(?:D[OA]S?|MOS|N)?\b|"
+    r"\bTARIFA\s+(?:PACTADA|CONTRATADA|VIGENTE)\b|\bDIFERENCIA\b",
+    re.IGNORECASE,
+)
+
+
+def _las_cifras_vienen_con_nombre(chunk: str) -> bool:
+    """¿Este pedazo es prosa de glosa (cifras con nombre) o una fila de factura?
+
+    09-09-2026, caso real de la prueba del auditor. La glosa decía:
+
+        «VALOR FACTURADO $185.000 SUPERIOR AL PACTADO $157.250»
+
+    y el motor leyó **$157.250 como el valor facturado** —el último monto de
+    la ventana, que es la regla correcta para una fila de factura y la
+    equivocada para una frase—. Con eso recomendó aceptar $105.350 en vez de
+    $133.100: una diferencia de $27.750 que el hospital habría regalado, y
+    calculada además sobre una cifra leída al revés.
+
+    Cuando las cifras vienen con nombre, mandan los nombres: se devuelve
+    `True` para que el que llama use los patrones etiquetados, que sí leen
+    «FACTURADO» donde dice FACTURADO.
+    """
+    return bool(chunk) and bool(_ETIQUETAS_DE_CIFRA.search(chunk))
+
+
 def _facturado_linea_cups(texto: str, cups: str) -> float:
     """Busca el valor de LÍNEA del CUPS específico en la factura.
 
@@ -294,6 +328,11 @@ def _facturado_linea_cups(texto: str, cups: str) -> float:
     valores = [v for v in valores if v > 0]
     if not valores:
         return 0.0
+    # 09-09-2026: si las cifras del fragmento vienen con nombre, esto NO es
+    # una fila de factura y la regla del «último monto» miente. Se devuelve 0
+    # para que el que llama lea por las etiquetas, que es lo que corresponde.
+    if _las_cifras_vienen_con_nombre(chunk):
+        return 0.0
     # En facturas HUS la fila típica es "CANT  VR_UNIT  VR_PAC  VR_ENT".
     # El último monto significativo del chunk suele ser VR_ENT (valor
     # final de la línea). Si los dos últimos coinciden (cantidad=1 →
@@ -358,6 +397,10 @@ def _extraer_valores_glosa(texto: str, cups: Optional[str] = None) -> dict:
         # Forma explícita de HUS: "VALOR UNITARIO FACTURADO POR IPS $ 206,400"
         # o "FACTURADO POR IPS $XXX" (tolera hasta 3 palabras entre POR y el valor)
         r"FACTURAD[OA]S?\s+(?:POR\s+(?:\w+\s+){0,3})?\$?\s*([\d][\d\.,]{3,})",
+        # 09-09-2026: la entidad también lo escribe en pasado — «SE FACTURÓ
+        # $90.000». Sin esto, la lectura por etiquetas no encontraba nada y
+        # el valor facturado quedaba en cero.
+        r"\bFACTUR(?:Ó|O)\b[^\d$]{0,20}\$?\s*([\d][\d\.,]{3,})",
         r"VALOR\s+(?:UNITARIO\s+)?FACTURADO[:\s]+(?:POR\s+(?:\w+\s+){0,3})?\$?\s*([\d][\d\.,]{3,})",
         r"COBRAD[OA]\s+(?:POR\s+(?:\w+\s+){0,3})?\$?\s*([\d][\d\.,]{3,})",
         # Ronda 30: '$' OBLIGATORIO — sin él "FACTURA 90228637" capturaba el
@@ -402,6 +445,19 @@ def _extraer_valores_glosa(texto: str, cups: Optional[str] = None) -> dict:
     val_fact = 0.0
     if cups:
         val_fact = _facturado_linea_cups(t, cups)
+        # 09-09-2026 — LA EXCEPCIÓN, Y ES ESTRECHA A PROPÓSITO. La regla de
+        # arriba («con CUPS conocido, su línea o cero») nació de un incidente
+        # real: en una factura de 9 conceptos el motor le pasaba a la IA el
+        # TOTAL de la factura como valor de cada línea. Esa regla se queda.
+        #
+        # Pero no aplica cuando el texto no es una factura sino la frase de la
+        # glosa, donde cada cifra viene con su nombre («VALOR FACTURADO
+        # $185.000 SUPERIOR AL PACTADO $157.250»). Ahí no hay filas que
+        # contaminar: hay etiquetas, y leerlas es más seguro que contar
+        # posiciones. Sin esto el motor tomaba el pactado como facturado y
+        # recomendaba aceptar una cifra calculada al revés.
+        if not val_fact and _las_cifras_vienen_con_nombre(t):
+            val_fact = _primer_match(patrones_fact)
     else:
         val_fact = _primer_match(patrones_fact)
 
