@@ -95,6 +95,12 @@ RUTAS_RADICACION_DEFECTO: tuple[str, ...] = (
     # radicacion trae RADICACIÓN 2023 / RADICACION 2024.
     "\\\\Prime\\radicacion_2026\\Radicacion Digital - Carpeta 2\\RADICACION\\RADICACION DIGITAL",
     "\\\\Prime\\servidor_radicación\\RADICACION DIGITAL",
+    # Archivo de radicacion de 2025 (feb-ago): esos meses NO estan en
+    # "Radicacion Digital" (que solo llega a enero-2025) ni en SINAC 2025
+    # (arranca en septiembre). Viven aqui, con la misma estructura
+    # ...\<mes>\RADICACION DE <MES>\COOSALUD\<gestora>\ENV-...\IMG\HUS<n>\.
+    # Se apunta al padre porque cada año cuelga de la misma carpeta.
+    "\\\\Prime\\FACTURACIÓN\\CONSULTA FACTURACION 2\\CONSULTA FACTTURACION 2\\FACTURACION 2024\\FACTURACION UT",
 )
 
 # Numero de factura dentro de nombres de carpeta/archivo del share de

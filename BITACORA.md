@@ -125,6 +125,13 @@ no seguir a ciegas, el diagnóstico ahora acepta **varias rutas de una vez** y
 un **`--buscar HUS<n>`** que rastrea una factura y dice en qué carpeta exacta
 aparece. Van 26 pruebas.
 
+**HALLADOS (mismo día):** el rastreo destapó dónde estaban los soportes de
+2025: en el servidor de **FACTURACIÓN**, no en los de radicación —
+`\\Prime\FACTURACIÓN\CONSULTA FACTURACION 2\...\FACTURACION UT\2025\04. Abril\RADICACION DE ABRIL\COOSALUD\KARIN\ABRIL\ENV-208739-OK-C\IMG\HUS359567\`,
+con la misma forma de siempre (`COOSALUD\<gestora>\ENV-...\IMG\HUS<n>`).
+95 coincidencias de las 3 facturas de prueba. Esa carpeta quedó agregada a la
+lista fija del bot, así que la corrida del lote ya no necesita banderas.
+
 
 ### 09-09-2026 — Las carpetas ya salen con el formato del cargue de COOSALUD
 
