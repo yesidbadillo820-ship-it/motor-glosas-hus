@@ -123,6 +123,73 @@ funcionaban siguen igual.
 
 21 pruebas, 10 de ellas fallan sin el arreglo.
 
+### 09-09-2026 — «Me das cosas planas»: el curso de noruego se ve como se debía ver
+
+**La observación de Yesid, y tenía razón.** «Siempre que te pido algo me das
+cosas planas, puras cosas con código como de principiante. Te pedí una app de
+aprender noruego y funciona, pero también es un tema de estética.»
+
+**Lo primero fue mirar, no responder de memoria.** Se abrió la aplicación en un
+navegador de celular y se revisó el archivo. El diagnóstico no fue el que decía
+la queja, pero sí confirmó el fondo:
+
+- **No era «solo HTML».** Había 314 líneas de CSS con su sistema de diseño:
+  variables de color, escala de espacios, sombras, modo oscuro y botones de 52
+  píxeles para el dedo. La estructura estaba bien hecha.
+- **Lo que fallaba era el acabado.** La aplicación usaba **40 emoji distintos**
+  como juego de iconos. Ese es el detalle que hace que algo se vea a medio
+  terminar, y por razones concretas: cada teléfono los dibuja distinto, no
+  toman el color del texto (no se pueden apagar cuando una fila está
+  bloqueada) y no se alinean con la letra que acompañan.
+
+**Por qué pasó, dicho de frente.** Este repositorio es software de auditoría de
+un hospital, donde lo sobrio es lo correcto y el adorno es un riesgo. Traje ese
+mismo criterio a una aplicación personal de estudiar idiomas, donde es el
+criterio equivocado: esta se abre por gusto, todos los días, y tiene que dar
+ganas de abrirla. Nunca pregunté qué debía **sentirse**, y di por terminado el
+trabajo cuando pasó las pruebas. Eso último es un sesgo mío que conviene tener
+anotado: **atiendo lo que puedo comprobar solo** —que no haya errores, que el
+contraste pase, que las pruebas queden verdes— y lo estético, que no se puede
+comprobar con una prueba automática, se queda sin atención hasta que alguien
+reclama.
+
+**Lo que se hizo:**
+
+1. **Un juego propio de 48 iconos** dibujados en SVG, de trazo uniforme,
+   incrustados en el archivo (la aplicación sigue funcionando sin internet).
+   Toman el color de donde se ponen y se ven igual en todo aparato. Incluye la
+   bandera de Noruega y un icono por cada uno de los 18 módulos del curso.
+2. **Una capa de acabado** encima del diseño que ya existía —aurora sobre
+   fiordo de noche—: la luz que entra por arriba de la pantalla, la bandera
+   enmarcada con sombra, las medallas en pastilla, el camino del curso con la
+   línea en degradado, el emblema redondo del final de la lección y la barra de
+   abajo en vidrio esmerilado. Va **como capa aparte**, al final del CSS, para
+   no reescribir lo que ya funcionaba.
+3. **Tres arreglos que aparecieron al mirar de cerca:** la cabecera de la
+   lección tapaba el fondo con un rectángulo opaco; el icono de «más despacio»
+   tenía tanto trazo que a tamaño real era un borrón; y el objetivo del día
+   decía «Son unos 1 minutos» en vez de «un minuto».
+
+**Lo que impide que se deshaga.** Cuatro pruebas nuevas: que **no vuelva ni un
+emoji** a la interfaz ni a los módulos del curso; que **todo icono que se pida
+exista** —pedir uno que no existe no da error, deja un hueco en blanco que
+nadie nota hasta que se abre la pantalla—; que **ninguno sobre**, porque es
+peso muerto en un archivo que viaja al celular; y que ninguno se pida por
+internet. Las pruebas del curso pasaron de 193 a **215**.
+
+**Se comprobó en navegador**, claro y oscuro, recorriendo bienvenida, inicio,
+curso, lección y veredicto: sin errores de JavaScript y sin que la página se
+salga de ancho.
+
+**El verde del botón lleva letra oscura a propósito**: con letra blanca el
+contraste da 3,5:1 y hace falta 4,5:1; con tinta oscura da 5,4:1. Lo bonito no
+puede costarle la legibilidad a nadie.
+
+**Queda igual de pendiente para las otras dos aplicaciones** (ICFES y velas):
+las dos usan emoji por iconos con el mismo problema. No se tocaron en este
+cambio para no mezclar.
+
+---
 
 ### 09-09-2026 (tarde, 6) — El motor confundía lo FACTURADO con lo PACTADO (lo destapó la prueba de Yesid)
 
@@ -12732,6 +12799,15 @@ de la que más cuesta a la que menos:
   por debajo de la mitad de la primera—, hay que añadir la condición a mano y
   volver a medir.
 
+
+### Aspecto de las tres aplicaciones (09-09)
+- **~~El curso de noruego se veía a medio terminar~~ — HECHO (09-09).** Juego
+  propio de 48 iconos y capa de acabado. Ver la entrada del 09-09.
+- **Falta lo mismo en ICFES y en velas japonesas.** Las dos siguen usando emoji
+  como iconos, con los mismos tres problemas: se dibujan distinto en cada
+  aparato, no toman el color del texto y no se alinean con la letra. El juego
+  de iconos y la capa de acabado ya están hechos y se pueden reusar; es
+  trabajo de una tanda por aplicación.
 
 ### Curso de noruego (31-08, noche)
 - **Probarlo en SU celular.** Aquí se probó en un navegador de celular
