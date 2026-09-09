@@ -7404,6 +7404,27 @@ var _ultimo403 = 0;
   window.fetch = function(entrada, opciones){
     return original(entrada, opciones).then(function(res){
       try{
+        // ── 09-09-2026 — LA SESIÓN VENCIDA, DICHA COMO ES ────────────────
+        // El auditor abrió el motor por la mañana con la sesión de la noche
+        // anterior (el token dura 8 horas) y le salió un recuadro rojo que
+        // decía «Error · Credenciales inválidas o token expirado» — el texto
+        // crudo del servidor, escrito para un programador. La pantalla ya
+        // tenía el manejador bueno («Tu sesión venció, vuelve a iniciar
+        // sesión») pero solo lo llamaban unas pocas llamadas: hay 173 sitios
+        // que muestran errores y cada uno decidía por su cuenta.
+        //
+        // Va acá, en el mismo envoltorio del 403, porque es el único punto
+        // por el que pasan TODAS: da igual cuál de los 173 recibió el 401.
+        if (res && res.status === 401) {
+          var rutaAuth = '';
+          try { rutaAuth = (typeof entrada === 'string' ? entrada : (entrada && entrada.url) || ''); } catch(_){}
+          // El login mismo contesta 401 cuando la contraseña está mal: eso
+          // NO es una sesión vencida y su pantalla ya lo explica.
+          var soloRuta = String(rutaAuth).split('?')[0];
+          if (!/\/token$/.test(soloRuta)) {
+            if (typeof manejarSesionExpirada === 'function') manejarSesionExpirada();
+          }
+        }
         if (res && res.status === 403) {
           _ultimo403 = Date.now();
           var ruta = '';

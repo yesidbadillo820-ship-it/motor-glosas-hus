@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 08-09-2026
+**Última actualización:** 09-09-2026
 
 ---
 
@@ -90,6 +90,42 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 09-09-2026 — «Credenciales inválidas o token expirado»: ahora dice qué pasó
+
+**Lo que vio el auditor.** Abrió el motor a las 8:15 de la mañana, en la
+pantalla de Usuarios, y le salió un recuadro rojo que decía:
+
+> Error
+> Credenciales inválidas o token expirado
+
+**Qué era en realidad.** Nada roto: la sesión se había vencido. El motor
+mantiene la sesión abierta **8 horas**, así que la de la noche anterior ya no
+valía. Ese texto es el que el programa se dice a sí mismo por dentro, no un
+mensaje para una persona.
+
+**Lo confuso.** La pantalla YA sabía decirlo bien —«Tu sesión venció, vuelve
+a iniciar sesión», y lo devuelve al login guardándole lo que estaba
+escribiendo—, pero solo unas pocas de las llamadas al servidor lo hacían. Hay
+173 sitios que muestran errores y cada uno decidía por su cuenta.
+
+**Cómo queda.** Ahora **cualquier** llamada que se encuentre con la sesión
+vencida muestra el mensaje claro y lo lleva al login. Da igual en qué pantalla
+esté. Se puso en el mismo sitio donde ya se atrapaban los avisos de permisos,
+que es por donde pasan todas.
+
+Con una excepción a propósito: **equivocarse de contraseña al entrar no es una
+sesión vencida** — ahí sigue saliendo el aviso de siempre en la pantalla de
+login, no un «su sesión venció» que confundiría más.
+
+**Mientras tanto, si le vuelve a salir:** salga y vuelva a entrar. No se
+pierde nada.
+
+8 pruebas nuevas y comprobación en navegador (un 401 en cuatro pantallas
+distintas avisa una sola vez; el del login, ninguna).
+
+---
+
 
 ### 08-09-2026 (noche, 4) — Segunda corrida de los cinco casos: cuatro cosas más
 
