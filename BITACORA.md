@@ -91,6 +91,35 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde, 12) — Una regresión mía, vista y corregida el mismo día
+
+Yesid probó una factura real del Dispensario (HUS0000541440, 8 conceptos) y
+**dos análisis de la MISMA factura salieron con la entidad escrita distinto**:
+uno decía «DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANGA» y
+el otro «DMBUG», con un aviso amarillo de «entidad pagadora corregida» que no
+corregía nada.
+
+**Lo causé yo esa misma tarde**, arreglando lo de los regímenes especiales.
+Dos errores:
+
+1. **Agregué «SANIDAD MILITAR» como nombre de entidad, y no lo es.** Es un
+   régimen, y aparece en prosa corriente: la glosa decía «cotización
+   **avalada por sanidad militar**», que describe quién debe avalar, no
+   quién paga. Peor todavía: con ese término, una glosa de FAMISANAR que lo
+   mencionara se habría respondido con el contrato del Dispensario.
+
+2. **El motor comparaba los nombres tal cual.** El desplegable trae el
+   nombre oficial largo y el catálogo usa la sigla: no comparten ni una letra
+   seguida, así que los daba por entidades distintas y «corregía» una que ya
+   estaba bien elegida. Ahora compara por el nombre canónico, que es lo que
+   de verdad decide qué contrato se carga — y eso sirve para todas las
+   entidades, no solo para esta.
+
+6 pruebas nuevas, 4 fallan sin el arreglo. Y se retiró de las pruebas del
+arreglo anterior el caso que exigía lo contrario, dejando escrito por qué: la
+evidencia de producción manda sobre un beneficio hipotético.
+
+
 ### 09-09-2026 (tarde, 8) — Los soportes también se ven al analizar (lo que quedó a medias)
 
 **Yesid preguntó qué había pasado con esto, y tenía razón.** Cuando pidió que
