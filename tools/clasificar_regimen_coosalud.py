@@ -633,12 +633,17 @@ def ruta_legible(ruta: object) -> str:
     return s
 
 
-def explorar_ruta(raiz: Path, muestras: int = 8) -> None:
+def explorar_ruta(raiz: Path, muestras: int = 8, buscar: set[str] | None = None) -> int:
     """Diagnostico: recorre una ruta y dice que hay adentro y que falla.
 
     Sirve para entender una carpeta de radicacion nueva antes de agregarla:
     cuantas carpetas y archivos tiene, hasta que profundidad, cuantas NO se
-    pudieron leer, y ejemplos de nombres con y sin numero de factura."""
+    pudieron leer, y ejemplos de nombres con y sin numero de factura.
+
+    Con `buscar` (claves numericas de factura) ademas RASTREA esas facturas y
+    reporta cada coincidencia: sirve para responder "¿donde quedaron los
+    soportes de esta factura?" sin recorrer los servidores a mano. Devuelve
+    cuantas coincidencias encontro."""
     base = ruta_larga(raiz)
     carpetas = archivos = con_hus = 0
     prof_max = 0
@@ -646,6 +651,7 @@ def explorar_ruta(raiz: Path, muestras: int = 8) -> None:
     ej_carpetas: list[str] = []
     ej_archivos: list[str] = []
     ej_con_hus: list[str] = []
+    encontrados: list[str] = []
 
     def _niveles(p: object) -> int:
         return str(p).rstrip("\\/").replace("/", "\\").count("\\")
@@ -667,12 +673,19 @@ def explorar_ruta(raiz: Path, muestras: int = 8) -> None:
         for d in dirs:
             if len(ej_carpetas) < muestras:
                 ej_carpetas.append(f"{ruta_legible(root)}\\{d}")
+            if buscar:
+                m = _RE_NUM_FACTURA.search(d)
+                if m and (m.group(1).lstrip("0") or "0") in buscar:
+                    encontrados.append(f"{ruta_legible(root)}\\{d}  [CARPETA]")
         for fn in files:
             archivos += 1
-            if _RE_NUM_FACTURA.search(fn):
+            m = _RE_NUM_FACTURA.search(fn)
+            if m:
                 con_hus += 1
                 if len(ej_con_hus) < muestras:
                     ej_con_hus.append(f"{ruta_legible(root)}\\{fn}")
+                if buscar and (m.group(1).lstrip("0") or "0") in buscar:
+                    encontrados.append(f"{ruta_legible(root)}\\{fn}")
             elif len(ej_archivos) < muestras:
                 ej_archivos.append(f"{ruta_legible(root)}\\{fn}")
 
@@ -688,6 +701,15 @@ def explorar_ruta(raiz: Path, muestras: int = 8) -> None:
             logger.warning(f"      {f}")
     else:
         logger.info("  Carpetas ilegibles  : 0")
+    if buscar:
+        if encontrados:
+            logger.info(f"  >>> FACTURAS BUSCADAS: {len(encontrados)} coincidencia(s) AQUI:")
+            for e in encontrados[:40]:
+                logger.info(f"      {e}")
+            if len(encontrados) > 40:
+                logger.info(f"      ... y {len(encontrados) - 40} mas")
+        else:
+            logger.warning("  >>> FACTURAS BUSCADAS: ninguna aparece en esta ruta.")
     for titulo, ejemplos in (
         ("Ejemplos de archivos CON numero de factura", ej_con_hus),
         ("Ejemplos de archivos SIN numero de factura", ej_archivos),
@@ -697,6 +719,7 @@ def explorar_ruta(raiz: Path, muestras: int = 8) -> None:
             logger.info(f"  {titulo}:")
             for e in ejemplos:
                 logger.info(f"      {e}")
+    return len(encontrados)
 
 
 def indexar_radicacion(raices: list[Path], objetivos: set[str]) -> dict[str, list[Path]]:
@@ -1224,20 +1247,42 @@ def main() -> int:
     )
     parser.add_argument(
         "--explorar-soportes",
-        type=str,
+        action="append",
         default=None,
         metavar="RUTA",
-        help="DIAGNOSTICO: no procesa facturas; recorre esa ruta y reporta que "
-        "hay adentro (carpetas, archivos, cuantos traen HUS<n>, que no se pudo leer).",
+        help="DIAGNOSTICO (repetible): no procesa facturas; recorre esa ruta y "
+        "reporta que hay adentro (carpetas, archivos, cuantos traen HUS<n>, que "
+        "no se pudo leer).",
+    )
+    parser.add_argument(
+        "--buscar",
+        type=str,
+        default="",
+        metavar="HUS<n>[,HUS<n>]",
+        help="Con --explorar-soportes: RASTREA esas facturas y dice en que "
+        "carpeta exacta aparecen. Sirve para hallar donde quedaron los soportes.",
     )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
     if args.explorar_soportes:
-        raices = resolver_raices([args.explorar_soportes])
+        raices = resolver_raices(list(args.explorar_soportes))
         if not raices:
             return 1
-        explorar_ruta(raices[0])
+        buscar = {clave_numerica(f) for f in args.buscar.split(",") if f.strip()} or None
+        if buscar:
+            logger.info(f"Rastreando {len(buscar)} factura(s) en {len(raices)} ruta(s)...")
+        total = 0
+        for raiz in raices:
+            total += explorar_ruta(raiz, buscar=buscar) or 0
+            logger.info("")
+        if buscar:
+            if total:
+                logger.info(f"========== TOTAL: {total} coincidencia(s) en todas las rutas.")
+            else:
+                logger.warning(
+                    "========== Las facturas buscadas NO aparecen en NINGUNA de esas rutas."
+                )
         return 0
 
     try:

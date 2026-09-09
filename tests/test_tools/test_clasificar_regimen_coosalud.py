@@ -461,6 +461,48 @@ class TestRutasLargas:
         assert "Acceso denegado" in caplog.text
 
 
+class TestExplorador:
+    """El diagnostico de una ruta nueva y el rastreo de una factura puntual."""
+
+    def _correr_explorador(self, tmp_path, *extra: str) -> int:
+        raiz = tmp_path / "3. MARZO 2026 - SOPORTES RADICACION"
+        carpeta = raiz / "COOSALUD" / "KARIN" / "ENV-222670-OK" / "IMG" / "HUS472660"
+        carpeta.mkdir(parents=True)
+        (carpeta / "FEV_900006037_HUS472660.pdf").write_bytes(b"%PDF")
+        (raiz / "COOSALUD" / "KARIN" / "carga_indices.txt").write_text("x", encoding="utf-8")
+        argv = ["clasificar_regimen_coosalud.py", "--explorar-soportes", str(raiz), *extra]
+        viejo = sys.argv
+        sys.argv = argv
+        try:
+            return cr.main()
+        finally:
+            sys.argv = viejo
+
+    def test_reporta_lo_que_hay(self, tmp_path, caplog):
+        import logging as _log
+
+        with caplog.at_level(_log.INFO):
+            assert self._correr_explorador(tmp_path) == 0
+        assert "QUE HAY EN ESTA RUTA" in caplog.text
+        assert "Con numero de factura (HUS<n>): 1" in caplog.text
+        assert "carga_indices.txt" in caplog.text  # ejemplo del archivo sin factura
+
+    def test_buscar_encuentra_la_factura(self, tmp_path, caplog):
+        import logging as _log
+
+        with caplog.at_level(_log.INFO):
+            assert self._correr_explorador(tmp_path, "--buscar", "HUS0000472660") == 0
+        assert "FACTURAS BUSCADAS: 2 coincidencia(s)" in caplog.text  # carpeta + PDF
+        assert "[CARPETA]" in caplog.text
+
+    def test_buscar_avisa_cuando_no_esta(self, tmp_path, caplog):
+        import logging as _log
+
+        with caplog.at_level(_log.INFO):
+            assert self._correr_explorador(tmp_path, "--buscar", "HUS999111") == 0
+        assert "NO aparecen en NINGUNA" in caplog.text
+
+
 class TestPiezas:
     def test_norm_factura(self):
         assert cr.norm_factura("HUS0000349680") == "HUS349680"
