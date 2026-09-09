@@ -4386,6 +4386,19 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             </div>
           </div>
 
+          <div id="admin-diagnostico-card" class="form-card" style="display:none;margin-top:1rem;border:1px solid #c7d2fe;background:#eef2ff">
+            <h3 style="color:#3730a3">📊 Por qué la confianza no sube <span style="color:#4f46e5">Solo SUPER_ADMIN</span></h3>
+            <p style="font-size:.78rem;color:#312e81;line-height:1.55;margin-bottom:.85rem">
+              Los números reales de esta base de datos, no supuestos: cuántas glosas
+              quedaron sin entidad identificada, si el catálogo de tarifas pactadas
+              está cargado, cuántas glosas tienen ya el veredicto de la EPS —de ahí
+              salen el precedente interno y los ejemplos que recibe la IA— y qué
+              confianza promedio da cada modelo. <b>Solo lee. No cambia nada.</b>
+            </p>
+            <button class="btn btn-primary" style="background:#4f46e5" onclick="cargarDiagnosticoCalidad()">Ver el diagnóstico</button>
+            <div id="diag-calidad-salida" style="margin-top:.9rem"></div>
+          </div>
+
           <div id="admin-reset-card" class="form-card" style="display:none;margin-top:1rem;border:1px solid #fecaca;background:#fff5f5">
             <h3 style="color:#991b1b">Zona peligrosa <span style="color:#dc2626">Solo SUPER_ADMIN</span></h3>
             <p style="font-size:.78rem;color:#7f1d1d;line-height:1.55;margin-bottom:.85rem">
@@ -12294,6 +12307,142 @@ function poblarLandingInsights(metrics){
   if(box && (top.length > 0 || byTipo.length > 0)) box.style.display = '';
 }
 
+// ─── DIAGNÓSTICO DE CALIDAD (solo SUPER_ADMIN) ──────────────────
+// 09-09-2026. El endpoint /admin/diagnostico-calidad existe desde ayer,
+// pero pedirle al auditor que escriba esa URL en el navegador no sirve:
+// el navegador no manda el token y lo único que ve es
+// {"detail":"Token de autenticación requerido"}. Aquí sí, porque la
+// pantalla ya tiene la sesión iniciada. Y en vez del JSON crudo, se
+// pinta en español: cada número con la frase que dice qué significa.
+async function cargarDiagnosticoCalidad(){
+  var caja = document.getElementById('diag-calidad-salida');
+  if(!caja) return;
+  caja.innerHTML = '<div style="color:#4338ca;font-size:.82rem">Leyendo la base de datos…</div>';
+  try{
+    var r = await fetch('/admin/diagnostico-calidad', { headers: authH() });
+    if(!r.ok){
+      var det = '';
+      try{ det = (await r.json()).detail || ''; }catch(e){ det = await r.text(); }
+      caja.innerHTML = '<div style="color:#b91c1c;font-size:.82rem;background:#fef2f2;'
+        + 'border:1px solid #fecaca;border-radius:6px;padding:.65rem .8rem">'
+        + 'No se pudo leer el diagnóstico (código ' + r.status + '). ' + escHtml(String(det).substring(0,200))
+        + '</div>';
+      return;
+    }
+    caja.innerHTML = _pintarDiagnostico(await r.json());
+  }catch(e){
+    caja.innerHTML = '<div style="color:#b91c1c;font-size:.82rem;background:#fef2f2;'
+      + 'border:1px solid #fecaca;border-radius:6px;padding:.65rem .8rem">'
+      + 'No se pudo conectar con el servidor: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function _diagBloque(titulo, cuerpo, colorBorde){
+  return '<div style="background:#fff;border-left:3px solid ' + (colorBorde || '#6366f1')
+    + ';border-radius:6px;padding:.6rem .85rem;margin-bottom:.6rem">'
+    + '<div style="font-weight:700;color:#312e81;font-size:.78rem;text-transform:uppercase;'
+    + 'letter-spacing:.03em;margin-bottom:.3rem">' + titulo + '</div>'
+    + '<div style="font-size:.82rem;color:var(--text);line-height:1.55">' + cuerpo + '</div>'
+    + '</div>';
+}
+
+function _pintarDiagnostico(d){
+  if(!d || typeof d !== 'object') return '<div style="font-size:.82rem">Respuesta vacía.</div>';
+  var total = Number(d.glosas_analizadas || 0);
+  var html = '';
+
+  html += _diagBloque('Volumen', 'El motor ha analizado <b>' + total + '</b> glosas.'
+    + (total && total < 200
+      ? ' Con este volumen, el «precedente interno» —que exige una glosa YA levantada'
+        + ' con la misma EPS y el mismo tipo de código— va a coincidir pocas veces por'
+        + ' pura estadística, no porque algo esté roto.'
+      : ''));
+
+  if(d.nota) return html + _diagBloque('Nota', escHtml(d.nota), '#d97706');
+
+  if(d.eps){
+    var pct = Number(d.eps.pct_genericas || 0);
+    var lista = (d.eps.con_nombre_real || []).slice(0,10).map(function(x){
+      return '<li>' + escHtml(x.eps) + ' — ' + x.glosas + '</li>';
+    }).join('');
+    html += _diagBloque('Entidad pagadora',
+      '<b>' + d.eps.genericas + '</b> de ' + total + ' glosas (' + pct + '%) quedaron sin'
+      + ' entidad identificada («OTRA / SIN DEFINIR»).'
+      + (pct > 15
+        ? ' <b style="color:#b45309">Más de 1 de cada 7 es mucho.</b> Hasta el 09-09-2026'
+          + ' cualquier EPS sin contrato cargado SOLO se podía elegir como «OTRA»; con'
+          + ' el catálogo nuevo ya no. Las glosas viejas conservan el valor genérico.'
+        : '')
+      + (lista ? '<ul style="margin:.4rem 0 0 1.1rem;font-size:.8rem">' + lista + '</ul>' : ''),
+      pct > 15 ? '#d97706' : '#16a34a');
+  }
+
+  if(d.tarifas_pactadas_por_cups){
+    var nt = Number(d.tarifas_pactadas_por_cups.filas || 0);
+    html += _diagBloque('Tarifas pactadas por CUPS',
+      '<b>' + nt + '</b> filas cargadas. ' + escHtml(d.tarifas_pactadas_por_cups.diagnostico || '')
+      + (nt === 0
+        ? ' Cargar el Excel de tarifas de una sola EPS en la pantalla <b>Tarifas</b> sube'
+          + ' de inmediato la precisión de las glosas TA*, que son las más mecánicas.'
+        : ''),
+      nt === 0 ? '#dc2626' : '#16a34a');
+  }
+
+  if(d.contratos){
+    html += _diagBloque('Contratos',
+      'EPS con cláusulas extraídas: <b>' + d.contratos.eps_con_clausulas + '</b>. '
+      + 'Contratos registrados: <b>' + d.contratos.eps_con_registro_de_contrato + '</b>.');
+  }
+
+  if(d.veredicto_final_eps){
+    var v = d.veredicto_final_eps;
+    var porEstado = (v.por_estado || []).slice(0,8).map(function(x){
+      return '<li>' + escHtml(x.estado) + ' — ' + x.glosas + '</li>';
+    }).join('');
+    html += _diagBloque('Veredicto final de la EPS',
+      '<b>' + v.con_veredicto + '</b> de ' + total + ' (' + v.pct + '%) tienen registrado'
+      + ' si la EPS levantó, ratificó o aceptó. ' + escHtml(v.diagnostico || '')
+      + (porEstado ? '<ul style="margin:.4rem 0 0 1.1rem;font-size:.8rem">' + porEstado + '</ul>' : ''),
+      Number(v.pct || 0) < 30 ? '#d97706' : '#16a34a');
+  }
+
+  if(d.confianza_por_modelo && d.confianza_por_modelo.length){
+    var filas = d.confianza_por_modelo.map(function(x){
+      return '<tr><td style="padding:.2rem .5rem">' + escHtml(x.modelo) + '</td>'
+        + '<td style="padding:.2rem .5rem;text-align:right">' + x.glosas + '</td>'
+        + '<td style="padding:.2rem .5rem;text-align:right"><b>' + x.confianza_promedio + '%</b></td></tr>';
+    }).join('');
+    html += _diagBloque('Confianza promedio por modelo',
+      '<table style="width:100%;font-size:.8rem;border-collapse:collapse">'
+      + '<thead><tr style="color:var(--text3);font-size:.72rem;text-transform:uppercase">'
+      + '<th style="text-align:left;padding:.2rem .5rem">Modelo</th>'
+      + '<th style="text-align:right;padding:.2rem .5rem">Glosas</th>'
+      + '<th style="text-align:right;padding:.2rem .5rem">Confianza</th></tr></thead>'
+      + '<tbody>' + filas + '</tbody></table>'
+      + '<div style="margin-top:.45rem;color:var(--text3);font-size:.78rem">'
+      + 'Si un modelo saca una confianza claramente más alta que los demás, esa es la'
+      + ' prueba —con datos de este hospital, no con casos inventados— de si vale la'
+      + ' pena cambiar el proveedor principal.</div>');
+  }
+
+  if(d.costo_ia && d.costo_ia.length){
+    var costos = d.costo_ia.map(function(x){
+      return '<li><b>' + escHtml(x.proveedor) + '</b>: ' + x.llamadas + ' llamadas · '
+        + 'USD $' + x.costo_total_usd + ' acumulado · $' + x.costo_promedio_usd + ' por llamada · '
+        + x.latencia_promedio_ms + ' ms · proyección a este volumen: <b>USD $'
+        + x.proyeccion_mensual_usd_a_este_volumen + '</b></li>';
+    }).join('');
+    html += _diagBloque('Costo real de la IA',
+      '<ul style="margin:0 0 0 1.1rem">' + costos + '</ul>');
+  } else {
+    html += _diagBloque('Costo real de la IA',
+      'Todavía no hay llamadas con costo registrado. El día que se pruebe otro proveedor'
+      + ' como principal, aunque sea con 20 o 30 glosas, el costo exacto de esa prueba'
+      + ' queda aquí en dólares: no hay que estimarlo.');
+  }
+  return html;
+}
+
 // ─── TEST SENTRY (solo SUPER_ADMIN) ─────────────────────────────
 async function dispararSentryTest(){
   if(USER_ROL !== 'SUPER_ADMIN'){
@@ -17058,12 +17207,32 @@ async function analizar(modoOverride){
   _rehab();
 }
 
+// Los caminos en los que el dictamen NO lo escribió la IA: texto fijo del
+// área (ratificación, extemporánea, plantillas curadas), abstención por
+// falta de elementos, plantilla, o el argumento que dictó el auditor.
+var _SIN_IA = ['texto_fijo','plantilla','abstencion','directo_auditor'];
+function _dictamenLoEscribioLaIA(d){
+  var m = String((d && d.modelo_ia) || '').toLowerCase();
+  return _SIN_IA.indexOf(m) === -1;
+}
+
 function renderAccionIA(d){
-  // Banner premium con la decisión autónoma de la IA: DEFENDER_TOTAL,
-  // ACEPTAR_PARCIAL, ACEPTAR_TOTAL o REVISAR. Incluye botón para
-  // pre-cargar los campos del formulario con los montos sugeridos.
+  // Banner premium con la decisión: DEFENDER_TOTAL, ACEPTAR_PARCIAL,
+  // ACEPTAR_TOTAL o REVISAR. Incluye botón para pre-cargar los campos
+  // del formulario con los montos sugeridos.
+  //
+  // 09-09-2026 (caso 4). Este recuadro decía «💡 La IA recomienda defender
+  // íntegramente la glosa» en dictámenes donde la IA NUNCA CORRIÓ: en una
+  // ratificación el motor devuelve el texto fijo del área (modelo_ia =
+  // 'texto_fijo') y la acción sale de una tabla en Python, no de un
+  // análisis. Atribuírselo a la IA le da al auditor una segunda opinión
+  // que no existe — y encima la más convincente de las dos.
+  // Ahora el recuadro dice de dónde salió de verdad la decisión.
   if(!d || !d.accion_ia) return '';
   var accion = String(d.accion_ia).toUpperCase();
+  var conIA = _dictamenLoEscribioLaIA(d);
+  var quien = conIA ? 'La IA' : 'El texto fijo del área';
+  var titulo = conIA ? '💡 La IA recomienda' : '📋 Regla fija del área';
   var aceptar = Number(d.valor_aceptar_ia || 0);
   var defender = Number(d.valor_defender_ia || 0);
   var fmt = function(v){ return fmtCOP(Number(v||0)); };
@@ -17071,22 +17240,22 @@ function renderAccionIA(d){
     'DEFENDER_TOTAL': {
       bg: 'linear-gradient(135deg,#dcfce7,#bbf7d0)',
       border: '#16a34a', icon: '🛡', label: 'DEFENDER 100%',
-      texto: 'La IA recomienda defender íntegramente la glosa. La objeción de la EPS no procede.',
+      texto: quien + ' defiende íntegramente la glosa: la objeción de la entidad no procede.',
     },
     'ACEPTAR_PARCIAL': {
       bg: 'linear-gradient(135deg,#fef3c7,#fde68a)',
       border: '#d97706', icon: '◐', label: 'ACEPTACIÓN PARCIAL',
-      texto: 'La IA recomienda aceptar el excedente real y defender el resto.',
+      texto: quien + ' acepta el excedente real y defiende el resto.',
     },
     'ACEPTAR_TOTAL': {
       bg: 'linear-gradient(135deg,#fee2e2,#fecaca)',
       border: '#dc2626', icon: '✓', label: 'ACEPTAR 100%',
-      texto: 'La IA considera que la objeción de la EPS es procedente.',
+      texto: quien + ' da por procedente la objeción de la entidad.',
     },
     'REVISAR': {
       bg: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)',
       border: '#4f46e5', icon: '❗', label: 'REVISAR MANUALMENTE',
-      texto: 'La IA detectó datos faltantes o inconsistentes — confirma manualmente.',
+      texto: quien + ' encontró datos faltantes o inconsistentes: confírmelo a mano.',
     },
   }[accion] || { bg:'#f3f4f6', border:'#9ca3af', icon:'?', label: accion, texto:'' };
   var detalle = '';
@@ -17109,7 +17278,7 @@ function renderAccionIA(d){
     + '<div style="font-size:1.6rem;line-height:1">' + meta.icon + '</div>'
     + '<div style="flex:1;min-width:0">'
     + '<div style="font-weight:800;color:' + meta.border + ';letter-spacing:.04em;font-size:.78rem;text-transform:uppercase">'
-    + '💡 La IA recomienda · ' + meta.label + '</div>'
+    + titulo + ' · ' + meta.label + '</div>'
     + '<div style="margin-top:.3rem;color:var(--text);font-size:.9rem">' + meta.texto + '</div>'
     + detalle
     + btnAplicar
@@ -24112,6 +24281,9 @@ async function loadUsuarios(){
   // Token de integración: solo SUPER_ADMIN
   var tokCard = document.getElementById('admin-token-card');
   if(tokCard) tokCard.style.display = (USER_ROL === 'SUPER_ADMIN') ? 'block' : 'none';
+  // Diagnóstico de calidad: solo SUPER_ADMIN
+  var diagCard = document.getElementById('admin-diagnostico-card');
+  if(diagCard) diagCard.style.display = (USER_ROL === 'SUPER_ADMIN') ? 'block' : 'none';
 
   var tbody=document.getElementById('usuarios-body');
   tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3)">Cargando…</td></tr>';

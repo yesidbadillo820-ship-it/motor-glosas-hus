@@ -3096,6 +3096,14 @@ _MARCAS_DE_BLOQUEO = (
         "LA CIFRA DEL ESCRITO NO ES LA DE LA GLOSA",
         "El valor que dice el escrito no es el valor objetado",
     ),
+    # 09-09-2026 (caso 4). El texto de ratificación dice «se mantiene la
+    # respuesta dada en trámite de la glosa inicial» sobre una factura que
+    # no tiene ninguna respuesta previa registrada. Es lo primero que la
+    # entidad va a pedir, y no existe.
+    (
+        "NO HAY RESPUESTA INICIAL REGISTRADA",
+        "Dice que mantiene una respuesta anterior que no aparece",
+    ),
 )
 
 
@@ -4432,6 +4440,56 @@ def _quitar_signos_vacios(texto: str) -> str:
     resultado = re.sub(r"\s+([,;.])", r"\1", resultado)
     resultado = re.sub(r",(\s*,)+", ",", resultado)
     return resultado
+
+
+# ── 09-09-2026 (caso 5): una corrección automática que corta mal ─────────
+# En el lote de prueba salió publicada la frase «…LEY 1438 DE 2011 ART. EL
+# DECRETO 780…». Ninguna norma se cita así: quedó un «ART.» huérfano, sin
+# número, porque una de las redes que corrigen el texto borró la cita
+# equivocada y se llevó por delante el número del artículo siguiente.
+#
+# Las redes son decenas y cada una recorta a su manera; perseguir cuál fue en
+# cada caso es interminable. Lo que sí se puede afirmar siempre es el
+# resultado: un «ART.»/«ARTÍCULO» sin número detrás no es una cita, es un
+# resto. Y en un documento que se radica ante la entidad, un resto así es la
+# prueba a la vista de que el escrito salió sin que nadie lo leyera.
+#
+# Se quita el resto —no la norma, que sigue sirviendo al argumento— y se
+# avisa, porque el artículo que se perdió puede hacerle falta al gestor.
+_ART_HUERFANO = re.compile(
+    # A la izquierda, el final de una cita ya completa: «…LEY 1438 DE 2011».
+    r"(?<=\d)\s+\b(?:ART[ÍI]?CULOS?|ARTS?)\.?\s+"
+    # A la derecha, en vez del número del artículo, el arranque de OTRA cita.
+    r"(?=(?:EL|LA|LOS|LAS|DEL|DE\s+LA|Y\s+EL)\s+"
+    r"(?:DECRETO|LEY|RESOLUCI[ÓO]N|CIRCULAR|ACUERDO|SENTENCIA|C[ÓO]DIGO|MANUAL)\b)",
+    re.IGNORECASE,
+)
+
+
+def _quitar_articulo_huerfano(texto: str) -> tuple[str, bool]:
+    """Quita el «ART.» que quedó sin número tras una corrección automática.
+
+    Devuelve `(texto, se_corrigio)`.
+
+    Conservadora a propósito, con las dos orillas exigidas: solo actúa cuando
+    a la izquierda del «ART.» termina una cita («…LEY 1438 DE 2011») y a la
+    derecha, donde iba el número, arranca otra norma («EL DECRETO 780…»). Esa
+    es la huella exacta del corte, y no la de la prosa normal: «el artículo
+    del decreto» —vago pero correcto— no la deja, y «ART. 57», «ART.
+    2.5.3.4.3» o «ARTÍCULOS 57 Y SIGUIENTES» tampoco.
+    """
+    if not texto:
+        return texto, False
+    nuevo, n = _ART_HUERFANO.subn(" ", texto)
+    if not n:
+        return texto, False
+    nuevo = re.sub(r"[ \t]{2,}", " ", nuevo)
+    nuevo = re.sub(r"\s+([,;.])", r"\1", nuevo)
+    logger.warning(
+        f"[ART-HUERFANO] {n} «ART.» sin número retirado(s): una corrección "
+        "automática anterior cortó la cita a mitad."
+    )
+    return nuevo, True
 
 
 def _neutralizar_periodo_inventado(
@@ -7022,6 +7080,60 @@ TEXTO_RATIFICADA = (
     "DE NO OBTENERSE RESPUESTA A LA GLOSA RATIFICADA EN LOS TÉRMINOS ESTABLECIDOS, "
     "SE DARÁ POR LEVANTADA LA RESPECTIVA OBJECIÓN."
 )
+
+
+def _hay_respuesta_inicial_registrada(numero_factura: Optional[str]) -> Optional[bool]:
+    """¿La factura tiene ya una respuesta de la primera glosa en el historial?
+
+    09-09-2026, prueba del auditor (caso 4). El texto de ratificación —fijo,
+    del área— arranca diciendo «SE MANTIENE LA RESPUESTA DADA EN TRÁMITE DE
+    LA GLOSA INICIAL». Salió tal cual sobre una factura que en el historial
+    no tenía ninguna respuesta previa: el escrito afirmaba mantener algo que
+    no existe. A la entidad le basta pedir esa primera respuesta para tumbar
+    la ratificación entera.
+
+    Devuelve:
+      · ``True``  — hay al menos una respuesta previa (no ratificación) con
+        dictamen guardado para esa factura,
+      · ``False`` — la factura está en el historial y ninguna de sus filas
+        anteriores tiene dictamen,
+      · ``None``  — no se puede saber (sin número de factura, sin base, o la
+        factura no aparece del todo en el historial).
+
+    El ``None`` es deliberado y vale lo mismo que en el aviso de soportes:
+    **«no se sabe» no es «no existe»**. Una factura respondida antes de que
+    el motor existiera, o respondida en otro sistema, no aparece acá — y
+    acusar de inventar por eso sería el error contrario.
+    """
+    if not numero_factura or not str(numero_factura).strip():
+        return None
+    factura = str(numero_factura).strip()
+    try:
+        from app.database import SessionLocal
+        from app.models.db import GlosaRecord
+
+        db = SessionLocal()
+        try:
+            filas = (
+                db.query(GlosaRecord.etapa, GlosaRecord.dictamen)
+                .filter(GlosaRecord.factura == factura)
+                .all()
+            )
+            if not filas:
+                return None  # la factura no está en el historial: no se sabe
+            for etapa, dictamen in filas:
+                # La ratificación que se está respondiendo AHORA no cuenta
+                # como «la respuesta que se mantiene»: sería circular.
+                if "RATIF" in str(etapa or "").upper():
+                    continue
+                if (dictamen or "").strip():
+                    return True
+            return False
+        finally:
+            db.close()
+    except Exception as e:  # noqa: BLE001 — sin base no se acusa a nadie
+        logger.debug(f"[RATIFICADA-SIN-RESPUESTA] no se pudo revisar: {e}")
+        return None
 
 
 # ─── Texto fijo: DISPENSARIO MEDICO BUCARAMANGA (DMBUG) — concepto TARIFAS ───
@@ -11770,6 +11882,26 @@ class GlosaService:
             except Exception as _e_am:
                 logger.debug(f"[ARTICULO-MAL-CITADO] red final no aplicada: {_e_am}")
 
+            # 09-09-2026 (caso 5) — EL RESTO QUE DEJA UNA CORRECCIÓN QUE CORTA
+            # MAL. Va DESPUÉS de todas las redes que reescriben citas, porque
+            # limpia lo que ellas dejan: un «ART.» sin número, pegado al
+            # arranque de la norma siguiente («…LEY 1438 DE 2011 ART. EL
+            # DECRETO 780…»). Se avisa además de limpiar: el artículo que se
+            # perdió puede hacerle falta al gestor.
+            try:
+                _sin_huerfano, _hubo_huerfano = _quitar_articulo_huerfano(dictamen)
+                if _hubo_huerfano:
+                    dictamen = _sin_huerfano
+                    _correcciones.append(
+                        "Una corrección anterior cortó una cita a mitad y dejó un "
+                        "«ART.» sin número delante de la norma siguiente. Retiré ese "
+                        "resto para que el escrito no salga con una cita rota. Si el "
+                        "artículo que se perdió le hacía falta al argumento, agrégalo "
+                        "a mano antes de radicar."
+                    )
+            except Exception as _e_ah:
+                logger.debug(f"[ART-HUERFANO] red final no aplicada: {_e_ah}")
+
             # 31-08-2026 — LA SEGUNDA OBJECIÓN QUE NADIE CONTESTÓ (CL4506).
             # No se escribe el argumento que falta: se avisa. El gestor sabe
             # defender un tope contractual; lo que no puede es adivinar que el
@@ -11914,6 +12046,39 @@ class GlosaService:
                     )
             except Exception as _e_fs:
                 logger.debug(f"[FALTA-SOPORTE] aviso no aplicado: {_e_fs}")
+
+            # 09-09-2026 (caso 4) — NO SE MANTIENE UNA RESPUESTA QUE NO EXISTE.
+            # El texto fijo de ratificación abre afirmando que «se mantiene la
+            # respuesta dada en trámite de la glosa inicial». Cuando en el
+            # historial no hay ninguna respuesta anterior de esa factura, esa
+            # primera frase es falsa — y es justo lo primero que la entidad va
+            # a pedir para tumbar la ratificación completa.
+            try:
+                if es_ratificacion and "NO HAY RESPUESTA INICIAL REGISTRADA" not in dictamen:
+                    _hubo_respuesta = _hay_respuesta_inicial_registrada(
+                        getattr(data, "numero_factura", None)
+                    )
+                    # Solo False bloquea. `None` es «no se sabe» —factura que
+                    # no está en el historial, o base no disponible— y con eso
+                    # no se acusa a nadie de inventar.
+                    if _hubo_respuesta is False:
+                        logger.warning(
+                            f"[RATIFICADA-SIN-RESPUESTA] factura "
+                            f"{getattr(data, 'numero_factura', '')!r}: el escrito dice que "
+                            "mantiene la respuesta inicial y el historial no tiene ninguna."
+                        )
+                        dictamen = dictamen.rstrip() + (
+                            "\n\n⛔ NO RADICAR TODAVÍA: NO HAY RESPUESTA INICIAL REGISTRADA. "
+                            "Este escrito dice que se mantiene la respuesta dada a la glosa "
+                            "inicial, y en el historial de esta factura no aparece ninguna "
+                            "respuesta anterior. Es lo primero que la entidad va a pedir. "
+                            "Antes de radicar: cargue la respuesta inicial si se dio por "
+                            "fuera del motor, o —si de verdad nunca se respondió— conteste "
+                            "el fondo de la objeción en vez de remitirse a un trámite que "
+                            "no consta."
+                        )
+            except Exception as _e_rsr:
+                logger.debug(f"[RATIFICADA-SIN-RESPUESTA] aviso no aplicado: {_e_rsr}")
 
             # 27-08-2026 — LA GLOSA DE SOPORTES SE CONTESTA CON EL FOLIO.
             # Va después del aviso de arriba a propósito: aquel dice que el
@@ -12716,6 +12881,19 @@ class GlosaService:
         # `verif_citas` va también: un hallazgo de severidad ALTA es un
         # bloqueo aunque no haya dejado marca en el texto (caso 2).
         _motivos_bloqueo = _bloqueos_para_radicar(dictamen, locals().get("verif_citas"))
+
+        # 09-09-2026 — QUE LOS DOS INDICADORES NO SE CONTRADIGAN. Salía
+        # «riesgo BAJO — alta probabilidad de levantamiento» junto al sello
+        # rojo de «NO RADICAR». Si el motor no deja radicar el escrito, la
+        # entidad va a encontrar el mismo defecto: el riesgo no puede quedar
+        # en verde. Manda el bloqueo, y cada motivo entra como factor a la
+        # vista para que se vea POR QUÉ subió.
+        try:
+            from app.services.riesgo_ratificacion import elevar_por_bloqueo
+
+            riesgo = elevar_por_bloqueo(riesgo, _motivos_bloqueo)
+        except Exception as _e_rb:
+            logger.debug(f"[RIESGO-BLOQUEO] no elevado: {_e_rb}")
 
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",

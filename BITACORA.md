@@ -91,6 +91,81 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde, 3) — La pantalla del diagnóstico, y dos afirmaciones que el motor no podía probar
+
+**Tres cosas, todas del mismo tipo: el motor decía algo que no le constaba.**
+
+**1. El diagnóstico de calidad, ahora sí, en pantalla.** Esta mañana se
+publicó la dirección `/admin/diagnostico-calidad`. Yesid la escribió en el
+navegador y lo único que vio fue `{"detail":"Token de autenticación
+requerido"}`. Y estaba bien que saliera: esa dirección pide el permiso de la
+sesión, y el navegador —escribiendo la dirección a mano— no lo manda. O sea
+que existía pero era inalcanzable para la única persona que la necesitaba.
+Ahora el diagnóstico es un **botón dentro del motor**, en la pantalla de
+**Usuarios** (solo para el administrador), y no muestra el texto técnico
+crudo sino cada número con la frase que dice qué significa: cuántas glosas
+quedaron sin entidad identificada, si el catálogo de tarifas está cargado,
+cuántas glosas tienen ya el veredicto de la EPS, y qué confianza promedio
+saca cada modelo de IA. **Solo lee: no cambia nada.**
+
+**2. Una ratificación no puede decir que mantiene una respuesta que no
+existe.** El texto fijo del área para las glosas RATIFICADAS arranca
+diciendo «SE MANTIENE LA RESPUESTA DADA EN TRÁMITE DE LA GLOSA INICIAL». En
+la prueba del lunes salió tal cual sobre una factura que en el historial no
+tenía ninguna respuesta anterior — y esa primera respuesta es justo lo
+primero que la entidad va a pedir para tumbar la ratificación entera. Ahora
+el motor revisa el historial de la factura antes de firmar: si comprueba que
+no hay respuesta previa, el dictamen sale con **«⛔ NO RADICAR TODAVÍA: NO
+HAY RESPUESTA INICIAL REGISTRADA»** y queda bloqueado, con la instrucción de
+qué hacer (cargar la respuesta inicial si se dio por fuera del motor, o
+contestar el fondo de la objeción si de verdad nunca se respondió).
+Importante: **si no se puede saber, no se acusa a nadie.** Una factura que no
+está en el historial, o respondida antes de que el motor existiera, no
+dispara el aviso. «No se sabe» no es «no existe».
+
+**3. Ya no se le atribuye a la IA lo que la IA no hizo.** En una glosa
+ratificada la IA no corre: el motor devuelve el texto fijo del área y la
+decisión sale de una tabla escrita en el programa. Y aun así la pantalla
+remataba con un recuadro verde que decía «💡 **La IA recomienda** defender
+íntegramente la glosa». Para el auditor eso parece una segunda opinión que
+respalda la primera; no existe, es la misma regla dicha dos veces y la
+segunda con autoridad prestada. Ahora el recuadro dice de dónde salió de
+verdad la decisión: **«📋 Regla fija del área»** cuando es texto fijo,
+abstención, plantilla o el argumento que dictó el propio auditor, y sigue
+diciendo «💡 La IA recomienda» solo cuando la IA sí analizó el caso.
+
+**4. Un medicamento ya no se llama CUPS.** El caso del acetaminofén: el
+dictamen habló del «código homologado del CUPS facturado» y el acetaminofén
+no tiene CUPS, tiene CUM. Son dos tablas distintas del Ministerio —CUPS son
+procedimientos, CUM son medicamentos— y la entidad cruza el CUPS contra la
+suya, no encuentra el código y ratifica la glosa entera. Buscando el
+culpable resultó que **no era el modelo de IA**: la ficha de datos que el
+motor le entrega, la que el propio texto llama AUTORITATIVA, rotulaba «CUPS»
+cualquier código y encima ordenaba «USA ESTE CUPS», contradiciendo la regla
+que unas líneas antes decía justo lo contrario. Corregido: ahora la ficha
+dice «CUM (medicamento)» cuando lo es, y le prohíbe al modelo la frase exacta
+que salió mal.
+
+**5. Una corrección que corta mal ya no deja el escrito peor.** Salió
+publicada la frase «…LEY 1438 DE 2011 ART. EL DECRETO 780…»: un «ART.» sin
+número, resto de una red que borró una cita equivocada y se llevó por delante
+el número de la siguiente. No se persiguió cuál de las decenas de redes fue
+—la próxima lo volvería a hacer—: ahora se revisa el resultado. Un «ART.» sin
+número pegado al arranque de otra norma es un resto: se retira y se avisa,
+por si el artículo perdido le hacía falta al gestor. Las citas buenas no se
+tocan (probado con siete formas distintas).
+
+**6. El riesgo ya no se contradice con el sello rojo.** Salía «Indicador de
+riesgo: BAJO — alta probabilidad de levantamiento» y dos renglones más abajo
+«⛔ NO RADICAR». Los dos los calcula el motor, y entre los dos el auditor le
+cree al verde — que es lo natural, y por eso el indicador optimista anulaba
+la advertencia. Ahora manda el bloqueo: si el motor no deja radicar el
+escrito, el riesgo sube a ALTO y muestra como factor cada motivo, para que se
+vea por qué subió. Sin bloqueo, el cálculo de siempre sigue mandando igual.
+
+Con sus 75 pruebas nuevas, todas comprobadas: fallan con el código de ayer y
+pasan con el de hoy.
+
 ### 09-09-2026 (tarde, 2) — El diagnóstico de calidad ahora es un enlace, no un script
 
 Para responder por qué la confianza no sube hacía falta mirar la base de
@@ -12267,23 +12342,48 @@ de la que más cuesta a la que menos:
    semanas ya tienen respuesta de la EPS y siguen sin marcarse.
 
 ### Motor de Glosas — lo que destapó la prueba de cinco casos (08-09), lo que falta
-- **Tarifas: trató un medicamento (CUM) como procedimiento (CUPS).** Lo de la
-  contradicción con el contrato ya quedó resuelto (08-09, noche 3); falta esta
-  parte: el acetaminofén tiene CUM, y el escrito habló del «código homologado
-  del CUPS facturado».
-- **Ratificación sin respuesta inicial.** El texto fijo dice «se mantiene la
-  respuesta dada en la glosa inicial» aunque la factura no tenga ninguna
-  respuesta previa registrada. Hay que detectarlo y avisar. Y no mostrar
-  «la IA recomienda» cuando la IA no corrió.
-- **Una corrección automática dejó una frase rota** («…LEY 1438 DE 2011 ART.
-  EL DECRETO 780…») y una nota de corrección con basura. Revisar el corte.
+- ~~**Tarifas: trató un medicamento (CUM) como procedimiento (CUPS).**~~
+  **RESUELTO el 09-09 (tarde, 3).** Y no era culpa del modelo: la ficha de
+  datos que el motor le pasa —la parte que el propio prompt llama
+  AUTORITATIVA— rotulaba «CUPS» cualquier código, CUM incluido, y remataba
+  con «USA ESTE CUPS». Ahora la ficha dice «CUM (medicamento)» cuando lo es y
+  le prohíbe expresamente la frase «código homologado del CUPS».
+- ~~**Ratificación sin respuesta inicial.**~~ **RESUELTO el 09-09 (tarde, 3).**
+  Ahora el motor mira el historial de la factura antes de firmar el texto: si
+  no hay ninguna respuesta anterior, el dictamen sale con «⛔ NO RADICAR
+  TODAVÍA» y no deja radicar. Y el recuadro de la recomendación ya no dice
+  «la IA recomienda» en las ratificaciones: dice «regla fija del área», que es
+  de donde sale de verdad.
+- ~~**Una corrección automática dejó una frase rota**~~ («…LEY 1438 DE 2011
+  ART. EL DECRETO 780…»). **RESUELTO el 09-09 (tarde, 3).** No se persiguió
+  cuál de las decenas de redes cortó mal —la siguiente lo volvería a hacer—:
+  se revisa el RESULTADO. Un «ART.» sin número pegado a la norma siguiente es
+  un resto, se retira y se avisa, por si el artículo perdido le hacía falta al
+  gestor.
 - **Citas mal usadas pasan el verificador:** el Art. 5 de la Res. 2284/2023
   salió explicado de dos formas distintas en dos dictámenes. El verificador
-  comprueba que la norma existe, no que diga lo que se le atribuye. Esto es
-  del modelo, no del verificador — se relaciona directo con el punto 1 de
-  arriba.
-- **Indicadores que se contradicen:** «riesgo BAJO» junto a «NO RADICAR»;
-  «DEFENDER 100 %» junto a «riesgo ALTO, preparar conciliación».
+  comprueba que la norma existe, no que diga lo que se le atribuye.
+  **Revisado a fondo el 09-09 (tarde, 3) y NO se tocó todavía, a propósito.**
+  Lo que se averiguó: la biblioteca de normas del motor ya guarda, para 26 de
+  sus 50 artículos, las palabras clave de lo que cada artículo dice de verdad
+  — o sea que SÍ se puede revisar si la cita viene a cuento, no solo si
+  existe. Se armó la revisión de prueba y funciona con el caso malo. El
+  problema es el otro lado: probada contra un texto que cita BIEN ese mismo
+  artículo, también lo marcó (el dictamen decía «malla validadora» y la
+  palabra clave es «mallas validadoras»). Poner en producción una alarma que
+  grita sobre dictámenes correctos es peor que no tenerla: el auditor deja de
+  creerle a TODAS las alarmas, incluidas las buenas. Para afinarla hace falta
+  medirla contra dictámenes reales del hospital — que existen en la base del
+  servidor y no acá. **Va después del diagnóstico de la pantalla nueva**, que
+  es justamente de donde salen esos dictámenes.
+- ~~**Indicadores que se contradicen:** «riesgo BAJO» junto a «NO RADICAR».~~
+  **RESUELTO el 09-09 (tarde, 3).** Si el motor no deja radicar el escrito, el
+  riesgo ya no puede quedar en verde: sube a ALTO y muestra como factor cada
+  motivo del bloqueo. Lo de «DEFENDER 100 %» junto a «riesgo ALTO» se revisó y
+  **no es contradicción**: uno dice qué se responde (defender todo, que es la
+  posición del hospital) y el otro qué se espera de la entidad (que ratifique
+  y toque ir a conciliación). Las dos cosas pueden ser ciertas a la vez y por
+  eso se dejó como está.
 - **Volver a correr el caso 3 (pertinencia) en etapa Inicial:** en
   Ratificación no usa la IA, así que la prueba de si inventa hallazgos
   clínicos quedó sin hacer.
@@ -13269,6 +13369,13 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ## 4) PARA MAÑANA
 
+
+**Motor de Glosas — abrir el diagnóstico y decidir el modelo.** Entrar al motor
+con el usuario administrador, ir a **Usuarios**, y darle al botón azul «Ver el
+diagnóstico» del recuadro «📊 Por qué la confianza no sube». Pasar al chat lo
+que salga: con esos números —y no con suposiciones— se decide si vale la pena
+cambiar el modelo de IA principal, que es la causa #1 de la lista de pendientes.
+El botón solo lee: no cambia nada.
 
 **Mesa de conciliación — probarla de verdad.** Abrir una mesa con una lista de
 facturas y el consolidado de la MISMA remesa de la EPS, y trabajarla de punta a
