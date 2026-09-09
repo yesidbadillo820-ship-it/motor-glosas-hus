@@ -111,6 +111,20 @@ hay adentro (cuántos archivos, cuántos traen número de factura, hasta qué
 profundidad, qué no se pudo leer y ejemplos de nombres) — para entender un
 servidor nuevo sin ir a ciegas. Van 23 pruebas del clasificador.
 
+**Lo que reveló el diagnóstico (mismo día):** con el arreglo, el bot recorrió
+~100.000 carpetas de los 12 servidores y quedó claro dónde está el hueco:
+**Radicación Digital solo llega hasta enero de 2025** (esa carpeta tiene un
+solo mes, «01. ENERO», con 13.035 archivos de facturas de diciembre 2024), y
+el servidor SINAC 2025 arranca en septiembre. O sea que de las radicaciones de
+**febrero a agosto de 2025** —donde cae el grueso de este lote— no hay
+soportes en ninguna de las rutas conocidas. Quedan por revisar cuatro
+servidores que nunca se habían mirado: `Z:` (cartera y glosas, con carpetas
+«02.FEBRERO» y «DEVOLUCIONES 2025»), `\\Prime\FACTURACIÓN` (dos carpetas de
+consulta), la carpeta `recepcion` de radicación 2026 y `CORRESPONDENCIA`. Para
+no seguir a ciegas, el diagnóstico ahora acepta **varias rutas de una vez** y
+un **`--buscar HUS<n>`** que rastrea una factura y dice en qué carpeta exacta
+aparece. Van 26 pruebas.
+
 
 ### 09-09-2026 — Las carpetas ya salen con el formato del cargue de COOSALUD
 
