@@ -132,6 +132,16 @@ con la misma forma de siempre (`COOSALUD\<gestora>\ENV-...\IMG\HUS<n>`).
 95 coincidencias de las 3 facturas de prueba. Esa carpeta quedó agregada a la
 lista fija del bot, así que la corrida del lote ya no necesita banderas.
 
+**CERRADO: 178 de 178 con soportes.** Con esa ruta agregada, la corrida final
+del lote para radicar quedó completa: las 178 facturas con su carpeta armada
+en el formato del cargue (`<Régimen>\<lote>\RIPS\` + `IMG\HUS<n>\`) y sus
+soportes adentro, en
+`\\Prime\servidor_cartera_glosas\SERVIDOR GLOSAS\F\PARA RADICAR COOSALUD`.
+Reparto: 157 Subsidiado, 16 Contributivo, 4 sin clasificar (facturas viejas
+sin RIPS en la carpeta) y 1 «Otro (05)» (paciente no afiliado). Quedan 19
+facturas con diferencia real de fechas entre el RIPS y la factura, marcadas en
+rojo en el Excel de auditoría, para revisar antes de radicar.
+
 
 ### 09-09-2026 — Las carpetas ya salen con el formato del cargue de COOSALUD
 
