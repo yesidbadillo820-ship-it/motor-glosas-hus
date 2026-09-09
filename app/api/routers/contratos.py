@@ -108,6 +108,43 @@ def eps_sin_contrato(
     }
 
 
+@router.get("/eps-seleccionables", response_model=List[str])
+def eps_seleccionables(
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Las entidades que un auditor puede elegir para analizar una glosa.
+
+    09-09-2026. El desplegable de «EPS / Entidad Pagadora» del botón
+    Analizar se llenaba con `GET /contratos/`, así que solo ofrecía las
+    entidades con `ContratoRecord`: SURA, SALUD TOTAL, EMSSANAR, SAVIA y
+    MUTUAL SER —reales, con bot de portal y lógica propia en el resto del
+    motor— jamás aparecían, y el auditor solo podía elegir
+    «OTRA / SIN DEFINIR» para ellas. Todos esos dictámenes salían genéricos.
+
+    `/eps-sin-contrato` (arriba) no resuelve esto solo: solo lista EPS que
+    YA están en `GlosaRecord.eps`, y una EPS que nunca se pudo seleccionar
+    tampoco pudo quedar guardada con su nombre real — es un candado que se
+    cierra solo. Esta ruta une TRES fuentes para que eso no vuelva a pasar:
+    el catálogo fijo de entidades reales, las que ya tienen contrato, y las
+    que ya aparecen en el historial aunque no tengan contrato.
+    """
+    from app.models.db import GlosaRecord
+    from app.services.catalogo_eps import eps_seleccionables as _unir
+
+    # El marcador del desplegable no es una entidad — sin este filtro, la
+    # unión lo metería a la lista como si «OTRA / SIN DEFINIR» fuera un
+    # pagador más (mismo marcador que `_EPS_GENERICAS` en glosa_service.py).
+    _generico = {"", "OTRA", "SIN DEFINIR", "OTRA / SIN DEFINIR", "OTRA/SIN DEFINIR"}
+    con_contrato = [c.eps for c in db.query(ContratoRecord.eps).all() if c.eps]
+    en_historial = [
+        r[0]
+        for r in db.query(GlosaRecord.eps).distinct().all()
+        if r[0] and r[0].strip() and r[0].strip().upper() not in _generico
+    ]
+    return _unir(con_contrato, en_historial)
+
+
 @router.get("/exportar.csv")
 def exportar_contratos_csv(
     db: Session = Depends(get_db),

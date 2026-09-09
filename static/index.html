@@ -16492,10 +16492,25 @@ async function loadContratos(){
     grid.innerHTML='';
     document.getElementById('n-contratos').textContent=data.length;
     data.forEach(function(c){
-      sel.innerHTML+='<option value="'+escHtml(c.eps)+'">'+escHtml(c.eps)+'</option>';
       hEps.innerHTML+='<option value="'+escHtml(c.eps)+'">'+escHtml(c.eps)+'</option>';
       grid.innerHTML+='<div class="contrato-card"><div class="contrato-eps">'+escHtml(c.eps)+'</div><div class="contrato-det">'+escHtml(c.detalles)+'</div></div>';
     });
+    // 09-09-2026 — el desplegable de Analizar NO puede limitarse a las EPS
+    // con contrato. SURA, SALUD TOTAL, EMSSANAR, SAVIA y MUTUAL SER son
+    // entidades reales sin contrato cargado, y sin esto solo se podían
+    // analizar como «OTRA / SIN DEFINIR»: todo dictamen suyo salía genérico.
+    // Va aparte de la grilla de contratos (arriba, que sí debe mostrar solo
+    // contratos de verdad) y no bloquea si falla: peor es nada, mejor es
+    // la lista completa.
+    try{
+      var r2 = await fetch('/contratos/eps-seleccionables', {headers:authH()});
+      if(r2.ok){
+        var eps = await r2.json();
+        (eps || []).forEach(function(nombre){
+          sel.innerHTML += '<option value="'+escHtml(nombre)+'">'+escHtml(nombre)+'</option>';
+        });
+      }
+    }catch(e){ avisarNoCargo('las entidades sin contrato', e); }
   }catch(e){ avisarNoCargo('los contratos', e); }
 }
 

@@ -1,5 +1,48 @@
 # Registro de cambios
 
+## Sesión 09-sep-2026 (tarde) — El desplegable de EPS no puede depender de tener contrato
+
+SURA, SALUD TOTAL, EMSSANAR, SAVIA y MUTUAL SER —entidades reales, con bot de
+portal propio y lógica propia en el resto del motor desde hace meses—
+nunca aparecían en «EPS / Entidad Pagadora» del botón Analizar: el
+desplegable se llenaba solo con `GET /contratos/`, o sea con las EPS que
+tienen `ContratoRecord`. El auditor solo podía elegir «OTRA / SIN DEFINIR»,
+y todo dictamen de esas cinco entidades salía genérico.
+
+- **`app/services/catalogo_eps.py`** (nuevo) — el catálogo fijo de entidades
+  reales, y `eps_seleccionables()` para unir varias fuentes sin repetidos.
+  Cada entidad agregada ya estaba en uso en otra parte del motor (bot de
+  portal, rama de lógica de negocio); no se inventó ninguna.
+- **`GET /contratos/eps-seleccionables`** — une tres fuentes: el catálogo
+  fijo, las EPS con `ContratoRecord`, y las que ya aparecen en
+  `GlosaRecord.eps` sin tenerlo. `/eps-sin-contrato` (ya existía) no bastaba
+  sola: solo lista EPS que YA están en el historial, y una EPS que nunca se
+  pudo seleccionar tampoco pudo quedar guardada con su nombre real — un
+  candado que se cierra solo.
+- **`loadContratos()`** — el `<select id="eps-sel">` del botón Analizar ahora
+  se llena también desde la ruta nueva. La grilla de la pantalla Contratos
+  sigue mostrando solo contratos reales (no se infla con entidades sin
+  contrato). El fallo de esa llamada avisa con `avisarNoCargo`, no se traga
+  en la consola (regla del `MASTER_IMPROVEMENT_PLAN.md`, 1.3).
+- **`extractor_factura.py`** — su lista propia de EPS conocidas (que se había
+  quedado atrás, sin MUTUAL SER/EMSSANAR/SAVIA) ahora importa del catálogo
+  nuevo: una sola fuente, no dos copias que se desincronizan.
+- **`scripts/diagnostico_calidad_ia.py`** (nuevo) — reporte de solo lectura
+  para correr en el servidor del hospital: EPS genéricas vs. con nombre,
+  filas en `tarifas_contratadas` (tarifa pactada por CUPS), cobertura de
+  `clausulas_contrato`, qué fracción de las glosas tiene ya el veredicto
+  final de la EPS registrado (de ahí se alimentan el precedente interno y el
+  banco de argumentos ganadores), el promedio de confianza real por
+  `modelo_ia`, y el **costo real** de Anthropic leído de `ai_calls` —esa
+  tabla ya existe y ya calcula el costo en dólares por llamada; no hay que
+  estimarlo, solo leerlo.
+
+39 pruebas nuevas. Comprobado en navegador: con la base vacía, las cinco
+entidades ya aparecen en el desplegable. El script de diagnóstico se probó
+con datos sembrados (65 glosas, dos modelos, EPS mixtas) y se limpiaron
+después.
+
+
 ## Sesión 09-sep-2026 — Todo 401 va al manejador de sesión vencida
 
 El auditor abrió el motor a las 8:15 con la sesión de la noche anterior (el
