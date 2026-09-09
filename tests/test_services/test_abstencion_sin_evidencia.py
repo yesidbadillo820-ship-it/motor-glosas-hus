@@ -168,18 +168,48 @@ class TestElFormularioTambienEsEvidencia:
     MOTOR = io.open("app/services/glosa_service.py", encoding="utf-8").read()
 
     def test_con_fechas_no_se_abstiene(self):
-        """Con fechas, «sin fechas que permitan calcular extemporaneidad» sería falso."""
+        """Con fechas, «sin fechas que permitan calcular extemporaneidad» sería falso.
+
+        09-09-2026 — SE QUITÓ «tabla_excel» DE ESTA LISTA, y vale la pena
+        dejar dicho por qué, porque esta prueba se contradecía a sí misma.
+
+        La lista era un inventario de nombres que debían APARECER en el
+        bloque. Uno de ellos, `locals().get("tabla_excel")`, no existía como
+        variable en ese método: devolvía None siempre. Era código muerto, y
+        la prueba certificaba su presencia sin comprobar que hiciera nada.
+
+        Y no se podía «arreglar» conectándolo. `data.tabla_excel` es
+        obligatorio en el formulario (`min_length=3`), así que `_hay_algo_mas`
+        daría True SIEMPRE y la abstención no volvería a activarse nunca.
+        La prueba de abajo —`test_fa0205_sigue_abstenido`— exige justo lo
+        contrario, y FA0205 **es una tabla de Excel pegada**: si tener tabla
+        contara como evidencia, ese caso nunca se abstendría.
+
+        Lo que esa línea quería mirar ya lo mira `_glosa_sin_elementos` sobre
+        el mismo texto. Se comprueban los nombres que sí gobiernan algo.
+        """
         i = self.MOTOR.index("_hay_algo_mas = bool(")
         bloque = self.MOTOR[i : i + 500]
         for campo in (
             "fecha_radicacion",
             "fecha_recepcion",
-            "tabla_excel",
             "es_ratificacion",
             "es_extemporanea",
             "modo_resp",
         ):
             assert campo in bloque, campo
+
+    def test_la_tabla_de_excel_no_se_cuenta_como_evidencia(self):
+        """La otra mitad del arreglo, y la que de verdad importa: que nadie
+        vuelva a meter `tabla_excel` ahí sin darse cuenta de que apaga la
+        abstención completa."""
+        i = self.MOTOR.index("_hay_algo_mas = bool(")
+        bloque = self.MOTOR[i : i + 500]
+        assert "tabla_excel" not in bloque, (
+            "Volvió `tabla_excel` al bloque. Es obligatorio en el formulario: "
+            "con él, `_hay_algo_mas` es True siempre y la abstención "
+            "—que existe por el caso FA0205— deja de activarse."
+        )
 
     def test_la_abstencion_exige_las_dos_cosas(self):
         assert "(not _hay_algo_mas) and _glosa_sin_elementos(" in self.MOTOR
