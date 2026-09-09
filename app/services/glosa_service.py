@@ -2916,6 +2916,58 @@ def _paciente_honesto(pac) -> str:
 # Las marcas que el propio motor deja en el texto cuando decide que el
 # dictamen NO está listo para radicar, y el motivo en una línea. La pantalla
 # las usa para no estampar el sello verde encima.
+# ── La cifra que dice el escrito vs. la que se está objetando ─────────
+# 08-09-2026, caso 1. La glosa objetaba $19.500 y el escrito radicable decía
+# «POR UN VALOR OBJETADO DE $ 19.». No es un adorno: la entidad tiene la
+# factura, ve que el número no cuadra, y con eso desestima sin entrar al
+# fondo. Da igual si lo cortó el modelo o una de las redes de limpieza — lo
+# que no puede pasar es que salga.
+#
+# Solo se miran las cifras que el propio escrito PRESENTA como el valor
+# objetado. Las demás (topes, valores de contrato, la UVB) tienen sus
+# propias redes y acá no se tocan.
+_RE_CIFRA_PRESENTADA_COMO_OBJETADO = re.compile(
+    r"VALOR\s+OBJETADO\s*(?:DE|:|ES|POR)?\s*\$\s*([\d\.,]+)"
+    r"|\$\s*([\d\.,]+)\s*(?:,\s*)?(?:COMO\s+)?VALOR\s+OBJETADO",
+    re.IGNORECASE,
+)
+
+
+def _cifra_del_escrito_no_es_la_de_la_glosa(argumento: str, valor_objetado) -> list[str]:
+    """Cifras que el escrito llama «valor objetado» y no coinciden con él.
+
+    Devuelve los fragmentos que no cuadran. Lista vacía = todas cuadran, o no
+    hay con qué comparar (sin valor objetado no se inventa una comparación).
+    """
+    from app.utils.moneda import parse_valor_cop
+
+    if not argumento:
+        return []
+    try:
+        esperado = parse_valor_cop(valor_objetado)
+    except Exception:  # noqa: BLE001
+        return []
+    if not esperado or esperado <= 0:
+        return []
+
+    malas: list[str] = []
+    for m in _RE_CIFRA_PRESENTADA_COMO_OBJETADO.finditer(_solo_texto_argumento(argumento)):
+        crudo = (m.group(1) or m.group(2) or "").strip().rstrip(".,")
+        if not crudo:
+            continue
+        try:
+            dice = parse_valor_cop(crudo)
+        except Exception:  # noqa: BLE001
+            continue
+        # Un peso de diferencia por redondeo no es una contradicción; el
+        # orden de magnitud sí lo es, y es lo que se ve a simple vista.
+        if dice > 0 and abs(dice - esperado) > max(1.0, esperado * 0.01):
+            texto = f"el escrito dice ${dice:,.0f} y lo objetado es ${esperado:,.0f}"
+            if texto not in malas:
+                malas.append(texto.replace(",", "."))
+    return malas
+
+
 # ── El escrito contra la ficha del propio motor (08-09-2026) ──────────
 # Prueba del caso 1, glosa TA0701 de COOSALUD. El motor TIENE el contrato
 # cargado —«68001C00060340-24 · SOAT -15 %», vigente hasta 2027— y lo imprime
@@ -2949,6 +3001,18 @@ _RE_DICE_SIN_CONTRATO = re.compile(
 )
 # «NO HA APORTADO … TARIFA PACTADA DISTINTA O INFERIOR» — la entidad no tiene
 # que aportar lo que el hospital ya tiene guardado.
+# 08-09-2026, segunda corrida del caso 1. Ya no decía «SOAT PLENO», pero
+# invocó el ART. 87 DEL DECRETO 2423 DE 1996 —la regla para procedimientos
+# SIN tarifa asignada— teniendo el recuadro del mismo dictamen un «Tarifa
+# pactada: SOAT -15 %». Es la misma contradicción con otra cara: apoyarse en
+# la norma del vacío tarifario cuando sí hay pacto.
+_RE_NORMA_DEL_VACIO_TARIFARIO = re.compile(
+    r"ART[\u00cdI]CULO\s+87\b(?:(?!\.).){0,60}?DECRETO\s+2423"
+    r"|DECRETO\s+2423(?:(?!\.).){0,60}?ART[\u00cdI]CULO\s+87\b"
+    r"|NO\s+(?:SE\s+ENCUENTRE\s+DEFINIDO|TENGA\s+ASIGNADA\s+TARIFA)",
+    re.IGNORECASE | re.DOTALL,
+)
+
 _RE_EXIGE_PRUEBA_DEL_PACTO = re.compile(
     r"NO\s+HA\s+(?:APORTADO|ACREDITADO|DEMOSTRADO|PROBADO)"
     r"(?:(?!\.).){0,120}?TARIFA\s+PACTADA",
@@ -3001,6 +3065,11 @@ def _contradice_la_ficha_contractual(argumento: str, ficha) -> list[str]:
         hallazgos.append(f"dice que no hay contrato pactado y el motor tiene el {numero}")
     if _RE_EXIGE_PRUEBA_DEL_PACTO.search(texto):
         hallazgos.append("le exige a la entidad probar una tarifa pactada que el hospital ya tiene")
+    if _RE_NORMA_DEL_VACIO_TARIFARIO.search(texto):
+        hallazgos.append(
+            "se apoya en la norma de los servicios SIN tarifa asignada (art. 87 del "
+            f"Decreto 2423 de 1996) teniendo pactada «{pactada}»"
+        )
     return hallazgos
 
 
@@ -3019,19 +3088,53 @@ _MARCAS_DE_BLOQUEO = (
         "CONTRADICE LA TARIFA PACTADA QUE TIENE EL MOTOR",
         "El escrito contradice el contrato que el motor tiene cargado",
     ),
+    # 08-09-2026 (caso 2). El escrito enumeraba los nueve soportes con los
+    # que «se radicó» la factura sin señalar un folio y sin un solo PDF
+    # adjunto. El aviso ya salía; lo que faltaba era que impidiera radicar.
+    ("AFIRMA SIN PROBAR", "Dice que aportó soportes pero no señala ninguno"),
+    (
+        "LA CIFRA DEL ESCRITO NO ES LA DE LA GLOSA",
+        "El valor que dice el escrito no es el valor objetado",
+    ),
 )
 
 
-def _bloqueos_para_radicar(dictamen: str) -> list[str]:
+def _bloqueos_para_radicar(dictamen: str, verificacion_citas=None) -> list[str]:
     """Los motivos por los que el motor marcó el dictamen como no radicable.
 
     Lista vacía = el motor no lo bloqueó. No juzga la calidad del argumento:
-    solo lee lo que el motor ya escribió.
+    solo lee lo que el motor ya encontró.
+
+    08-09-2026 (caso 2, SO3401). El verificador de citas encontró un hallazgo
+    de severidad ALTA —«el dictamen afirma lo que dice un documento clínico y
+    no se leyó ningún soporte»— y el dictamen salió sin sello verde… pero
+    tampoco bloqueado, y el recuadro remataba con «el gestor decide si corrige
+    o ignora — esto es solo orientativo». Un hallazgo que el propio motor
+    llama GRAVE no puede quedar en consejo.
     """
-    if not dictamen:
-        return []
-    up = dictamen.upper()
-    return [motivo for marca, motivo in _MARCAS_DE_BLOQUEO if marca in up]
+    motivos: list[str] = []
+    if dictamen:
+        up = dictamen.upper()
+        motivos += [motivo for marca, motivo in _MARCAS_DE_BLOQUEO if marca in up]
+    if isinstance(verificacion_citas, dict):
+        graves = [
+            i
+            for i in (verificacion_citas.get("issues") or [])
+            if isinstance(i, dict) and str(i.get("severidad", "")).upper() == "ALTA"
+        ]
+        if graves:
+            cuantos = len(graves)
+            motivos.append(
+                f"{cuantos} hallazgo(s) GRAVE(S) en la revisión de citas"
+                if cuantos > 1
+                else "Un hallazgo GRAVE en la revisión de citas"
+            )
+    # Sin duplicados y en el orden en que se encontraron.
+    vistos: list[str] = []
+    for m in motivos:
+        if m not in vistos:
+            vistos.append(m)
+    return vistos
 
 
 def _avisos_de_soportes_no_leidos(
@@ -11521,6 +11624,35 @@ class GlosaService:
             except Exception as _e_cf3:
                 logger.debug(f"[CONTRADICE-FICHA] red no aplicada: {_e_cf3}")
 
+            # 08-09-2026 (caso 1) — LA CIFRA QUE DICE EL ESCRITO. La glosa
+            # objetaba $19.500 y el texto radicable decía «POR UN VALOR
+            # OBJETADO DE $ 19.». La entidad tiene la factura: ve que el
+            # número no cuadra y desestima sin entrar al fondo.
+            try:
+                _cifras_malas = _cifra_del_escrito_no_es_la_de_la_glosa(
+                    dictamen, locals().get("valor_raw")
+                )
+                if _cifras_malas:
+                    _det_c = "; ".join(_cifras_malas)
+                    dictamen = dictamen.rstrip() + (
+                        '<div style="background:#fee2e2;border-left:4px solid #dc2626;'
+                        'padding:16px;margin:15px 0;border-radius:8px;">'
+                        '<h4 style="color:#991b1b;margin:0 0 8px 0;">LA CIFRA DEL '
+                        "ESCRITO NO ES LA DE LA GLOSA</h4>"
+                        '<p style="font-size:13px;line-height:1.7;color:#7f1d1d;margin:0;">'
+                        f"En el texto que se radica, {_det_c}. La entidad tiene la "
+                        "factura: le basta comparar para desestimar la respuesta sin "
+                        "entrar en el fondo. <b>Corrija la cifra antes de radicar.</b>"
+                        "</p></div>"
+                    )
+                    _correcciones.append(
+                        f"OJO: la cifra del escrito no cuadra con la glosa ({_det_c}). "
+                        "El dictamen quedó marcado como NO listo para radicar."
+                    )
+                    logger.warning(f"[CIFRA-QUE-NO-CUADRA] {_det_c}")
+            except Exception as _e_cq:
+                logger.debug(f"[CIFRA-QUE-NO-CUADRA] red no aplicada: {_e_cq}")
+
             # 02-09-2026 — TRIAGE, CIE-10 O FECHAS QUE NINGÚN PDF TRAE.
             try:
                 _clinico = _hechos_clinicos_sin_respaldo(
@@ -12581,7 +12713,9 @@ class GlosaService:
             dictamen = _neutralizar_eps_generica_en_dictamen(dictamen, getattr(data, "eps", ""))
         except Exception as _e_neg:
             logger.debug(f"[EPS-GENERICA-EN-TEXTO] no aplicada: {_e_neg}")
-        _motivos_bloqueo = _bloqueos_para_radicar(dictamen)
+        # `verif_citas` va también: un hallazgo de severidad ALTA es un
+        # bloqueo aunque no haya dejado marca en el texto (caso 2).
+        _motivos_bloqueo = _bloqueos_para_radicar(dictamen, locals().get("verif_citas"))
 
         resultado = GlosaResult(
             tipo=f"RESPUESTA {cod_res}",
@@ -12628,10 +12762,15 @@ class GlosaService:
 
         # PostHog event tracking. Best-effort, no falla si está down.
         # OJO: solo enviamos métricas, NUNCA texto del paciente / dictamen.
+        # 08-09-2026: esto era `float(re.sub(r"[^\d.]", "", valor_raw))`, que lee
+        # el punto de MILES como decimal: «$ 19.500» daba 19.5, y con dos puntos
+        # («$ 1.240.000») reventaba y caía en el except con 0.0. O sea que TODA
+        # glosa de más de un millón se contaba en el cajón «<100K».
+        # `parse_valor_cop` entiende el formato colombiano y existe justo para esto.
         try:
-            import re as _re
+            from app.utils.moneda import parse_valor_cop as _pvc_tel
 
-            _valor_num = float(_re.sub(r"[^\d.]", "", valor_raw or "") or 0)
+            _valor_num = float(_pvc_tel(valor_raw) or 0)
         except Exception:
             _valor_num = 0.0
         try:

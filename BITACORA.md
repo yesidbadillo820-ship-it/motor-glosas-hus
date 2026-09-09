@@ -91,6 +91,54 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 08-09-2026 (noche, 4) — Segunda corrida de los cinco casos: cuatro cosas más
+
+Volvimos a correr las cinco glosas de prueba después de los arreglos. **Lo de
+antes quedó bien**: ya sale «paciente no identificado en los soportes» en vez
+de inventar que se identificó, el marcador «OTRA / SIN DEFINIR» desapareció
+del escrito, el sello rojo aparece cuando toca, y el aviso de soportes ya no
+se contradice consigo mismo.
+
+Y salieron cuatro cosas nuevas, todas corregidas en esta tanda:
+
+**1. El motor encontraba un defecto GRAVE y no bloqueaba.** En la glosa de
+soportes, el revisor de citas dijo «1 hallazgo de severidad ALTA — corregir
+antes de radicar»… y el recuadro remataba: «el gestor decide si corrige o
+ignora, esto es solo orientativo». Un defecto que el propio motor llama grave
+no es un consejo. Ahora bloquea, y el pie dice que no es opcional. Las
+observaciones menores siguen siendo orientativas, como debe ser.
+
+**2. Una cifra de plata salió cortada en el papel que se radica.** La glosa
+objetaba $19.500 y el escrito decía «POR UN VALOR OBJETADO DE **$ 19.**». La
+EPS tiene la factura: ve que el número no cuadra y desestima sin discutir el
+fondo. Ahora el motor compara lo que dice el escrito contra el valor objetado
+de verdad, y si no cuadra, bloquea.
+
+**3. La contradicción de la tarifa, con otra cara.** Ya no decía «SOAT
+PLENO», pero se apoyó en el artículo 87 del Decreto 2423 de 1996 — que es la
+regla para procedimientos **sin tarifa asignada** — teniendo el recuadro del
+mismo dictamen un «Tarifa pactada: SOAT −15 %». Se amplió la revisión para
+que también atrape esa forma.
+
+**4. Las estadísticas venían contando mal.** El sistema leía «$ 19.500» como
+19 pesos con 5 centavos, y con «$ 1.240.000» se atragantaba y contaba cero.
+Resultado: **toda glosa de más de un millón se estaba contando en el cajón de
+«menos de cien mil»**. No afecta ningún dictamen —es solo el conteo interno—
+pero cualquier informe que saliera de ahí estaba equivocado.
+
+**Sobre el porcentaje de confianza.** Preguntó por qué nunca pasa del 80 %.
+No es un defecto: son siete factores, y tres de ellos no se pueden ganar con
+facturas inventadas y sin PDF —soportes adjuntos, precedente de una glosa
+igual ya ganada, y la cláusula del contrato—. Eso es 25 puntos fuera de
+alcance. El mismo dictamen, con soportes y con precedente, da **89 %**. El
+motor no está siendo pesimista: se niega a decir «alta confianza» de un
+escrito sin una prueba detrás.
+
+32 pruebas nuevas y comprobación en navegador.
+
+---
+
+
 ### 08-09-2026 (cierre 3) — la pantalla Objeciones DGH ya sirve para TODAS las entidades
 
 Se terminó lo que faltaba: **las ocho entidades** que el motor sabe trabajar ya
