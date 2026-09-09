@@ -1,5 +1,27 @@
 # Registro de cambios
 
+## Sesión 09-sep-2026 (tarde, 2) — `GET /admin/diagnostico-calidad`
+
+Los números detrás de la confianza baja solo se ven en la base real del
+hospital. Pedirle al auditor que corriera un script por consola era pasarle
+trabajo manual; esto lo vuelve un enlace que abre y copia.
+
+- **`app/api/routers/diagnostico_calidad.py`** (nuevo) — solo lectura, solo
+  SUPER_ADMIN. Devuelve: % de glosas con EPS genérica y el detalle de las
+  que sí tienen nombre; filas en `tarifas_contratadas` (con el diagnóstico
+  escrito cuando está vacía); cobertura de `clausulas_contrato`; % de glosas
+  con veredicto final de la EPS —de ahí se alimentan el precedente interno y
+  `few_shot_gold`, y por debajo del 30% lo dice explícitamente—; confianza
+  promedio **por `modelo_ia`** (la comparación Groq vs. Claude con datos
+  propios); y costo real por proveedor leído de `ai_calls`, con proyección
+  mensual al volumen actual.
+
+Complementa `scripts/diagnostico_calidad_ia.py` (misma información por
+consola, para quien tenga acceso al servidor).
+
+9 pruebas nuevas. Verificado contra un servidor real con datos sembrados.
+
+
 ## Sesión 09-sep-2026 (tarde) — El desplegable de EPS no puede depender de tener contrato
 
 SURA, SALUD TOTAL, EMSSANAR, SAVIA y MUTUAL SER —entidades reales, con bot de

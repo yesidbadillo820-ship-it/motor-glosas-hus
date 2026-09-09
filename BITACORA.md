@@ -91,6 +91,39 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde, 2) — El diagnóstico de calidad ahora es un enlace, no un script
+
+Para responder por qué la confianza no sube hacía falta mirar la base de
+datos REAL del hospital, que desde acá no se ve. La opción era pedirle a
+Yesid que corriera un script por consola en el servidor — trabajo manual que
+él no tiene tiempo de hacer.
+
+**Ahora es una dirección web.** Entra como administrador a
+`https://iaglosassinac.help/admin/diagnostico-calidad`, copia lo que sale, y
+listo. Solo lee, no cambia nada, y solo lo ve un SUPER_ADMIN.
+
+Lo que contesta, con números reales:
+
+- **Cuántas glosas quedaron sin entidad identificada** («OTRA / SIN
+  DEFINIR») y cuáles EPS sí tienen nombre.
+- **Si el catálogo de tarifas pactadas por CUPS está vacío** — es lo que le
+  falta al motor para una glosa de TARIFAS: comparar cifra contra cifra por
+  ítem, en vez de razonar con el texto general del contrato.
+- **Qué fracción de las glosas tiene ya el veredicto final de la EPS.** De
+  ahí se alimentan dos cosas a la vez: el «precedente interno» del puntaje
+  de confianza y el banco de argumentos ganadores que la IA recibe como
+  ejemplo. Si eso se queda atrás, las dos se secan aunque entren más glosas.
+- **El promedio de confianza por modelo de IA** — la comparación directa
+  entre lo que produce Groq y lo que produce Claude, con datos propios.
+- **El costo real de la IA en dólares**, incluida la proyección mensual al
+  volumen actual. Esa cifra ya la calculaba el motor por cada llamada; lo
+  único que faltaba era mostrarla.
+
+9 pruebas nuevas y verificación contra un servidor de verdad.
+
+---
+
+
 ### 09-09-2026 (tarde) — Por qué SURA, SALUD TOTAL, EMSSANAR, SAVIA y MUTUAL SER siempre salían como «OTRA»
 
 **Lo que preguntó Yesid.** Por qué hay EPS que glosan pero no tienen
