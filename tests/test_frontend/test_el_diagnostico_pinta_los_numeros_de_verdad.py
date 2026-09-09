@@ -46,9 +46,32 @@ RESPUESTA = {
         "por_estado": [{"estado": "PENDIENTE", "glosas": 131}],
         "diagnostico": "Menos del 30%: el precedente se queda sin combustible.",
     },
-    "confianza_por_modelo": [
-        {"modelo": "openai/gpt-oss-120b", "glosas": 120, "confianza_promedio": 41.2},
-        {"modelo": "claude-sonnet-4-5", "glosas": 8, "confianza_promedio": 73.5},
+    # 09-09-2026: `confianza_por_modelo` pasó de lista a objeto cuando se
+    # separó la Confianza de verdad de la fórmula vieja de probabilidad de
+    # éxito, que hasta entonces salían con el mismo nombre.
+    "confianza_por_modelo": {
+        "glosas_con_confianza_guardada": 128,
+        "de_un_total_de": 143,
+        "detalle": [
+            {
+                "modelo": "openai/gpt-oss-120b",
+                "glosas": 120,
+                "confianza_promedio": 41.2,
+                "peor": 22.0,
+                "mejor": 66.0,
+            },
+            {
+                "modelo": "claude-sonnet-4-5",
+                "glosas": 8,
+                "confianza_promedio": 73.5,
+                "peor": 58.0,
+                "mejor": 89.0,
+            },
+        ],
+        "diagnostico": "Esta es la comparación buena.",
+    },
+    "probabilidad_exito_por_modelo": [
+        {"modelo": "openai/gpt-oss-120b", "glosas": 120, "promedio": 77.0},
     ],
     "costo_ia": [
         {

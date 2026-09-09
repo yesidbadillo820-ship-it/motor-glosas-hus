@@ -853,6 +853,8 @@ async def _persistir_y_responder(
     except Exception as _e_dup:
         logger.debug(f"[ANTI-DUP] Lookup falló: {_e_dup}")
 
+    _conf_score, _conf_nivel = _confianza_para_guardar(resultado)
+
     if existente:
         # UPDATE de la fila existente — sobreescribe dictamen y campos.
         from datetime import datetime, timezone as _tz
@@ -865,6 +867,11 @@ async def _persistir_y_responder(
         existente.dias_restantes = resultado.dias_restantes
         existente.modelo_ia = (resultado.modelo_ia or "")[:100]
         existente.score = resultado.score
+        # Solo se pisa si este análisis SÍ trajo Confianza: si no la trajo, se
+        # conserva la del análisis anterior en vez de borrarla.
+        if _conf_score is not None:
+            existente.confianza_score = _conf_score
+            existente.confianza_nivel = _conf_nivel
         existente.numero_radicado = numero_radicado or existente.numero_radicado
         existente.texto_glosa_original = tabla_excel or existente.texto_glosa_original
         existente.codigo_respuesta = cod_resp or existente.codigo_respuesta
@@ -894,6 +901,8 @@ async def _persistir_y_responder(
             dias_restantes=resultado.dias_restantes,
             modelo_ia=(resultado.modelo_ia or "")[:100],
             score=resultado.score,
+            confianza_score=_conf_score,
+            confianza_nivel=_conf_nivel,
             numero_radicado=numero_radicado,
             factura=numero_factura,
             texto_glosa_original=tabla_excel,
@@ -1714,6 +1723,33 @@ def _marcar_glosa_error_ocr(
             pass
         logger.error(f"[{req_id}] [{ETIQUETA_ERROR_OCR}] No pude marcar la glosa: {e}")
         return None
+
+
+def _confianza_para_guardar(resultado) -> tuple:
+    """La Confianza del dictamen, lista para la base: `(0-100, nivel)`.
+
+    09-09-2026. `calcular_confianza` la devuelve de 0.0 a 1.0 dentro de un
+    diccionario; en pantalla se ve como porcentaje. Se guarda igual que se ve
+    —de 0 a 100— para que nadie tenga que acordarse de multiplicar al leer la
+    tabla.
+
+    Devuelve `(None, None)` cuando el análisis no la trajo: los caminos de
+    salida temprana no pasan por el cálculo, y un 0 ahí sería mentira —
+    «no se calculó» no es «confianza cero», y con un 0 el promedio por modelo
+    saldría hundido sin que nada lo explique.
+    """
+    conf = getattr(resultado, "confianza", None)
+    if not isinstance(conf, dict):
+        return None, None
+    bruto = conf.get("score")
+    if bruto is None:
+        return None, None
+    try:
+        valor = round(float(bruto) * 100, 1)
+    except (TypeError, ValueError):
+        return None, None
+    nivel = str(conf.get("nivel") or "")[:10] or None
+    return valor, nivel
 
 
 async def _analizar_impl(

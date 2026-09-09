@@ -12346,6 +12346,27 @@ function _diagBloque(titulo, cuerpo, colorBorde){
     + '</div>';
 }
 
+// Una tabla del diagnóstico. `columnas` es [clave, título, sufijo?]; la
+// primera va a la izquierda y las demás alineadas a la derecha, que es como
+// se leen las cifras.
+function _diagTabla(filas, columnas){
+  var thead = columnas.map(function(c, i){
+    return '<th style="text-align:' + (i ? 'right' : 'left') + ';padding:.2rem .5rem">'
+      + escHtml(c[1]) + '</th>';
+  }).join('');
+  var tbody = filas.map(function(f){
+    return '<tr>' + columnas.map(function(c, i){
+      var v = f[c[0]];
+      var txt = escHtml(v === null || v === undefined ? '—' : v) + (c[2] && v != null ? c[2] : '');
+      return '<td style="padding:.2rem .5rem;text-align:' + (i ? 'right' : 'left') + '">'
+        + (i === columnas.length - 1 || i === 2 ? '<b>' + txt + '</b>' : txt) + '</td>';
+    }).join('') + '</tr>';
+  }).join('');
+  return '<table style="width:100%;font-size:.8rem;border-collapse:collapse">'
+    + '<thead><tr style="color:var(--text3);font-size:.72rem;text-transform:uppercase">'
+    + thead + '</tr></thead><tbody>' + tbody + '</tbody></table>';
+}
+
 function _pintarDiagnostico(d){
   if(!d || typeof d !== 'object') return '<div style="font-size:.82rem">Respuesta vacía.</div>';
   var total = Number(d.glosas_analizadas || 0);
@@ -12404,25 +12425,62 @@ function _pintarDiagnostico(d){
       + ' si la EPS levantó, ratificó o aceptó. ' + escHtml(v.diagnostico || '')
       + (porEstado ? '<ul style="margin:.4rem 0 0 1.1rem;font-size:.8rem">' + porEstado + '</ul>' : ''),
       Number(v.pct || 0) < 30 ? '#d97706' : '#16a34a');
+
+    // 09-09-2026. Con 0 de 397, el diagnóstico solo señalaba el problema y
+    // dejaba al auditor sin saber qué hacer con él. Un tablero que diagnostica
+    // y no dice dónde se arregla se lee una vez y no se vuelve a abrir.
+    if(Number(v.pct || 0) < 30){
+      html += _diagBloque('◀ Qué hacer con esto',
+        '<b>Es lo que más rinde de toda esta lista, y no cuesta nada.</b> El motor '
+        + 'no puede aprender de su propio trabajo mientras no sepa cómo le fue: sin '
+        + 'una sola glosa levantada, el «precedente interno» —que vale 15 de los 100 '
+        + 'puntos de la Confianza— nunca se puede activar, y el banco de argumentos '
+        + 'ganadores que se le muestra a la IA como ejemplo está vacío.'
+        + '<div style="margin-top:.55rem;padding:.55rem .75rem;background:#f0fdf4;'
+        + 'border-left:3px solid #16a34a;border-radius:6px">'
+        + 'Se marca en <b>Mis Glosas</b>: marque las glosas con la casilla y use '
+        + '<b>⬆ EPS LEVANTÓ</b> o <b>❌ EPS RATIFICÓ</b>. Se puede de a 500 a la vez.'
+        + '</div>', '#16a34a');
+    }
   }
 
-  if(d.confianza_por_modelo && d.confianza_por_modelo.length){
-    var filas = d.confianza_por_modelo.map(function(x){
-      return '<tr><td style="padding:.2rem .5rem">' + escHtml(x.modelo) + '</td>'
-        + '<td style="padding:.2rem .5rem;text-align:right">' + x.glosas + '</td>'
-        + '<td style="padding:.2rem .5rem;text-align:right"><b>' + x.confianza_promedio + '%</b></td></tr>';
-    }).join('');
-    html += _diagBloque('Confianza promedio por modelo',
-      '<table style="width:100%;font-size:.8rem;border-collapse:collapse">'
-      + '<thead><tr style="color:var(--text3);font-size:.72rem;text-transform:uppercase">'
-      + '<th style="text-align:left;padding:.2rem .5rem">Modelo</th>'
-      + '<th style="text-align:right;padding:.2rem .5rem">Glosas</th>'
-      + '<th style="text-align:right;padding:.2rem .5rem">Confianza</th></tr></thead>'
-      + '<tbody>' + filas + '</tbody></table>'
+  // 09-09-2026, corrección. Este recuadro decía «Confianza promedio por
+  // modelo» y mostraba otra cosa: el promedio de `score`, que es la fórmula
+  // vieja de probabilidad de éxito. Daba 77% mientras el auditor veía 51% al
+  // pie del dictamen — y con ese número se habría decidido no cambiar de
+  // modelo. Ahora van los dos, cada uno con su nombre.
+  var conf = d.confianza_por_modelo || {};
+  var detalle = conf.detalle || [];
+  if(detalle.length){
+    html += _diagBloque('Confianza real por modelo',
+      _diagTabla(detalle, [
+        ['modelo','Modelo'], ['glosas','Glosas'],
+        ['confianza_promedio','Confianza','%'], ['peor','Peor','%'], ['mejor','Mejor','%'],
+      ])
       + '<div style="margin-top:.45rem;color:var(--text3);font-size:.78rem">'
-      + 'Si un modelo saca una confianza claramente más alta que los demás, esa es la'
-      + ' prueba —con datos de este hospital, no con casos inventados— de si vale la'
-      + ' pena cambiar el proveedor principal.</div>');
+      + escHtml(conf.diagnostico || '') + '</div>', '#16a34a');
+  } else {
+    html += _diagBloque('Confianza real por modelo',
+      '<b>' + (conf.glosas_con_confianza_guardada || 0) + '</b> de '
+      + (conf.de_un_total_de || 0) + ' glosas tienen guardada la Confianza —la misma '
+      + 'que sale al pie del dictamen—. '
+      + escHtml(conf.diagnostico || '')
+      + '<div style="margin-top:.5rem;padding:.5rem .7rem;background:#eff6ff;border-radius:6px;'
+      + 'font-size:.8rem;color:#1e3a8a">Analice unas glosas y vuelva a este botón: '
+      + 'ahí se verá qué modelo da mejor Confianza, con casos de este hospital.</div>',
+      '#d97706');
+  }
+
+  var exito = d.probabilidad_exito_por_modelo || [];
+  if(exito.length){
+    html += _diagBloque('Probabilidad de éxito (fórmula antigua)',
+      _diagTabla(exito, [['modelo','Modelo'], ['glosas','Glosas'], ['promedio','Promedio','%']])
+      + '<div style="margin-top:.45rem;color:var(--text3);font-size:.78rem">'
+      + 'Cuidado: <b>esto NO es la Confianza</b> del dictamen. Es una fórmula fija '
+      + 'por tipo de glosa (extemporánea 99, ratificación 92, urgencia 90, tarifa 75, '
+      + 'el resto 85, +5 si hay PDF): no mide qué tan bueno quedó el escrito ni sirve '
+      + 'para comparar modelos de IA. Se muestra solo porque es el número que quedó '
+      + 'guardado en las glosas viejas.</div>', '#94a3b8');
   }
 
   if(d.costo_ia && d.costo_ia.length){

@@ -335,6 +335,26 @@ async def lifespan(app: FastAPI):
             pass
         logger.warning(f"MIGRACIÓN numero_radicado: {e}")
 
+    # 09-09-2026 — LA CONFIANZA QUE SE VE EN PANTALLA, GUARDADA.
+    # Se calculaba, se mostraba y se botaba. Con 397 glosas analizadas, la
+    # pregunta del área —«¿qué modelo de IA da mejor Confianza?»— no se podía
+    # contestar con datos porque el número no quedaba en ninguna parte. (La
+    # columna `score`, que sí existía, es la fórmula vieja de probabilidad de
+    # éxito: otra cosa.) Las glosas viejas quedan en NULL, que es la verdad:
+    # de ellas no se guardó y no se puede inventar hacia atrás.
+    try:
+        if _tiene_tabla("historial") and not _tiene_columna("historial", "confianza_score"):
+            logger.warning("MIGRACIÓN: Agregando columnas de confianza a historial")
+            db.execute(text("ALTER TABLE historial ADD COLUMN confianza_score REAL"))
+            db.execute(text("ALTER TABLE historial ADD COLUMN confianza_nivel VARCHAR(10)"))
+            db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN confianza: {e}")
+
     try:
         if _tiene_tabla("historial") and not _tiene_columna("historial", "request_id"):
             logger.warning("MIGRACIÓN: Agregando columnas a historial")

@@ -1,5 +1,72 @@
 # Registro de cambios
 
+## Sesión 09-sep-2026 (tarde, 4) — La Confianza se guarda; el panel dejó de confundir dos métricas
+
+El diagnóstico corrió contra la base real (397 glosas) y devolvió
+«Confianza promedio por modelo: 77%» — mientras el auditor ve 51% al pie de
+sus dictámenes. Los dos números eran ciertos y medían cosas distintas:
+
+- `historial.score` (77%) = `_calcular_score()`, fórmula fija por tipo de
+  glosa (99 extemporánea / 92 ratificación / 90 urgencia / 75 tarifa / 85
+  resto, +5 con PDF). No lee el escrito.
+- La Confianza (51%) = `confidence_scorer.calcular_confianza()`, siete
+  factores ponderados — **y no se persistía en ninguna parte**.
+
+Con lo cual la pregunta que motivó el diagnóstico («¿qué modelo de IA da
+mejor Confianza?») era incontestable, no por falta de volumen sino porque el
+número nunca se escribía.
+
+### Persistencia de la Confianza
+
+- **`app/models/db.py`** — `GlosaRecord.confianza_score` (Float, 0-100 para
+  que se lea igual que en pantalla) y `confianza_nivel` (String(10)). Sin
+  default: las 397 filas previas quedan en NULL, que es la verdad.
+- **`app/main.py`** — migración en caliente (`ADD COLUMN` para ambas), en el
+  patrón de las demás de `historial`.
+- **`app/repositories/glosa_repository.py`** — `crear()` las acepta.
+- **`app/api/routers/analizar.py`** — `_confianza_para_guardar(resultado)`
+  convierte `{score: 0.51}` → `(51.0, "medio")` y devuelve `(None, None)`
+  ante cualquier forma inesperada: **nunca 0**, que hundiría el promedio del
+  modelo sin explicación. Se escribe en las dos ramas (crear y re-analizar);
+  al re-analizar solo pisa si este análisis sí la calculó.
+
+### El panel deja de llamar Confianza a lo que no lo es
+
+- **`app/api/routers/diagnostico_calidad.py`** — `probabilidad_exito_por_modelo`
+  (la fórmula vieja, con su nombre) y `confianza_por_modelo` como objeto con
+  `glosas_con_confianza_guardada`, `detalle` (promedio + peor + mejor por
+  modelo) y `diagnostico`.
+- **`static/index.html`** — `_diagTabla()` como helper compartido. «Confianza
+  real por modelo» va **primero**; «Probabilidad de éxito (fórmula antigua)»
+  después, con la fórmula escrita y la advertencia de que no sirve para
+  comparar modelos. Sin datos aún, el recuadro dice qué hacer en vez de
+  mostrar un 0% que se leería como «el motor saca cero».
+
+### `TypeError` real en la consola del auditor
+
+`sinac-ux.js:216 Cannot read properties of undefined (reading 'toLowerCase')`,
+dos veces al entrar al portal: el gestor de contraseñas del navegador emite
+eventos `keydown` sin `e.key` al autocompletar (uno por campo). No tumbaba la
+página pero apagaba todos los atajos en ese evento.
+
+- **`static/sinac-ux.js`** — `const tecla = typeof e.key === 'string' ?
+  e.key.toLowerCase() : ''` con salida temprana; las dos llamadas (⌘K y el
+  `switch`) usan la variable. Las comparaciones `e.key === 'Escape'` se dejan:
+  con `undefined` dan `false`, no revientan.
+
+### Pruebas (33, todas comprobadas contra el código anterior)
+
+- `tests/test_api/test_la_confianza_se_guarda.py` (19) — conversión, los seis
+  casos que deben quedar en blanco, las columnas, la migración y las dos ramas
+  de guardado.
+- `tests/test_frontend/test_no_se_confunde_la_confianza_con_la_formula_vieja.py`
+  (9) — ejecuta el panel con Node contra la respuesta real de hoy (0 con
+  Confianza) y contra una futura con dos modelos. Compara sobre el **texto
+  plano**, no el HTML: buscar «0%» en el marcado encuentra `width:100%`.
+- `tests/test_frontend/test_el_autocompletado_no_revienta_los_atajos.py` (5) —
+  dispara el evento sin `key` contra el manejador real.
+
+
 ## Sesión 09-sep-2026 (tarde, 3) — El diagnóstico en pantalla, y dos afirmaciones sin respaldo
 
 Las tres del mismo tipo: el motor decía algo que no le constaba.
