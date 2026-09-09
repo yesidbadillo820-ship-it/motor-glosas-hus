@@ -607,6 +607,98 @@ def resolver_raices(rutas: list[str]) -> list[Path]:
     return accesibles
 
 
+def ruta_larga(ruta: object) -> str:
+    """Ruta lista para pasar el limite de 260 caracteres de Windows (MAX_PATH).
+
+    Los arboles de radicacion digital anidan mes/EPS/envio/IMG/factura y se
+    pasan del limite: sin el prefijo de ruta extendida Windows NIEGA el acceso
+    y `os.walk` se lo come como si la carpeta estuviera vacia. Fuera de Windows
+    devuelve la ruta tal cual."""
+    s = str(ruta)
+    if os.name != "nt" or s.startswith("\\\\?\\"):
+        return s
+    s = os.path.abspath(s)
+    if s.startswith("\\\\"):  # UNC: \\Prime\share -> \\?\UNC\Prime\share
+        return "\\\\?\\UNC" + s[1:]
+    return "\\\\?\\" + s
+
+
+def ruta_legible(ruta: object) -> str:
+    """Quita el prefijo \\\\?\\ para que el informe y el log se lean normales."""
+    s = str(ruta)
+    if s.startswith("\\\\?\\UNC\\"):
+        return "\\\\" + s[8:]
+    if s.startswith("\\\\?\\"):
+        return s[4:]
+    return s
+
+
+def explorar_ruta(raiz: Path, muestras: int = 8) -> None:
+    """Diagnostico: recorre una ruta y dice que hay adentro y que falla.
+
+    Sirve para entender una carpeta de radicacion nueva antes de agregarla:
+    cuantas carpetas y archivos tiene, hasta que profundidad, cuantas NO se
+    pudieron leer, y ejemplos de nombres con y sin numero de factura."""
+    base = ruta_larga(raiz)
+    carpetas = archivos = con_hus = 0
+    prof_max = 0
+    fallos: list[str] = []
+    ej_carpetas: list[str] = []
+    ej_archivos: list[str] = []
+    ej_con_hus: list[str] = []
+
+    def _niveles(p: object) -> int:
+        return str(p).rstrip("\\/").replace("/", "\\").count("\\")
+
+    nivel_base = _niveles(base)
+
+    def _anotar(exc: OSError) -> None:
+        if len(fallos) < 5:
+            fallos.append(f"{ruta_legible(getattr(exc, 'filename', '?'))}: {exc.strerror}")
+        else:
+            fallos.append("")
+
+    logger.info(f"Explorando: {raiz}")
+    for root, dirs, files in os.walk(base, onerror=_anotar):
+        carpetas += 1
+        prof_max = max(prof_max, _niveles(root) - nivel_base)
+        if carpetas % 2000 == 0:
+            logger.info(f"  ... {carpetas} carpetas")
+        for d in dirs:
+            if len(ej_carpetas) < muestras:
+                ej_carpetas.append(f"{ruta_legible(root)}\\{d}")
+        for fn in files:
+            archivos += 1
+            if _RE_NUM_FACTURA.search(fn):
+                con_hus += 1
+                if len(ej_con_hus) < muestras:
+                    ej_con_hus.append(f"{ruta_legible(root)}\\{fn}")
+            elif len(ej_archivos) < muestras:
+                ej_archivos.append(f"{ruta_legible(root)}\\{fn}")
+
+    logger.info("")
+    logger.info("========== QUE HAY EN ESTA RUTA ==========")
+    logger.info(f"  Carpetas recorridas : {carpetas}")
+    logger.info(f"  Archivos vistos     : {archivos}")
+    logger.info(f"  Con numero de factura (HUS<n>): {con_hus}")
+    logger.info(f"  Profundidad maxima  : {prof_max} niveles")
+    if fallos:
+        logger.warning(f"  Carpetas ILEGIBLES  : {len(fallos)} (permisos o red)")
+        for f in [x for x in fallos if x][:3]:
+            logger.warning(f"      {f}")
+    else:
+        logger.info("  Carpetas ilegibles  : 0")
+    for titulo, ejemplos in (
+        ("Ejemplos de archivos CON numero de factura", ej_con_hus),
+        ("Ejemplos de archivos SIN numero de factura", ej_archivos),
+        ("Ejemplos de carpetas", ej_carpetas),
+    ):
+        if ejemplos:
+            logger.info(f"  {titulo}:")
+            for e in ejemplos:
+                logger.info(f"      {e}")
+
+
 def indexar_radicacion(raices: list[Path], objetivos: set[str]) -> dict[str, list[Path]]:
     """Recorre cada raiz UNA vez y devuelve {clave_numerica: [hallazgos]}.
 
@@ -614,13 +706,24 @@ def indexar_radicacion(raices: list[Path], objetivos: set[str]) -> dict[str, lis
     archivo suelto con el numero en el nombre (FEV_..._HUS349680.pdf). Poda: no
     desciende a carpetas de OTRAS facturas (las mas numerosas del share) ni a
     las carpetas objetivo ya encontradas. Un hilo por raiz: el costo es
-    latencia de red, no CPU."""
+    latencia de red, no CPU.
+
+    Las carpetas que no se pueden leer (permisos, ruta larga, red) NO se
+    silencian: se cuentan y se avisan al final de cada raiz."""
     hallados: dict[str, list[Path]] = {k: [] for k in objetivos}
 
-    def _explorar(raiz: Path) -> tuple[Path, int, int]:
+    def _explorar(raiz: Path) -> tuple[Path, int, int, list[str]]:
         vistos = 0
         hits = 0
-        for root, dirs, files in os.walk(str(raiz), onerror=lambda _e: None):
+        fallos: list[str] = []
+
+        def _anotar(exc: OSError) -> None:
+            if len(fallos) < 5:
+                fallos.append(f"{ruta_legible(getattr(exc, 'filename', '?'))}: {exc.strerror}")
+            else:
+                fallos.append("")
+
+        for root, dirs, files in os.walk(ruta_larga(raiz), onerror=_anotar):
             vistos += 1
             if vistos % 2000 == 0:
                 logger.info(
@@ -645,10 +748,10 @@ def indexar_radicacion(raices: list[Path], objetivos: set[str]) -> dict[str, lis
                 if num in objetivos:
                     hallados[num].append(Path(root) / fn)
                     hits += 1
-        return raiz, vistos, hits
+        return raiz, vistos, hits, fallos
 
     with ThreadPoolExecutor(max_workers=max(1, min(len(raices), 12))) as pool:
-        for raiz, vistos, hits in pool.map(_explorar, raices):
+        for raiz, vistos, hits, fallos in pool.map(_explorar, raices):
             if hits == 0:
                 logger.warning(
                     f"  soportes: {raiz} — {vistos} carpetas revisadas y NINGUN hallazgo "
@@ -656,6 +759,12 @@ def indexar_radicacion(raices: list[Path], objetivos: set[str]) -> dict[str, lis
                 )
             else:
                 logger.info(f"  soportes: {raiz} — {vistos} carpetas revisadas, {hits} hallazgos")
+            if fallos:
+                ejemplos = [f for f in fallos if f][:3]
+                logger.warning(
+                    f"    OJO: {len(fallos)} carpetas NO se pudieron leer en esta ruta "
+                    f"(permisos o red). Ejemplos: " + " | ".join(ejemplos)
+                )
     return hallados
 
 
@@ -703,11 +812,15 @@ def armar_radicacion(
     # --- Soportes del servicio a IMG\HUS<n>\ (aplanados: el portal no
     #     entiende subcarpetas dentro de la carpeta de la factura) ---
     for hit in soportes:
-        archivos = sorted(p for p in hit.rglob("*") if p.is_file()) if hit.is_dir() else [hit]
+        archivos = (
+            sorted(p for p in Path(ruta_larga(hit)).rglob("*") if p.is_file())
+            if hit.is_dir()
+            else [hit]
+        )
         for a in archivos:
             try:
                 img_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(a, img_dir / a.name)
+                shutil.copy2(ruta_larga(a), ruta_larga(img_dir / a.name))
                 copiados += 1
             except OSError as exc:
                 obs.append(f"NO se pudo copiar soporte {a.name}: {exc}")
@@ -722,10 +835,10 @@ def copiar_soportes(soportes: list[Path], destino_fac: Path) -> tuple[int, list[
     for hit in soportes:
         try:
             if hit.is_dir():
-                shutil.copytree(hit, sop_dir / hit.name, dirs_exist_ok=True)
+                shutil.copytree(ruta_larga(hit), ruta_larga(sop_dir / hit.name), dirs_exist_ok=True)
             else:
                 sop_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(hit, sop_dir / hit.name)
+                shutil.copy2(ruta_larga(hit), ruta_larga(sop_dir / hit.name))
         except OSError as exc:
             obs.append(f"NO se pudo copiar soporte {hit.name}: {exc}")
     copiados = sum(1 for p in sop_dir.rglob("*") if p.is_file()) if sop_dir.is_dir() else 0
@@ -794,7 +907,7 @@ def procesar_factura(
     r = Resultado(factura=factura)
     soportes = soportes or []
     if soportes:
-        r.soportes_origen = "; ".join(str(h) for h in soportes[:5]) + (
+        r.soportes_origen = "; ".join(ruta_legible(h) for h in soportes[:5]) + (
             f" (+{len(soportes) - 5} mas)" if len(soportes) > 5 else ""
         )
     if not carpetas:
@@ -1109,8 +1222,23 @@ def main() -> int:
         metavar="RUTA",
         help="Ruta de radicacion donde buscar soportes (repetible; reemplaza las default).",
     )
+    parser.add_argument(
+        "--explorar-soportes",
+        type=str,
+        default=None,
+        metavar="RUTA",
+        help="DIAGNOSTICO: no procesa facturas; recorre esa ruta y reporta que "
+        "hay adentro (carpetas, archivos, cuantos traen HUS<n>, que no se pudo leer).",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+    if args.explorar_soportes:
+        raices = resolver_raices([args.explorar_soportes])
+        if not raices:
+            return 1
+        explorar_ruta(raices[0])
+        return 0
 
     try:
         import openpyxl  # noqa: F401
