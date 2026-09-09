@@ -91,6 +91,46 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde, 9) — El motor podía negarse a responder una glosa que SÍ tenía el servicio
+
+Yesid mandó dos análisis del código con ~136 hallazgos. Se verificaron uno
+por uno contra el motor: **ocho estaban equivocados** (uno de ellos, si se
+aplicaba, dejaba el sistema MENOS seguro), ocho a medias, y el resto ciertos.
+
+**El más valioso no lo marcó como crítico ninguno de los dos**, y era el
+único de toda la lista que afecta el papel que se radica:
+
+Hay una regla que dice que si la glosa trae un **servicio identificado**
+(un CUPS), el motor NO puede abstenerse de responder: un servicio
+identificado es un elemento, y con él hay de qué hablar. Esa regla estaba
+escrita y **nunca se aplicó ni una vez**: el CUPS se sacaba del texto 270
+líneas más abajo, dentro del camino de la IA —o sea, después de que la
+decisión de abstenerse ya estaba tomada— y en el sitio de la decisión se
+leía una variable que en ese punto todavía no existe.
+
+Resultado: el motor podía devolver «no hay elementos para pronunciarse»
+sobre una glosa que traía el servicio perfectamente identificado. Una glosa
+sin contestar se ratifica.
+
+**Y una prueba vieja se contradecía a sí misma.** Certificaba que en el
+mismo bloque apareciera la palabra «tabla_excel» — otra variable inexistente.
+Conectarla habría sido peor: el campo es obligatorio en el formulario, así
+que la abstención no se habría activado nunca más… y este mismo archivo de
+pruebas exige que el caso FA0205 SÍ se abstenga. Se cambió para que compruebe
+**comportamiento** en vez de la presencia de una palabra, y se le agregó una
+guarda para que nadie la vuelva a meter sin darse cuenta.
+
+Se quitó además una condición imposible (`… and not m` con un `if not m:
+return` tres renglones arriba) que dejaba muerta la guarda de tarifas
+neutras.
+
+**Lo que NO se tocó, habiéndolo revisado:** la doble asignación de
+`es_extemporanea` que señalaba el análisis. Las dos tienen propósito: la
+primera alimenta el mensaje de plazo, la segunda garantiza que la variable
+exista cuando las fechas no se pudieron leer. Es redundante, no es un
+defecto, y tocarlo sería cambiar código que funciona sin razón demostrable.
+
+
 ### 09-09-2026 (tarde, 8) — Los soportes también se ven al analizar (lo que quedó a medias)
 
 **Yesid preguntó qué había pasado con esto, y tenía razón.** Cuando pidió que
