@@ -1,5 +1,28 @@
 # Registro de cambios
 
+## Sesión 09-sep-2026 — Todo 401 va al manejador de sesión vencida
+
+El auditor abrió el motor a las 8:15 con la sesión de la noche anterior (el
+token dura 8 h) y en Usuarios le salió el `detail` crudo de FastAPI:
+«Error · Credenciales inválidas o token expirado».
+
+- **El envoltorio global de `fetch`** —el que ya existía para los 403— atrapa
+  ahora también el **401** y llama a `manejarSesionExpirada()`, que ya decía
+  «Tu sesión venció — vuelve a iniciar sesión» y devuelve al login
+  conservando el formulario. Va ahí porque es el único punto por el que pasan
+  las 173 llamadas: arreglarlo sitio por sitio dejaría el siguiente afuera.
+- **`/token` queda excluido**: el login contesta 401 con la contraseña mala y
+  eso no es una sesión vencida; su pantalla ya lo explica. Se compara la ruta
+  sin los parámetros.
+- `manejarSesionExpirada()` ya traía sus dos guardas y se conservan: no avisa
+  si no hay token guardado, y avisa **una sola vez** aunque varios sondeos de
+  fondo reciban 401 a la vez.
+
+8 pruebas nuevas. Comprobado en navegador con las rutas interceptadas: un 401
+en `/usuarios/`, `/2fa/estado` y `/notificaciones/badge` avisa una vez cada
+uno; en `/token`, ninguna.
+
+
 ## Sesión 08-sep-2026 (noche, 4) — Lo que destapó la segunda corrida
 
 Los cinco casos, vueltos a correr tras los arreglos. Lo anterior quedó bien;
