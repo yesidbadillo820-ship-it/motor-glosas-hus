@@ -221,7 +221,38 @@ sola vez que «bil» es masculino y que su definido es «bilen», y de ahí sale
 solos el ejercicio de género, el de forma, el de traducción, el de escucha y el
 de parejas. Agregar una palabra agrega ejercicios a todo el curso.
 
-Pruebas: `python -m pytest tests/test_noruego -q` (193).
+### El aspecto: por qué no hay ni un emoji
+
+La aplicación usaba **40 emoji distintos** como juego de iconos (🏠 🗺️ 🔁 🔊 …).
+Funcionaba, pero se veía a medio terminar, y por tres razones concretas:
+
+- **Cada teléfono los dibuja distinto.** El mismo 🔁 no se parece en un Android,
+  un iPhone y el PC del hospital. No hay forma de que la pantalla se vea igual.
+- **No toman el color del texto.** Un emoji es una imagen a todo color: no se
+  puede apagar cuando la fila está bloqueada ni encender cuando está activa.
+- **No se alinean con la letra.** Quedan altos o bajos respecto a la palabra que
+  acompañan, y eso es justo lo que hace que algo «se vea barato».
+
+Ahora hay un **juego propio de 48 iconos** dibujados en SVG, de trazo uniforme,
+incrustados dentro del archivo (la aplicación sigue funcionando sin internet).
+Toman el color de donde se ponen, se alinean con la tipografía y se ven igual
+en todas partes. Se piden con `ic("casa")`.
+
+Cuatro pruebas lo sostienen: que **no vuelva ni un emoji** a la interfaz, que
+todo icono que se pida **exista** (pedir uno que no existe no da error: deja un
+hueco en blanco que nadie nota), que **ninguno sobre** —peso muerto en un
+archivo que viaja al celular— y que ninguno se pida por internet.
+
+Encima del sistema de diseño va una **capa de acabado** (aurora sobre fiordo de
+noche): la luz que entra por arriba, la bandera enmarcada, las medallas en
+pastilla, el emblema del final de la lección y la barra de abajo con vidrio
+esmerilado. Va como capa aparte, al final del CSS, para que lo que ya
+funcionaba —rejilla, contraste, zona segura del iPhone— siguiera intacto.
+
+**El verde del botón lleva texto oscuro a propósito.** Con letra blanca el
+contraste da 3,5:1 y hace falta 4,5:1; con la tinta oscura da 5,4:1.
+
+Pruebas: `python -m pytest tests/test_noruego -q` (215).
 
 ---
 
