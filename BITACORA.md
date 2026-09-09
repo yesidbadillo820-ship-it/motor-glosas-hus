@@ -91,6 +91,38 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde, 7) — Un dictamen del Dispensario salió con el contrato de FAMISANAR
+
+Otro hallazgo de las pruebas de Yesid, y de los caros. Corrió una glosa que
+empezaba «DISPENSARIO MEDICO · FA0801 $275.000…» con el desplegable en
+FAMISANAR (le había quedado de la glosa anterior). El motor **no corrigió
+nada**, y el dictamen salió:
+
+- firmado a nombre de **FAMISANAR EPS**,
+- citando el contrato **S-13-1-03-1-04958**, que es el de FAMISANAR,
+- con su tarifa «SOAT UVB VIGENTE −5 %»,
+
+para una factura de **sanidad militar**. Radicado así, el Dispensario lo tumba
+sin leer el fondo: le están contestando con el contrato de otra entidad.
+
+**Por qué no lo corrigió.** El motor SÍ sabe hacerlo —en las mismas pruebas
+corrigió COOSALUD, COMPENSAR y NUEVA EPS, avisando en pantalla— pero su lista
+de entidades tenía el Dispensario **solo con el nombre largo**, «DISPENSARIO
+MEDICO BUCARAMANGA». El nombre corto, que es como lo escribe casi todo el
+mundo, no cruzaba. Con él tampoco cruzaban DIGSA, «SANIDAD EJÉRCITO»,
+«SANIDAD MILITAR» ni la Policía Nacional.
+
+Es el mismo desastre que esa función vino a evitar en junio, pero al revés:
+entonces el desplegable decía Dispensario y la glosa era de una EPS.
+
+**Arreglado**, y con cuidado de no cambiar los nombres canónicos que el motor
+ya usaba: si se devolviera otro nombre, el contrato se buscaría con uno que la
+malla contractual no conoce y el problema sería el mismo por otra puerta.
+Comprobado que cada régimen trae ahora SU contrato, y que las EPS que ya
+funcionaban siguen igual.
+
+21 pruebas, 10 de ellas fallan sin el arreglo.
+
 ### 09-09-2026 — «Me das cosas planas»: el curso de noruego se ve como se debía ver
 
 **La observación de Yesid, y tenía razón.** «Siempre que te pido algo me das
