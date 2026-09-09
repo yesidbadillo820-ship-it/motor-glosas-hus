@@ -128,6 +128,59 @@ expediente completo, y encima bloqueaba la radicación.
 
 35 pruebas nuevas, todas comprobadas contra el código anterior.
 
+### 09-09-2026 (cierre) — Un solo sistema de diseño para las tres aplicaciones
+
+**Lo que pidió Yesid:** «Hazlo mejor, como si realmente fuera algo profesional
+donde un equipo de ingenieros experimentados trabajó en ello».
+
+**Lo que estaba mal de fondo.** No era solo el acabado de cada una. Era que
+**ICFES, noruego y velas eran tres productos de tres autores distintos**: tres
+escalas de letra, tres formas de botón, tres maneras de marcar la pestaña
+activa, y las tres usando emoji como iconos.
+
+**Lo que se hizo — una sola fuente de verdad.** Las tres aplicaciones siguen
+siendo programas independientes (ninguno importa nada del otro), pero ahora
+llevan **el mismo bloque de diseño, carácter por carácter**. Cada una conserva
+sus propios colores y solo los traduce a los nombres del sistema en su cabecera;
+de ahí para abajo, todo funciona igual en las tres:
+
+1. **Tipografía** con una escala fluida, no tamaños sueltos, y **cifras de ancho
+   fijo** para que las columnas de números no tiemblen.
+2. **Iconos propios en SVG**, incrustados en cada archivo (siguen funcionando
+   sin internet), que toman el color de donde se ponen. Cada aplicación lleva
+   solo los que usa.
+3. **Interacción**: todo lo que se toca responde al pulsar, y el anillo de foco
+   siempre se ve para quien navega con teclado.
+4. **Movimiento** único, que se apaga entero si el sistema operativo lo pide.
+5. **Impresión**: las tres salen legibles en papel.
+
+**Tres errores que se encontraron por el camino** —y que ahora tienen prueba:
+
+- **La barra de abajo dejó de quedarse pegada a la pantalla.** Para poner el
+  contenido encima de la luz del fondo usé `position:relative`, y eso le pisa
+  el `position:fixed` a la barra: se iba con el desplazamiento. **Lo había
+  metido también en el curso de noruego, que ya estaba fusionado.** Corregido
+  en las dos.
+- **Un icono que no existe no da error**: deja un hueco en blanco que nadie nota
+  hasta que abre la pantalla.
+- **Un color escrito después del bloque de modo oscuro** se queda sin valor por
+  defecto. Esa la cazó una prueba que ya existía en el ICFES.
+
+**Detalles de redacción que también se arreglaron**, porque son los que delatan
+que algo está a medio hacer: «Son unos 1 minutos» y «a 1 sesión(es)».
+
+**Lo que impide que se deshaga:** 21 pruebas nuevas en `tests/test_diseno/`.
+La más importante comprueba que **las tres lleven el mismo sistema palabra por
+palabra**: si alguien arregla una sola, se pone roja. Se comprobó que la prueba
+de la barra fija de verdad atrapa el error, volviéndolo a meter a propósito.
+
+**Comprobado en navegador**, las tres, en claro y oscuro, recorriendo todas las
+pantallas: sin errores, con la barra fija, sin un solo emoji y sin que ninguna
+se salga de ancho.
+
+Guía nueva: `docs/SISTEMA_DE_DISENO.md`.
+
+---
 
 ### 09-09-2026 (tarde, 7) — Un dictamen del Dispensario salió con el contrato de FAMISANAR
 
@@ -12841,11 +12894,10 @@ de la que más cuesta a la que menos:
 ### Aspecto de las tres aplicaciones (09-09)
 - **~~El curso de noruego se veía a medio terminar~~ — HECHO (09-09).** Juego
   propio de 48 iconos y capa de acabado. Ver la entrada del 09-09.
-- **Falta lo mismo en ICFES y en velas japonesas.** Las dos siguen usando emoji
-  como iconos, con los mismos tres problemas: se dibujan distinto en cada
-  aparato, no toman el color del texto y no se alinean con la letra. El juego
-  de iconos y la capa de acabado ya están hechos y se pueden reusar; es
-  trabajo de una tanda por aplicación.
+- **~~Falta lo mismo en ICFES y en velas japonesas~~ — HECHO (09-09, cierre).**
+  Las tres comparten ahora un mismo sistema de diseño, con prueba que impide
+  que se separen. Ver la entrada del 09-09 (cierre) y
+  `docs/SISTEMA_DE_DISENO.md`.
 
 ### Curso de noruego (31-08, noche)
 - **Probarlo en SU celular.** Aquí se probó en un navegador de celular

@@ -35,8 +35,21 @@
   --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
   --mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
   --toque:52px;
+  /* PUENTE al sistema de diseño común (ver el bloque del final del CSS).
+     Cada aplicación conserva sus propios nombres de color y solo los
+     traduce aquí; de ahí para abajo, el acabado es el mismo en las tres. */
+  --ds-sup:var(--sup); --ds-linea:var(--linea); --ds-tinta3:var(--tinta3);
+  --ds-acento:var(--aurora); --ds-acento-hondo:var(--aurora2);
+  --ds-vidrio:color-mix(in srgb, var(--sup) 78%, transparent);
+  --ds-luz1:color-mix(in srgb, #0E9C74 17%, transparent);
+  --ds-luz2:color-mix(in srgb, #5B4BC4 14%, transparent);
+  --ds-r2:var(--r3); --ds-r3:var(--r4); --ds-hueco:var(--s7);
+  --ds-e2:var(--e2); --ds-e3:var(--e3);
 }
 @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --ds-luz1:color-mix(in srgb, #35D6A4 24%, transparent);
+  --ds-luz2:color-mix(in srgb, #9B8CF5 22%, transparent);
+
   --noche:#0B1120; --sup:#151E31; --sup2:#1C2740; --sup3:#25324F;
   --tinta:#E8EEF9; --tinta2:#A3B1CC; --tinta3:#7686A5;
   --linea:#25324F; --linea2:#1B2540;
@@ -49,6 +62,9 @@
   --e3:0 10px 34px -8px rgba(0,0,0,.9);
 }}
 :root[data-theme="dark"]{
+  --ds-luz1:color-mix(in srgb, #35D6A4 24%, transparent);
+  --ds-luz2:color-mix(in srgb, #9B8CF5 22%, transparent);
+
   --noche:#0B1120; --sup:#151E31; --sup2:#1C2740; --sup3:#25324F;
   --tinta:#E8EEF9; --tinta2:#A3B1CC; --tinta3:#7686A5;
   --linea:#25324F; --linea2:#1B2540;
@@ -332,77 +348,25 @@ table.datos td{padding:9px 6px; border-bottom:1px solid var(--linea2)}
 }
 
 /* ===========================================================================
-   CAPA DE ACABADO
-   ---------------------------------------------------------------------------
-   Lo de arriba resuelve la estructura: rejilla, estados, contraste, zona
-   segura. Esto le pone carácter. Se escribe como capa aparte, encima, en vez
-   de reescribir las 314 líneas anteriores: lo que ya funcionaba sigue igual y
-   cada regla de aquí se puede quitar sola si estorba.
-
-   La idea: aurora sobre fiordo de noche. Un solo verde de acción, un azul
-   profundo de tinta, y luz que entra por arriba.
+   PIEZAS PROPIAS DE ESTE CURSO
+   Lo que no es del sistema común porque solo existe aquí: la bandera, el
+   emblema del final de la lección, el camino del curso y el botón de audio.
    =========================================================================== */
 
-:root{
-  --hondo:#0A1B2E;                 /* el azul del fiordo, para tinta y realces */
-  --brillo:0 0 0 1px rgba(14,156,116,.14), 0 6px 22px -10px rgba(14,156,116,.45);
-  --vidrio:color-mix(in srgb, var(--sup) 78%, transparent);
-}
-:root[data-theme="dark"], :root:not([data-theme="light"]){ --hondo:#CFE0F5; }
-
-/* --- la luz que entra por arriba ------------------------------------------ */
-body::before{
-  content:""; position:fixed; inset:0 0 auto 0; height:52vh; pointer-events:none; z-index:0;
-  background:
-    radial-gradient(120% 62% at 18% 0%, color-mix(in srgb,var(--aurora) 17%,transparent), transparent 62%),
-    radial-gradient(110% 58% at 88% 4%, color-mix(in srgb,var(--violeta) 14%,transparent), transparent 66%);
-}
-@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) body::before{
-  background:
-    radial-gradient(120% 62% at 18% 0%, color-mix(in srgb,var(--aurora) 24%,transparent), transparent 62%),
-    radial-gradient(110% 58% at 88% 4%, color-mix(in srgb,var(--violeta) 22%,transparent), transparent 66%);
-}}
-:root[data-theme="dark"] body::before{
-  background:
-    radial-gradient(120% 62% at 18% 0%, color-mix(in srgb,var(--aurora) 24%,transparent), transparent 62%),
-    radial-gradient(110% 58% at 88% 4%, color-mix(in srgb,var(--violeta) 22%,transparent), transparent 66%);
-}
-.pantalla, .nav, .tope, .veredicto{position:relative; z-index:1}
-
-/* --- tipografía: que se note quién manda ---------------------------------- */
-h1{font-size:1.75rem; font-weight:800; letter-spacing:-.035em}
-h2{font-size:1.2rem; font-weight:750; letter-spacing:-.025em}
-.rot{font-size:.68rem; letter-spacing:.13em}
-
-/* --- superficies con más aire y menos borde ------------------------------- */
-.tarjeta{border-radius:var(--r4); border-color:color-mix(in srgb,var(--linea) 70%,transparent);
-  padding:var(--s5); background:var(--vidrio); backdrop-filter:blur(6px)}
-.tarjeta.acento{box-shadow:var(--e2), var(--brillo)}
-.mod-cab{border-radius:var(--r4); padding:var(--s5)}
-.dato{border-radius:var(--r3); padding:var(--s4)}
-
-/* --- el botón principal: verde vivo, tinta oscura (el blanco no pasa el
-       contraste sobre este verde: 3,5:1 contra el 4,5:1 que hace falta) ----- */
-.pri{background:linear-gradient(178deg, color-mix(in srgb,var(--aurora) 88%,#fff), var(--aurora));
-  box-shadow:0 4px 0 var(--aurora2), 0 10px 22px -12px rgba(14,156,116,.85);
-  letter-spacing:-.01em}
-.pri:active{box-shadow:0 1px 0 var(--aurora2)}
-.blq{width:100%}
-
-/* --- la bandera del arranque, enmarcada y con luz propia ------------------ */
+/* La bandera de Noruega, enmarcada y con luz propia. */
 .bandera-hero, .bandera-mini{display:grid; place-items:center; margin:0 auto var(--s4)}
-.bandera-hero .ic{width:74px; height:52px; border-radius:9px; box-shadow:
-  0 0 0 1px rgba(10,27,46,.13), 0 12px 30px -10px rgba(10,27,46,.5)}
-.bandera-mini .ic{width:52px; height:37px; border-radius:7px; box-shadow:
-  0 0 0 1px rgba(10,27,46,.13), 0 8px 20px -10px rgba(10,27,46,.45)}
+.bandera-hero .ic{width:74px; height:52px; border-radius:9px;
+  box-shadow:0 0 0 1px rgba(10,27,46,.13), 0 12px 30px -10px rgba(10,27,46,.5)}
+.bandera-mini .ic{width:52px; height:37px; border-radius:7px;
+  box-shadow:0 0 0 1px rgba(10,27,46,.13), 0 8px 20px -10px rgba(10,27,46,.45)}
 
-/* --- medallas del encabezado como pastillas ------------------------------- */
+/* Las medallas del encabezado, en pastilla. */
 .medalla{padding:5px 11px 5px 8px; border-radius:99px; font-size:.85rem;
   background:var(--sup2); border:1px solid color-mix(in srgb,var(--linea) 60%,transparent)}
 .medalla.xp{background:var(--oro-f); border-color:transparent}
 .medalla.racha{background:var(--rojo-f); border-color:transparent}
 
-/* --- el emblema de fin de lección ---------------------------------------- */
+/* El emblema redondo del final de la lección. */
 .emblema{width:104px; height:104px; margin:0 auto var(--s4); border-radius:50%;
   display:grid; place-items:center; color:var(--aurora2);
   background:radial-gradient(circle at 50% 38%, var(--aurora-f), var(--sup));
@@ -412,22 +376,22 @@ h2{font-size:1.2rem; font-weight:750; letter-spacing:-.025em}
   background:radial-gradient(circle at 50% 38%, var(--rojo-f), var(--sup));
   box-shadow:0 0 0 1px color-mix(in srgb,var(--rojo) 28%,transparent),
              0 18px 40px -18px color-mix(in srgb,var(--rojo) 80%,transparent)}
+@media (prefers-reduced-motion:no-preference){
+  .emblema{animation:brota .45s cubic-bezier(.2,1.3,.4,1) both}
+  @keyframes brota{from{opacity:0; transform:scale(.72)} to{opacity:1; transform:none}}
+}
 
-/* --- estrellas de la lección: que se lean como estrellas ------------------ */
+/* Las estrellas de la lección. */
 .estrellas{display:inline-flex; gap:2px; color:var(--oro-vivo)}
 .estrellas .ic{width:1em; height:1em}
 
-/* --- el camino del curso: la línea con degradado -------------------------- */
+/* El camino del curso: la línea de avance en degradado. */
 .senda::before{background:linear-gradient(var(--aurora), var(--sup3) 55%)}
-.nodo{border-radius:var(--r3)}
 .nodo .bola .ic{width:1em; height:1em}
 .nodo.actual{box-shadow:0 0 0 4px color-mix(in srgb,var(--aurora) 16%,transparent)}
-
-/* --- opciones de respuesta ------------------------------------------------ */
-.op{border-radius:var(--r3)}
 .op.sel{box-shadow:0 0 0 3px color-mix(in srgb,var(--aurora) 18%,transparent)}
 
-/* --- el botón grande de audio -------------------------------------------- */
+/* El botón grande de audio. */
 .audio-btn{background:linear-gradient(165deg, var(--violeta-f),
   color-mix(in srgb,var(--violeta-f) 55%, var(--sup)));
   box-shadow:0 0 0 1px color-mix(in srgb,var(--violeta) 22%,transparent),
@@ -436,48 +400,128 @@ h2{font-size:1.2rem; font-weight:750; letter-spacing:-.025em}
 .audio-btn.chico{border-radius:var(--r2)}
 .audio-btn.chico .ic{width:1.35rem; height:1.35rem}
 
-/* --- barra de navegación: pastilla bajo el icono activo ------------------- */
-.nav{background:color-mix(in srgb,var(--sup) 86%,transparent); backdrop-filter:blur(18px) saturate(1.4)}
-.nav button{gap:4px; font-size:.68rem; letter-spacing:-.005em; position:relative}
-.nav button .ic{width:23px; height:23px; font-size:inherit; transition:transform .18s}
-.nav button[aria-current="page"] .ic{transform:translateY(-1px)}
-.nav button[aria-current="page"]::before{
-  content:""; position:absolute; top:6px; left:50%; translate:-50% 0; width:42px; height:29px;
-  border-radius:99px; background:var(--aurora-f); z-index:-1}
-
-/* --- logros -------------------------------------------------------------- */
-.logro{border-radius:var(--r3); padding:var(--s4) var(--s3)}
-.logro .ic{width:26px; height:26px; color:var(--aurora2)}
-.logro.gris .ic{color:var(--tinta3)}
-
-/* --- avisos con el icono alineado arriba --------------------------------- */
-.aviso{border-radius:var(--r3); align-items:flex-start}
-.aviso > .ic{margin-top:1px; color:var(--tinta3)}
-.aviso.vio > .ic{color:var(--violeta)} .aviso.oro > .ic{color:var(--oro)}
-
-/* --- el veredicto entra con más cuerpo ----------------------------------- */
+/* La cabecera de la lección: translúcida, para que no tape la luz del fondo. */
+.lec-tope{background:color-mix(in srgb,var(--noche) 82%,transparent); backdrop-filter:blur(12px)}
 .veredicto{border-radius:var(--r4) var(--r4) 0 0; border-top-width:0;
   box-shadow:0 -14px 40px -20px rgba(10,27,46,.55)}
 .veredicto .cab .ic{width:1.35em; height:1.35em}
-
-/* --- buscador ------------------------------------------------------------ */
+.aviso.vio > .ic{color:var(--violeta)} .aviso.oro > .ic{color:var(--oro)}
+.aviso > .ic{color:var(--tinta3)}
+.logro .ic{width:26px; height:26px; color:var(--aurora2)}
+.logro.gris .ic{color:var(--tinta3)}
 .buscador .lupa{display:grid; place-items:center}
 .palabra-fila .fav.on .ic{filter:drop-shadow(0 1px 4px color-mix(in srgb,var(--oro-vivo) 60%,transparent))}
 
-/* --- movimiento: escalonar la entrada de las tarjetas -------------------- */
-@media (prefers-reduced-motion:no-preference){
-  .entra{animation:aparece .34s cubic-bezier(.2,.8,.3,1) both}
-  @keyframes aparece{from{opacity:0; transform:translateY(14px) scale(.985)} to{opacity:1; transform:none}}
-  .pantalla > .tarjeta:nth-of-type(2){animation-delay:.05s}
-  .pantalla > .tarjeta:nth-of-type(3){animation-delay:.1s}
-  .emblema{animation:brota .45s cubic-bezier(.2,1.3,.4,1) both}
-  @keyframes brota{from{opacity:0; transform:scale(.72)} to{opacity:1; transform:none}}
+/* ===========================================================================
+   SISTEMA DE DISEÑO COMÚN — una sola fuente de verdad para las tres
+   aplicaciones (ICFES, noruego, velas japonesas).
+   ---------------------------------------------------------------------------
+   Este bloque es IDÉNTICO, carácter por carácter, en las tres plantillas, y
+   hay una prueba que lo comprueba. Antes cada aplicación traía su propio
+   acabado y las tres se veían como tres productos de tres autores distintos.
+
+   Cada aplicación conserva sus nombres de color y solo declara el «puente»
+   (los tokens --ds-*) en su :root, arriba, junto a los demás. De ahí para
+   abajo, todo lo que sigue funciona igual en las tres.
+
+   Lo que NO hace: tocar la rejilla, los estados ni el contraste que cada
+   aplicación ya tenía resueltos. Es una capa, no un reemplazo.
+   =========================================================================== */
+
+/* --- 1. Tipografía: una escala, no tamaños sueltos ------------------------ */
+h1{font-size:clamp(1.6rem, 1.28rem + 1.6vw, 2.1rem); font-weight:800;
+   letter-spacing:-.035em; line-height:1.12; text-wrap:balance}
+h2{font-size:clamp(1.12rem, 1.02rem + .5vw, 1.3rem); font-weight:750;
+   letter-spacing:-.025em; line-height:1.22; text-wrap:balance}
+h3{letter-spacing:-.015em}
+p{text-wrap:pretty}
+/* Las cifras alineadas en columna: sin esto, «11» ocupa menos que «88» y las
+   listas de números quedan temblorosas. */
+.num, .dato b, .kpi b, .v, td, th, time{font-variant-numeric:tabular-nums}
+
+/* --- 2. La luz del fondo -------------------------------------------------- */
+/* Va DETRÁS de todo con z-index:-1. Levantar el contenido con
+   `position:relative` sería un error: le pisaría el `position:fixed` a la
+   barra de abajo y dejaría de quedarse pegada a la pantalla. */
+body::before{
+  content:""; position:fixed; inset:0 0 auto 0; height:48vh; z-index:-1;
+  pointer-events:none;
+  background:
+    radial-gradient(118% 60% at 14% 0%, var(--ds-luz1), transparent 62%),
+    radial-gradient(108% 56% at 88% 3%, var(--ds-luz2), transparent 66%);
 }
 
-/* --- en pantalla ancha, la barra flota ----------------------------------- */
-@media(min-width:700px){
-  .nav{border-radius:var(--r4) var(--r4) 0 0; box-shadow:0 -10px 34px -22px rgba(10,27,46,.5)}
-  h1{font-size:2rem}
+/* --- 3. Superficies: tres niveles, no quince ----------------------------- */
+.tarjeta, .mod-cab, .bloque{
+  border-radius:var(--ds-r3);
+  border-color:color-mix(in srgb, var(--ds-linea) 68%, transparent);
+  background:var(--ds-vidrio);
+  backdrop-filter:blur(7px) saturate(1.05);
+  box-shadow:var(--ds-e2);
+}
+.dato, .kpi, .nodo, .op, .logro{border-radius:var(--ds-r2)}
+
+/* --- 4. Interacción: todo lo que se toca responde ------------------------ */
+button, .op, .nodo, [role="button"]{
+  transition:transform .13s cubic-bezier(.2,.8,.3,1),
+             box-shadow .18s ease, background .18s ease, border-color .18s ease;
+}
+button:active:not(:disabled), .op:active:not([disabled]), .nodo:active{transform:scale(.978)}
+@media (hover:hover){
+  .tarjeta:hover{box-shadow:var(--ds-e3)}
+  .op:not([disabled]):hover, .nodo:not(.bloqueada):hover{
+    border-color:color-mix(in srgb, var(--ds-acento) 55%, transparent)}
+}
+/* El anillo de foco: visible siempre, para quien navega con teclado. */
+:focus-visible{outline:3px solid var(--ds-acento); outline-offset:2px; border-radius:4px}
+
+/* --- 5. El botón principal ----------------------------------------------- */
+.pri{
+  background:linear-gradient(177deg, color-mix(in srgb, var(--ds-acento) 88%, #fff), var(--ds-acento));
+  box-shadow:0 3px 0 var(--ds-acento-hondo),
+             0 10px 22px -13px color-mix(in srgb, var(--ds-acento) 92%, transparent);
+  letter-spacing:-.012em;
+}
+.pri:active:not(:disabled){box-shadow:0 1px 0 var(--ds-acento-hondo); transform:translateY(2px) scale(1)}
+
+/* --- 6. Iconos ------------------------------------------------------------ */
+.ic{width:1.25em; height:1.25em; flex:none; display:inline-block; vertical-align:-.22em}
+.ic.g{width:1.55em; height:1.55em} .ic.gg{width:2.2em; height:2.2em}
+.ic.xl{width:3.2em; height:3.2em; stroke-width:1.35}
+
+/* --- 7. Barra de navegación ---------------------------------------------- */
+.nav{background:color-mix(in srgb, var(--ds-sup) 86%, transparent);
+     backdrop-filter:blur(18px) saturate(1.4)}
+.nav button{gap:4px; position:relative}
+.nav button .ic{width:23px; height:23px; transition:transform .18s cubic-bezier(.2,.8,.3,1)}
+.nav button[aria-current="page"] .ic{transform:translateY(-1px)}
+.nav button[aria-current="page"]::before{
+  content:""; position:absolute; top:5px; left:50%; translate:-50% 0;
+  width:42px; height:29px; border-radius:99px;
+  background:color-mix(in srgb, var(--ds-acento) 13%, transparent); z-index:-1}
+
+/* --- 8. Avisos y estados vacíos ------------------------------------------ */
+.aviso{border-radius:var(--ds-r2); align-items:flex-start}
+.aviso > .ic{margin-top:1px; flex:none}
+.vacio{padding-block:var(--ds-hueco)}
+.vacio > .ic{color:var(--ds-tinta3); display:block; margin:0 auto .75rem}
+
+/* --- 9. Movimiento: uno solo, y se apaga si el sistema lo pide ----------- */
+@media (prefers-reduced-motion:no-preference){
+  .entra{animation:ds-entra .34s cubic-bezier(.2,.8,.3,1) both}
+  @keyframes ds-entra{from{opacity:0; transform:translateY(13px) scale(.988)} to{opacity:1; transform:none}}
+  .entra:nth-of-type(2){animation-delay:.045s}
+  .entra:nth-of-type(3){animation-delay:.09s}
+  .entra:nth-of-type(4){animation-delay:.13s}
+}
+@media (prefers-reduced-motion:reduce){
+  *, *::before, *::after{animation-duration:.01ms !important; transition-duration:.01ms !important}
+}
+
+/* --- 10. Impresión: que salga legible en papel --------------------------- */
+@media print{
+  body::before, .nav{display:none}
+  .tarjeta{box-shadow:none; border:1px solid #ccc; break-inside:avoid}
 }
 </style>
 </head>
@@ -538,6 +582,7 @@ h2{font-size:1.2rem; font-weight:750; letter-spacing:-.025em}
 <symbol id="i-birrete" viewBox="0 0 24 24"><path d="M2.8 8.8 12 4.4l9.2 4.4-9.2 4.4Z"/><path d="M6.8 11v4.6c0 1.6 2.3 2.8 5.2 2.8s5.2-1.2 5.2-2.8V11"/><path d="M20.4 9.4v5"/></symbol>
 <symbol id="i-atras" viewBox="0 0 24 24"><path d="M4.4 12.4h11.2a4 4 0 0 1 0 8h-2.8"/><path d="m8.6 7.6-4.2 4.8 4.2 4.8"/><path d="M8.6 3.6h10.8"/></symbol>
 <symbol id="i-bandera" viewBox="0 0 22 16"><path d="M0 0h22v16H0z" fill="#BA0C2F" stroke="none"/><path d="M6 0h4v16H6z" fill="#fff" stroke="none"/><path d="M0 6h22v4H0z" fill="#fff" stroke="none"/><path d="M7 0h2v16H7z" fill="#00205B" stroke="none"/><path d="M0 7h22v2H0z" fill="#00205B" stroke="none"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 11.2v5"/><circle cx="12" cy="7.9" r="1" fill="currentColor" stroke="none"/></symbol>
 </defs></svg>
 <div class="pantalla" id="app"></div>
 <nav class="nav" id="nav"></nav>
@@ -1585,7 +1630,7 @@ function vGramatica(){
   const sonidos = DATOS.lexico.sonidos || [];
   if(sonidos.length){
     h += `<div class="rot" style="margin:var(--s6) 0 var(--s3)">Pronunciación</div>`;
-    h += `<div class="aviso"><span>ℹ️</span><span>${esc(DATOS.notas.sonidos || "")}</span></div>`;
+    h += `<div class="aviso">${ic("info")}<span>${esc(DATOS.notas.sonidos || "")}</span></div>`;
     for(const s of sonidos){
       h += `<div class="tarjeta"><h3>${esc(s.letra)} — ${esc(s.nombre)}</h3>
         <p class="tenue mini" style="margin:var(--s2) 0">${esc(s.como)}</p>` +

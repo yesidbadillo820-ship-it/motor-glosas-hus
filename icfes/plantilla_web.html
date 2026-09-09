@@ -31,6 +31,9 @@
   --serio:#ec835a; --serio-t:#96421C; --serio-f:#FDEFE8;
   --critico:#d03b3b; --critico-t:#981919; --critico-f:#FCECEC;
   /* forma */
+  /* Superficie de vidrio de la capa de acabado. Va aca, con los demas: un
+     token escrito despues del bloque oscuro se queda sin valor por defecto. */
+  --vidrio:color-mix(in srgb, #FFFFFF 80%, transparent);
   --r1:6px; --r2:10px; --r3:14px; --r4:20px;
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px;
   --e1:0 1px 2px rgba(15,22,33,.06);
@@ -40,10 +43,23 @@
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
   --mono:ui-monospace,"Cascadia Mono","Segoe UI Mono","SF Mono",Menlo,Consolas,monospace;
   --rail:236px;
+  /* PUENTE al sistema de diseño común (ver el bloque del final del CSS).
+     Cada aplicación conserva sus propios nombres de color y solo los
+     traduce aquí; de ahí para abajo, el acabado es el mismo en las tres. */
+  --ds-sup:var(--sup); --ds-linea:var(--linea); --ds-tinta3:var(--tinta3);
+  --ds-acento:var(--marca); --ds-acento-hondo:var(--marca-t);
+  --ds-vidrio:color-mix(in srgb, var(--sup) 80%, transparent);
+  --ds-luz1:color-mix(in srgb, #2a78d6 14%, transparent);
+  --ds-luz2:color-mix(in srgb, #0ca30c 9%, transparent);
+  --ds-r2:var(--r3); --ds-r3:var(--r4); --ds-hueco:var(--s7);
+  --ds-e2:var(--e2); --ds-e3:var(--e3);
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --plano:#0C1017; --sup:#161B22; --sup2:#1B222C; --sup3:#232B37;
+  --ds-luz1:color-mix(in srgb, #86b6ef 20%, transparent);
+  --ds-luz2:color-mix(in srgb, #0ca30c 14%, transparent);
+
+    --plano:#0C1017; --sup:#161B22; --vidrio:color-mix(in srgb, var(--sup) 82%, transparent); --sup2:#1B222C; --sup3:#232B37;
     --tinta:#E8EDF4; --tinta2:#A6B1C2; --tinta3:#7C889B;
     --linea:#28313D; --linea2:#1F2631;
     --marca:#3987e5; --marca-t:#84B4F2; --marca-suave:#15243A; --marca-borde:#24405F;
@@ -59,7 +75,10 @@
   }
 }
 :root[data-theme="dark"]{
-  --plano:#0C1017; --sup:#161B22; --sup2:#1B222C; --sup3:#232B37;
+  --ds-luz1:color-mix(in srgb, #86b6ef 20%, transparent);
+  --ds-luz2:color-mix(in srgb, #0ca30c 14%, transparent);
+
+  --plano:#0C1017; --sup:#161B22; --vidrio:color-mix(in srgb, var(--sup) 82%, transparent); --sup2:#1B222C; --sup3:#232B37;
   --tinta:#E8EDF4; --tinta2:#A6B1C2; --tinta3:#7C889B;
   --linea:#28313D; --linea2:#1F2631;
   --marca:#3987e5; --marca-t:#84B4F2; --marca-suave:#15243A; --marca-borde:#24405F;
@@ -152,6 +171,11 @@ button:disabled{opacity:.45; cursor:default; transform:none}
 .fantasma:hover{background:var(--sup3); border-color:transparent}
 .bloque{width:100%}
 .fila-btn{display:flex; gap:var(--s2); flex-wrap:wrap}
+
+/* -------------------------------------------------------------------- iconos - */
+.ic{width:1.25em; height:1.25em; flex:none; display:inline-block; vertical-align:-.22em}
+.ic.g{width:1.55em; height:1.55em} .ic.gg{width:2.2em; height:2.2em}
+.ic.xl{width:3.2em; height:3.2em; stroke-width:1.35}
 
 /* ------------------------------------------------------------- fichas ---- */
 .ficha{display:inline-flex; align-items:center; gap:5px; font-size:.74rem; font-weight:650;
@@ -391,9 +415,142 @@ table.datos tbody tr:hover{background:var(--sup2)}
   .entra{animation:sube .32s cubic-bezier(.2,.7,.3,1) both}
   @keyframes sube{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
 }
+
+/* ===========================================================================
+   SISTEMA DE DISEÑO COMÚN — una sola fuente de verdad para las tres
+   aplicaciones (ICFES, noruego, velas japonesas).
+   ---------------------------------------------------------------------------
+   Este bloque es IDÉNTICO, carácter por carácter, en las tres plantillas, y
+   hay una prueba que lo comprueba. Antes cada aplicación traía su propio
+   acabado y las tres se veían como tres productos de tres autores distintos.
+
+   Cada aplicación conserva sus nombres de color y solo declara el «puente»
+   (los tokens --ds-*) en su :root, arriba, junto a los demás. De ahí para
+   abajo, todo lo que sigue funciona igual en las tres.
+
+   Lo que NO hace: tocar la rejilla, los estados ni el contraste que cada
+   aplicación ya tenía resueltos. Es una capa, no un reemplazo.
+   =========================================================================== */
+
+/* --- 1. Tipografía: una escala, no tamaños sueltos ------------------------ */
+h1{font-size:clamp(1.6rem, 1.28rem + 1.6vw, 2.1rem); font-weight:800;
+   letter-spacing:-.035em; line-height:1.12; text-wrap:balance}
+h2{font-size:clamp(1.12rem, 1.02rem + .5vw, 1.3rem); font-weight:750;
+   letter-spacing:-.025em; line-height:1.22; text-wrap:balance}
+h3{letter-spacing:-.015em}
+p{text-wrap:pretty}
+/* Las cifras alineadas en columna: sin esto, «11» ocupa menos que «88» y las
+   listas de números quedan temblorosas. */
+.num, .dato b, .kpi b, .v, td, th, time{font-variant-numeric:tabular-nums}
+
+/* --- 2. La luz del fondo -------------------------------------------------- */
+/* Va DETRÁS de todo con z-index:-1. Levantar el contenido con
+   `position:relative` sería un error: le pisaría el `position:fixed` a la
+   barra de abajo y dejaría de quedarse pegada a la pantalla. */
+body::before{
+  content:""; position:fixed; inset:0 0 auto 0; height:48vh; z-index:-1;
+  pointer-events:none;
+  background:
+    radial-gradient(118% 60% at 14% 0%, var(--ds-luz1), transparent 62%),
+    radial-gradient(108% 56% at 88% 3%, var(--ds-luz2), transparent 66%);
+}
+
+/* --- 3. Superficies: tres niveles, no quince ----------------------------- */
+.tarjeta, .mod-cab, .bloque{
+  border-radius:var(--ds-r3);
+  border-color:color-mix(in srgb, var(--ds-linea) 68%, transparent);
+  background:var(--ds-vidrio);
+  backdrop-filter:blur(7px) saturate(1.05);
+  box-shadow:var(--ds-e2);
+}
+.dato, .kpi, .nodo, .op, .logro{border-radius:var(--ds-r2)}
+
+/* --- 4. Interacción: todo lo que se toca responde ------------------------ */
+button, .op, .nodo, [role="button"]{
+  transition:transform .13s cubic-bezier(.2,.8,.3,1),
+             box-shadow .18s ease, background .18s ease, border-color .18s ease;
+}
+button:active:not(:disabled), .op:active:not([disabled]), .nodo:active{transform:scale(.978)}
+@media (hover:hover){
+  .tarjeta:hover{box-shadow:var(--ds-e3)}
+  .op:not([disabled]):hover, .nodo:not(.bloqueada):hover{
+    border-color:color-mix(in srgb, var(--ds-acento) 55%, transparent)}
+}
+/* El anillo de foco: visible siempre, para quien navega con teclado. */
+:focus-visible{outline:3px solid var(--ds-acento); outline-offset:2px; border-radius:4px}
+
+/* --- 5. El botón principal ----------------------------------------------- */
+.pri{
+  background:linear-gradient(177deg, color-mix(in srgb, var(--ds-acento) 88%, #fff), var(--ds-acento));
+  box-shadow:0 3px 0 var(--ds-acento-hondo),
+             0 10px 22px -13px color-mix(in srgb, var(--ds-acento) 92%, transparent);
+  letter-spacing:-.012em;
+}
+.pri:active:not(:disabled){box-shadow:0 1px 0 var(--ds-acento-hondo); transform:translateY(2px) scale(1)}
+
+/* --- 6. Iconos ------------------------------------------------------------ */
+.ic{width:1.25em; height:1.25em; flex:none; display:inline-block; vertical-align:-.22em}
+.ic.g{width:1.55em; height:1.55em} .ic.gg{width:2.2em; height:2.2em}
+.ic.xl{width:3.2em; height:3.2em; stroke-width:1.35}
+
+/* --- 7. Barra de navegación ---------------------------------------------- */
+.nav{background:color-mix(in srgb, var(--ds-sup) 86%, transparent);
+     backdrop-filter:blur(18px) saturate(1.4)}
+.nav button{gap:4px; position:relative}
+.nav button .ic{width:23px; height:23px; transition:transform .18s cubic-bezier(.2,.8,.3,1)}
+.nav button[aria-current="page"] .ic{transform:translateY(-1px)}
+.nav button[aria-current="page"]::before{
+  content:""; position:absolute; top:5px; left:50%; translate:-50% 0;
+  width:42px; height:29px; border-radius:99px;
+  background:color-mix(in srgb, var(--ds-acento) 13%, transparent); z-index:-1}
+
+/* --- 8. Avisos y estados vacíos ------------------------------------------ */
+.aviso{border-radius:var(--ds-r2); align-items:flex-start}
+.aviso > .ic{margin-top:1px; flex:none}
+.vacio{padding-block:var(--ds-hueco)}
+.vacio > .ic{color:var(--ds-tinta3); display:block; margin:0 auto .75rem}
+
+/* --- 9. Movimiento: uno solo, y se apaga si el sistema lo pide ----------- */
+@media (prefers-reduced-motion:no-preference){
+  .entra{animation:ds-entra .34s cubic-bezier(.2,.8,.3,1) both}
+  @keyframes ds-entra{from{opacity:0; transform:translateY(13px) scale(.988)} to{opacity:1; transform:none}}
+  .entra:nth-of-type(2){animation-delay:.045s}
+  .entra:nth-of-type(3){animation-delay:.09s}
+  .entra:nth-of-type(4){animation-delay:.13s}
+}
+@media (prefers-reduced-motion:reduce){
+  *, *::before, *::after{animation-duration:.01ms !important; transition-duration:.01ms !important}
+}
+
+/* --- 10. Impresión: que salga legible en papel --------------------------- */
+@media print{
+  body::before, .nav{display:none}
+  .tarjeta{box-shadow:none; border:1px solid #ccc; break-inside:avoid}
+}
 </style>
 </head>
 <body>
+<!-- Los iconos de la aplicacion. Antes eran emoji: se dibujaban distinto en cada aparato, no tomaban el color del texto y no se alineaban con la letra. Van incrustados; sigue sin necesitar internet. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-casa" viewBox="0 0 24 24"><path d="M3 10.2 12 3l9 7.2"/><path d="M5.5 9.2V20h13V9.2"/><path d="M9.75 20v-5.5h4.5V20"/></symbol>
+<symbol id="i-lapiz" viewBox="0 0 24 24"><path d="M16.5 3.9 20.1 7.5 8.6 19H5v-3.6Z"/><path d="m14.2 6.2 3.6 3.6"/></symbol>
+<symbol id="i-cronometro" viewBox="0 0 24 24"><circle cx="12" cy="13.6" r="7.6"/><path d="M12 9.8v3.8l2.6 1.6"/><path d="M9.4 2.9h5.2M12 2.9v3.1M18.6 7.4l1.6-1.6"/></symbol>
+<symbol id="i-tendencia" viewBox="0 0 24 24"><path d="M3.4 19.4h17.2"/><path d="m5.4 15.6 4.2-4.8 3.4 2.8 6.2-6.6"/><path d="M15.4 6.6h4v4"/></symbol>
+<symbol id="i-calendario" viewBox="0 0 24 24"><rect x="3.6" y="5.4" width="16.8" height="15" rx="2.6"/><path d="M3.6 10.2h16.8M8.2 2.9v4.4M15.8 2.9v4.4"/><circle cx="8.4" cy="14.2" r=".95" fill="currentColor" stroke="none"/><circle cx="12" cy="14.2" r=".95" fill="currentColor" stroke="none"/><circle cx="15.6" cy="14.2" r=".95" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-engranaje" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.9v2.4M12 18.7v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.9 12h2.4M18.7 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></symbol>
+<symbol id="i-libro" viewBox="0 0 24 24"><path d="M4 4.5h5a3 3 0 0 1 3 3v12a2.6 2.6 0 0 0-2.6-2.5H4Z"/><path d="M20 4.5h-5a3 3 0 0 0-3 3v12a2.6 2.6 0 0 1 2.6-2.5H20Z"/></symbol>
+<symbol id="i-repetir" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-13.9-5.4L3.5 8"/><path d="M4 13a8 8 0 0 0 13.9 5.4L20.5 16"/><path d="M3.5 3.8V8H7.7M20.5 20.2V16h-4.2"/></symbol>
+<symbol id="i-diana" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.3"/><circle cx="12" cy="12" r="4.6"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-libreta" viewBox="0 0 24 24"><path d="M6.6 3.4h11a2 2 0 0 1 2 2v13.2a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2V5.4a2 2 0 0 1 2-2Z"/><path d="M8.4 3.4v17.2"/><path d="M11.8 8.2h4.4M11.8 12h4.4"/></symbol>
+<symbol id="i-alerta" viewBox="0 0 24 24"><path d="M12 3.6 21.2 19.6H2.8Z"/><path d="M12 9.8v4.2"/><circle cx="12" cy="16.9" r="1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m4.5 12.6 4.8 4.8L19.5 7.2" stroke-width="2.1"/></symbol>
+<symbol id="i-equis" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke-width="2.1"/></symbol>
+<symbol id="i-circulo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.4"/></symbol>
+<symbol id="i-punto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-estrella" viewBox="0 0 24 24"><path d="m12 3.6 2.6 5.3 5.9.9-4.25 4.15 1 5.85L12 17l-5.25 2.8 1-5.85L3.5 9.8l5.9-.9Z" fill="currentColor" stroke-width="1.4"/></symbol>
+<symbol id="i-estrella-no" viewBox="0 0 24 24"><path d="m12 3.6 2.6 5.3 5.9.9-4.25 4.15 1 5.85L12 17l-5.25 2.8 1-5.85L3.5 9.8l5.9-.9Z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 11.2v5"/><circle cx="12" cy="7.9" r="1" fill="currentColor" stroke="none"/></symbol>
+</defs></svg>
 <div class="app">
   <aside class="rail" id="rail"></aside>
   <div class="zona">
@@ -651,6 +808,19 @@ function calidadDe(acerto, segundos, causa){
    privada, o con las cookies bloqueadas, localStorage lanza excepción: un
    estudiante no puede quedarse sin app por eso.
    =========================================================================== */
+/* ---------------------------------------------------------------------------
+   Los iconos. `ic("casa")` devuelve el SVG que apunta al juego incrustado en
+   el <body>. Los atributos de trazo van en el <svg> que hace el <use>, y el
+   contenido del <symbol> los hereda: un solo juego sirve para cualquier color
+   y cualquier tamano. Antes esto eran emoji, que se dibujan distinto en cada
+   aparato, no toman el color del texto y no se alinean con la letra.
+   --------------------------------------------------------------------------- */
+function ic(nombre, clase){
+  return `<svg class="ic${clase ? " " + clase : ""}" aria-hidden="true" focusable="false"`
+    + ` fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"`
+    + ` stroke-linejoin="round"><use href="#i-${nombre}"></use></svg>`;
+}
+
 const CLAVE = "icfes.v2";
 const CFG = Object.assign({}, DATOS.plan, {areasFicha: DATOS.areas});
 const ORDEN = DATOS.plan ? DATOS.plan.orden_areas : [];
@@ -936,9 +1106,9 @@ function activarGlobos(raiz){
 /* ===========================================================================
    Navegación y pantallas
    =========================================================================== */
-const VISTAS = [["inicio","🏠","Inicio"],["estudiar","✍️","Estudiar"],
-                ["simulacro","⏱️","Simulacro"],["progreso","📈","Progreso"],
-                ["plan","🗓️","Plan"],["ajustes","⚙️","Ajustes"]];
+const VISTAS = [["inicio","casa","Inicio"],["estudiar","lapiz","Estudiar"],
+                ["simulacro","cronometro","Simulacro"],["progreso","tendencia","Progreso"],
+                ["plan","calendario","Plan"],["ajustes","engranaje","Ajustes"]];
 let vista = "inicio", sesion = null, cronoID = null, BLOQUES_HOY = [];
 
 function ir(v){
@@ -955,12 +1125,12 @@ function pintar(){
   const dias = c && c.examen ? aDias(c.examen) - aDias(hoyISO()) : null;
   document.getElementById("rail").innerHTML =
     `<div class="marcaapp"><span class="sello">S11</span><b>Preparación ICFES</b></div>` +
-    VISTAS.map(([id,ic,t]) => `<button ${id===vista?'aria-current="page"':""} onclick="ir('${id}')">
-      <span class="ic">${ic}</span>${t}</button>`).join("") +
+    VISTAS.map(([id,icono,rotulo]) => `<button ${id===vista?'aria-current="page"':""} onclick="ir('${id}')">
+      ${ic(icono)}<span>${rotulo}</span></button>`).join("") +
     `<div class="pin">${c&&c.examen ? `Examen<br><b>${fLarga(c.examen)}</b>` : "Sin fecha de examen"}</div>`;
-  document.getElementById("nav").innerHTML = VISTAS.map(([id,ic,t]) =>
+  document.getElementById("nav").innerHTML = VISTAS.map(([id,icono,rotulo]) =>
     `<button ${id===vista?'aria-current="page"':""} onclick="ir('${id}')">
-      <span class="ic">${ic}</span>${t}</button>`).join("");
+      ${ic(icono)}<span>${rotulo}</span></button>`).join("");
   document.getElementById("barra").innerHTML =
     `<div class="marcaapp"><span class="sello">S11</span><b>Preparación ICFES</b></div>` +
     (dias !== null ? `<div class="cuenta"><b class="num">${dias > 0 ? dias : 0}</b>
@@ -1031,16 +1201,17 @@ function vInicio(){
     BLOQUES_HOY = bloques;
     h += `<div class="bloques">` + bloques.map((b,i) => {
       const clave = b.fecha+"|"+i, hecho = E.hechos[clave];
-      const ic = {teoria:"📖",practica:"✍️",repaso:"🔁",simulacro_area:"⏱️",
-                  simulacro_completo:"🎯",cuaderno_errores:"📕"}[b.tipo] || "•";
+      // La variable NO puede llamarse `ic`: taparia a la funcion ic() que dibuja el
+    // SVG, y saldria escrito el nombre del icono en vez del dibujo.
+    const icono = {teoria:"libro",practica:"lapiz",repaso:"repetir",simulacro_area:"cronometro",simulacro_completo:"diana",cuaderno_errores:"libreta"}[b.tipo] || "punto";
       return `<div class="bloque-p${hecho?" hecho":""}">
-        <span class="ic">${ic}</span>
+        ${ic(icono)}
         <span class="tx"><b>${b.area?esc(nombreArea(b.area)):"Todo el examen"} · ${
           esc(CFG.sesiones[b.tipo].etiqueta)}</b>
           <span>${esc(b.foco)} · ${b.minutos} min</span></span>
         <span class="fila-btn">
           <button class="fantasma" title="Marcar como hecho" onclick="marcarHecho('${clave}')">
-            ${hecho?"✓":"○"}</button>
+            ${hecho?ic("check"):ic("circulo")}</button>
           <button onclick="arrancarBloque(${i})">Empezar</button>
         </span></div>`;
     }).join("") + `</div>`;
@@ -1091,7 +1262,7 @@ function bienvenida(){
       <p class="tenue">Necesito tres datos. Después el sistema arma solo el plan hasta el día
       del examen.</p>
       <button class="pri" onclick="ir('ajustes')">Configurar</button></div>
-    <div class="aviso info"><span class="ic">ℹ️</span><span>Todo lo que respondas se guarda
+    <div class="aviso info">${ic("info")}<span>Todo lo que respondas se guarda
       solo en este navegador. No se sube a ningún lado y funciona sin internet.</span></div></div>`;
 }
 function marcarHecho(clave){
@@ -1298,7 +1469,7 @@ function vSimulacro(){
     [20,40,60,999].map(n => `<button aria-pressed="${topeSim===n}"
       onclick="topeSim=${n}; pintar()">${n===999?"Todas":n}</button>`).join("") + `</div>`;
 
-  h += `<div class="aviso ojo" style="margin-top:var(--s5)"><span class="ic">⚠️</span><span>
+  h += `<div class="aviso ojo" style="margin-top:var(--s5)">${ic("alerta")}<span>
     Este simulacro va a <b>escala ${Math.round(suma/totalOficial*100)} %</b>: ${suma} preguntas
     en vez de ${totalOficial}, con la misma proporción por área y los mismos ${segs} segundos por
     pregunta. Entrena el ritmo, pero <b>no</b> el cansancio de las 4 h 30. Para eso están los
@@ -1440,7 +1611,7 @@ function vSesion(){
     if(s.mostrando){ if(i === b.correcta) cl = "buena"; else if(i === s.elegida) cl = "mala"; }
     return `<button class="op ${cl}" ${s.mostrando?"disabled":""} onclick="responder(${i})">
       <span class="l">${L[i]}</span><span>${txt(o)}</span>
-      <span class="mk">${cl==="buena"?"✓":cl==="mala"?"✗":""}</span></button>`;
+      <span class="mk">${cl==="buena"?ic("check"):cl==="mala"?ic("equis"):""}</span></button>`;
   }).join("") + `</div>`;
 
   if(!s.mostrando){
@@ -1450,7 +1621,7 @@ function vSesion(){
 
   if(s.mostrando && s.modo !== "simulacro"){
     const bien = s.elegida === b.correcta;
-    h += `<div class="veredicto ${bien?"si":"no"}">${bien?"✓ Correcta":"✗ Incorrecta"}
+    h += `<div class="veredicto ${bien?"si":"no"}">${bien?ic("check")+" Correcta":ic("equis")+" Incorrecta"}
       <span class="mini tenue" style="font-weight:400">· ${Math.round(s.segundos)} segundos</span></div>`;
     h += `<div class="explica"><span class="rot">Por qué</span>${txt(p.explicacion)}</div>`;
     if(p.trampa) h += `<div class="explica trampa"><span class="rot">La trampa</span>${txt(p.trampa)}</div>`;
@@ -1468,7 +1639,7 @@ function vSesion(){
 
   h += `<div class="fila-btn" style="margin-top:var(--s5);justify-content:space-between">
     <button class="fantasma" onclick="marcarPregunta('${p.id}')">
-      ${marcada?"★ Marcada":"☆ Marcar para revisar"}</button>
+      ${marcada?ic("estrella")+" Marcada":ic("estrella-no")+" Marcar para revisar"}</button>
     <span class="fila-btn">
       <button class="fantasma" onclick="salirSesion()">Terminar</button>
       ${s.mostrando ? `<button class="pri" onclick="siguiente()">
@@ -1575,7 +1746,7 @@ function vResultado(){
     <span class="d">por pregunta${s.objetivo ? ` · objetivo ${Math.floor(s.objetivo/60)}:${String(s.objetivo%60).padStart(2,"0")}` : ""}</span></div></div>`;
 
   if(s.escala && s.escala < 0.99){
-    h += `<div class="aviso ojo"><span class="ic">⚠️</span><span>Simulacro a escala
+    h += `<div class="aviso ojo">${ic("alerta")}<span>Simulacro a escala
       ${Math.round(s.escala*100)} % del examen real. Sirve para compararte contigo mismo a lo
       largo del año, no para anunciar un puntaje.</span></div>`;
   }
@@ -1642,7 +1813,7 @@ function vProgreso(){
   const hoy = hoyISO(), c = E.config || {};
   if(!E.intentos.length){
     return `<div class="entra"><h1>Progreso</h1><div class="tarjeta"><div class="vacio">
-      <span class="big">📈</span><h2>Todavía no hay nada que medir</h2>
+      ${ic("tendencia","xl")}<h2>Todavía no hay nada que medir</h2>
       <p>Cuando respondas preguntas, aquí vas a ver tu dominio por competencia, por qué estás
       fallando y a qué puntaje vas a llegar el día del examen.</p>
       <button class="pri" onclick="ir('simulacro')">Empezar con el diagnóstico</button>
@@ -1756,13 +1927,13 @@ let semanaAbierta = null;
 function vPlan(){
   const c = E.config;
   if(!c || !c.examen) return `<div class="entra"><h1>Plan</h1><div class="tarjeta">
-    <div class="vacio"><span class="big">🗓️</span><h2>Falta la fecha del examen</h2>
+    <div class="vacio">${ic("calendario","xl")}<h2>Falta la fecha del examen</h2>
     <p>Con la fecha, la meta y tus horas semanales, el sistema arma el plan completo hasta el
     día del examen.</p><button class="pri" onclick="ir('ajustes')">Configurar</button>
     </div></div></div>`;
   const plan = planActual();
   if(!plan) return `<div class="entra"><h1>Plan</h1><div class="aviso ojo">
-    <span class="ic">⚠️</span><span>La fecha del examen ya pasó. Cámbiala en Ajustes.</span></div></div>`;
+    ${ic("alerta")}<span>La fecha del examen ya pasó. Cámbiala en Ajustes.</span></div></div>`;
   const hoy = hoyISO(), actual = semanaDe(plan, hoy);
   const diag = diagnostico();
   const metas = metaPorArea(c.meta||400, diag.datos, DATOS.areas, ORDEN);
@@ -1782,7 +1953,7 @@ function vPlan(){
       <span class="d">completos</span></div></div>`;
 
   if(!diag.real){
-    h += `<div class="aviso ojo"><span class="ic">⚠️</span><span>Este reparto supone que estás
+    h += `<div class="aviso ojo">${ic("alerta")}<span>Este reparto supone que estás
       en 50 sobre 100 en las cinco áreas, porque todavía no has hecho un simulacro completo.
       Apenas lo hagas, el plan se recalcula solo con tu nivel real.</span></div>`;
   }
@@ -1831,8 +2002,7 @@ function vPlan(){
         Object.keys(porDia).sort().map(d => `<div>
           <div class="mini tenue" style="margin:var(--s2) 0 4px;font-weight:650">${fCorta(d)}</div>` +
           porDia[d].map(b => `<div class="bloque-p" style="margin-bottom:6px">
-            <span class="ic">${({teoria:"📖",practica:"✍️",repaso:"🔁",simulacro_area:"⏱️",
-              simulacro_completo:"🎯",cuaderno_errores:"📕"})[b.tipo]||"•"}</span>
+            ${ic({teoria:"libro",practica:"lapiz",repaso:"repetir",simulacro_area:"cronometro",simulacro_completo:"diana",cuaderno_errores:"libreta"}[b.tipo]||"punto")}
             <span class="tx"><b>${b.area?esc(nombreArea(b.area)):"Todo el examen"} · ${esc(CFG.sesiones[b.tipo].etiqueta)}</b>
               <span>${esc(b.foco)} · ${b.minutos} min</span></span><span></span></div>`).join("")
           + `</div>`).join("") + `</div></div>`;
