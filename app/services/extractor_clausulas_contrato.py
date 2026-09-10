@@ -22,6 +22,7 @@ robusto que pdfplumber → texto plano → Claude.
 """
 
 from app.core.config import espera_maxima
+from app.services.modelos_anthropic import temperatura_si_aplica
 import os
 import json
 import base64
@@ -85,7 +86,7 @@ async def extraer_clausulas_desde_texto(
     (el endpoint marcará la subida como "PDF guardado, extracción pendiente").
     """
     api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
-    modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+    modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
 
     if not api_key:
         logger.warning("[CLAUSULAS] ANTHROPIC_API_KEY no configurada — saltando extracción")
@@ -125,7 +126,7 @@ async def extraer_clausulas_desde_texto(
                 json={
                     "model": modelo,
                     "max_tokens": 8000,
-                    "temperature": 0.0,
+                    **temperatura_si_aplica(modelo, 0.0),
                     "system": SYSTEM_EXTRACCION,
                     "messages": [{"role": "user", "content": user_prompt}],
                 },
@@ -201,7 +202,7 @@ async def extraer_clausulas_desde_pdf_bytes(
     que el gestor sepa si subir otro PDF, hacer OCR, etc.
     """
     api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
-    modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+    modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
 
     if not api_key:
         logger.warning("[CLAUSULAS] ANTHROPIC_API_KEY no configurada — saltando")
@@ -239,7 +240,7 @@ async def extraer_clausulas_desde_pdf_bytes(
                 json={
                     "model": modelo,
                     "max_tokens": 16000,
-                    "temperature": 0.0,
+                    **temperatura_si_aplica(modelo, 0.0),
                     "system": SYSTEM_EXTRACCION,
                     "messages": [
                         {

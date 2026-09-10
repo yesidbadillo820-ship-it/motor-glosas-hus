@@ -1,4 +1,5 @@
 from app.core.config import espera_maxima
+from app.services.modelos_anthropic import temperatura_si_aplica
 import os
 import re
 import json
@@ -173,16 +174,25 @@ _CACHE_IA: TTLCache = TTLCache(maxsize=500, ttl=3600)
 # Cache READ es 10% del precio de input normal (oferta estándar Anthropic).
 # Cache WRITE 5min: 1.25× input. WRITE 1h (extended-cache-ttl): 2× input.
 _TARIFAS_ANTHROPIC_USD_POR_MTOK = {
-    # Familia Sonnet 4.x
+    # Generación actual
+    "claude-sonnet-5": {"input": 2.0, "output": 10.0},
+    "claude-opus-5": {"input": 5.0, "output": 25.0},
+    # Familia Sonnet 4.x (se conservan: hay glosas ya costeadas con ellos)
     "claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
     "claude-sonnet-4-5": {"input": 3.0, "output": 15.0},
     "claude-sonnet-4-7": {"input": 3.0, "output": 15.0},
-    # Familia Opus 4.x
-    "claude-opus-4-6": {"input": 15.0, "output": 75.0},
-    "claude-opus-4-7": {"input": 15.0, "output": 75.0},
-    # Familia Haiku
+    # 10-09-2026 — los Opus estaban a 15,00 / 75,00: el precio de la
+    # generación Opus 3, no la de estos. Sobreestimaba el costo por TRES.
+    # Los tres valen 5,00 / 25,00.
+    "claude-opus-4-6": {"input": 5.0, "output": 25.0},
+    "claude-opus-4-7": {"input": 5.0, "output": 25.0},
+    "claude-opus-4-8": {"input": 5.0, "output": 25.0},
+    # Familia Haiku. El nombre CON fecha estaba y el pelado no, pero el
+    # motor usa el pelado para el ping de `ia_status`: caía al default y se
+    # cobraba a 3,00 / 15,00 en vez de 1,00 / 5,00.
+    "claude-haiku-4-5": {"input": 1.0, "output": 5.0},
     "claude-haiku-4-5-20251001": {"input": 1.0, "output": 5.0},
-    # Default conservador
+    # Default conservador: sobreestimar es el error seguro de los dos.
     "_default": {"input": 3.0, "output": 15.0},
 }
 
@@ -8501,7 +8511,7 @@ class GlosaService:
         groq_api_key: str = None,
         anthropic_api_key: str = None,
         primary_ai: str = "anthropic",
-        anthropic_model: str = "claude-sonnet-4-5",
+        anthropic_model: str = "claude-sonnet-5",
         # 19-08-2026. Estos parámetros NO llevan el nombre del modelo escrito
         # a mano: se resuelven contra `app/core/config.py`, que es la única
         # fuente de verdad. Antes cada uno traía su copia, y cuando el 05-08 se
@@ -8539,7 +8549,7 @@ class GlosaService:
                 "(proveedor retirado jun-2026). Normalizando a 'groq'."
             )
             self.primary_ai = "groq"
-        self.anthropic_model = anthropic_model or "claude-sonnet-4-5"
+        self.anthropic_model = anthropic_model or "claude-sonnet-5"
         # Cadena de modelos DENTRO de Groq (decision 16-jun-2026 ronda 8,
         # La cadena vigente vive en app/core/config.py — acá NO se repite,
         # porque repetirla fue justo lo que dejó el modelo muerto vivo dos
@@ -10020,7 +10030,7 @@ class GlosaService:
                     # Las palabras-clave críticas o valores ≥ $50M reventaban
                     # a Llama 4 Scout (rondas 14-15-16: Cart-T, Norwood, VIH).
                     elif _es_complejo_forzar_claude and self.primary_ai == "groq":
-                        _modelo_override = self.anthropic_model or "claude-sonnet-4-5"
+                        _modelo_override = self.anthropic_model or "claude-sonnet-5"
                         logger.warning(
                             "[ROUTING-IA] FORZANDO ANTHROPIC — primary_ai=groq pero "
                             f"caso complejo ({', '.join(_resultado_complej.motivos)}). "
@@ -14449,7 +14459,7 @@ class GlosaService:
         )
         _modelo_override_refinar = None
         if _complej_refinar.es_complejo and self.anthropic_key:
-            _modelo_override_refinar = self.anthropic_model or "claude-sonnet-4-5"
+            _modelo_override_refinar = self.anthropic_model or "claude-sonnet-5"
             logger.warning(
                 f"[REFINAR-DICTAMEN] FORZANDO ANTHROPIC "
                 f"({', '.join(_complej_refinar.motivos)}) — "
@@ -14857,7 +14867,7 @@ class GlosaService:
                         json={
                             "model": _modelo_efectivo,
                             "max_tokens": max_tokens_anthropic,
-                            "temperature": _temp_efectiva,
+                            **temperatura_si_aplica(_modelo_efectivo, _temp_efectiva),
                             "system": system_payload,
                             "messages": [{"role": "user", "content": user}],
                         },
@@ -14987,7 +14997,7 @@ class GlosaService:
                         json={
                             "model": modelo_efectivo,
                             "max_tokens": 4000,
-                            "temperature": 0.10,
+                            **temperatura_si_aplica(modelo_efectivo, 0.10),
                             "system": system,
                             "tools": TOOLS_DISPONIBLES,
                             "messages": messages,
@@ -15118,7 +15128,7 @@ class GlosaService:
                         # a multimodal se degradaba en silencio a Sonnet.
                         "model": modelo_override or self.anthropic_model,
                         "max_tokens": 3000,
-                        "temperature": 0.10,
+                        **temperatura_si_aplica(modelo_override or self.anthropic_model, 0.10),
                         "system": system,
                         "messages": [{"role": "user", "content": content_blocks}],
                     },
