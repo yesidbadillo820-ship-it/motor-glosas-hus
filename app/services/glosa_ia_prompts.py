@@ -1978,7 +1978,11 @@ _TOKENS_PAGADOR_EN_TEXTO: tuple[tuple[str, str], ...] = (
     ("DIGSA", "DMBUG"),
     ("SANIDAD EJERCITO", "DMBUG"),
     ("SANIDAD EJÉRCITO", "DMBUG"),
-    ("SANIDAD MILITAR", "DMBUG"),
+    # «SANIDAD MILITAR» se retiró el mismo día que se agregó: aparece en prosa
+    # corriente —«cotización avalada por sanidad militar»— describiendo un
+    # régimen, no nombrando al pagador. Con ella, una glosa de FAMISANAR que
+    # mencionara el término se habría respondido con el contrato del
+    # Dispensario. «SANIDAD EJERCITO» sí queda: es parte del nombre oficial.
     ("POLICIA NACIONAL", "POLICIA NACIONAL"),
     ("POLICÍA NACIONAL", "POLICIA NACIONAL"),
     ("SANIDAD POLICIA", "POLICIA NACIONAL"),
@@ -2157,6 +2161,21 @@ def resolver_eps_efectiva(
         or (len(dropdown_norm) >= 4 and dropdown_norm in texto_norm)
         or (len(texto_norm) >= 4 and texto_norm in dropdown_norm)
     ):
+        return eps_dropdown, False, ""
+
+    # 2-bis) 09-09-2026 — LA MISMA ENTIDAD CON DOS NOMBRES NO ES UNA
+    # CONTRADICCIÓN. Comparar los textos tal cual falla cuando el desplegable
+    # trae el nombre oficial largo y el catálogo usa la sigla: «DIRECCION DE
+    # SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANGA» y «DMBUG» no
+    # comparten ni una letra seguida, y el motor los daba por entidades
+    # distintas: avisaba de una «corrección» que no corregía nada y cambiaba
+    # el nombre claro del encabezado por la sigla.
+    #
+    # Lo vio el auditor el mismo día del arreglo de los regímenes especiales:
+    # dos análisis de la MISMA factura salieron con entidades escritas
+    # distinto. Se comparan por el nombre canónico, que es lo que de verdad
+    # decide qué contrato se carga.
+    if _detectar_pagador_en_texto(eps_dropdown) == eps_texto:
         return eps_dropdown, False, ""
 
     # 3) CONTRADICCIÓN: dropdown específico ≠ EPS del texto → priorizar texto.

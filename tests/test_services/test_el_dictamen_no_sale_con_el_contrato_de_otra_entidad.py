@@ -66,7 +66,13 @@ class TestLasFormasEnQueSeNombraLaSanidadMilitar:
             "DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANGA",
             "GLOSA DMBUG TA0801 $12.000",
             "CONTRATO DIGSA TA0801",
-            "SANIDAD MILITAR SO0101",
+            # «SANIDAD MILITAR» a secas se retiró el mismo día que se agregó.
+            # No es un nombre: es un régimen, y aparece en prosa corriente
+            # («cotización avalada por sanidad militar»). En una glosa real del
+            # auditor hizo que el motor «corrigiera» una entidad que ya estaba
+            # bien elegida, y con otro desplegable habría respondido una glosa
+            # de FAMISANAR con el contrato del Dispensario. Ver
+            # TestLaMismaEntidadConDosNombresNoEsContradiccion, abajo.
         ],
     )
     def test_todas_llevan_al_mismo_canonico(self, texto):
@@ -130,3 +136,72 @@ class TestLoQueYaFuncionabaSigueIgual:
         """No se puede inventar una entidad donde el texto no nombra ninguna."""
         eps, corrigio, _ = resolver_eps_efectiva("FAMISANAR EPS", "TA0201 $185.000 CONSULTA")
         assert not corrigio and eps == "FAMISANAR EPS"
+
+
+class TestLaMismaEntidadConDosNombresNoEsContradiccion:
+    """Regresión introducida y corregida el mismo día, 09-09-2026.
+
+    Al agregar los regímenes especiales a la lista de pagadores, dos análisis
+    de la MISMA factura del auditor salieron con la entidad escrita distinto:
+    uno dijo «DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANGA»
+    y el otro «DMBUG», con un aviso amarillo de «entidad pagadora corregida»
+    que no corregía nada.
+
+    Dos causas, las dos mías:
+
+    **1 · Se comparaban los nombres tal cual.** El desplegable traía el
+    nombre oficial largo y el catálogo devuelve la sigla: no comparten ni una
+    letra seguida, así que el motor los daba por entidades distintas. Ahora se
+    comparan por el nombre canónico, que es lo que de verdad decide qué
+    contrato se carga.
+
+    **2 · «SANIDAD MILITAR» era un token demasiado suelto.** La glosa decía
+    «cotización avalada por SANIDAD MILITAR» — eso describe quién debe avalar,
+    no nombra al pagador. Con ese token, una glosa de FAMISANAR que mencionara
+    el término se habría respondido con el contrato del Dispensario.
+    """
+
+    CASO_REAL = (
+        "SO4201 - Existe ausencia total, parcial o inconsistencia de la lista de "
+        "precios - CUPS FMQ6276 - MICROGUÍA CON PUNTA 0,10 - SE OBJETA MATERIAL DE "
+        "PROCEDIMIENTO NO SE EVIDENCIA FRA DE COMPRA Y COTIZACION AVALADA POR "
+        "SANIDAD MILITAR PARA SU RESPECTIVO COBRO."
+    )
+    NOMBRE_LARGO = "DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANGA"
+
+    def test_no_se_corrige_lo_que_ya_estaba_bien(self):
+        eps, corrigio, _ = resolver_eps_efectiva(self.NOMBRE_LARGO, self.CASO_REAL)
+        assert not corrigio, (
+            "Avisa de una «corrección» sobre la entidad que el auditor ya había "
+            "elegido bien. El aviso confunde y encima cambia el nombre claro "
+            "del encabezado por la sigla."
+        )
+
+    def test_y_se_conserva_el_nombre_que_eligio_el_auditor(self):
+        eps, _, _ = resolver_eps_efectiva(self.NOMBRE_LARGO, self.CASO_REAL)
+        assert eps == self.NOMBRE_LARGO
+
+    def test_dos_glosas_de_la_misma_factura_dan_la_misma_entidad(self):
+        """Lo que lo destapó: dos análisis de HUS0000541440 salieron con la
+        entidad escrita distinto según qué decía el texto de cada concepto."""
+        otra = "FA0701 - ... - SE OBJETA MEDIO DE CONTRASTE UTILIZADO SEGUN NOTA OPERATORIA"
+        a, _, _ = resolver_eps_efectiva(self.NOMBRE_LARGO, self.CASO_REAL)
+        b, _, _ = resolver_eps_efectiva(self.NOMBRE_LARGO, otra)
+        assert a == b, f"La misma factura resolvió a {a!r} y a {b!r}."
+
+    def test_la_frase_suelta_no_secuestra_una_glosa_de_otra_eps(self):
+        """El daño mayor que evitaba el token suelto: una glosa de FAMISANAR
+        respondida con el contrato del Dispensario."""
+        eps, corrigio, _ = resolver_eps_efectiva(
+            "FAMISANAR EPS", "TA0201 cotización avalada por sanidad militar"
+        )
+        assert not corrigio and eps == "FAMISANAR EPS"
+
+    def test_pero_el_Dispensario_de_verdad_sigue_detectandose(self):
+        """El arreglo no puede deshacer lo que vino a arreglar."""
+        eps, corrigio, _ = resolver_eps_efectiva("FAMISANAR EPS", "GLOSA DMBUG TA0801")
+        assert corrigio and eps == "DMBUG"
+
+    def test_y_una_contradiccion_de_verdad_se_sigue_avisando(self):
+        eps, corrigio, _ = resolver_eps_efectiva("FAMISANAR EPS", "COOSALUD AU0201 $555.000")
+        assert corrigio and eps == "COOSALUD"
