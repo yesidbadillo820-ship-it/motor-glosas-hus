@@ -24,6 +24,8 @@ Setup:
 from __future__ import annotations
 
 import logging
+
+from app.core.logging_utils import clave_para_log
 import os
 from typing import Optional
 
@@ -71,7 +73,8 @@ def init_posthog() -> bool:
             # flush_at=20 default es ok
             # flush_interval=5 segundos default
         )
-        logger.info(f"PostHog activado | host={host} | key={api_key[:8]}...")
+        # 09-09-2026: era `key={api_key[:8]}...`. Ver `clave_para_log`.
+        logger.info(f"PostHog activado | host={host} | key={clave_para_log(api_key)}")
     except Exception as e:
         logger.error(f"Error inicializando PostHog (la app sigue): {e}")
         _cliente_posthog = None

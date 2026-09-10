@@ -118,6 +118,59 @@ Dos errores:
 6 pruebas nuevas, 4 fallan sin el arreglo. Y se retiró de las pruebas del
 arreglo anterior el caso que exigía lo contrario, dejando escrito por qué: la
 evidencia de producción manda sobre un beneficio hipotético.
+
+---
+
+### 09-09-2026 (tarde, 11) — Se dejaron de publicar pedazos de las claves, y el contenedor ya no corre como administrador
+
+Tercera tanda de los análisis de código. Cuatro cosas que no rompían nada
+hoy pero dejaban la puerta entornada.
+
+**1 · El motor publicaba pedazos de sus propias claves.** En el registro de
+arranque salía «OK sk-ant-api03…»: los diez primeros caracteres de cada
+clave de IA. Diez caracteres no alcanzan para usarla, pero dicen de qué
+proveedor y de qué tipo es, y le ahorran la mitad del trabajo a quien ya
+tenga una copia parcial. **Y buscándolo aparecieron más sitios de los que
+señalaba el análisis**, peores: la pantalla de Diagnóstico devolvía el
+pedazo **en la respuesta** —o sea que viaja cuando uno pega esa salida en un
+chat o en un ticket—, y una de esas pantallas la puede abrir **cualquier
+usuario con sesión**, no solo el administrador. Ahora lo único que se dice
+es si la clave está o no está.
+
+**2 · La documentación técnica de la API estaba abierta.** Las direcciones
+`/docs` y `/redoc` publicaban el mapa completo del motor —cada pantalla,
+cada dato que recibe— sin pedir contraseña. No es una brecha por sí sola
+(todo lo de adentro sigue exigiendo entrar), pero es el plano del edificio
+pegado en la puerta. Quedan **apagadas por defecto**; para verlas mientras
+se desarrolla, se pone `DOCS_PUBLICOS=1` en el archivo de configuración.
+
+**3 · El motor no le pedía nada al navegador para protegerse.** No es que
+estuviera mal configurado: no había **ninguna** de las instrucciones que un
+sitio le da al navegador para defender a quien tiene la sesión abierta. Se
+agregaron cuatro, y cada una tapa algo concreto: que nadie meta el portal
+dentro de una página ajena para robarle un clic al auditor; que el navegador
+no adivine el tipo de un archivo (un PDF de soportes con contenido raro
+podría terminar ejecutándose); que al salir del portal no se le mande a la
+otra página la dirección completa (llevan números de factura); y que cámara,
+micrófono y ubicación queden apagados de plano.
+
+*No se tocó la más potente de todas (la que restringe qué scripts pueden
+correr): la pantalla del motor tiene estilos y programación escritos dentro
+del propio HTML, y ponerla a ojo dejaría el portal en blanco. Merece su
+propio trabajo, con la pantalla delante.*
+
+**4 · El contenedor corría como administrador.** Si alguna vez se logra
+ejecutar algo adentro —una librería con un fallo, un PDF que rompa el
+lector— con permisos de administrador ese algo escribe donde quiera. Ahora
+corre con un usuario propio que solo puede tocar lo suyo. No cuesta
+rendimiento ni cambia el arranque.
+
+18 pruebas nuevas, 17 fallan sin el arreglo. Una de ellas **recorre todo el
+código buscando recortes de credenciales**: no comprueba una lista, así que
+avisa sola si mañana aparece otro.
+
+---
+
 ### 09-09-2026 (tarde, 10) — El arranque se ahogaba solo y el «pulso» del motor mentía
 
 Segunda tanda de los análisis de código de Yesid. Tres cosas, todas del

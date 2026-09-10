@@ -102,3 +102,39 @@ def set_request_id(req_id: Optional[str] = None) -> str:
 
 
 logger = setup_logging()
+
+
+def clave_para_log(clave: str | None) -> str:
+    """Cómo se nombra una credencial en el registro, sin entregarla.
+
+    09-09-2026, hallazgo de los análisis de código del auditor. El motor
+    logueaba los primeros 10 caracteres de cada clave de IA («OK sk-ant-api03…»)
+    y los primeros 8 de la de PostHog. En el arranque, y en un archivo que se
+    comparte al depurar.
+
+    Diez caracteres no dejan usar la clave, pero sí dicen **de qué proveedor
+    es y de qué tipo** —«sk-ant-api03» es inconfundible—, y sobre todo:
+    reducen a la mitad el trabajo de quien ya tenga una copia parcial. Una
+    credencial no se publica «un poquito».
+
+    Lo único que el registro necesita responder es si la clave ESTÁ. Eso se
+    dice sin mostrar nada de ella.
+    """
+    if not clave or not str(clave).strip():
+        return "AUSENTE"
+    return "CONFIGURADA"
+
+
+def huella_de_clave(clave: str | None) -> str:
+    """Una huella corta y estable de una credencial, para usarla de índice.
+
+    09-09-2026. Varias cachés se indexaban con `clave[:6]` — un pedazo literal
+    de la credencial. Como índice funciona igual, pero deja el fragmento
+    escrito en memoria y en cualquier volcado. Un hash sirve para lo mismo
+    (distinguir una clave de otra) sin llevar nada de la clave adentro.
+    """
+    import hashlib
+
+    if not clave or not str(clave).strip():
+        return "sin-clave"
+    return hashlib.sha256(str(clave).encode("utf-8")).hexdigest()[:12]

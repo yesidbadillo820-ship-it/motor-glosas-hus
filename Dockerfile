@@ -54,6 +54,17 @@ COPY tests/benchmark/ /app/tests/benchmark/
 # efímero del contenedor (igual que Render Free /tmp).
 RUN mkdir -p /data/soportes
 
+# 09-09-2026 — EL CONTENEDOR CORRÍA COMO ROOT.
+# Si alguna vez se logra ejecutar algo dentro del contenedor —una librería
+# con un fallo, un PDF malicioso que rompa el parser— con root ese algo puede
+# escribir en cualquier parte de la imagen. Con un usuario propio, solo puede
+# tocar lo suyo. No cuesta rendimiento ni cambia el arranque.
+#
+# El `chown` va sobre /app y /data: /data es donde se monta el volumen de los
+# soportes y el motor tiene que poder escribir ahí.
+RUN useradd --system --create-home --shell /usr/sbin/nologin motor \
+    && chown -R motor:motor /app /data
+
 # Variable que el motor lee para saber dónde guardar/leer soportes.
 # El volumen persistente Fly se monta en /data; soportes en subcarpeta.
 ENV SOPORTES_ROOT=/data/soportes \
@@ -73,4 +84,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
 # await httpx, pdf_service con run_in_executor) por lo que el endpoint
 # /health sigue respondiendo entre await points incluso durante una
 # extracción Claude de 60s.
+# A partir de acá, nada corre como root.
+USER motor
+
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
