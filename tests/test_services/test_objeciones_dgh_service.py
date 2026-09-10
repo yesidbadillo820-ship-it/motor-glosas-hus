@@ -301,6 +301,46 @@ def _adres() -> bytes:
     )
 
 
+def _mutual() -> bytes:
+    """Consolidado de MUTUAL SER: la columna «SERVICIO» trae el CÓDIGO, y el
+    nombre del servicio va escondido dentro de la observación."""
+    return _excel(
+        "CONSOLIDADO",
+        [
+            "Número de factura",
+            "SERVICIO",
+            "Cantidad facturada",
+            "Valor glosado",
+            "Concepto de glosa",
+            "Código de glosa",
+            "Observacion",
+        ],
+        [
+            [
+                "HUS0000548556",
+                "FMQ0113",
+                1,
+                "$\xa05.800",
+                "Dispositivos médicos - TARIFAS",
+                "TA0601",
+                "La tecnología FMQ0113 - CATETER INTRAVENOSO 20 no se encuentra "
+                "dentro del contrato número 20352.",
+            ],
+            [
+                "HUS0000548556",
+                "903883",
+                1,
+                "$\xa04.700",
+                "Recargos no pactados - TARIFAS",
+                "TA2901",
+                "La tarifa facturada 4700 no coincide con la tarifa 3900 definida "
+                "en el contrato para la tecnologia 903883 - GLUCOMETRIA GLUCOSA "
+                "SEMIAUTOMATIZADA.",
+            ],
+        ],
+    )
+
+
 def _homologador() -> bytes:
     """Homologador Gold Standard: código SOAT → CUPS."""
     return _excel("CUPS", ["CUPS", "SOAT"], [["903883", "29117"], ["FMQ0113", "21705"]])
@@ -329,6 +369,15 @@ class TestDetectarEntidad:
         assert svc.detectar_entidad(_vco()).id == "vco"
 
     def test_adres(self):
+        assert svc.detectar_entidad(_adres()).id == "adres"
+
+    def test_mutual(self):
+        assert svc.detectar_entidad(_mutual()).id == "mutual"
+
+    def test_mutual_no_le_roba_el_archivo_a_sanitas(self):
+        """Las dos tienen una columna «NUMERO DE FACTURA»: gana la que más señas
+        tenga, no la primera del catálogo."""
+        assert svc.detectar_entidad(_sanitas()).id == "sanitas"
         assert svc.detectar_entidad(_adres()).id == "adres"
 
     def test_un_pdf_es_de_emssanar(self, tmp_path):
@@ -367,6 +416,7 @@ class TestDetectarEntidad:
             "vco",
             "emssanar",
             "adres",
+            "mutual",
         } <= ids
 
 
@@ -523,6 +573,29 @@ class TestProcesar:
         )
         with pytest.raises(svc.ErrorObjeciones, match="ninguna glosa"):
             svc.procesar(vacio, _dgh(), entidad_id="adres", fecha="2026-09-04")
+
+    def test_mutual_de_punta_a_punta(self):
+        r = svc.procesar(_mutual(), _dgh(), fecha="2026-09-07")
+        assert r.entidad_id == "mutual"
+        assert r.objeciones == 2 and r.facturas == 1
+        assert r.valor_total == 10500
+        assert r.confianza["ALTA"] == 2
+        assert r.reglas_ok and not r.fallas_reglas
+        assert r.nombre_objeciones == "OBJECIONES_MUTUAL_07092026.xlsx"
+        assert r.nombre_cruce == "CRUCE_MUTUAL_07092026.xlsx"
+
+    def test_mutual_ubica_el_servicio_por_el_nombre_de_la_observacion(self):
+        """El DGH tiene la glucometría como 903883H; MUTUAL manda 903883 y el
+        nombre sólo aparece dentro del texto de la observación."""
+        import io
+
+        r = svc.procesar(_mutual(), _dgh(), fecha="2026-09-07")
+        ws = openpyxl.load_workbook(io.BytesIO(r.objeciones_xlsx))["OBJECIONES"]
+        cols = [c.value for c in ws[1]]
+        filas = [dict(zip(cols, f)) for f in ws.iter_rows(min_row=2, values_only=True)]
+        assert [f["SLNSERPRO"] for f in filas] == ["FMQ0113", "903883H"]
+        assert {f["CTNCENCOS"] for f in filas} == {None}
+        assert {f["CROTIPOBJ"] for f in filas} == {0}
 
     def test_un_pdf_que_no_es_una_objecion(self, tmp_path):
         with pytest.raises(svc.ErrorObjeciones, match="PDF"):

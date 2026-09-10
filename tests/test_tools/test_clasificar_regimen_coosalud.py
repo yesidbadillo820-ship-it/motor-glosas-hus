@@ -20,6 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 
 import clasificar_regimen_coosalud as cr  # noqa: E402
+import pytest  # noqa: E402
 from openpyxl import Workbook, load_workbook  # noqa: E402
 
 # InvoicePeriod real del HUS: EndDate = fecha de facturacion (07/05), NO el
@@ -302,6 +303,34 @@ class TestSoportesRadicacion:
         # La que no tiene soportes lo dice en observaciones.
         assert "sin soportes en las rutas" not in str(filas["HUS0000349680"][16] or "")
 
+    def test_formato_lote_para_el_cargue_de_coosalud(self, tmp_path):
+        """Con --lote la salida queda como la pide el portal:
+        <Regimen>\\<lote>\\RIPS\\HUS<n>.json (+CUV) y \\IMG\\HUS<n>\\<soportes>."""
+        r1, r2 = _armar_radicacion(tmp_path)
+        destino = _correr(
+            tmp_path,
+            "--raiz-soportes",
+            str(r1),
+            "--raiz-soportes",
+            str(r2),
+            "--lote",
+            "605505_20260908_135357",
+            soportes=True,
+        )
+        lote = destino / "Subsidiado" / "605505_20260908_135357"
+        # RIPS planos y renombrados al nombre que espera el portal.
+        assert (lote / "RIPS" / "HUS349680.json").is_file()
+        assert (lote / "RIPS" / "CUV_HUS349680.json").is_file()
+        # Soportes del servicio en IMG\<factura>\ (aplanados).
+        img = lote / "IMG" / "HUS349680"
+        assert (img / "FEV_900006037_HUS349680.pdf").is_file()
+        assert (img / "HEV_900006037_HUS349680.pdf").is_file()
+        # La contributiva arma su propio lote bajo su regimen.
+        lote_c = destino / "Contributivo" / "605505_20260908_135357"
+        assert (lote_c / "IMG" / "HUS352629" / "900006037_HUS352629_FACTURA.pdf").is_file()
+        # Ya NO se crea la carpeta por factura del formato viejo.
+        assert not (destino / "Subsidiado" / "HUS349680").exists()
+
     def test_indexar_radicacion_no_desciende_a_facturas_ajenas(self, tmp_path):
         r1, _ = _armar_radicacion(tmp_path)
         idx = cr.indexar_radicacion([r1], {"349680"})
@@ -320,6 +349,34 @@ class TestSoportesRadicacion:
         assert [p.name for p in idx["472660"]] == ["HUS472660"]
         copiados, obs = cr.copiar_soportes(idx["472660"], tmp_path / "out")
         assert copiados == 5 and obs == []
+
+    def test_lista_txt_procesa_facturas_sin_excel(self, tmp_path):
+        share = _armar_share(tmp_path)
+        destino = tmp_path / "CLASIFICADO"
+        # TXT como lo deja PowerShell (`>` = UTF-16 con BOM), con duplicada,
+        # comillas, linea vacia y comentario.
+        lista = tmp_path / "facturas.txt"
+        lista.write_bytes(
+            '﻿HUS0000349680\n\n# comentario\n"HUS352629"\nHUS349680\n'.encode("utf-16")
+        )
+        argv = [
+            "clasificar_regimen_coosalud.py",
+            "--lista",
+            str(lista),
+            "--share",
+            str(share),
+            "--destino",
+            str(destino),
+            "--sin-soportes",
+        ]
+        viejo = sys.argv
+        sys.argv = argv
+        try:
+            assert cr.main() == 0
+        finally:
+            sys.argv = viejo
+        filas = _filas(destino)
+        assert set(filas) == {"HUS0000349680", "HUS352629"}  # deduplicada
 
     def test_solo_procesa_facturas_puntuales_sin_excel(self, tmp_path):
         share = _armar_share(tmp_path)
@@ -359,6 +416,91 @@ class TestSoportesRadicacion:
         existente.mkdir()
         out = cr.resolver_raices([str(existente), str(tmp_path / "no_existe")])
         assert out == [existente]
+
+
+class TestRutasLargas:
+    """El limite de 260 caracteres de Windows (MAX_PATH) hacia que os.walk se
+    comiera carpetas enteras del arbol de radicacion digital sin avisar."""
+
+    def test_ruta_larga_unc_en_windows(self, monkeypatch):
+        monkeypatch.setattr(cr.os, "name", "nt")
+        monkeypatch.setattr(cr.os.path, "abspath", lambda s: s)  # en Linux abspath no entiende UNC
+        assert cr.ruta_larga(r"\\Prime\radicacion_2026\X") == r"\\?\UNC\Prime\radicacion_2026\X"
+        assert cr.ruta_larga(r"D:\USUARIO\X") == r"\\?\D:\USUARIO\X"
+        # No se duplica el prefijo.
+        assert cr.ruta_larga(r"\\?\UNC\Prime\X") == r"\\?\UNC\Prime\X"
+
+    def test_ruta_larga_no_toca_linux(self):
+        assert cr.ruta_larga("/mnt/soportes/HUS1") == "/mnt/soportes/HUS1"
+
+    def test_ruta_legible_deshace_el_prefijo(self):
+        assert cr.ruta_legible(r"\\?\UNC\Prime\radicacion_2026\X") == r"\\Prime\radicacion_2026\X"
+        assert cr.ruta_legible(r"\\?\D:\USUARIO\X") == r"D:\USUARIO\X"
+        assert cr.ruta_legible(r"D:\USUARIO\X") == r"D:\USUARIO\X"
+
+    def test_carpeta_ilegible_se_avisa_y_no_se_silencia(self, tmp_path, caplog):
+        raiz = tmp_path / "radicacion"
+        (raiz / "COOSALUD").mkdir(parents=True)
+        real_walk = cr.os.walk
+
+        def walk_con_fallo(top, onerror=None, **kw):
+            # Simula la carpeta que Windows niega por ruta larga.
+            if onerror is not None:
+                exc = OSError(5, "Acceso denegado")
+                exc.filename = str(raiz / "COOSALUD" / "ENV-1" / "IMG")
+                onerror(exc)
+            yield from real_walk(top, onerror=onerror, **kw)
+
+        import logging as _log
+
+        with caplog.at_level(_log.WARNING):
+            with pytest.MonkeyPatch.context() as mp:
+                mp.setattr(cr.os, "walk", walk_con_fallo)
+                cr.indexar_radicacion([raiz], {"349680"})
+        assert "NO se pudieron leer" in caplog.text
+        assert "Acceso denegado" in caplog.text
+
+
+class TestExplorador:
+    """El diagnostico de una ruta nueva y el rastreo de una factura puntual."""
+
+    def _correr_explorador(self, tmp_path, *extra: str) -> int:
+        raiz = tmp_path / "3. MARZO 2026 - SOPORTES RADICACION"
+        carpeta = raiz / "COOSALUD" / "KARIN" / "ENV-222670-OK" / "IMG" / "HUS472660"
+        carpeta.mkdir(parents=True)
+        (carpeta / "FEV_900006037_HUS472660.pdf").write_bytes(b"%PDF")
+        (raiz / "COOSALUD" / "KARIN" / "carga_indices.txt").write_text("x", encoding="utf-8")
+        argv = ["clasificar_regimen_coosalud.py", "--explorar-soportes", str(raiz), *extra]
+        viejo = sys.argv
+        sys.argv = argv
+        try:
+            return cr.main()
+        finally:
+            sys.argv = viejo
+
+    def test_reporta_lo_que_hay(self, tmp_path, caplog):
+        import logging as _log
+
+        with caplog.at_level(_log.INFO):
+            assert self._correr_explorador(tmp_path) == 0
+        assert "QUE HAY EN ESTA RUTA" in caplog.text
+        assert "Con numero de factura (HUS<n>): 1" in caplog.text
+        assert "carga_indices.txt" in caplog.text  # ejemplo del archivo sin factura
+
+    def test_buscar_encuentra_la_factura(self, tmp_path, caplog):
+        import logging as _log
+
+        with caplog.at_level(_log.INFO):
+            assert self._correr_explorador(tmp_path, "--buscar", "HUS0000472660") == 0
+        assert "FACTURAS BUSCADAS: 2 coincidencia(s)" in caplog.text  # carpeta + PDF
+        assert "[CARPETA]" in caplog.text
+
+    def test_buscar_avisa_cuando_no_esta(self, tmp_path, caplog):
+        import logging as _log
+
+        with caplog.at_level(_log.INFO):
+            assert self._correr_explorador(tmp_path, "--buscar", "HUS999111") == 0
+        assert "NO aparecen en NINGUNA" in caplog.text
 
 
 class TestPiezas:

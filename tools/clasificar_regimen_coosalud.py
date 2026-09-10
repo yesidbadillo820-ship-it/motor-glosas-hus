@@ -36,6 +36,11 @@ USO tipico (PowerShell, desde C:\\temp-notas):
 
     * quitar --piloto para procesar todas las facturas.
     * --solo HUS472660 procesa SOLO esa factura (sin Excel): ideal para probar.
+    * --lista facturas.txt procesa las facturas del TXT (una por linea, sin Excel).
+    * --lote <nombre> arma las carpetas con el FORMATO DEL CARGUE de COOSALUD:
+        <destino>\\<Regimen>\\<lote>\\RIPS\\HUS<n>.json  (+ CUV_HUS<n>.json)
+        <destino>\\<Regimen>\\<lote>\\IMG\\HUS<n>\\<soportes del servicio>
+      Sin --lote, cada factura queda en su propia carpeta con todo adentro.
     * --sin-copiar genera solo el informe (no copia carpetas ni busca soportes).
     * --sin-soportes procesa y copia la factura electronica pero NO busca en
       las rutas de radicacion (mas rapido).
@@ -90,6 +95,12 @@ RUTAS_RADICACION_DEFECTO: tuple[str, ...] = (
     # radicacion trae RADICACIÓN 2023 / RADICACION 2024.
     "\\\\Prime\\radicacion_2026\\Radicacion Digital - Carpeta 2\\RADICACION\\RADICACION DIGITAL",
     "\\\\Prime\\servidor_radicación\\RADICACION DIGITAL",
+    # Archivo de radicacion de 2025 (feb-ago): esos meses NO estan en
+    # "Radicacion Digital" (que solo llega a enero-2025) ni en SINAC 2025
+    # (arranca en septiembre). Viven aqui, con la misma estructura
+    # ...\<mes>\RADICACION DE <MES>\COOSALUD\<gestora>\ENV-...\IMG\HUS<n>\.
+    # Se apunta al padre porque cada año cuelga de la misma carpeta.
+    "\\\\Prime\\FACTURACIÓN\\CONSULTA FACTURACION 2\\CONSULTA FACTTURACION 2\\FACTURACION 2024\\FACTURACION UT",
 )
 
 # Numero de factura dentro de nombres de carpeta/archivo del share de
@@ -602,6 +613,121 @@ def resolver_raices(rutas: list[str]) -> list[Path]:
     return accesibles
 
 
+def ruta_larga(ruta: object) -> str:
+    """Ruta lista para pasar el limite de 260 caracteres de Windows (MAX_PATH).
+
+    Los arboles de radicacion digital anidan mes/EPS/envio/IMG/factura y se
+    pasan del limite: sin el prefijo de ruta extendida Windows NIEGA el acceso
+    y `os.walk` se lo come como si la carpeta estuviera vacia. Fuera de Windows
+    devuelve la ruta tal cual."""
+    s = str(ruta)
+    if os.name != "nt" or s.startswith("\\\\?\\"):
+        return s
+    s = os.path.abspath(s)
+    if s.startswith("\\\\"):  # UNC: \\Prime\share -> \\?\UNC\Prime\share
+        return "\\\\?\\UNC" + s[1:]
+    return "\\\\?\\" + s
+
+
+def ruta_legible(ruta: object) -> str:
+    """Quita el prefijo \\\\?\\ para que el informe y el log se lean normales."""
+    s = str(ruta)
+    if s.startswith("\\\\?\\UNC\\"):
+        return "\\\\" + s[8:]
+    if s.startswith("\\\\?\\"):
+        return s[4:]
+    return s
+
+
+def explorar_ruta(raiz: Path, muestras: int = 8, buscar: set[str] | None = None) -> int:
+    """Diagnostico: recorre una ruta y dice que hay adentro y que falla.
+
+    Sirve para entender una carpeta de radicacion nueva antes de agregarla:
+    cuantas carpetas y archivos tiene, hasta que profundidad, cuantas NO se
+    pudieron leer, y ejemplos de nombres con y sin numero de factura.
+
+    Con `buscar` (claves numericas de factura) ademas RASTREA esas facturas y
+    reporta cada coincidencia: sirve para responder "¿donde quedaron los
+    soportes de esta factura?" sin recorrer los servidores a mano. Devuelve
+    cuantas coincidencias encontro."""
+    base = ruta_larga(raiz)
+    carpetas = archivos = con_hus = 0
+    prof_max = 0
+    fallos: list[str] = []
+    ej_carpetas: list[str] = []
+    ej_archivos: list[str] = []
+    ej_con_hus: list[str] = []
+    encontrados: list[str] = []
+
+    def _niveles(p: object) -> int:
+        return str(p).rstrip("\\/").replace("/", "\\").count("\\")
+
+    nivel_base = _niveles(base)
+
+    def _anotar(exc: OSError) -> None:
+        if len(fallos) < 5:
+            fallos.append(f"{ruta_legible(getattr(exc, 'filename', '?'))}: {exc.strerror}")
+        else:
+            fallos.append("")
+
+    logger.info(f"Explorando: {raiz}")
+    for root, dirs, files in os.walk(base, onerror=_anotar):
+        carpetas += 1
+        prof_max = max(prof_max, _niveles(root) - nivel_base)
+        if carpetas % 2000 == 0:
+            logger.info(f"  ... {carpetas} carpetas")
+        for d in dirs:
+            if len(ej_carpetas) < muestras:
+                ej_carpetas.append(f"{ruta_legible(root)}\\{d}")
+            if buscar:
+                m = _RE_NUM_FACTURA.search(d)
+                if m and (m.group(1).lstrip("0") or "0") in buscar:
+                    encontrados.append(f"{ruta_legible(root)}\\{d}  [CARPETA]")
+        for fn in files:
+            archivos += 1
+            m = _RE_NUM_FACTURA.search(fn)
+            if m:
+                con_hus += 1
+                if len(ej_con_hus) < muestras:
+                    ej_con_hus.append(f"{ruta_legible(root)}\\{fn}")
+                if buscar and (m.group(1).lstrip("0") or "0") in buscar:
+                    encontrados.append(f"{ruta_legible(root)}\\{fn}")
+            elif len(ej_archivos) < muestras:
+                ej_archivos.append(f"{ruta_legible(root)}\\{fn}")
+
+    logger.info("")
+    logger.info("========== QUE HAY EN ESTA RUTA ==========")
+    logger.info(f"  Carpetas recorridas : {carpetas}")
+    logger.info(f"  Archivos vistos     : {archivos}")
+    logger.info(f"  Con numero de factura (HUS<n>): {con_hus}")
+    logger.info(f"  Profundidad maxima  : {prof_max} niveles")
+    if fallos:
+        logger.warning(f"  Carpetas ILEGIBLES  : {len(fallos)} (permisos o red)")
+        for f in [x for x in fallos if x][:3]:
+            logger.warning(f"      {f}")
+    else:
+        logger.info("  Carpetas ilegibles  : 0")
+    if buscar:
+        if encontrados:
+            logger.info(f"  >>> FACTURAS BUSCADAS: {len(encontrados)} coincidencia(s) AQUI:")
+            for e in encontrados[:40]:
+                logger.info(f"      {e}")
+            if len(encontrados) > 40:
+                logger.info(f"      ... y {len(encontrados) - 40} mas")
+        else:
+            logger.warning("  >>> FACTURAS BUSCADAS: ninguna aparece en esta ruta.")
+    for titulo, ejemplos in (
+        ("Ejemplos de archivos CON numero de factura", ej_con_hus),
+        ("Ejemplos de archivos SIN numero de factura", ej_archivos),
+        ("Ejemplos de carpetas", ej_carpetas),
+    ):
+        if ejemplos:
+            logger.info(f"  {titulo}:")
+            for e in ejemplos:
+                logger.info(f"      {e}")
+    return len(encontrados)
+
+
 def indexar_radicacion(raices: list[Path], objetivos: set[str]) -> dict[str, list[Path]]:
     """Recorre cada raiz UNA vez y devuelve {clave_numerica: [hallazgos]}.
 
@@ -609,13 +735,24 @@ def indexar_radicacion(raices: list[Path], objetivos: set[str]) -> dict[str, lis
     archivo suelto con el numero en el nombre (FEV_..._HUS349680.pdf). Poda: no
     desciende a carpetas de OTRAS facturas (las mas numerosas del share) ni a
     las carpetas objetivo ya encontradas. Un hilo por raiz: el costo es
-    latencia de red, no CPU."""
+    latencia de red, no CPU.
+
+    Las carpetas que no se pueden leer (permisos, ruta larga, red) NO se
+    silencian: se cuentan y se avisan al final de cada raiz."""
     hallados: dict[str, list[Path]] = {k: [] for k in objetivos}
 
-    def _explorar(raiz: Path) -> tuple[Path, int, int]:
+    def _explorar(raiz: Path) -> tuple[Path, int, int, list[str]]:
         vistos = 0
         hits = 0
-        for root, dirs, files in os.walk(str(raiz), onerror=lambda _e: None):
+        fallos: list[str] = []
+
+        def _anotar(exc: OSError) -> None:
+            if len(fallos) < 5:
+                fallos.append(f"{ruta_legible(getattr(exc, 'filename', '?'))}: {exc.strerror}")
+            else:
+                fallos.append("")
+
+        for root, dirs, files in os.walk(ruta_larga(raiz), onerror=_anotar):
             vistos += 1
             if vistos % 2000 == 0:
                 logger.info(
@@ -640,10 +777,10 @@ def indexar_radicacion(raices: list[Path], objetivos: set[str]) -> dict[str, lis
                 if num in objetivos:
                     hallados[num].append(Path(root) / fn)
                     hits += 1
-        return raiz, vistos, hits
+        return raiz, vistos, hits, fallos
 
     with ThreadPoolExecutor(max_workers=max(1, min(len(raices), 12))) as pool:
-        for raiz, vistos, hits in pool.map(_explorar, raices):
+        for raiz, vistos, hits, fallos in pool.map(_explorar, raices):
             if hits == 0:
                 logger.warning(
                     f"  soportes: {raiz} — {vistos} carpetas revisadas y NINGUN hallazgo "
@@ -651,7 +788,72 @@ def indexar_radicacion(raices: list[Path], objetivos: set[str]) -> dict[str, lis
                 )
             else:
                 logger.info(f"  soportes: {raiz} — {vistos} carpetas revisadas, {hits} hallazgos")
+            if fallos:
+                ejemplos = [f for f in fallos if f][:3]
+                logger.warning(
+                    f"    OJO: {len(fallos)} carpetas NO se pudieron leer en esta ruta "
+                    f"(permisos o red). Ejemplos: " + " | ".join(ejemplos)
+                )
     return hallados
+
+
+def armar_radicacion(
+    factura: str,
+    carpeta_fe: Path | None,
+    soportes: list[Path],
+    lote_dir: Path,
+) -> tuple[int, list[str]]:
+    """Arma la carpeta como la pide el cargue de COOSALUD:
+
+        <lote>\\RIPS\\HUS<n>.json          (el RIPS de la factura)
+        <lote>\\RIPS\\CUV_HUS<n>.json      (el resultado de validacion MinSalud)
+        <lote>\\IMG\\HUS<n>\\*.pdf          (los soportes del servicio)
+
+    Los RIPS van PLANOS en una sola carpeta (renombrados al nombre que espera
+    el portal) y cada factura tiene su subcarpeta dentro de IMG. Devuelve
+    (archivos copiados, observaciones)."""
+    obs: list[str] = []
+    copiados = 0
+    fac = norm_factura(factura) or factura
+    rips_dir = lote_dir / "RIPS"
+    img_dir = lote_dir / "IMG" / fac
+
+    # --- RIPS y CUV desde la carpeta de facturacion electronica ---
+    if carpeta_fe is not None:
+        for ruta in sorted(carpeta_fe.rglob("*.json")):
+            try:
+                raw = json.loads(_decodificar(ruta.read_bytes()))
+            except (OSError, ValueError):
+                continue
+            if _es_rips_json(raw):
+                destino_json = rips_dir / f"{fac}.json"
+            elif "resultadosdoker" in ruta.name.lower() or "cuv" in ruta.name.lower():
+                destino_json = rips_dir / f"CUV_{fac}.json"
+            else:
+                continue
+            try:
+                rips_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(ruta, destino_json)
+                copiados += 1
+            except OSError as exc:
+                obs.append(f"NO se pudo copiar {ruta.name}: {exc}")
+
+    # --- Soportes del servicio a IMG\HUS<n>\ (aplanados: el portal no
+    #     entiende subcarpetas dentro de la carpeta de la factura) ---
+    for hit in soportes:
+        archivos = (
+            sorted(p for p in Path(ruta_larga(hit)).rglob("*") if p.is_file())
+            if hit.is_dir()
+            else [hit]
+        )
+        for a in archivos:
+            try:
+                img_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(ruta_larga(a), ruta_larga(img_dir / a.name))
+                copiados += 1
+            except OSError as exc:
+                obs.append(f"NO se pudo copiar soporte {a.name}: {exc}")
+    return copiados, obs
 
 
 def copiar_soportes(soportes: list[Path], destino_fac: Path) -> tuple[int, list[str]]:
@@ -662,10 +864,10 @@ def copiar_soportes(soportes: list[Path], destino_fac: Path) -> tuple[int, list[
     for hit in soportes:
         try:
             if hit.is_dir():
-                shutil.copytree(hit, sop_dir / hit.name, dirs_exist_ok=True)
+                shutil.copytree(ruta_larga(hit), ruta_larga(sop_dir / hit.name), dirs_exist_ok=True)
             else:
                 sop_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(hit, sop_dir / hit.name)
+                shutil.copy2(ruta_larga(hit), ruta_larga(sop_dir / hit.name))
         except OSError as exc:
             obs.append(f"NO se pudo copiar soporte {hit.name}: {exc}")
     copiados = sum(1 for p in sop_dir.rglob("*") if p.is_file()) if sop_dir.is_dir() else 0
@@ -729,11 +931,12 @@ def procesar_factura(
     copiar: bool,
     soportes: list[Path] | None = None,
     con_soportes: bool = False,
+    lote: str = "",
 ) -> Resultado:
     r = Resultado(factura=factura)
     soportes = soportes or []
     if soportes:
-        r.soportes_origen = "; ".join(str(h) for h in soportes[:5]) + (
+        r.soportes_origen = "; ".join(ruta_legible(h) for h in soportes[:5]) + (
             f" (+{len(soportes) - 5} mas)" if len(soportes) > 5 else ""
         )
     if not carpetas:
@@ -742,9 +945,14 @@ def procesar_factura(
         # Aunque no este la factura electronica, los soportes de radicacion
         # que si aparecieron se guardan para no perderlos.
         if copiar and soportes:
-            destino_fac = destino / SIN_CLASIFICAR / (norm_factura(factura) or factura)
-            r.soportes_copiados, obs_sop = copiar_soportes(soportes, destino_fac)
-            r.destino = str(destino_fac)
+            if lote:
+                lote_dir = destino / SIN_CLASIFICAR / lote
+                r.soportes_copiados, obs_sop = armar_radicacion(factura, None, soportes, lote_dir)
+                r.destino = str(lote_dir / "IMG" / (norm_factura(factura) or factura))
+            else:
+                destino_fac = destino / SIN_CLASIFICAR / (norm_factura(factura) or factura)
+                r.soportes_copiados, obs_sop = copiar_soportes(soportes, destino_fac)
+                r.destino = str(destino_fac)
             r.obs.extend(obs_sop)
         return r
     # Si esta en varios meses se usa la carpeta del mes mas reciente.
@@ -787,19 +995,29 @@ def procesar_factura(
 
     if copiar:
         subcarpeta = r.regimen if r.regimen in (REGIMEN_SUB, REGIMEN_CON) else SIN_CLASIFICAR
-        destino_fac = destino / subcarpeta / carpeta.name
-        try:
-            shutil.copytree(carpeta, destino_fac, dirs_exist_ok=True)
-            r.destino = str(destino_fac)
-            r.copiados = sum(1 for p in destino_fac.rglob("*") if p.is_file())
-        except OSError as exc:
-            r.obs.append(f"NO se pudo copiar: {exc}")
-        if soportes:
-            r.soportes_copiados, obs_sop = copiar_soportes(soportes, destino_fac)
-            r.obs.extend(obs_sop)
-            # El conteo de la carpeta de la factura ya incluye los soportes.
-            r.copiados = sum(1 for p in destino_fac.rglob("*") if p.is_file())
-        elif con_soportes:
+        if lote:
+            # Formato del cargue de COOSALUD: <regimen>\<lote>\RIPS + IMG\HUS<n>
+            lote_dir = destino / subcarpeta / lote
+            r.copiados, obs_rad = armar_radicacion(factura, carpeta, soportes, lote_dir)
+            r.soportes_copiados = sum(
+                1 for p in (lote_dir / "IMG" / carpeta.name).rglob("*") if p.is_file()
+            )
+            r.destino = str(lote_dir / "IMG" / carpeta.name)
+            r.obs.extend(obs_rad)
+        else:
+            destino_fac = destino / subcarpeta / carpeta.name
+            try:
+                shutil.copytree(carpeta, destino_fac, dirs_exist_ok=True)
+                r.destino = str(destino_fac)
+                r.copiados = sum(1 for p in destino_fac.rglob("*") if p.is_file())
+            except OSError as exc:
+                r.obs.append(f"NO se pudo copiar: {exc}")
+            if soportes:
+                r.soportes_copiados, obs_sop = copiar_soportes(soportes, destino_fac)
+                r.obs.extend(obs_sop)
+                # El conteo de la carpeta de la factura ya incluye los soportes.
+                r.copiados = sum(1 for p in destino_fac.rglob("*") if p.is_file())
+        if not soportes and con_soportes:
             r.obs.append("sin soportes en las rutas de radicacion")
     return r
 
@@ -807,6 +1025,36 @@ def procesar_factura(
 # ─────────────────────────────────────────────────────────────────────────────
 # Entrada (Excel de facturas) y salida (Excel de auditoria)
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def leer_facturas_lista(ruta: Path) -> list[str]:
+    """TXT con una factura por linea. Tolera el BOM UTF-16/UTF-8 que dejan
+    `Out-File` y `>` de PowerShell, comillas envolventes, lineas vacias y
+    comentarios (#). Deduplica conservando el orden."""
+    raw = ruta.read_bytes()
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        texto = raw.decode("utf-16")
+    elif raw.startswith(b"\xef\xbb\xbf"):
+        texto = raw.decode("utf-8-sig")
+    else:
+        try:
+            texto = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            texto = raw.decode("latin-1")
+    facturas: list[str] = []
+    vistas: set[str] = set()
+    for linea in texto.splitlines():
+        # El ﻿ suelto aparece cuando el TXT ya traia BOM y PowerShell le
+        # agrego otro al reescribirlo: si no se quita, la factura no cruza.
+        s = linea.replace("﻿", "").strip().strip('"').strip("'")
+        if not s or s.startswith("#"):
+            continue
+        clave = norm_factura(s)
+        if not clave or clave in vistas:
+            continue
+        vistas.add(clave)
+        facturas.append(s)
+    return facturas
 
 
 def leer_facturas_excel(ruta: Path, hoja: str | None, columna: str) -> list[str]:
@@ -952,6 +1200,24 @@ def main() -> int:
         help="Procesar SOLO estas facturas por coma (p.ej. --solo HUS472660). "
         "Con este flag el Excel es opcional: sirve para probar una factura puntual.",
     )
+    parser.add_argument(
+        "--lista",
+        type=Path,
+        default=None,
+        help="TXT con una factura por linea (alternativa al Excel; tolera el BOM "
+        "de PowerShell, comillas y lineas vacias).",
+    )
+    parser.add_argument(
+        "--lote",
+        type=str,
+        default="",
+        nargs="?",
+        const="auto",
+        help="Arma las carpetas con el FORMATO DEL CARGUE de COOSALUD: "
+        "<destino>\\<Regimen>\\<lote>\\RIPS\\HUS<n>.json + CUV_HUS<n>.json y "
+        "<lote>\\IMG\\HUS<n>\\<soportes>. Se le puede dar el nombre del lote "
+        "(p.ej. --lote 605505_20260908_135357); sin valor usa la fecha y hora.",
+    )
     parser.add_argument("--hoja", type=str, default=None, help="Hoja a leer (default: la primera).")
     parser.add_argument("--columna", type=str, default="FACTURA", help="Columna de facturas.")
     parser.add_argument(
@@ -985,8 +1251,45 @@ def main() -> int:
         metavar="RUTA",
         help="Ruta de radicacion donde buscar soportes (repetible; reemplaza las default).",
     )
+    parser.add_argument(
+        "--explorar-soportes",
+        action="append",
+        default=None,
+        metavar="RUTA",
+        help="DIAGNOSTICO (repetible): no procesa facturas; recorre esa ruta y "
+        "reporta que hay adentro (carpetas, archivos, cuantos traen HUS<n>, que "
+        "no se pudo leer).",
+    )
+    parser.add_argument(
+        "--buscar",
+        type=str,
+        default="",
+        metavar="HUS<n>[,HUS<n>]",
+        help="Con --explorar-soportes: RASTREA esas facturas y dice en que "
+        "carpeta exacta aparecen. Sirve para hallar donde quedaron los soportes.",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+    if args.explorar_soportes:
+        raices = resolver_raices(list(args.explorar_soportes))
+        if not raices:
+            return 1
+        buscar = {clave_numerica(f) for f in args.buscar.split(",") if f.strip()} or None
+        if buscar:
+            logger.info(f"Rastreando {len(buscar)} factura(s) en {len(raices)} ruta(s)...")
+        total = 0
+        for raiz in raices:
+            total += explorar_ruta(raiz, buscar=buscar) or 0
+            logger.info("")
+        if buscar:
+            if total:
+                logger.info(f"========== TOTAL: {total} coincidencia(s) en todas las rutas.")
+            else:
+                logger.warning(
+                    "========== Las facturas buscadas NO aparecen en NINGUNA de esas rutas."
+                )
+        return 0
 
     try:
         import openpyxl  # noqa: F401
@@ -997,9 +1300,18 @@ def main() -> int:
     if args.solo.strip():
         facturas = [f.strip() for f in args.solo.split(",") if f.strip()]
         logger.info(f"SOLO estas facturas (sin leer Excel): {', '.join(facturas)}")
+    elif args.lista is not None:
+        if not args.lista.is_file():
+            logger.error(f"No existe la lista: {args.lista}")
+            return 1
+        facturas = leer_facturas_lista(args.lista)
+        if not facturas:
+            logger.error(f"La lista esta vacia: {args.lista}")
+            return 1
+        logger.info(f"Lista {args.lista.name}: {len(facturas)} facturas (sin leer Excel)")
     else:
         if args.excel is None:
-            logger.error("Falta --excel (o use --solo HUS<n> para probar facturas puntuales).")
+            logger.error("Falta --excel (o --lista <txt>, o --solo HUS<n> para pruebas).")
             return 1
         if not args.excel.is_file():
             logger.error(f"No existe el Excel: {args.excel}")
@@ -1038,6 +1350,15 @@ def main() -> int:
             buscar_soportes = False
             logger.warning("Ninguna ruta de soportes accesible: se continua sin soportes.")
 
+    lote = args.lote.strip()
+    if lote == "auto":
+        lote = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if lote:
+        logger.info(
+            f"Formato CARGUE COOSALUD: las carpetas quedan como "
+            f"<Regimen>\\{lote}\\RIPS y <Regimen>\\{lote}\\IMG\\HUS<n>"
+        )
+
     salida = args.salida or (args.destino / "AUDITORIA_FECHAS_REGIMEN.xlsx")
     resultados: list[Resultado] = []
     for i, fac in enumerate(facturas, 1):
@@ -1048,6 +1369,7 @@ def main() -> int:
             not args.sin_copiar,
             soportes=soportes_idx.get(clave_numerica(fac), []),
             con_soportes=buscar_soportes,
+            lote=lote,
         )
         resultados.append(r)
         rango_rips = (
