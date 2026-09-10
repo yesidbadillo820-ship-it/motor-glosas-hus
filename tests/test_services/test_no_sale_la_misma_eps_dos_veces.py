@@ -149,11 +149,21 @@ class TestNoFundeEntidadesDistintas:
             ("SURA", "SAVIA"),
             ("NUEVA EPS", "SALUD TOTAL EPS"),
             ("AURORA", "ASEGURADORA SOLIDARIA SEGUROS"),
-            ("ADRES ACCIDENTES DE TRANSITO", "ADRES"),
         ],
     )
     def test_son_pagadores_distintos(self, a, b):
         assert not misma_entidad(a, b)
+
+    def test_adres_pelado_es_el_mismo_adres(self):
+        """Respuesta de Cartera (10-09-2026): «ADRES nada de otros nombres».
+
+        Todo lo de ADRES en este hospital entra por accidentes de tránsito,
+        así que el nombre pelado y el largo son el mismo renglón. Estuvo un
+        rato al revés en el código, por precaución mía; mandó el dato real.
+        """
+        assert misma_entidad("ADRES", "ADRES ACCIDENTES DE TRANSITO")
+        salida = eps_seleccionables(["ADRES", "ADRES ACCIDENTES DE TRANSITO"])
+        assert len([e for e in salida if e.startswith("ADRES")]) == 1
 
     def test_ninguna_pareja_del_catalogo_curado_choca(self):
         """Si esta prueba se cae, la regla se volvió demasiado laxa."""
