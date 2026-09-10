@@ -59,6 +59,13 @@ from pathlib import Path
 # Un solo lector de pesos para todos los bots: la copia que vivía aquí
 # multiplicaba por cien los valores con centavos.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _cruce_dgh import (  # noqa: E402
+    escribir_reporte_cruce,
+    leer_servicios_dgh,
+    resolver_servicio,
+    traza,
+    verificar_reglas,
+)
 from _dinero import a_entero  # noqa: E402
 
 logger = logging.getLogger("organizar_savia")
@@ -269,9 +276,17 @@ def construir_registros(
     consecutivo: int,
     codigo_sufijo: str,
     mapa_codigos: dict[str, str] | None,
+    servicios_dgh: dict | None = None,
+    trazas: list[dict] | None = None,
 ) -> list[dict]:
     """Lee el Excel de SAVIA y devuelve una lista de dicts, uno por objeción, ya
-    con las 16 columnas del formato del Dispensario."""
+    con las 16 columnas del formato del Dispensario.
+
+    Con `servicios_dgh` (el export de servicios facturados) se comprueba además
+    que el código que manda SAVIA exista en esa factura, y si el DGH lo tiene
+    con otro código —o si SAVIA no lo mandó— se pone el del hospital, que es el
+    que Dinámica Gerencial reconoce. Sin cruce confiable la celda queda vacía:
+    nunca se inventa un código."""
     try:
         from openpyxl import load_workbook
     except ImportError:
@@ -309,6 +324,34 @@ def construir_registros(
             consec_por_factura[crncxc] = consecutivo + len(consec_por_factura)
         codigo = codigo_dispensario(motivo, codigo_sufijo, mapa_codigos)
         valor = _num(_cell(r, idx, "valor_glosa"))
+        cod_servicio = str(_cell(r, idx, "cod_servicio") or "").strip()
+        servicio = str(_cell(r, idx, "servicio") or "").strip()
+
+        if servicios_dgh is not None:
+            cruce = resolver_servicio(
+                servicios_dgh.get(crncxc, []),
+                codigo=cod_servicio,
+                descripcion=servicio,
+                valor=valor,
+                valor_unitario=_num(_cell(r, idx, "valor_unitario")),
+                cantidad=_num(_cell(r, idx, "cantidad")),
+            )
+            # Manda el código del hospital: es el que DGH reconoce.
+            cod_servicio = cruce.linea.codigo if cruce.linea is not None else ""
+            if trazas is not None:
+                trazas.append(
+                    traza(
+                        factura=crncxc,
+                        codigo_objecion=codigo,
+                        valor=valor,
+                        cod_entidad=str(_cell(r, idx, "cod_servicio") or "").strip(),
+                        desc_entidad=servicio,
+                        unitario_entidad=_num(_cell(r, idx, "valor_unitario")),
+                        observacion=observacion,
+                        cruce=cruce,
+                    )
+                )
+
         registros.append(
             {
                 # CDCONSEC como TEXTO, igual que los archivos reales.
@@ -322,7 +365,7 @@ def construir_registros(
                 "CRNCLAOBJ": None,
                 "GENUSUARIO4": GENUSUARIO4_CONST,
                 "CRNCONOBJ": codigo,
-                "SLNSERPRO": str(_cell(r, idx, "cod_servicio") or "").strip() or None,
+                "SLNSERPRO": cod_servicio or None,
                 "IDRIPS": None,
                 "CTNCENCOS": None,
                 "CROVALOBJ": valor,
@@ -487,6 +530,20 @@ def main(argv: list[str] | None = None) -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
+        "--servicios-dgh",
+        type=Path,
+        default=None,
+        help="Export de servicios facturados del DGH: comprueba que el código de "
+        "SAVIA exista en esa factura y, si no, pone el del hospital.",
+    )
+    parser.add_argument(
+        "--reporte-cruce",
+        type=Path,
+        default=None,
+        help="Excel de trabajo con el detalle del cruce (hojas CRUCE, REVISAR y "
+        "RESUMEN). Requiere --servicios-dgh.",
+    )
+    parser.add_argument(
         "--entrada",
         type=Path,
         required=True,
@@ -548,9 +605,30 @@ def main(argv: list[str] | None = None) -> int:
         logger.error(f"No existe el archivo de entrada: {args.entrada}")
         return 1
 
+    if args.reporte_cruce is not None and args.servicios_dgh is None:
+        logger.error("--reporte-cruce necesita --servicios-dgh (es el detalle de ese cruce).")
+        return 1
+
     fecha = _parse_fecha(args.fecha)
     mapa = _cargar_mapa(args.mapa_codigos)
 
+    servicios_dgh = None
+    if args.servicios_dgh is not None:
+        if not args.servicios_dgh.is_file():
+            logger.error(f"No existe el export del DGH: {args.servicios_dgh}")
+            return 1
+        logger.info(f"Leyendo servicios facturados del DGH: {args.servicios_dgh.name}")
+        try:
+            servicios_dgh = leer_servicios_dgh(args.servicios_dgh, avisar=logger.warning)
+        except ValueError as e:
+            logger.error(str(e))
+            return 1
+        logger.info(
+            f"  {sum(len(v) for v in servicios_dgh.values())} renglones de servicio "
+            f"en {len(servicios_dgh)} facturas."
+        )
+
+    trazas: list[dict] = []
     logger.info(f"Leyendo glosas de SAVIA: {args.entrada.name}")
     registros = construir_registros(
         args.entrada,
@@ -558,10 +636,42 @@ def main(argv: list[str] | None = None) -> int:
         consecutivo=args.consecutivo,
         codigo_sufijo=args.codigo_sufijo,
         mapa_codigos=mapa,
+        servicios_dgh=servicios_dgh,
+        trazas=trazas,
     )
     if not registros:
         logger.error("No se encontró ninguna objeción en el archivo de entrada.")
         return 1
+
+    if servicios_dgh is not None:
+        cuenta = {
+            k: sum(1 for t in trazas if t["confianza"] == k)
+            for k in ("ALTA", "MEDIA", "BAJA", "SIN CRUCE")
+        }
+        ubicados = cuenta["ALTA"] + cuenta["MEDIA"]
+        logger.info(
+            f"  Cruce contra los servicios del DGH: {ubicados} de {len(trazas)} servicios "
+            f"ubicados con confianza alta/media ({ubicados / (len(trazas) or 1):.0%})."
+        )
+        logger.info(
+            f"    ALTA={cuenta['ALTA']}  MEDIA={cuenta['MEDIA']}  BAJA={cuenta['BAJA']}  "
+            f"SIN CRUCE={cuenta['SIN CRUCE']}  → revisar {cuenta['BAJA'] + cuenta['SIN CRUCE']}."
+        )
+
+    verificar_reglas(
+        [
+            {
+                "factura": r["CRNCXC"],
+                "slnserpro": r["SLNSERPRO"],
+                "ctncencos": r["CTNCENCOS"],
+                "crotipobj": r["CROTIPOBJ"],
+                "codigo_glosa": r["CRNCONOBJ"],
+            }
+            for r in registros
+        ],
+        servicios_dgh,
+        avisar=logger.info,
+    )
 
     if args.consolidado:
         escribir_consolidado(registros, args.salida)
@@ -571,6 +681,13 @@ def main(argv: list[str] | None = None) -> int:
             registros, args.salida, prefijo=args.prefijo, consecutivo=args.consecutivo
         )
         logger.info(f"\n{len(generados)} archivo(s) de SAVIA en: {args.salida}")
+
+    if args.reporte_cruce is not None:
+        escribir_reporte_cruce(trazas, args.reporte_cruce, entidad="SAVIA SALUD")
+        pendientes = sum(1 for t in trazas if t["aviso"] or t["confianza"] in ("BAJA", "SIN CRUCE"))
+        logger.info(
+            f"Detalle del cruce: {args.reporte_cruce} ({pendientes} renglón(es) en REVISAR)."
+        )
 
     _resumen(registros)
     return 0

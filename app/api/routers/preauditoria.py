@@ -48,6 +48,7 @@ from app.models.db import (
     RadicacionCuentaRecord,
     UsuarioRecord,
 )
+from app.services import preauditoria_atencion_service as atencion_svc
 from app.services import preauditoria_service as svc
 from app.services.oficio_devolucion_pdf import generar_pdf_oficio_devolucion
 
@@ -77,6 +78,12 @@ class AuditarIn(BaseModel):
     # SIA, que es larguísimo, y encima el aviso salía como "[object Object]"
     # (25-08-2026). La columna de la base es Text: no tiene tope.
     observaciones: Optional[str] = Field(None, max_length=4000)
+
+
+class AutorizarDevolucionExtraIn(BaseModel):
+    # El motivo es obligatorio: es lo que justifica romper el tope de 3 y queda
+    # en el historial como testigo de la excepción.
+    motivo: str = Field(..., min_length=3, max_length=4000)
 
 
 class ObservacionIn(BaseModel):
@@ -162,9 +169,12 @@ def _factura_dict(db: Session, f: FacturaPreauditoriaRecord, fuente: dict = None
         "ronda": f.ronda_actual,
         "num_subsanacion": f.num_subsanacion,
         "num_devoluciones": f.num_devoluciones,
-        "max_devoluciones": svc.MAX_DEVOLUCIONES,
+        # Tope EFECTIVO de esta factura: 3 + las devoluciones extra que
+        # coordinación haya autorizado como excepción (con testigo).
+        "max_devoluciones": svc.tope_devoluciones(f),
+        "devoluciones_extra": int(getattr(f, "devoluciones_extra", 0) or 0),
         "pendiente_subsanacion": bool(f.pendiente_subsanacion),
-        "en_limite": f.num_devoluciones >= svc.MAX_DEVOLUCIONES,
+        "en_limite": f.num_devoluciones >= svc.tope_devoluciones(f),
         "motivo_devolucion": f.motivo_ultima_devolucion,
         "observaciones": f.observaciones,
         "auditor": f.auditor,
@@ -856,6 +866,30 @@ def auditar_factura(
     return _factura_dict(db, f)
 
 
+@router.post("/facturas/{factura_id}/autorizar-devolucion-extra")
+def autorizar_devolucion_extra(
+    factura_id: int,
+    body: AutorizarDevolucionExtraIn,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_coordinador_o_admin),
+):
+    """Coordinación/administración autoriza UNA devolución por encima del tope.
+
+    Excepción puntual y con testigo: sube el cupo de ESA factura en uno (el tope
+    pasa de 3 a 4), queda grabado quién y por qué en el historial, y al usar la
+    cuarta la factura se vuelve a bloquear sola. La regla de 3 no cambia para
+    las demás. Solo coordinación/administración (por eso get_coordinador_o_admin).
+    """
+    f = db.get(FacturaPreauditoriaRecord, factura_id)
+    if not f:
+        raise HTTPException(404, "Factura no encontrada")
+    res = svc.autorizar_devolucion_extra(db, f, _nombre_auditor(current_user), motivo=body.motivo)
+    if not res.get("ok"):
+        raise HTTPException(res.get("codigo", 400), res.get("mensaje", "No se pudo autorizar"))
+    db.refresh(f)
+    return _factura_dict(db, f)
+
+
 @router.patch("/facturas/{factura_id}/observacion")
 def anotar_observacion(
     factura_id: int,
@@ -992,6 +1026,24 @@ def ver_factura(
     if not f:
         raise HTTPException(404, "Factura no encontrada")
     return _factura_dict(db, f)
+
+
+@router.get("/facturas/{factura_id}/atencion")
+def ver_atencion(
+    factura_id: int,
+    db: Session = Depends(get_db),
+    current_user: UsuarioRecord = Depends(get_usuario_actual),
+):
+    """Fechas de ingreso y egreso del RIPS, y cuánto le queda de plazo.
+
+    Solo se calcula para las facturas del ADRES, y solo cuando el gestor
+    abre la factura: cada revisión toca el servidor de facturación
+    electrónica, y hacerlo al cargar el envío volvería lentísima la carga.
+    """
+    f = db.get(FacturaPreauditoriaRecord, factura_id)
+    if not f:
+        raise HTTPException(404, "Factura no encontrada")
+    return atencion_svc.revisar(db, f.factura)
 
 
 @router.get("/facturas/{numero}/historial")

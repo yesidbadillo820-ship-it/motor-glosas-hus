@@ -22,6 +22,7 @@ from app.auth import get_password_hash
 from app.database import Base, get_db
 from app.models.db import (
     DgReportRecord,
+    FacturaEventoRecord,
     FacturaPreauditoriaRecord,
     RadicacionCuentaRecord,
     UsuarioRecord,
@@ -814,6 +815,156 @@ class TestAuditoria:
         assert "máximo 3" in r.json()["detail"]
         # radicar sí se permite
         assert _radicar(client, fid).json()["estado"] == "SUBSANADA"
+
+
+# ------------------------------------------------------------------
+# Excepción al tope de 3 devoluciones (autorizada por coordinación)
+# ------------------------------------------------------------------
+
+
+def _autoriza_coordinacion(db_session):
+    """Deja que get_coordinador_o_admin pase (el cliente base es AUDITOR)."""
+    from app.api.deps import get_coordinador_o_admin
+    from app.main import app
+
+    admin = UsuarioRecord(
+        id=7, nombre="COORD", email="coord@hus.gov.co", rol="COORDINADOR", activo=1
+    )
+    app.dependency_overrides[get_coordinador_o_admin] = lambda: admin
+
+
+def _reingresar_y_devolver(client, envio, fecha):
+    """Reingresa F1 en un envío/oficio nuevo y la devuelve. Devuelve la respuesta."""
+    _subir_radicacion(client, [_rad_fila(envio, F1, 250700)])
+    oo = _crear_oficio(client, f"FHUS-{envio}", fecha)
+    _escribir(client, oo["id"], envio)
+    return _devolver(client, _factura_id(client, F1))
+
+
+class TestExcepcionAlTope:
+    """Caso 07-09-2026 (HUS315614): coordinación autoriza una cuarta devolución.
+
+    La regla de 3 sigue firme; esto es una excepción puntual, por factura y con
+    testigo. Sube el cupo en uno, permite UNA devolución más, y se re-bloquea.
+    """
+
+    def _hasta_el_tope(self, client):
+        """Deja F1 devuelta 3 veces y reingresada, lista para el 4.º (bloqueado)."""
+        _subir_dgreport(client, [F1])
+        assert _reingresar_y_devolver(client, "310001", "2026-07-20T08:00").status_code == 200
+        assert _reingresar_y_devolver(client, "310002", "2026-07-21T08:00").status_code == 200
+        assert _reingresar_y_devolver(client, "310003", "2026-07-22T08:00").status_code == 200
+        # 4.º reingreso: queda PENDIENTE pero devolver está bloqueado por el tope.
+        _subir_radicacion(client, [_rad_fila("310004", F1, 250700)])
+        o4 = _crear_oficio(client, "FHUS-310004", "2026-07-24T08:00")
+        _escribir(client, o4["id"], "310004")
+        return _factura_id(client, F1)
+
+    def test_sin_autorizacion_la_cuarta_se_bloquea(self, client):
+        fid = self._hasta_el_tope(client)
+        r = _devolver(client, fid)
+        assert r.status_code == 409
+        assert "máximo 3" in r.json()["detail"]
+
+    def test_el_auditor_no_puede_autorizar(self, client):
+        fid = self._hasta_el_tope(client)
+        # Cliente base = AUDITOR: get_coordinador_o_admin lo rechaza.
+        r = client.post(
+            f"/preauditoria/facturas/{fid}/autorizar-devolucion-extra",
+            json={"motivo": "caso especial"},
+        )
+        assert r.status_code == 403
+
+    def test_coordinacion_autoriza_y_pasa_la_cuarta(self, client, db_session):
+        fid = self._hasta_el_tope(client)
+        _autoriza_coordinacion(db_session)
+        r = client.post(
+            f"/preauditoria/facturas/{fid}/autorizar-devolucion-extra",
+            json={"motivo": "HUS315614: la EPS pidió corrección adicional (autoriza coordinación)"},
+        )
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert d["devoluciones_extra"] == 1
+        assert d["max_devoluciones"] == 4
+        # Ahora la 4.ª devolución SÍ pasa.
+        r4 = _devolver(client, fid)
+        assert r4.status_code == 200
+        assert r4.json()["num_devoluciones"] == 4
+
+    def test_la_autorizacion_exige_motivo(self, client, db_session):
+        fid = self._hasta_el_tope(client)
+        _autoriza_coordinacion(db_session)
+        r = client.post(
+            f"/preauditoria/facturas/{fid}/autorizar-devolucion-extra", json={"motivo": "  "}
+        )
+        # Pydantic (min_length) o el servicio: en ambos casos NO se autoriza.
+        assert r.status_code in (400, 422)
+
+    def test_la_quinta_se_vuelve_a_bloquear(self, client, db_session):
+        fid = self._hasta_el_tope(client)
+        _autoriza_coordinacion(db_session)
+        client.post(
+            f"/preauditoria/facturas/{fid}/autorizar-devolucion-extra",
+            json={"motivo": "excepción única"},
+        )
+        assert _devolver(client, fid).status_code == 200  # la 4.ª
+        # La 5.ª, tras reingresar, se bloquea otra vez (el cupo era de UNA sola).
+        r5 = _reingresar_y_devolver(client, "310005", "2026-07-25T08:00")
+        assert r5.status_code == 409
+        assert "máximo 4" in r5.json()["detail"]
+
+    def test_queda_el_testigo_en_el_historial(self, client, db_session):
+        fid = self._hasta_el_tope(client)
+        _autoriza_coordinacion(db_session)
+        client.post(
+            f"/preauditoria/facturas/{fid}/autorizar-devolucion-extra",
+            json={"motivo": "motivo que debe quedar grabado"},
+        )
+        evento = (
+            db_session.query(FacturaEventoRecord)
+            .filter(
+                FacturaEventoRecord.factura_id == fid,
+                FacturaEventoRecord.tipo_evento == "DEVOLUCION_EXTRA_AUTORIZADA",
+            )
+            .first()
+        )
+        assert evento is not None
+        assert evento.motivo == "motivo que debe quedar grabado"
+        assert evento.auditor or ""
+
+    def test_la_excepcion_tambien_abre_el_cuarto_oficio_del_envio(self, client, db_session):
+        """El caso completo de Yesid (08-09-2026): Facturación reenvía la
+        factura con el MISMO número de envío en un oficio nuevo. La excepción
+        subía el cupo de devoluciones, pero el tope gemelo —«un envío en máximo
+        3 oficios»— seguía bloqueando la carga («aún no me deja meter ese
+        envío»). Una vuelta más es un oficio más."""
+        _subir_dgreport(client, [F1])
+        _subir_radicacion(client, [_rad_fila(ENV, F1, 250700)])
+        # Tres vueltas con el MISMO envío: 3 oficios y 3 devoluciones.
+        for n, fecha in ((1, "2026-07-20T08:00"), (2, "2026-07-22T08:00"), (3, "2026-07-24T08:00")):
+            o = _crear_oficio(client, f"FHUS-ENV-{n}", fecha)
+            _escribir(client, o["id"], ENV)
+            assert _devolver(client, _factura_id(client, F1)).status_code == 200
+        fid = _factura_id(client, F1)
+        # El 4.º oficio con el mismo envío: bloqueado por el tope de 3 oficios.
+        o4 = _crear_oficio(client, "FHUS-ENV-4", "2026-07-26T08:00")
+        r = _escribir(client, o4["id"], ENV)
+        assert r.json()["ya_cargado"] is True and "máximo 3" in r.json()["mensaje"]
+        # Coordinación autoriza la devolución extra → también abre el 4.º oficio.
+        _autoriza_coordinacion(db_session)
+        r_aut = client.post(
+            f"/preauditoria/facturas/{fid}/autorizar-devolucion-extra",
+            json={"motivo": "HUS315614: cuarta vuelta autorizada"},
+        )
+        assert r_aut.status_code == 200, r_aut.text
+        r4 = _escribir(client, o4["id"], ENV)
+        assert r4.json().get("ya_cargado") is not True, r4.json()
+        assert r4.json()["reingresos"] == 1
+        # La 4.ª devolución pasa, y el 5.º oficio vuelve a quedar bloqueado.
+        assert _devolver(client, _factura_id(client, F1)).status_code == 200
+        o5 = _crear_oficio(client, "FHUS-ENV-5", "2026-07-28T08:00")
+        r5 = _escribir(client, o5["id"], ENV)
+        assert r5.json()["ya_cargado"] is True and "máximo 4" in r5.json()["mensaje"]
 
 
 # ------------------------------------------------------------------

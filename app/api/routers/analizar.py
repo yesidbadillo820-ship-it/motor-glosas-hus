@@ -853,6 +853,8 @@ async def _persistir_y_responder(
     except Exception as _e_dup:
         logger.debug(f"[ANTI-DUP] Lookup falló: {_e_dup}")
 
+    _conf_score, _conf_nivel = _confianza_para_guardar(resultado)
+
     if existente:
         # UPDATE de la fila existente — sobreescribe dictamen y campos.
         from datetime import datetime, timezone as _tz
@@ -865,6 +867,11 @@ async def _persistir_y_responder(
         existente.dias_restantes = resultado.dias_restantes
         existente.modelo_ia = (resultado.modelo_ia or "")[:100]
         existente.score = resultado.score
+        # Solo se pisa si este análisis SÍ trajo Confianza: si no la trajo, se
+        # conserva la del análisis anterior en vez de borrarla.
+        if _conf_score is not None:
+            existente.confianza_score = _conf_score
+            existente.confianza_nivel = _conf_nivel
         existente.numero_radicado = numero_radicado or existente.numero_radicado
         existente.texto_glosa_original = tabla_excel or existente.texto_glosa_original
         existente.codigo_respuesta = cod_resp or existente.codigo_respuesta
@@ -894,6 +901,8 @@ async def _persistir_y_responder(
             dias_restantes=resultado.dias_restantes,
             modelo_ia=(resultado.modelo_ia or "")[:100],
             score=resultado.score,
+            confianza_score=_conf_score,
+            confianza_nivel=_conf_nivel,
             numero_radicado=numero_radicado,
             factura=numero_factura,
             texto_glosa_original=tabla_excel,
@@ -1716,6 +1725,216 @@ def _marcar_glosa_error_ocr(
         return None
 
 
+def _confianza_para_guardar(resultado) -> tuple:
+    """La Confianza del dictamen, lista para la base: `(0-100, nivel)`.
+
+    09-09-2026. `calcular_confianza` la devuelve de 0.0 a 1.0 dentro de un
+    diccionario; en pantalla se ve como porcentaje. Se guarda igual que se ve
+    —de 0 a 100— para que nadie tenga que acordarse de multiplicar al leer la
+    tabla.
+
+    Devuelve `(None, None)` cuando el análisis no la trajo: los caminos de
+    salida temprana no pasan por el cálculo, y un 0 ahí sería mentira —
+    «no se calculó» no es «confianza cero», y con un 0 el promedio por modelo
+    saldría hundido sin que nada lo explique.
+    """
+    conf = getattr(resultado, "confianza", None)
+    if not isinstance(conf, dict):
+        return None, None
+    bruto = conf.get("score")
+    if bruto is None:
+        return None, None
+    try:
+        valor = round(float(bruto) * 100, 1)
+    except (TypeError, ValueError):
+        return None, None
+    nivel = str(conf.get("nivel") or "")[:10] or None
+    return valor, nivel
+
+
+# Nombres en cristiano de cada tipo de soporte. Los mismos que ya usa el
+# aviso de «falta el soporte de la causal», para que el auditor no lea dos
+# vocabularios distintos para la misma cosa.
+_NOMBRE_DEL_SOPORTE = {
+    "historia_clinica": "la historia clínica",
+    "epicrisis": "la epicrisis",
+    "hoja_atencion_urgencias": "la hoja de atención de urgencias",
+    "hoja_administracion_medicamentos": "la hoja de administración de medicamentos",
+    "descripcion_quirurgica": "la descripción quirúrgica",
+    "registro_anestesia": "el registro de anestesia",
+    "factura_electronica": "la factura electrónica",
+    "rips": "los RIPS",
+    "cuv": "el CUV",
+    "autorizacion": "la autorización",
+}
+
+
+def _evidencia_de_los_soportes(
+    servicio, numero_factura: Optional[str], codigo_glosa: str, contexto_pdf: Optional[str]
+) -> Optional[dict]:
+    """Qué soportes pide esta causal, cuáles hay y cuáles faltan.
+
+    09-09-2026, la otra mitad del pedido de Yesid: «que cuando analicen una
+    glosa vean qué van a auditar». Para una glosa de TARIFAS eso es el renglón
+    del contrato; para una de SOPORTES —que es donde más plata se pierde— es
+    esta lista.
+
+    Las tres columnas salen de sitios distintos y ninguna se inventa:
+
+      · **pide la causal** — `catalogo_glosas.soportes_que_pide`, o sea lo que
+        la Resolución 2284 exige para responder ESE código.
+      · **hay en el expediente** — el índice del servidor de radicación.
+      · **se adjuntó ahora** — los PDF que el gestor subió en este análisis.
+
+    Y de ahí sale lo único que el auditor necesita decidir: **qué falta**.
+
+    Devuelve `None` sin número de factura. Y cuando el índice se está
+    reconstruyendo devuelve la lista de lo que se pide con
+    `no_se_pudo_consultar=True` en vez de una lista vacía: «todavía no sé» no
+    es «no hay», y con las dos cosas iguales un dictamen sacado en mitad de una
+    reindexación acusaba de faltar soportes que sí estaban.
+    """
+    if not numero_factura or not str(numero_factura).strip():
+        return None
+
+    try:
+        from app.services.catalogo_glosas import soportes_que_pide
+
+        pide = list(soportes_que_pide(codigo_glosa) or ())
+    except Exception as e:  # noqa: BLE001 — sin catálogo no se exige nada
+        logger.debug(f"[EVIDENCIA-SOPORTES] catálogo no disponible: {e}")
+        pide = []
+
+    hay: list[dict] = []
+    construyendo = False
+    try:
+        from app.services.soportes_autodiscovery_service import get_indexer
+
+        _idx = get_indexer()
+        encontrados = _idx.lookup(str(numero_factura).strip()) or []
+        if not encontrados:
+            try:
+                construyendo = bool(_idx.stats().get("construyendo"))
+            except Exception:  # noqa: BLE001 — sin estado se trata como «no hay»
+                construyendo = False
+        for s in encontrados:
+            if not isinstance(s, dict):
+                continue
+            hay.append(
+                {
+                    "tipo": s.get("tipo") or "otro",
+                    "nombre": _NOMBRE_DEL_SOPORTE.get(s.get("tipo") or "", s.get("tipo") or "otro"),
+                    "archivo": s.get("nombre_archivo") or "",
+                }
+            )
+    except Exception as e:  # noqa: BLE001 — sin índice se avisa, no se inventa
+        logger.debug(f"[EVIDENCIA-SOPORTES] índice no consultable: {e}")
+        construyendo = True
+
+    adjuntos: list[str] = []
+    try:
+        from app.services.glosa_service import GlosaService
+
+        adjuntos = GlosaService._documentos_adjuntos(contexto_pdf) or []
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"[EVIDENCIA-SOPORTES] adjuntos no leídos: {e}")
+
+    # Lo que falta solo se puede afirmar si el índice contestó. Basta UNO de
+    # los soportes que sirven para la causal: la epicrisis y la hoja de
+    # urgencias prueban lo mismo según el caso.
+    tipos_presentes = {s["tipo"] for s in hay}
+    if construyendo or not pide:
+        faltan: list[str] = []
+    elif tipos_presentes & set(pide):
+        faltan = []
+    else:
+        faltan = [_NOMBRE_DEL_SOPORTE.get(x, x) for x in pide]
+
+    return {
+        "factura": str(numero_factura).strip(),
+        "codigo_glosa": codigo_glosa or "",
+        "pide_la_causal": [{"tipo": x, "nombre": _NOMBRE_DEL_SOPORTE.get(x, x)} for x in pide],
+        "hay_en_el_expediente": hay,
+        "se_adjunto_en_este_analisis": adjuntos,
+        "faltan": faltan,
+        # El «no se sabe», dicho con todas las letras.
+        "no_se_pudo_consultar": bool(construyendo),
+    }
+
+
+def _evidencia_de_la_tarifa(info_tarifa: Optional[dict]) -> Optional[dict]:
+    """La fila del catálogo de tarifas pactadas, lista para pintar en pantalla.
+
+    09-09-2026, pedido de Yesid: que al analizar una glosa de TARIFAS el
+    auditor vea **el renglón del Excel pactado** —el que él mismo cargó— junto
+    a lo facturado y lo objetado, para poder revisarlo con sus propios ojos en
+    vez de creerle al dictamen.
+
+    Todo esto ya se calculaba para armar el prompt; lo único que faltaba era
+    entregarlo como dato en vez de como HTML pegado dentro del escrito.
+
+    Devuelve `None` cuando no hay nada que probar: la glosa no es de tarifas,
+    o el CUPS no está en el catálogo. Eso NO se disfraza — que el motor no
+    tenga con qué comparar es justamente lo que el auditor necesita saber
+    antes de radicar.
+    """
+    if not info_tarifa or not info_tarifa.get("encontrada"):
+        return None
+    t = info_tarifa.get("tarifa") or {}
+    pactado = float(info_tarifa.get("valor_pactado_calc") or 0.0)
+    facturado = float(info_tarifa.get("valor_facturado") or 0.0)
+    objetado = float(info_tarifa.get("valor_objetado") or 0.0)
+    reconocido = float(info_tarifa.get("valor_reconocido") or 0.0)
+
+    # La diferencia solo se calcula con las DOS cifras presentes. En este
+    # motor el 0 no es «cero pesos», es «no se pudo leer»: restar contra un
+    # cero daría una diferencia inventada del tamaño de la factura.
+    diferencia = round(facturado - pactado, 2) if (facturado > 0 and pactado > 0) else None
+
+    homolog = info_tarifa.get("homologacion_2641") or {}
+    return {
+        # La fila tal como está en el catálogo que cargó el hospital.
+        "fila_del_catalogo": {
+            "codigo_cups": t.get("codigo_cups"),
+            "codigo_ips": t.get("codigo_ips"),
+            "descripcion": t.get("descripcion"),
+            "valor_pactado": pactado,
+            "tipo_tarifa": t.get("tipo_tarifa"),
+            "factor_ajuste": t.get("factor_ajuste"),
+            "modalidad": t.get("modalidad"),
+            "contrato_numero": t.get("contrato_numero"),
+            "vigencia_desde": t.get("vigencia_desde"),
+            "vigencia_hasta": t.get("vigencia_hasta"),
+            # De qué archivo salió: es lo que le permite al auditor ir a
+            # buscarlo y comprobarlo por su cuenta.
+            "fuente_archivo": t.get("fuente_archivo"),
+        },
+        "las_cifras_del_caso": {
+            "facturado": facturado or None,
+            "pactado": pactado or None,
+            "objetado": objetado or None,
+            "reconocido": reconocido or None,
+            "diferencia": diferencia,
+            # Qué falta, dicho con todas las letras. Un valor en cero es un
+            # dato que no se pudo leer, y el auditor tiene que saberlo antes
+            # de darle la razón al cálculo.
+            "no_se_pudo_leer": [
+                nombre
+                for nombre, valor in (
+                    ("el valor facturado", facturado),
+                    ("el valor objetado", objetado),
+                    ("la tarifa pactada", pactado),
+                )
+                if not valor
+            ],
+        },
+        "recomendacion": info_tarifa.get("recomendacion") or None,
+        # Si el código del contrato no es el mismo que el facturado, se dice:
+        # el auditor tiene que saber que el cruce pasó por una homologación.
+        "homologacion": homolog if homolog.get("aplicada") else None,
+    }
+
+
 async def _analizar_impl(
     *,
     eps: str,
@@ -1990,6 +2209,19 @@ async def _analizar_impl(
             info_tarifa=info_tarifa_pre,
             pdfs_raw_para_multimodal=pdfs_raw,
         )
+        # La evidencia de la tarifa, como dato para la pantalla. Va aquí y no
+        # dentro del dictamen: el escrito que se radica no lleva cuadros de
+        # trabajo interno, y la pantalla necesita el dato para pintar la tabla.
+        try:
+            resultado.evidencia_tarifa = _evidencia_de_la_tarifa(info_tarifa_pre)
+        except Exception as _e_ev:
+            logger.debug(f"[{req_id}] evidencia de tarifa no armada: {_e_ev}")
+        try:
+            resultado.evidencia_soportes = _evidencia_de_los_soportes(
+                service, numero_factura, resultado.codigo_glosa or "", contexto_pdf
+            )
+        except Exception as _e_es:
+            logger.debug(f"[{req_id}] evidencia de soportes no armada: {_e_es}")
         _publicar_progreso(
             _tid,
             "ia_completada",

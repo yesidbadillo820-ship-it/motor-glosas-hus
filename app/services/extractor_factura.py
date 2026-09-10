@@ -34,6 +34,8 @@ import re
 from datetime import datetime
 from typing import Optional
 
+from app.services.catalogo_eps import EPS_CONOCIDAS as _EPS_CONOCIDAS
+
 
 # ─── Helpers genéricos ──────────────────────────────────────────────────────
 
@@ -91,26 +93,9 @@ def _parsear_fecha(raw: str) -> Optional[str]:
     return None
 
 
-_EPS_CONOCIDAS = [
-    "FAMISANAR",
-    "NUEVA EPS",
-    "COOSALUD",
-    "COMPENSAR",
-    "POSITIVA",
-    "FOMAG",
-    "SANITAS",
-    "SALUD TOTAL",
-    "SURA",
-    "ECOOPSOS",
-    "POLICIA NACIONAL",
-    "DISPENSARIO MEDICO",
-    "SUMIMEDICAL",
-    "AURORA",
-    "SALUD MIA",
-    "PPL",
-    "COMFENALCO",
-    "CAJACOPI",
-]
+# 09-09-2026: la lista de EPS conocidas se movió a app/services/catalogo_eps.py
+# (import junto a los demás, arriba) — antes esta era una copia propia y se
+# quedó atrás (le faltaban MUTUAL SER, EMSSANAR, SAVIA).
 
 
 # ─── Extractor principal ────────────────────────────────────────────────────

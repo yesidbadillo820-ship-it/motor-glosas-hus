@@ -1,5 +1,680 @@
 # Registro de cambios
 
+## Sesión 09-sep-2026 (tarde, 8) — `evidencia_soportes`: la mitad que faltaba del panel de análisis
+
+El pedido original («que vean qué van a auditar, o también si es por tarifas
+que aparezca el Excel de la tarifa pactada») tenía dos partes. Se entregó la
+tarifaria en la sesión anterior; esta es la de soportes.
+
+Mismo patrón que `evidencia_tarifa`: los tres datos existían y se
+concatenaban como HTML dentro del dictamen (`_soportes_reales`,
+`_documentos_adjuntos`, `catalogo_glosas.soportes_que_pide`), fuera del
+alcance de la pantalla.
+
+- **`app/models/schemas.py`** — `GlosaResult.evidencia_soportes`.
+- **`app/api/routers/analizar.py`** — `_evidencia_de_los_soportes()` cruza las
+  tres fuentes: lo que la causal exige (Res. 2284), lo que el índice del
+  servidor de radicación reporta, y los PDF de este análisis. Deriva `faltan`
+  con la regla de que **basta uno** de los soportes válidos para la causal.
+  `None` sin número de factura.
+- **`static/index.html`** — `renderEvidenciaSoportes()` en tres columnas, con
+  remate accionable según el caso. Se pinta junto a `renderEvidenciaTarifa`,
+  antes del riesgo y de la recomendación.
+
+**`no_se_pudo_consultar`**: cuando el índice está reconstruyéndose (o revienta),
+`faltan` queda vacío y el panel dice «todavía no se sabe». Es el defecto que
+ya se pagó una vez — expedientes completos reportados como ausentes durante
+una reindexación, con bloqueo de radicación incluido.
+
+### Pruebas (35, todas comprobadas contra el código anterior)
+
+- `tests/test_api/test_la_evidencia_de_los_soportes.py` (18) — las tres
+  fuentes por separado, la regla de «basta uno», y los cuatro estados del
+  índice (con datos / vacío al día / reconstruyéndose / caído).
+- `tests/test_frontend/test_el_auditor_ve_que_soporte_le_falta.py` (17) —
+  ejecuta el pintor con Node contra las tres formas reales.
+
+
+## Sesión 09-sep-2026 (tarde, 7) — `_detectar_pagador_en_texto` no conocía los regímenes especiales
+
+Detectado en la prueba del auditor. Glosa «DISPENSARIO MEDICO · FA0801
+$275.000…» con `eps_dropdown="FAMISANAR EPS"`: `resolver_eps_efectiva`
+devolvió `("FAMISANAR EPS", False, "")` y el dictamen salió con el contrato
+S-13-1-03-1-04958 y la tarifa SOAT UVB −5 % de FAMISANAR sobre una factura de
+sanidad militar.
+
+`_TOKENS_PAGADOR_EN_TEXTO` tenía `DMBUG` y `DISPENSARIO MEDICO BUCARAMANGA`,
+pero no la forma corta ni DIGSA / SANIDAD EJÉRCITO / SANIDAD MILITAR, y no
+tenía la Policía Nacional ni FIDUPREVISORA.
+
+- **`app/services/glosa_ia_prompts.py`** — entradas nuevas en
+  `_TOKENS_PAGADOR_EN_TEXTO`, todas con **el canónico que ya existía**
+  (`DMBUG`, `FOMAG`): devolver uno distinto haría que `get_contrato()` buscara
+  con un nombre que la malla no conoce. En `_RE_EPS_SOLA`, CAJACOPI, SAVIA
+  SALUD, COMFENALCO y SUMIMEDICAL.
+
+### Pruebas (21, con 10 que fallan sin el arreglo)
+
+- `tests/test_services/test_el_dictamen_no_sale_con_el_contrato_de_otra_entidad.py`
+  — el caso exacto, las siete formas de nombrar la sanidad militar, y la
+  comprobación de que tres regímenes distintos resuelven a **tres contratos
+  distintos** y ninguno al de FAMISANAR. Más una clase entera de no-regresión
+  para las EPS del contributivo.
+
+
+## Sesión 09-sep-2026 (tarde, 6) — `_facturado_linea_cups` leía el pactado como facturado
+
+Detectado en la prueba del auditor. Sobre «VALOR FACTURADO $185.000 SUPERIOR AL
+PACTADO $157.250» con `cups="890201"`, `_extraer_valores_glosa` devolvía
+`facturado: 157250.0`. La recomendación resultante fue aceptar $105.350 en vez
+de $133.100 — y se aplicó.
+
+`_facturado_linea_cups` toma `valores[-1]` de la ventana posterior al CUPS,
+correcto para una fila de factura (`CANT VR_UNIT VR_PAC VR_ENT`) e incorrecto
+para prosa etiquetada. La guarda existente (`len(todos_montos) < 2 → 0.0`) no
+lo cubría: aquí hay dos montos.
+
+- **`app/utils/parsers_glosa.py`** — `_las_cifras_vienen_con_nombre(chunk)`
+  detecta las etiquetas que asignan significado a un monto (PACTADO,
+  CONTRATADO, RECONOCIDO, OBJETADO, GLOSADO, ACEPTA(DO), TARIFA
+  PACTADA/CONTRATADA/VIGENTE, DIFERENCIA). Cuando aparecen,
+  `_facturado_linea_cups` devuelve `0.0` y `_extraer_valores_glosa` cae a
+  `patrones_fact`, que lee por etiqueta. La regla estricta del CUPS (incidente
+  27-abr-2026) queda intacta para columnas mudas. Se añadió también
+  `\bFACTUR(?:Ó|O)\b` a `patrones_fact` («SE FACTURÓ $90.000»).
+
+### Pruebas (20, con 7 que fallan sin el arreglo)
+
+- `tests/test_services/test_no_confundir_lo_facturado_con_lo_pactado.py` —
+  el caso exacto del auditor, cuatro variantes de redacción, y la verificación
+  de que las filas de factura no se marcan como prosa. Las 8 de
+  `test_parser_facturado_cups.py` (incidente de abril) siguen pasando.
+
+
+## Sesión 09-sep-2026 (tarde, 5) — La evidencia de la tarifa, como dato y no como texto
+
+Pedido del área: al analizar una glosa de TARIFAS, ver el renglón del catálogo
+pactado y las cifras, para poder auditarlo. El cruce contra las 19.051 filas de
+`tarifas_contratadas` ya existía (`_pre_lookup_tarifa` → `evaluar_glosa_tarifa`),
+pero su salida se **prepend-eaba como HTML al `dictamen`**: no renderizable como
+tabla, y contaminando el escrito radicable.
+
+- **`app/models/schemas.py`** — `GlosaResult.evidencia_tarifa: Optional[dict]`.
+- **`app/api/routers/analizar.py`** — `_evidencia_de_la_tarifa(info_tarifa)`
+  estructura la fila del catálogo (CUPS, `codigo_ips`, descripción,
+  `valor_pactado`, `tipo_tarifa`/`factor_ajuste`, modalidad, contrato, vigencia
+  y `fuente_archivo`) más las cifras del caso. **La diferencia solo se calcula
+  con las dos cifras presentes** — en este motor `0` significa «no se pudo
+  leer», y restar contra él produciría un sobrecosto ficticio del tamaño de la
+  tarifa; los ceros se entregan como `None` y se enumeran en `no_se_pudo_leer`.
+  Devuelve `None` cuando no hay fila que mostrar. Se asigna al resultado tras
+  `service.analizar`.
+- **`static/index.html`** — `renderEvidenciaTarifa()` pinta las tres cifras, la
+  diferencia explicada en castellano (tres desenlaces: por encima, exacta, por
+  debajo), el aviso de homologación cuando `aplicada`, y un `<details>` con el
+  renglón del contrato. Se invoca **antes** de `renderRiesgoRatificacion` y
+  `renderAccionIA`: leído después del veredicto, nadie revisa la evidencia.
+
+### Pruebas (38, todas comprobadas contra el código anterior)
+
+- `tests/test_api/test_la_evidencia_de_la_tarifa.py` (21) — incluye los casos
+  de cifra ausente, diferencia cero legítima vs. incalculable, y homologación.
+- `tests/test_frontend/test_el_auditor_ve_la_tarifa_pactada.py` (17) — ejecuta
+  el pintor con Node contra las formas reales; comprueba sobre el texto plano
+  que no aparezca `$0` donde falta el dato, y que el orden en pantalla ponga la
+  evidencia antes del veredicto.
+
+
+## Sesión 09-sep-2026 (tarde, 4) — La Confianza se guarda; el panel dejó de confundir dos métricas
+
+El diagnóstico corrió contra la base real (397 glosas) y devolvió
+«Confianza promedio por modelo: 77%» — mientras el auditor ve 51% al pie de
+sus dictámenes. Los dos números eran ciertos y medían cosas distintas:
+
+- `historial.score` (77%) = `_calcular_score()`, fórmula fija por tipo de
+  glosa (99 extemporánea / 92 ratificación / 90 urgencia / 75 tarifa / 85
+  resto, +5 con PDF). No lee el escrito.
+- La Confianza (51%) = `confidence_scorer.calcular_confianza()`, siete
+  factores ponderados — **y no se persistía en ninguna parte**.
+
+Con lo cual la pregunta que motivó el diagnóstico («¿qué modelo de IA da
+mejor Confianza?») era incontestable, no por falta de volumen sino porque el
+número nunca se escribía.
+
+### Persistencia de la Confianza
+
+- **`app/models/db.py`** — `GlosaRecord.confianza_score` (Float, 0-100 para
+  que se lea igual que en pantalla) y `confianza_nivel` (String(10)). Sin
+  default: las 397 filas previas quedan en NULL, que es la verdad.
+- **`app/main.py`** — migración en caliente (`ADD COLUMN` para ambas), en el
+  patrón de las demás de `historial`.
+- **`app/repositories/glosa_repository.py`** — `crear()` las acepta.
+- **`app/api/routers/analizar.py`** — `_confianza_para_guardar(resultado)`
+  convierte `{score: 0.51}` → `(51.0, "medio")` y devuelve `(None, None)`
+  ante cualquier forma inesperada: **nunca 0**, que hundiría el promedio del
+  modelo sin explicación. Se escribe en las dos ramas (crear y re-analizar);
+  al re-analizar solo pisa si este análisis sí la calculó.
+
+### El panel deja de llamar Confianza a lo que no lo es
+
+- **`app/api/routers/diagnostico_calidad.py`** — `probabilidad_exito_por_modelo`
+  (la fórmula vieja, con su nombre) y `confianza_por_modelo` como objeto con
+  `glosas_con_confianza_guardada`, `detalle` (promedio + peor + mejor por
+  modelo) y `diagnostico`.
+- **`static/index.html`** — `_diagTabla()` como helper compartido. «Confianza
+  real por modelo» va **primero**; «Probabilidad de éxito (fórmula antigua)»
+  después, con la fórmula escrita y la advertencia de que no sirve para
+  comparar modelos. Sin datos aún, el recuadro dice qué hacer en vez de
+  mostrar un 0% que se leería como «el motor saca cero».
+
+### `TypeError` real en la consola del auditor
+
+`sinac-ux.js:216 Cannot read properties of undefined (reading 'toLowerCase')`,
+dos veces al entrar al portal: el gestor de contraseñas del navegador emite
+eventos `keydown` sin `e.key` al autocompletar (uno por campo). No tumbaba la
+página pero apagaba todos los atajos en ese evento.
+
+- **`static/sinac-ux.js`** — `const tecla = typeof e.key === 'string' ?
+  e.key.toLowerCase() : ''` con salida temprana; las dos llamadas (⌘K y el
+  `switch`) usan la variable. Las comparaciones `e.key === 'Escape'` se dejan:
+  con `undefined` dan `false`, no revientan.
+
+### Pruebas (33, todas comprobadas contra el código anterior)
+
+- `tests/test_api/test_la_confianza_se_guarda.py` (19) — conversión, los seis
+  casos que deben quedar en blanco, las columnas, la migración y las dos ramas
+  de guardado.
+- `tests/test_frontend/test_no_se_confunde_la_confianza_con_la_formula_vieja.py`
+  (9) — ejecuta el panel con Node contra la respuesta real de hoy (0 con
+  Confianza) y contra una futura con dos modelos. Compara sobre el **texto
+  plano**, no el HTML: buscar «0%» en el marcado encuentra `width:100%`.
+- `tests/test_frontend/test_el_autocompletado_no_revienta_los_atajos.py` (5) —
+  dispara el evento sin `key` contra el manejador real.
+
+
+## Sesión 09-sep-2026 (tarde, 3) — El diagnóstico en pantalla, y dos afirmaciones sin respaldo
+
+Las tres del mismo tipo: el motor decía algo que no le constaba.
+
+### 1. El diagnóstico de calidad, dentro del motor
+
+`GET /admin/diagnostico-calidad` se publicó por la mañana y resultó
+inalcanzable: escrita en la barra del navegador, la ruta responde
+`{"detail":"Token de autenticación requerido"}` — correctamente, porque el
+navegador no manda el Bearer. La ruta existía y nadie podía usarla.
+
+- **`static/index.html`** — panel `#admin-diagnostico-card` en la pantalla de
+  Usuarios, visible solo con rol `SUPER_ADMIN` (nace con `display:none` y lo
+  destapa `loadUsuarios()`, igual que los otros dos paneles de administrador).
+  `cargarDiagnosticoCalidad()` pide la ruta con `authH()` y `_diagPintar()`
+  la renderiza en español —cada cifra con la frase que dice qué significa—
+  en vez del JSON crudo. Falla visible en pantalla tanto por red caída como
+  por respuesta de error (`r.ok`), nunca solo en consola.
+
+### 2. La ratificación no afirma una respuesta previa que no consta
+
+`TEXTO_RATIFICADA` abre con «SE MANTIENE LA RESPUESTA DADA EN TRÁMITE DE LA
+GLOSA INICIAL». En el caso 4 de la prueba salió sobre una factura sin
+ninguna respuesta anterior en el historial.
+
+- **`app/services/glosa_service.py`** — `_hay_respuesta_inicial_registrada()`
+  consulta `historial` por número de factura y devuelve `True` / `False` /
+  `None`. `None` («no se sabe»: factura ausente del historial, sin número, o
+  base no disponible) **no** dispara nada, igual que el aviso de soportes con
+  el índice a medio construir. Solo `False` agrega el aviso `⛔ NO RADICAR
+  TODAVÍA: NO HAY RESPUESTA INICIAL REGISTRADA`, y la marca entra en
+  `_MARCAS_DE_BLOQUEO` para que `bloqueado_para_radicar` lo impida — un
+  hallazgo grave bloquea, no aconseja. La propia ratificación no se cuenta a
+  sí misma como la respuesta que mantiene.
+
+### 3. No se le atribuye a la IA lo que la IA no hizo
+
+Con `modelo_ia = "texto_fijo"` la IA nunca corrió y `accion_ia` sale de
+`_mapa_accion` (Python), pero el recuadro decía «💡 La IA recomienda
+DEFENDER 100%»: una segunda opinión inexistente, con autoridad prestada.
+
+- **`static/index.html`** — `renderAccionIA()` deriva la atribución de
+  `d.modelo_ia`: «📋 Regla fija del área» para `texto_fijo`, `plantilla`,
+  `abstencion` y `directo_auditor`; «💡 La IA recomienda» solo cuando la IA
+  analizó. Las cuatro frases del panel también salen de esa variable.
+
+### 4. Un CUM no se rotula CUPS en la ficha del prompt
+
+La regla 4 del system prompt ya prohibía escribir «CUPS» sobre un CUM. Pero
+el BLOQUE 1 —declarado AUTORITATIVO— rotulaba `• CUPS : 20123-1` y remataba
+con «USA ESTE CUPS». Entre una regla general y un dato concreto con una orden
+al lado, gana el dato: salió «el código homologado del CUPS facturado» sobre
+acetaminofén.
+
+- **`app/services/glosa_ia_prompts.py`** — `_es_codigo_cum()` (forma
+  `\d{4,9}-\d{1,3}`, la misma de `citation_verifier._FORMA_CUM`, duplicada
+  adrede porque este módulo arma el prompt y no puede depender del que revisa
+  el resultado). La fila usa la etiqueta real y, con un CUM, `_nota_cups`
+  prohíbe explícitamente «CUPS X», «el CUPS facturado» y «código homologado
+  del CUPS», más el Manual Tarifario SOAT (no rige precios de medicamentos).
+  Un CUPS con anexo (`39147B-18`) sigue siendo CUPS.
+
+### 5. Una corrección automática ya no deja una cita rota
+
+Salió publicado «…LEY 1438 DE 2011 ART. EL DECRETO 780…». Perseguir cuál de
+las decenas de redes cortó mal es interminable; se valida el resultado.
+
+- **`app/services/glosa_service.py`** — `_quitar_articulo_huerfano()` exige
+  las dos orillas: a la izquierda el final de una cita completa (`(?<=\d)`), a
+  la derecha el arranque de otra norma (`EL|DEL|LA|…` + `DECRETO|LEY|
+  RESOLUCIÓN|…`). Corre después de todas las redes que reescriben citas y
+  registra la corrección en `_correcciones` — el artículo perdido puede
+  hacerle falta al gestor. La prosa vaga pero correcta («el artículo del
+  decreto») no la dispara.
+
+### 6. El riesgo de ratificación no contradice al sello de bloqueo
+
+Salía «riesgo BAJO — alta probabilidad de levantamiento» junto a «⛔ NO
+RADICAR». Ambos los calcula el motor.
+
+- **`app/services/riesgo_ratificacion.py`** — `elevar_por_bloqueo(riesgo,
+  motivos)`: con bloqueo, piso en 61 (ALTO), color/icono/etiqueta coherentes y
+  cada motivo añadido a `factores`. No muta el dict original y sin bloqueo
+  devuelve el mismo objeto — `calcular_riesgo` sigue mandando.
+- **`app/services/glosa_service.py`** — se aplica justo después de calcular
+  `_motivos_bloqueo`, antes de armar el `GlosaResult`.
+
+No se tocó «DEFENDER 100%» junto a «riesgo ALTO»: no es contradicción — uno
+dice qué responde el hospital, el otro qué se espera de la entidad.
+
+### Pruebas (75, todas comprobadas contra el código anterior)
+
+- `tests/test_frontend/test_el_diagnostico_de_calidad_se_ve_en_pantalla.py` (4)
+- `tests/test_frontend/test_el_diagnostico_pinta_los_numeros_de_verdad.py` (11),
+  que EJECUTA el pintor con Node contra la forma real de la respuesta: las
+  otras leen el HTML como texto y no verían un «undefined» en pantalla.
+- `tests/test_frontend/test_no_dice_que_la_ia_recomienda_si_la_ia_no_corrio.py` (5)
+- `tests/test_services/test_no_se_mantiene_una_respuesta_que_no_existe.py` (15),
+  con SQLite en memoria, los tres desenlaces del helper y tres de extremo a
+  extremo por `GlosaService.analizar` (probadas contra el cableado desactivado).
+- `tests/test_services/test_un_medicamento_no_se_llama_cups.py` (17)
+- `tests/test_services/test_una_correccion_no_puede_dejar_una_cita_rota.py` (14)
+- `tests/test_services/test_el_riesgo_no_contradice_al_sello.py` (9)
+
+## Sesión 09-sep-2026 (tarde, 2) — `GET /admin/diagnostico-calidad`
+
+Los números detrás de la confianza baja solo se ven en la base real del
+hospital. Pedirle al auditor que corriera un script por consola era pasarle
+trabajo manual; esto lo vuelve un enlace que abre y copia.
+
+- **`app/api/routers/diagnostico_calidad.py`** (nuevo) — solo lectura, solo
+  SUPER_ADMIN. Devuelve: % de glosas con EPS genérica y el detalle de las
+  que sí tienen nombre; filas en `tarifas_contratadas` (con el diagnóstico
+  escrito cuando está vacía); cobertura de `clausulas_contrato`; % de glosas
+  con veredicto final de la EPS —de ahí se alimentan el precedente interno y
+  `few_shot_gold`, y por debajo del 30% lo dice explícitamente—; confianza
+  promedio **por `modelo_ia`** (la comparación Groq vs. Claude con datos
+  propios); y costo real por proveedor leído de `ai_calls`, con proyección
+  mensual al volumen actual.
+
+Complementa `scripts/diagnostico_calidad_ia.py` (misma información por
+consola, para quien tenga acceso al servidor).
+
+9 pruebas nuevas. Verificado contra un servidor real con datos sembrados.
+
+
+## Sesión 09-sep-2026 (tarde) — El desplegable de EPS no puede depender de tener contrato
+
+SURA, SALUD TOTAL, EMSSANAR, SAVIA y MUTUAL SER —entidades reales, con bot de
+portal propio y lógica propia en el resto del motor desde hace meses—
+nunca aparecían en «EPS / Entidad Pagadora» del botón Analizar: el
+desplegable se llenaba solo con `GET /contratos/`, o sea con las EPS que
+tienen `ContratoRecord`. El auditor solo podía elegir «OTRA / SIN DEFINIR»,
+y todo dictamen de esas cinco entidades salía genérico.
+
+- **`app/services/catalogo_eps.py`** (nuevo) — el catálogo fijo de entidades
+  reales, y `eps_seleccionables()` para unir varias fuentes sin repetidos.
+  Cada entidad agregada ya estaba en uso en otra parte del motor (bot de
+  portal, rama de lógica de negocio); no se inventó ninguna.
+- **`GET /contratos/eps-seleccionables`** — une tres fuentes: el catálogo
+  fijo, las EPS con `ContratoRecord`, y las que ya aparecen en
+  `GlosaRecord.eps` sin tenerlo. `/eps-sin-contrato` (ya existía) no bastaba
+  sola: solo lista EPS que YA están en el historial, y una EPS que nunca se
+  pudo seleccionar tampoco pudo quedar guardada con su nombre real — un
+  candado que se cierra solo.
+- **`loadContratos()`** — el `<select id="eps-sel">` del botón Analizar ahora
+  se llena también desde la ruta nueva. La grilla de la pantalla Contratos
+  sigue mostrando solo contratos reales (no se infla con entidades sin
+  contrato). El fallo de esa llamada avisa con `avisarNoCargo`, no se traga
+  en la consola (regla del `MASTER_IMPROVEMENT_PLAN.md`, 1.3).
+- **`extractor_factura.py`** — su lista propia de EPS conocidas (que se había
+  quedado atrás, sin MUTUAL SER/EMSSANAR/SAVIA) ahora importa del catálogo
+  nuevo: una sola fuente, no dos copias que se desincronizan.
+- **`scripts/diagnostico_calidad_ia.py`** (nuevo) — reporte de solo lectura
+  para correr en el servidor del hospital: EPS genéricas vs. con nombre,
+  filas en `tarifas_contratadas` (tarifa pactada por CUPS), cobertura de
+  `clausulas_contrato`, qué fracción de las glosas tiene ya el veredicto
+  final de la EPS registrado (de ahí se alimentan el precedente interno y el
+  banco de argumentos ganadores), el promedio de confianza real por
+  `modelo_ia`, y el **costo real** de Anthropic leído de `ai_calls` —esa
+  tabla ya existe y ya calcula el costo en dólares por llamada; no hay que
+  estimarlo, solo leerlo.
+
+39 pruebas nuevas. Comprobado en navegador: con la base vacía, las cinco
+entidades ya aparecen en el desplegable. El script de diagnóstico se probó
+con datos sembrados (65 glosas, dos modelos, EPS mixtas) y se limpiaron
+después.
+
+
+## Sesión 09-sep-2026 — Todo 401 va al manejador de sesión vencida
+
+El auditor abrió el motor a las 8:15 con la sesión de la noche anterior (el
+token dura 8 h) y en Usuarios le salió el `detail` crudo de FastAPI:
+«Error · Credenciales inválidas o token expirado».
+
+- **El envoltorio global de `fetch`** —el que ya existía para los 403— atrapa
+  ahora también el **401** y llama a `manejarSesionExpirada()`, que ya decía
+  «Tu sesión venció — vuelve a iniciar sesión» y devuelve al login
+  conservando el formulario. Va ahí porque es el único punto por el que pasan
+  las 173 llamadas: arreglarlo sitio por sitio dejaría el siguiente afuera.
+- **`/token` queda excluido**: el login contesta 401 con la contraseña mala y
+  eso no es una sesión vencida; su pantalla ya lo explica. Se compara la ruta
+  sin los parámetros.
+- `manejarSesionExpirada()` ya traía sus dos guardas y se conservan: no avisa
+  si no hay token guardado, y avisa **una sola vez** aunque varios sondeos de
+  fondo reciban 401 a la vez.
+
+8 pruebas nuevas. Comprobado en navegador con las rutas interceptadas: un 401
+en `/usuarios/`, `/2fa/estado` y `/notificaciones/badge` avisa una vez cada
+uno; en `/token`, ninguna.
+
+
+## Sesión 08-sep-2026 (noche, 4) — Lo que destapó la segunda corrida
+
+Los cinco casos, vueltos a correr tras los arreglos. Lo anterior quedó bien;
+salieron cuatro cosas nuevas.
+
+- **Un hallazgo de severidad ALTA bloquea.** `_bloqueos_para_radicar()` ahora
+  recibe `verificacion_citas`: una cita ALTA es bloqueo aunque no haya dejado
+  marca en el texto. En la pantalla, el pie del recuadro deja de decir «solo
+  orientativo» cuando hay graves. Caso 2: el verificador marcó
+  AFIRMACION_SIN_SOPORTE en ALTA y el dictamen salió sin sello verde pero sin
+  bloquear.
+- **`_cifra_del_escrito_no_es_la_de_la_glosa()`** — caso 1: la glosa objetaba
+  $19.500 y el texto radicable decía «POR UN VALOR OBJETADO DE $ 19.». Compara
+  solo las cifras que el escrito PRESENTA como valor objetado (topes, UVB y
+  valores de contrato tienen sus propias redes) con tolerancia del 1 %.
+  Bloquea.
+- **`_RE_NORMA_DEL_VACIO_TARIFARIO`** — la contradicción con la ficha, en otra
+  forma: invocar el art. 87 del Decreto 2423/1996 (servicios SIN tarifa
+  asignada) teniendo pacto. Sin pacto esa norma es legítima y no se marca.
+- **Telemetría**: `float(re.sub(r"[^\d.]", ...))` leía el punto de miles como
+  decimal — «$ 19.500» → 19.5 — y con dos puntos lanzaba `ValueError` y caía al
+  `except` con 0.0. Toda glosa ≥ $1M iba al bucket «<100K». Ahora usa
+  `parse_valor_cop`, que existe justo para esto.
+- **`_MARCAS_DE_BLOQUEO`** += «AFIRMA SIN PROBAR» (el escrito enumera los
+  soportes con los que se radicó sin señalar un folio).
+
+32 pruebas nuevas + 4 de pantalla. Comprobado en navegador: con ALTA, sello
+rojo y pie «no es opcional»; con MEDIA, sello verde y pie orientativo.
+
+
+## Sesión 08-sep-2026 (noche, 3) — El escrito no puede contradecir la ficha del motor
+
+Caso 1 de la prueba del botón Analizar (TA0701, COOSALUD). El motor tiene el
+contrato cargado y lo imprime en el recuadro del dictamen; la argumentación del
+mismo documento decía «EL VALOR LIQUIDADO COINCIDE CON LA TARIFA SOAT PLENO» y
+«COOSALUD NO HA APORTADO ELEMENTOS DE PRUEBA QUE DEMUESTREN LA EXISTENCIA DE
+UNA TARIFA PACTADA DISTINTA O INFERIOR».
+
+- **`_contradice_la_ficha_contractual(argumento, ficha)`** — cruza el texto del
+  argumento contra la ficha de `get_contrato`. Detecta tres cosas: decir «SOAT
+  PLENO» con descuento pactado, negar el contrato que el motor tiene, y
+  exigirle a la entidad probar una tarifa pactada que el hospital ya tiene.
+  Devuelve las frases con ambos valores nombrados, para que el gestor lea qué
+  contradice a qué.
+- **`_hay_tarifa_pactada_de_verdad(ficha)`** — las tres puertas que evitan el
+  falso positivo: sin contrato, con `_vigencia_vencida` o con
+  `_tarifa_indeterminada` no se marca, porque ahí decir «SOAT pleno» es
+  correcto. Y un pacto A SOAT pleno (factor 1.0) tampoco contradice.
+- **Bloquea, no avisa.** Nueva marca en `_MARCAS_DE_BLOQUEO`, así que el sello
+  sale rojo por la vía de la PR anterior. El aviso de `[PLATA-INVENTADA]` ya
+  existía y solo avisaba: el caso 1 salió sellado en verde encima de la
+  contradicción.
+- **No reescribe el argumento.** Redactarle la defensa jurídica al modelo es
+  peor que marcarlo.
+
+La red anterior (`_vigencia_vencida`) solo cubría el contrato vencido; con uno
+vigente nadie cruzaba el texto contra la ficha.
+
+28 pruebas nuevas, incluido el párrafo del caso real palabra por palabra.
+
+
+## Sesión 08-sep-2026 (noche, 2) — Cuatro señales del dictamen que se contradecían
+
+Prueba de cinco casos desde `/analizar` (TA0701, SO3401, CL0101, FA1605,
+CO4601). La IA no fallaba de fondo; fallaba lo que el motor decía de sí mismo.
+
+- **`GlosaResult.bloqueado_para_radicar` + `motivos_bloqueo`** — el motor ya
+  escribía «⛔ NO RADICAR TODAVÍA» en el texto pero no se lo decía a la
+  pantalla, que estampaba «✓ VALIDADO POR QUALITY GATE» encima.
+  `_bloqueos_para_radicar()` lee las marcas que el propio motor deja
+  (falta de soporte de la causal, entidad sin identificar, afirmar contenido
+  de documentos no aportados). En `renderResult`, si viene bloqueado el sello
+  es rojo (`.qg-bloqueado`, «⛔ NO LISTO PARA RADICAR») con los motivos en el
+  `title`; el verde solo cuando no. Respuestas sin el campo (caminos de
+  salida temprana, historial viejo) se comportan como antes.
+- **`_neutralizar_eps_generica_en_dictamen()`** — con la EPS en «OTRA / SIN
+  DEFINIR», el escrito radicable decía «INTERPUESTA POR OTRA / SIN DEFINIR» y
+  «SE SOLICITA A OTRA / SIN DEFINIR PRECISAR». Se sustituye por «LA ENTIDAD
+  RESPONSABLE DE PAGO» **solo la forma suelta**: la del aviso al gestor
+  («quedó como «OTRA / SIN DEFINIR»») se conserva. `_parrafo_cobertura_soat`
+  deja de usar el marcador como nombre. En los dos impresos (`imprimirDictamen`
+  e `imprimirLoteConsolidado`) el marcador sale como «ENTIDAD PAGADORA SIN
+  IDENTIFICAR».
+- **`_paciente_honesto()`** — el prompt daba por defecto «PACIENTE
+  IDENTIFICADO EN EXPEDIENTE» y la cabecera lo mostraba sobre facturas sin
+  expediente. Ahora el prompt, `dictamen_directo` y el post-proceso dicen
+  «PACIENTE NO IDENTIFICADO EN LOS SOPORTES» cuando no hay nombre.
+- **`_avisos_de_soportes_no_leidos()`** — los avisos «no se adjuntó ningún
+  soporte» y «sí se adjuntaron, pero ninguno de ese tipo» salían juntos con
+  cero PDF: el segundo se calculaba contra un texto vacío y todo le parecía
+  faltante. Ahora la decisión se toma una vez: sin soportes va el de cero; con
+  soportes, la revisión por tipo.
+
+63 pruebas nuevas (51 de servicio, 10 de pantalla, 2 actualizadas). Chequeo
+en navegador de `renderResult` con resultado simulado en los tres estados.
+
+
+## Sesión 08-sep-2026 (noche) — Los soportes de mesa van a disco, en flujo
+
+El auditor reportó que sus escaneos pesan **25–40 MB**. El tope era de 15 MB
+—un número escogido sin dato— y los dejaba a todos afuera. Pero subir el
+número a secas habría tumbado el motor.
+
+### Lo que había mal, y no era el tope
+
+- El archivo se guardaba como base64 en SQLite: +33% de tamaño.
+- `soportes_subidos()` hacía `query(SoporteMesaRecord).all()`, así que
+  SQLAlchemy traía **todas** las columnas, `contenido_b64` incluida. Listar
+  diez soportes de 40 MB eran ~500 MB de texto en memoria.
+- `docker-compose.yml` fija `mem_limit: 640m` y su propio comentario
+  documenta que el OOM killer ya mató procesos al azar antes.
+
+### Cómo queda
+
+- **`guardar_soporte_en_disco()`** — escribe en pedazos de 1 MB. La memoria
+  usada no depende del tamaño del archivo. El tope se comprueba **mientras**
+  se escribe: 500 MB se cortan a los 50, no se sostienen para después
+  rechazarlos. Lo escrito a medias se borra.
+- **`carpeta_de_soportes()`** — deriva de `SOPORTES_ROOT`, así que en el
+  hospital cae en `/data/soportes_mesa`: el volumen persistente, junto a la
+  base. El motor se autoactualiza cada 5 minutos; fuera del volumen, la
+  evidencia de una audiencia duraría minutos.
+- **Nombre en disco propio** (`AAAAMM/<uuid>.<ext>`) — el nombre que pone el
+  usuario puede traer `../` y escribir fuera de la carpeta.
+- **`sha256`** por soporte — un archivo alterado no sirve de evidencia.
+- **`soportes_subidos()`** pide solo las columnas que muestra.
+- **Descarga con `FileResponse`** — por pedazos, no entera en memoria.
+- **`MAX_BYTES_SOPORTE = 50 MB`**, y el mismo tope en el frontend.
+- Aviso en pantalla cuando el archivo pasa de 8 MB: «puede tardar, no cierre
+  la ventana». Sin eso, el auditor cree que se colgó y le da otra vez.
+
+### Compatibilidad
+
+`contenido_b64` pasa a ser opcional y se sigue leyendo: los soportes subidos
+esta tarde, antes del cambio, se bajan igual. Migración en `app/main.py` para
+`ruta_relativa` y `sha256`.
+
+15 pruebas nuevas, incluidas: que un escaneo de 30 MB entra, que el
+contenido NO queda en la base, que listar no lee los archivos, que lo
+rechazado no deja basura en disco, que un nombre con `../` no escribe fuera
+de la carpeta, y que la carpeta cae en el volumen persistente.
+
+
+## Sesión 08-sep-2026 — Suite en cero fallas, gates de verdad y subida de soportes
+
+### La suite ya no arrastra doce fallas
+
+- **`office_tools.modulos_libreoffice_faltantes()` / `libreoffice_puede_convertir()`** —
+  la causa real de las doce fallas: `libreoffice-core` instalado sin Writer,
+  Calc ni Draw. `hay_libreoffice()` solo miraba el ejecutable, así que
+  `soffice` «existía» y la conversión moría con «source file could not be
+  loaded» — un mensaje que manda a buscar un archivo dañado que no existe.
+  Ahora `a_pdf()` comprueba el módulo del tipo de archivo ANTES de intentar y
+  nombra el paquete a instalar.
+- **`scripts/preparar_entorno_pruebas.sh`** — instala LibreOffice completo y
+  `extract-msg` (con `--no-deps`: su dependencia `red-black-tree-mod` ya no
+  compila, y solo hace falta para re-escribir `.msg`, no para leerlos). Lo usa
+  el CI y sirve igual en un contenedor de desarrollo.
+- **`tests/test_tools/_entorno.py`** — en un PC sin las herramientas las
+  pruebas se saltan diciendo qué falta; en el CI,
+  `EXIGIR_HERRAMIENTAS_DE_PRUEBA=1` hace que la ausencia reviente al importar.
+  Un `skipif` ahí dejaría el CI verde con doce pruebas saltadas.
+
+### Gates que de verdad bloquean
+
+- **`scripts/revisar_vulnerabilidades.py`** — el paso de seguridad terminaba
+  en `|| true`: encontraba 22 vulnerabilidades y decía que todo estaba bien.
+  Ahora falla ante cualquier vulnerabilidad **nueva**; las conocidas están en
+  `seguridad/vulnerabilidades_conocidas.txt`, a la vista. Poner el gate en
+  cero de una vez dejaría el CI rojo permanentemente y bloquearía los propios
+  arreglos.
+- **Job `CI OK`** — una sola casilla que exige los tres pasos, para que el día
+  que se agregue un cuarto no quede fuera del gate.
+- **`.github/rulesets/motor-glosas-protegida.json`** — la protección lista
+  para importar. Aplicarla requiere permisos de dueño del repositorio.
+
+### El indexador ya no puede pintar en blanco
+
+- **`app/services/soportes_contrato.py`** — modelos Pydantic
+  (`SoporteDeFactura`, `RespuestaSoportes`) y `leer_soportes()`, el único
+  camino que deben usar las pantallas. Cinco estados explícitos:
+  `CON_SOPORTES`, `SIN_SOPORTES`, `INDEXANDO`, `SIN_INDICE` y
+  `DATOS_INVALIDOS`. Un registro malo se descarta y se **cuenta**; no tumba a
+  los buenos ni se cuela como fila vacía. Nunca lanza: un índice caído es un
+  estado que se pinta, no una excepción que tumba la mesa.
+- **`mesaPintarSoportes()`** en el frontend — una sola función pinta los cinco
+  estados. Los errores en rojo (`.mesa-sop-err`), lo que aún no se sabe en
+  ámbar (`.mesa-sop-duda`). «Dice que hay 3 y no se pudo leer ninguno» ya no
+  es una caja vacía.
+
+### Subir soportes en la mesa
+
+- **`SoporteMesaRecord`** — guardado en la base y no en el share: el índice
+  del hospital se reconstruye cada tantas horas y un archivo puesto a mano
+  desaparecería. Por factura, no por renglón.
+- **`validar_soporte()`** — peso (15 MB), tipo (PDF e imágenes) y **firma
+  real** del archivo: el `content-type` lo manda el navegador y un ejecutable
+  renombrado a `.pdf` llega diciendo «application/pdf».
+- **Cuatro rutas** bajo `/conciliaciones/mesa/{id}/soportes-subidos`. Una mesa
+  cerrada devuelve 409. La descarga filtra por mesa —cambiar el número en la
+  dirección no abre los soportes de otra audiencia— y sanea el nombre para
+  que no inyecte cabeceras.
+- **Frontend** — el peso se comprueba antes de mandar, el botón se bloquea
+  mientras sube (un doble clic no sube dos veces) y se desbloquea en
+  `finally`, con spinner que respeta `prefers-reduced-motion`.
+
+93 pruebas nuevas.
+
+
+## Sesión 07-sep-2026 (noche, 2) — La mesa muestra por qué se glosó y con qué refutar
+
+La tabla cortaba el motivo de la glosa a media línea y no decía si la factura
+tenía soportes. Con la EPS al frente, eso obligaba a abrir el Excel aparte.
+
+- **`glosa_del_motor()`** (`mesa_conciliacion.py`) — enlaza el renglón con la
+  glosa del historial por factura **y** código. Solo por factura traería la
+  primera de doce y se mostraría el dictamen de otra. Se guarda en
+  `MesaLineaRecord.glosa_id` al abrir la mesa (migración en `app/main.py`).
+- **`detalle_linea()`** — devuelve el dictamen del motor, los soportes y los
+  comentarios del equipo. Cuando la glosa no está en el motor (vino solo en el
+  archivo de la EPS) lo dice explícitamente en vez de responder vacío.
+- **`_soportes_de()`** — **tres** estados, no dos: `CON_SOPORTES`,
+  `SIN_SOPORTES` y `INDEXANDO`/`SIN_INDICE`. Decir «no tiene» mientras el
+  índice se construye induce a aceptar una glosa soportada.
+- **`soportes_de_la_mesa()`** — consulta por factura, no por renglón: doce
+  glosas de la misma factura comparten soportes y recorrer el índice doce
+  veces daría la misma respuesta.
+- **Pantalla** (`static/index.html`) — flecha que despliega el motivo completo
+  con `white-space:pre-wrap` (+ `title` para verlo al pasar el mouse), columna
+  de soportes con insignia, botón «Gestionar» que abre un cajón lateral con
+  cuatro secciones, y limpieza de la tabla (renglones alternados, hover,
+  `tabular-nums`).
+- **`.mesa-drawer[hidden]{display:none}`** — sin esta regla el `display:flex`
+  ganaba sobre `hidden` y el fondo invisible del cajón se comía todos los
+  clics de la página.
+
+Corregido en el camino:
+
+- `lookup()` del indexador devuelve **diccionarios**, no objetos: se leían con
+  `getattr` y el cajón mostraba «3 soportes» con tres nombres en blanco. Va
+  con prueba que falla contra el código anterior.
+- El ayudante `_funcion()` de `test_mesa_conciliacion_pantalla.py` cortaba el
+  cuerpo a 2.600 caracteres: agregarle una línea a la función dejaba el resto
+  fuera y las pruebas de «esto no aparece» (`toLocaleString`) pasaban sin
+  haber mirado. Ahora corta en la función siguiente.
+
+30 pruebas nuevas (11 de API, 18 de pantalla, 1 de regresión de soportes).
+
+
+## Sesión 07-sep-2026 (noche) — La mesa de conciliación vive en el motor
+
+El acta se arma, se guarda y se trabaja en pantalla; el Excel sale al final.
+
+- **`MesaConciliacionRecord` + `MesaLineaRecord`** — el acta en curso y sus
+  renglones. Tres dueños por renglón que no se mezclan: lo que trajo la EPS
+  (solo lectura), lo que decide la mesa y lo contable.
+- **`app/services/mesa_conciliacion.py`** — `abrir()`, `guardar_linea()`,
+  `resumen()`, `cerrar()`, `reabrir()` y `a_excel()`. Solo los campos de
+  `CAMPOS_EDITABLES` se tocan: el valor objetado y el código son de la EPS.
+  Guardar NO impide repartir de más —en una mesa se tantea— pero devuelve el
+  pendiente al instante y el `revisar()` lo atrapa al cerrar.
+- **`app/services/conceptos_nota_hus.py`** — el catálogo de contabilidad, 234
+  combinaciones. El centro de costo sale de `conceptos_glosa` (DGH) y se
+  consulta con vía ACTAS. Sin centro en el catálogo devuelve None: no se
+  aproxima una cuenta contable.
+- **Siete rutas** bajo `/conciliaciones/mesa`. Reabrir exige coordinador.
+- **Pantalla**: tabla con encabezado fijo, guardado automático, botones
+  «todo A/L/R» por renglón, renglones en ámbar cuando falta decidir, y la
+  tabla ancha recorriéndose en su propia caja.
+- **58 pruebas nuevas** (20 de ruta, 19 de pantalla, 19 de servicio y
+  catálogo).
+
+## Sesión 07-sep-2026 (hotfix) — El acta generada abría «[Reparado]»
+
+- **`_reponer_lo_que_openpyxl_se_lleva()`** — openpyxl no edita el `.xlsm`, lo
+  reconstruye, y descarta 3 de los 5 `definedNames` del modelo (los
+  `_FilterDatabase` de ACTA, GLOSAS y TRAMITES), dejando el superviviente
+  reasignado a `Hoja3`. También pierde `printerSettings` y las rels de una
+  hoja. Se repone todo desde el original tras guardar. `calcChain.xml` y
+  `sharedStrings.xml` se dejan fuera a propósito: son cachés, y un calcChain
+  previo a la escritura es en sí mismo un disparador de reparación.
+- **`_borrar_renglones_sobrantes()`** — el modelo trae 260 filas prebordeadas;
+  un acta de 3 líneas salía con 257 de cuadrícula vacía. Se les quita borde y
+  relleno en vez de borrar las filas: `delete_rows` correría el pie del acta
+  (bloque de observaciones y firmas, en celdas combinadas) y lo rompería. El
+  fin de la banda de datos se detecta por la primera combinación bajo el
+  encabezado, no por un número fijo.
+- **11 pruebas nuevas**: los 5 nombres sobreviven y cada autofiltro sigue en
+  su hoja, no falta ninguna parte salvo las dos cachés, las líneas reales
+  conservan su formato y el pie no se movió.
+
 ## Sesión 07-sep-2026 (tarde) — Armar el ACTA SINAC desde la lista y el archivo de la EPS
 
 Faltaba el paso de **aguas arriba** del módulo de conciliación: ya se sabía

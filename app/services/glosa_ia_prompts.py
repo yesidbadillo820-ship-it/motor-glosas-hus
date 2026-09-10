@@ -705,6 +705,23 @@ def get_contrato(eps: str, fecha_hecho=None) -> dict:
 # su Cláusula 4.2; FOMAG mezcló cláusulas del ACTA 012). Un número de
 # contrato ajeno es verificable por la EPS en segundos y destruye el
 # dictamen completo.
+# Forma de un CUM: el código del medicamento con su consecutivo («20123-1»,
+# «19953856-3»). Misma expresión que usa el verificador de citas
+# (`citation_verifier._FORMA_CUM`) — duplicada a propósito: este módulo arma
+# el prompt y no puede depender del que revisa el resultado.
+_FORMA_CUM_EN_LA_FICHA = re.compile(r"^\d{4,9}-\d{1,3}$")
+
+
+def _es_codigo_cum(codigo: str | None) -> bool:
+    """¿El código de la ficha es un CUM (medicamento) y no un CUPS?
+
+    09-09-2026. Un medicamento se factura con CUM; un procedimiento, con
+    CUPS. Son tablas distintas del Ministerio: la entidad cruza el CUPS
+    contra la suya, no encuentra el CUM y ratifica la glosa entera.
+    """
+    return bool(_FORMA_CUM_EN_LA_FICHA.match(str(codigo or "").strip()))
+
+
 _PAT_TOKEN_CONTRATO = re.compile(r"[A-Z0-9][A-Z0-9./\-]{4,40}")
 _PAT_TOKEN_NUM_ANIO = re.compile(
     r"\b(\d{3,4})\s+DE\s+(\d{4})\b|\b(\d{3,4})/(\d{4})\b",
@@ -1283,7 +1300,7 @@ defecto y emite <accion>DEFENDER_TOTAL</accion> <valor_aceptar>$0</valor_aceptar
 ═══════════════ CONTRATO DE SALIDA (XML) ═══════════════
 Responde EXACTAMENTE con estos tags, sin texto fuera de ellos:
 
-<paciente>Nombre si aparece, sino "PACIENTE IDENTIFICADO EN EXPEDIENTE"</paciente>
+<paciente>Nombre si aparece, sino "PACIENTE NO IDENTIFICADO EN LOS SOPORTES"</paciente>
 <servicio>Descripción del servicio + CUPS si hay</servicio>
 <contrato>Número de contrato o "SIN CONTRATO PACTADO"</contrato>
 <tarifa>Tarifa pactada (ej: "SOAT -20%"), "SOAT PLENO", o el texto de la ficha COPIADO TAL CUAL si empieza por "TARIFA NO DETERMINADA" — en ese caso está PROHIBIDO reemplazarlo por "SOAT PLENO"</tarifa>
@@ -1946,6 +1963,30 @@ _TOKENS_PAGADOR_EN_TEXTO: tuple[tuple[str, str], ...] = (
     ("MALLAMAS", "MALLAMAS EPS"),
     ("DMBUG", "DMBUG"),
     ("DISPENSARIO MEDICO BUCARAMANGA", "DMBUG"),
+    # 09-09-2026 — EL DICTAMEN QUE SALIÓ CON EL CONTRATO DE OTRA ENTIDAD.
+    # Prueba del auditor: una glosa que empezaba «DISPENSARIO MEDICO ·
+    # FA0801 …» con el desplegable en FAMISANAR. Acá arriba solo estaba el
+    # nombre LARGO —con «BUCARAMANGA»— y el corto no cruzaba, así que el
+    # motor no corrigió nada: el dictamen se firmó a nombre de FAMISANAR,
+    # citando el contrato S-13-1-03-1-04958 y la tarifa SOAT UVB −5 % de
+    # FAMISANAR para una factura de sanidad militar.
+    #
+    # Es el mismo desastre que esta función vino a evitar en junio, pero al
+    # revés: entonces el desplegable decía Dispensario y el texto una EPS.
+    ("DISPENSARIO MEDICO", "DMBUG"),
+    ("DISPENSARIO MÉDICO", "DMBUG"),
+    ("DIGSA", "DMBUG"),
+    ("SANIDAD EJERCITO", "DMBUG"),
+    ("SANIDAD EJÉRCITO", "DMBUG"),
+    # «SANIDAD MILITAR» se retiró el mismo día que se agregó: aparece en prosa
+    # corriente —«cotización avalada por sanidad militar»— describiendo un
+    # régimen, no nombrando al pagador. Con ella, una glosa de FAMISANAR que
+    # mencionara el término se habría respondido con el contrato del
+    # Dispensario. «SANIDAD EJERCITO» sí queda: es parte del nombre oficial.
+    ("POLICIA NACIONAL", "POLICIA NACIONAL"),
+    ("POLICÍA NACIONAL", "POLICIA NACIONAL"),
+    ("SANIDAD POLICIA", "POLICIA NACIONAL"),
+    ("FIDUPREVISORA", "FOMAG"),
     ("FOMAG", "FOMAG"),
     ("MAGISTERIO", "FOMAG"),
 )
@@ -1970,6 +2011,14 @@ _RE_EPS_SOLA = (
     (re.compile(r"\bASMET\s+SALUD\b"), "ASMET SALUD"),
     (re.compile(r"\bMEDIM[ÁA]S\b"), "MEDIMÁS"),
     (re.compile(r"\bSURA\b"), "SURA EPS"),
+    # 09-09-2026 — Los que faltaban y no son EPS del contributivo. Van con
+    # el MISMO nombre canónico que ya usa la lista de tokens de arriba: si
+    # aquí se devolviera otro, el contrato se buscaría con un nombre que la
+    # malla contractual no conoce.
+    (re.compile(r"\bCAJACOPI\b"), "CAJACOPI"),
+    (re.compile(r"\bSAVIA\s+SALUD\b"), "SAVIA SALUD"),
+    (re.compile(r"\bCOMFENALCO\b"), "COMFENALCO"),
+    (re.compile(r"\bSUMIMEDICAL\b"), "SUMIMEDICAL"),
 )
 
 
@@ -2112,6 +2161,21 @@ def resolver_eps_efectiva(
         or (len(dropdown_norm) >= 4 and dropdown_norm in texto_norm)
         or (len(texto_norm) >= 4 and texto_norm in dropdown_norm)
     ):
+        return eps_dropdown, False, ""
+
+    # 2-bis) 09-09-2026 — LA MISMA ENTIDAD CON DOS NOMBRES NO ES UNA
+    # CONTRADICCIÓN. Comparar los textos tal cual falla cuando el desplegable
+    # trae el nombre oficial largo y el catálogo usa la sigla: «DIRECCION DE
+    # SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANGA» y «DMBUG» no
+    # comparten ni una letra seguida, y el motor los daba por entidades
+    # distintas: avisaba de una «corrección» que no corregía nada y cambiaba
+    # el nombre claro del encabezado por la sigla.
+    #
+    # Lo vio el auditor el mismo día del arreglo de los regímenes especiales:
+    # dos análisis de la MISMA factura salieron con entidades escritas
+    # distinto. Se comparan por el nombre canónico, que es lo que de verdad
+    # decide qué contrato se carga.
+    if _detectar_pagador_en_texto(eps_dropdown) == eps_texto:
         return eps_dropdown, False, ""
 
     # 3) CONTRADICCIÓN: dropdown específico ≠ EPS del texto → priorizar texto.
@@ -3236,6 +3300,16 @@ def build_user_prompt(
     # Datos del PDF (si hay)
     datos = extraer_datos_soporte(contexto_pdf)
     cups = cups_verificado or datos["cups"]
+    # 09-09-2026 (caso 1 de la prueba, acetaminofén). Un medicamento no se
+    # factura con CUPS sino con CUM, y esta ficha rotulaba «CUPS» cualquier
+    # código —CUM incluido— y encima le ordenaba al modelo «USA ESTE CUPS».
+    # La regla 4 del prompt de sistema dice lo contrario («NUNCA escribas
+    # CUPS cuando el número viene de un CUM»), así que el prompt se
+    # contradecía a sí mismo y ganaba el dato, que es lo concreto. Salió un
+    # dictamen hablando del «código homologado del CUPS facturado» sobre un
+    # medicamento — y la entidad cruza ese código contra su tabla de CUPS,
+    # no lo encuentra, y ratifica la glosa completa.
+    _etiqueta_codigo = "CUM (medicamento)" if _es_codigo_cum(cups) else "CUPS"
     _nota_cups = ""
     if cups == "NO IDENTIFICADO":
         # Antes: "CUPS INDICADO EN EL EXPEDIENTE" -- aparecia literal en el
@@ -3259,6 +3333,19 @@ def build_user_prompt(
                 f"\n  ⚠ El número {numero_factura} es el NÚMERO DE FACTURA, "
                 "no un código CUPS — nunca lo presentes como CUPS."
             )
+    elif _etiqueta_codigo != "CUPS":
+        # No basta con rotular bien la fila: el resto del prompt está lleno de
+        # ejemplos y frases hechas con la palabra CUPS, y el modelo las copia.
+        _nota_cups = (
+            f"\n  ⚠ {cups} es un CUM (código del MEDICAMENTO), NO un CUPS. En "
+            "todo el dictamen llámalo CUM: «el medicamento facturado con CUM "
+            f"{cups}». PROHIBIDO escribir «CUPS {cups}», «el CUPS facturado» o "
+            "«código homologado del CUPS»: son tablas distintas del Ministerio "
+            "y la entidad cruza el CUPS contra la suya, no encuentra este "
+            "código y ratifica la glosa completa. La norma de precios de "
+            "medicamentos tampoco es la de procedimientos: no cites el Manual "
+            "Tarifario SOAT ni la homologación CUPS para un medicamento."
+        )
 
     paciente = datos.get("paciente", "NO IDENTIFICADO")
     medico = datos.get("medico", "NO IDENTIFICADO")
@@ -3941,7 +4028,7 @@ def build_user_prompt(
 • {_etiqueta_contrato} : {numero_contrato}{_nota_contrato}
 • Vigencia contrato : {contrato.get("vigencia", "—")}
 • Tarifa pactada    : {tarifa}
-• CUPS              : {cups}  ← USA ESTE CUPS, no el que la EPS mencione como alternativa{_nota_cups}
+• {_etiqueta_codigo:<18}: {cups}  ← USA ESTE CÓDIGO, no el que la EPS mencione como alternativa{_nota_cups}
   ⚠ DOS LETRAS + 4 DÍGITOS (TA, SO, FA, CO, CL, PE, AU, IN, ME, SE, EX, SA, RE
     y DE de devoluciones — Res. 2284/2023) es SIEMPRE un código de glosa o de
     devolución, NUNCA un CUPS. Si aparece en el texto, no lo escribas como CUPS

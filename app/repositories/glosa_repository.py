@@ -53,6 +53,10 @@ class GlosaRepository:
         request_id: Optional[str] = None,
         workflow_state: Optional[str] = "RADICADA",
         score: Optional[float] = 0.0,
+        # La Confianza que ve el auditor (0-100) y su nivel. Distinta de
+        # `score`, que es la fórmula vieja de probabilidad de éxito.
+        confianza_score: Optional[float] = None,
+        confianza_nivel: Optional[str] = None,
         prioridad: Optional[str] = "BAJA",
         numero_radicado: Optional[str] = None,
         factura: Optional[str] = None,
@@ -85,6 +89,8 @@ class GlosaRepository:
             request_id=request_id,
             workflow_state=workflow_state,
             score=score,
+            confianza_score=confianza_score,
+            confianza_nivel=confianza_nivel,
             prioridad=prioridad,
             numero_radicado=numero_radicado,
             factura=factura,

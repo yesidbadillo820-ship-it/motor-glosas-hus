@@ -35,8 +35,21 @@
   --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
   --mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
   --toque:52px;
+  /* PUENTE al sistema de diseño común (ver el bloque del final del CSS).
+     Cada aplicación conserva sus propios nombres de color y solo los
+     traduce aquí; de ahí para abajo, el acabado es el mismo en las tres. */
+  --ds-sup:var(--sup); --ds-linea:var(--linea); --ds-tinta3:var(--tinta3);
+  --ds-acento:var(--aurora); --ds-acento-hondo:var(--aurora2);
+  --ds-vidrio:color-mix(in srgb, var(--sup) 78%, transparent);
+  --ds-luz1:color-mix(in srgb, #0E9C74 17%, transparent);
+  --ds-luz2:color-mix(in srgb, #5B4BC4 14%, transparent);
+  --ds-r2:var(--r3); --ds-r3:var(--r4); --ds-hueco:var(--s7);
+  --ds-e2:var(--e2); --ds-e3:var(--e3);
 }
 @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --ds-luz1:color-mix(in srgb, #35D6A4 24%, transparent);
+  --ds-luz2:color-mix(in srgb, #9B8CF5 22%, transparent);
+
   --noche:#0B1120; --sup:#151E31; --sup2:#1C2740; --sup3:#25324F;
   --tinta:#E8EEF9; --tinta2:#A3B1CC; --tinta3:#7686A5;
   --linea:#25324F; --linea2:#1B2540;
@@ -49,6 +62,9 @@
   --e3:0 10px 34px -8px rgba(0,0,0,.9);
 }}
 :root[data-theme="dark"]{
+  --ds-luz1:color-mix(in srgb, #35D6A4 24%, transparent);
+  --ds-luz2:color-mix(in srgb, #9B8CF5 22%, transparent);
+
   --noche:#0B1120; --sup:#151E31; --sup2:#1C2740; --sup3:#25324F;
   --tinta:#E8EEF9; --tinta2:#A3B1CC; --tinta3:#7686A5;
   --linea:#25324F; --linea2:#1B2540;
@@ -117,6 +133,11 @@ button:disabled{opacity:.45; cursor:default; transform:none}
 .fantasma{border-color:transparent; background:transparent; color:var(--tinta2)}
 .fila-btn{display:flex; gap:var(--s2); flex-wrap:wrap}
 
+/* -------------------------------------------------------------------- iconos - */
+.ic{width:1.25em; height:1.25em; flex:none; display:inline-block; vertical-align:-.22em}
+.ic.g{width:1.55em; height:1.55em} .ic.gg{width:2.2em; height:2.2em}
+.ic.xl{width:3.4em; height:3.4em; stroke-width:1.35}
+
 /* ------------------------------------------------------------------ fichas - */
 .ficha{display:inline-flex; align-items:center; gap:5px; font-size:.76rem; font-weight:700;
   padding:4px 10px; border-radius:99px; background:var(--sup2); color:var(--tinta2);
@@ -165,7 +186,8 @@ button:disabled{opacity:.45; cursor:default; transform:none}
 .nodo .estrellas{margin-left:auto; font-size:.8rem; color:var(--oro); white-space:nowrap}
 
 /* ------------------------------------------------------------- ejercicios - */
-.lec-tope{position:sticky; top:0; z-index:30; background:var(--noche);
+.lec-tope{position:sticky; top:0; z-index:30;
+  background:color-mix(in srgb,var(--noche) 82%,transparent); backdrop-filter:blur(12px);
   padding:calc(var(--s3) + env(safe-area-inset-top)) 0 var(--s3); margin-bottom:var(--s4);
   display:flex; align-items:center; gap:var(--s3)}
 .lec-tope .barra{flex:1}
@@ -324,9 +346,244 @@ table.datos td{padding:9px 6px; border-bottom:1px solid var(--linea2)}
     var(--r3) 0 0; border:1px solid var(--linea); border-bottom:0}
   .parejas{grid-template-columns:repeat(2,1fr)}
 }
+
+/* ===========================================================================
+   PIEZAS PROPIAS DE ESTE CURSO
+   Lo que no es del sistema común porque solo existe aquí: la bandera, el
+   emblema del final de la lección, el camino del curso y el botón de audio.
+   =========================================================================== */
+
+/* La bandera de Noruega, enmarcada y con luz propia. */
+.bandera-hero, .bandera-mini{display:grid; place-items:center; margin:0 auto var(--s4)}
+.bandera-hero .ic{width:74px; height:52px; border-radius:9px;
+  box-shadow:0 0 0 1px rgba(10,27,46,.13), 0 12px 30px -10px rgba(10,27,46,.5)}
+.bandera-mini .ic{width:52px; height:37px; border-radius:7px;
+  box-shadow:0 0 0 1px rgba(10,27,46,.13), 0 8px 20px -10px rgba(10,27,46,.45)}
+
+/* Las medallas del encabezado, en pastilla. */
+.medalla{padding:5px 11px 5px 8px; border-radius:99px; font-size:.85rem;
+  background:var(--sup2); border:1px solid color-mix(in srgb,var(--linea) 60%,transparent)}
+.medalla.xp{background:var(--oro-f); border-color:transparent}
+.medalla.racha{background:var(--rojo-f); border-color:transparent}
+
+/* El emblema redondo del final de la lección. */
+.emblema{width:104px; height:104px; margin:0 auto var(--s4); border-radius:50%;
+  display:grid; place-items:center; color:var(--aurora2);
+  background:radial-gradient(circle at 50% 38%, var(--aurora-f), var(--sup));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--aurora) 28%,transparent),
+             0 18px 40px -18px color-mix(in srgb,var(--aurora) 90%,transparent)}
+.emblema.malo{color:var(--rojo);
+  background:radial-gradient(circle at 50% 38%, var(--rojo-f), var(--sup));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--rojo) 28%,transparent),
+             0 18px 40px -18px color-mix(in srgb,var(--rojo) 80%,transparent)}
+@media (prefers-reduced-motion:no-preference){
+  .emblema{animation:brota .45s cubic-bezier(.2,1.3,.4,1) both}
+  @keyframes brota{from{opacity:0; transform:scale(.72)} to{opacity:1; transform:none}}
+}
+
+/* Las estrellas de la lección. */
+.estrellas{display:inline-flex; gap:2px; color:var(--oro-vivo)}
+.estrellas .ic{width:1em; height:1em}
+
+/* El camino del curso: la línea de avance en degradado. */
+.senda::before{background:linear-gradient(var(--aurora), var(--sup3) 55%)}
+.nodo .bola .ic{width:1em; height:1em}
+.nodo.actual{box-shadow:0 0 0 4px color-mix(in srgb,var(--aurora) 16%,transparent)}
+.op.sel{box-shadow:0 0 0 3px color-mix(in srgb,var(--aurora) 18%,transparent)}
+
+/* El botón grande de audio. */
+.audio-btn{background:linear-gradient(165deg, var(--violeta-f),
+  color-mix(in srgb,var(--violeta-f) 55%, var(--sup)));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--violeta) 22%,transparent),
+             0 12px 26px -16px color-mix(in srgb,var(--violeta) 95%,transparent)}
+.audio-btn .ic{width:2.4rem; height:2.4rem; stroke-width:1.5}
+.audio-btn.chico{border-radius:var(--r2)}
+.audio-btn.chico .ic{width:1.35rem; height:1.35rem}
+
+/* La cabecera de la lección: translúcida, para que no tape la luz del fondo. */
+.lec-tope{background:color-mix(in srgb,var(--noche) 82%,transparent); backdrop-filter:blur(12px)}
+.veredicto{border-radius:var(--r4) var(--r4) 0 0; border-top-width:0;
+  box-shadow:0 -14px 40px -20px rgba(10,27,46,.55)}
+.veredicto .cab .ic{width:1.35em; height:1.35em}
+.aviso.vio > .ic{color:var(--violeta)} .aviso.oro > .ic{color:var(--oro)}
+.aviso > .ic{color:var(--tinta3)}
+.logro .ic{width:26px; height:26px; color:var(--aurora2)}
+.logro.gris .ic{color:var(--tinta3)}
+.buscador .lupa{display:grid; place-items:center}
+.palabra-fila .fav.on .ic{filter:drop-shadow(0 1px 4px color-mix(in srgb,var(--oro-vivo) 60%,transparent))}
+
+/* ===========================================================================
+   SISTEMA DE DISEÑO COMÚN — una sola fuente de verdad para las tres
+   aplicaciones (ICFES, noruego, velas japonesas).
+   ---------------------------------------------------------------------------
+   Este bloque es IDÉNTICO, carácter por carácter, en las tres plantillas, y
+   hay una prueba que lo comprueba. Antes cada aplicación traía su propio
+   acabado y las tres se veían como tres productos de tres autores distintos.
+
+   Cada aplicación conserva sus nombres de color y solo declara el «puente»
+   (los tokens --ds-*) en su :root, arriba, junto a los demás. De ahí para
+   abajo, todo lo que sigue funciona igual en las tres.
+
+   Lo que NO hace: tocar la rejilla, los estados ni el contraste que cada
+   aplicación ya tenía resueltos. Es una capa, no un reemplazo.
+   =========================================================================== */
+
+/* --- 1. Tipografía: una escala, no tamaños sueltos ------------------------ */
+h1{font-size:clamp(1.6rem, 1.28rem + 1.6vw, 2.1rem); font-weight:800;
+   letter-spacing:-.035em; line-height:1.12; text-wrap:balance}
+h2{font-size:clamp(1.12rem, 1.02rem + .5vw, 1.3rem); font-weight:750;
+   letter-spacing:-.025em; line-height:1.22; text-wrap:balance}
+h3{letter-spacing:-.015em}
+p{text-wrap:pretty}
+/* Las cifras alineadas en columna: sin esto, «11» ocupa menos que «88» y las
+   listas de números quedan temblorosas. */
+.num, .dato b, .kpi b, .v, td, th, time{font-variant-numeric:tabular-nums}
+
+/* --- 2. La luz del fondo -------------------------------------------------- */
+/* Va DETRÁS de todo con z-index:-1. Levantar el contenido con
+   `position:relative` sería un error: le pisaría el `position:fixed` a la
+   barra de abajo y dejaría de quedarse pegada a la pantalla. */
+body::before{
+  content:""; position:fixed; inset:0 0 auto 0; height:48vh; z-index:-1;
+  pointer-events:none;
+  background:
+    radial-gradient(118% 60% at 14% 0%, var(--ds-luz1), transparent 62%),
+    radial-gradient(108% 56% at 88% 3%, var(--ds-luz2), transparent 66%);
+}
+
+/* --- 3. Superficies: tres niveles, no quince ----------------------------- */
+.tarjeta, .mod-cab, .bloque{
+  border-radius:var(--ds-r3);
+  border-color:color-mix(in srgb, var(--ds-linea) 68%, transparent);
+  background:var(--ds-vidrio);
+  backdrop-filter:blur(7px) saturate(1.05);
+  box-shadow:var(--ds-e2);
+}
+.dato, .kpi, .nodo, .op, .logro{border-radius:var(--ds-r2)}
+
+/* --- 4. Interacción: todo lo que se toca responde ------------------------ */
+button, .op, .nodo, [role="button"]{
+  transition:transform .13s cubic-bezier(.2,.8,.3,1),
+             box-shadow .18s ease, background .18s ease, border-color .18s ease;
+}
+button:active:not(:disabled), .op:active:not([disabled]), .nodo:active{transform:scale(.978)}
+@media (hover:hover){
+  .tarjeta:hover{box-shadow:var(--ds-e3)}
+  .op:not([disabled]):hover, .nodo:not(.bloqueada):hover{
+    border-color:color-mix(in srgb, var(--ds-acento) 55%, transparent)}
+}
+/* El anillo de foco: visible siempre, para quien navega con teclado. */
+:focus-visible{outline:3px solid var(--ds-acento); outline-offset:2px; border-radius:4px}
+
+/* --- 5. El botón principal ----------------------------------------------- */
+.pri{
+  background:linear-gradient(177deg, color-mix(in srgb, var(--ds-acento) 88%, #fff), var(--ds-acento));
+  box-shadow:0 3px 0 var(--ds-acento-hondo),
+             0 10px 22px -13px color-mix(in srgb, var(--ds-acento) 92%, transparent);
+  letter-spacing:-.012em;
+}
+.pri:active:not(:disabled){box-shadow:0 1px 0 var(--ds-acento-hondo); transform:translateY(2px) scale(1)}
+
+/* --- 6. Iconos ------------------------------------------------------------ */
+.ic{width:1.25em; height:1.25em; flex:none; display:inline-block; vertical-align:-.22em}
+.ic.g{width:1.55em; height:1.55em} .ic.gg{width:2.2em; height:2.2em}
+.ic.xl{width:3.2em; height:3.2em; stroke-width:1.35}
+
+/* --- 7. Barra de navegación ---------------------------------------------- */
+.nav{background:color-mix(in srgb, var(--ds-sup) 86%, transparent);
+     backdrop-filter:blur(18px) saturate(1.4)}
+.nav button{gap:4px; position:relative}
+.nav button .ic{width:23px; height:23px; transition:transform .18s cubic-bezier(.2,.8,.3,1)}
+.nav button[aria-current="page"] .ic{transform:translateY(-1px)}
+.nav button[aria-current="page"]::before{
+  content:""; position:absolute; top:5px; left:50%; translate:-50% 0;
+  width:42px; height:29px; border-radius:99px;
+  background:color-mix(in srgb, var(--ds-acento) 13%, transparent); z-index:-1}
+
+/* --- 8. Avisos y estados vacíos ------------------------------------------ */
+.aviso{border-radius:var(--ds-r2); align-items:flex-start}
+.aviso > .ic{margin-top:1px; flex:none}
+.vacio{padding-block:var(--ds-hueco)}
+.vacio > .ic{color:var(--ds-tinta3); display:block; margin:0 auto .75rem}
+
+/* --- 9. Movimiento: uno solo, y se apaga si el sistema lo pide ----------- */
+@media (prefers-reduced-motion:no-preference){
+  .entra{animation:ds-entra .34s cubic-bezier(.2,.8,.3,1) both}
+  @keyframes ds-entra{from{opacity:0; transform:translateY(13px) scale(.988)} to{opacity:1; transform:none}}
+  .entra:nth-of-type(2){animation-delay:.045s}
+  .entra:nth-of-type(3){animation-delay:.09s}
+  .entra:nth-of-type(4){animation-delay:.13s}
+}
+@media (prefers-reduced-motion:reduce){
+  *, *::before, *::after{animation-duration:.01ms !important; transition-duration:.01ms !important}
+}
+
+/* --- 10. Impresión: que salga legible en papel --------------------------- */
+@media print{
+  body::before, .nav{display:none}
+  .tarjeta{box-shadow:none; border:1px solid #ccc; break-inside:avoid}
+}
 </style>
 </head>
 <body>
+<!-- ===========================================================================
+     Los iconos. Antes esto eran emoji (🏠 🗺️ 🔁 …): se veían distintos en cada
+     teléfono, no heredaban el color del texto y delataban que la aplicación
+     estaba a medio terminar. Ahora es un juego propio de trazo uniforme —24px,
+     1,75 de grosor— que toma el color de donde se pone y se ve igual en todas
+     partes. Va incrustado: la aplicación sigue funcionando sin internet.
+     =========================================================================== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-casa" viewBox="0 0 24 24"><path d="M3 10.2 12 3l9 7.2"/><path d="M5.5 9.2V20h13V9.2"/><path d="M9.75 20v-5.5h4.5V20"/></symbol>
+<symbol id="i-mapa" viewBox="0 0 24 24"><path d="m9 4.5-5.5 2.2v12.8L9 17.3l6 2.2 5.5-2.2V4.5L15 6.7Z"/><path d="M9 4.5v12.8M15 6.7v12.8"/></symbol>
+<symbol id="i-repetir" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-13.9-5.4L3.5 8"/><path d="M4 13a8 8 0 0 0 13.9 5.4L20.5 16"/><path d="M3.5 3.8V8H7.7M20.5 20.2V16h-4.2"/></symbol>
+<symbol id="i-libro" viewBox="0 0 24 24"><path d="M4 4.5h5a3 3 0 0 1 3 3v12a2.6 2.6 0 0 0-2.6-2.5H4Z"/><path d="M20 4.5h-5a3 3 0 0 0-3 3v12a2.6 2.6 0 0 1 2.6-2.5H20Z"/></symbol>
+<symbol id="i-grafico" viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M7 20V12M12 20V5M17 20v-5.5"/></symbol>
+<symbol id="i-volumen" viewBox="0 0 24 24"><path d="M11 5.5 6.6 9H3.5v6h3.1L11 18.5Z"/><path d="M15 9.4a3.6 3.6 0 0 1 0 5.2"/><path d="M17.8 6.8a7.3 7.3 0 0 1 0 10.4"/></symbol>
+<symbol id="i-volumen-no" viewBox="0 0 24 24"><path d="M11 5.5 6.6 9H3.5v6h3.1L11 18.5Z"/><path d="m15.5 10 5 4M20.5 10l-5 4"/></symbol>
+<symbol id="i-tortuga" viewBox="0 0 24 24"><path d="M3.4 15.8a6.8 6.8 0 0 1 13.6 0Z"/><path d="M2.4 15.8h15.2"/><path d="M17 13.4a2.1 2.1 0 1 1 1.6 3.3"/><path d="M6 15.8v2.6M14.4 15.8v2.6"/></symbol>
+<symbol id="i-estrella" viewBox="0 0 24 24"><path d="m12 3.6 2.6 5.3 5.9.9-4.25 4.15 1 5.85L12 17l-5.25 2.8 1-5.85L3.5 9.8l5.9-.9Z" fill="currentColor" stroke-width="1.4"/></symbol>
+<symbol id="i-estrella-no" viewBox="0 0 24 24"><path d="m12 3.6 2.6 5.3 5.9.9-4.25 4.15 1 5.85L12 17l-5.25 2.8 1-5.85L3.5 9.8l5.9-.9Z"/></symbol>
+<symbol id="i-fuego" viewBox="0 0 24 24"><path d="M12 3.2c3.2 3 4.8 5.5 4.8 7.6 0 1-.3 1.8-.8 2.4.9.3 1.5 1.4 1.5 2.9 0 3-2.5 4.7-5.5 4.7S6.5 19.1 6.5 16c0-2.4 1.3-4.7 3.2-6.4-.2 1.6.3 2.6 1.1 3 .5-2.6.6-5 1.2-9.4Z" fill="currentColor" stroke-width="1.4"/></symbol>
+<symbol id="i-chispa" viewBox="0 0 24 24"><path d="M12 3.2c.9 4.3 1.9 5.3 6.2 6.2-4.3.9-5.3 1.9-6.2 6.2-.9-4.3-1.9-5.3-6.2-6.2 4.3-.9 5.3-1.9 6.2-6.2Z" fill="currentColor" stroke-width="1.3"/><path d="M18 15.4c.4 1.9.8 2.3 2.7 2.7-1.9.4-2.3.8-2.7 2.7-.4-1.9-.8-2.3-2.7-2.7 1.9-.4 2.3-.8 2.7-2.7Z" fill="currentColor" stroke-width="1.3"/></symbol>
+<symbol id="i-corazon" viewBox="0 0 24 24"><path d="M12 20.3s-7.8-4.6-7.8-9.6a4.4 4.4 0 0 1 7.8-2.8 4.4 4.4 0 0 1 7.8 2.8c0 5-7.8 9.6-7.8 9.6Z" fill="currentColor" stroke-width="1.4"/></symbol>
+<symbol id="i-corazon-roto" viewBox="0 0 24 24"><path d="M12 20.3s-7.8-4.6-7.8-9.6a4.4 4.4 0 0 1 7.8-2.8 4.4 4.4 0 0 1 7.8 2.8c0 5-7.8 9.6-7.8 9.6Z"/><path d="m12 7.9-2.1 3.5 3.4 1.6-2.4 3.4"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m4.5 12.6 4.8 4.8L19.5 7.2" stroke-width="2.1"/></symbol>
+<symbol id="i-equis" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke-width="2.1"/></symbol>
+<symbol id="i-candado" viewBox="0 0 24 24"><rect x="4.5" y="10.2" width="15" height="10.3" rx="2.4"/><path d="M8 10.2V7.6a4 4 0 0 1 8 0v2.6"/></symbol>
+<symbol id="i-lupa" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.5 15.5 4 4"/></symbol>
+<symbol id="i-charla" viewBox="0 0 24 24"><path d="M20 13.5a3 3 0 0 1-3 3H9l-5 3.5V6.5a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3Z"/><path d="M8.5 8.6h7M8.5 12h4.5"/></symbol>
+<symbol id="i-diana" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.3"/><circle cx="12" cy="12" r="4.6"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-brujula" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m14.9 9.1-1.6 4.2-4.2 1.6 1.6-4.2Z" fill="currentColor" stroke-width="1.4"/></symbol>
+<symbol id="i-diamante" viewBox="0 0 24 24"><path d="M7 3.8h10l4 5.1L12 20.4 3 8.9Z"/><path d="M3 8.9h18M7 3.8l-1.2 5.1L12 20.4l6.2-11.5L17 3.8"/></symbol>
+<symbol id="i-rayo" viewBox="0 0 24 24"><path d="M13.4 2.8 4.8 13.4h6L10.6 21.2 19.2 10.6h-6Z" fill="currentColor" stroke-width="1.4"/></symbol>
+<symbol id="i-brote" viewBox="0 0 24 24"><path d="M12 20.5v-7.2"/><path d="M12 13.3C12 9.9 9.4 7.6 5.6 7.6c0 3.5 2.5 5.7 6.4 5.7Z"/><path d="M12.4 12.4c0-3.1 2.3-5.2 5.8-5.2 0 3.2-2.4 5.2-5.8 5.2Z"/></symbol>
+<symbol id="i-montana" viewBox="0 0 24 24"><path d="m2.6 19.4 6.2-11 3.5 6 2-3.4 7.1 8.4Z"/><path d="m6.3 12.9 2.5 1.6 2.4-1.9"/></symbol>
+<symbol id="i-alfabeto" viewBox="0 0 24 24"><path d="M3.2 16.4 6.9 7l3.7 9.4"/><path d="M4.4 13.4h5"/><circle cx="16.4" cy="15.4" r="3.1"/><path d="M19.5 11.8v7.2"/></symbol>
+<symbol id="i-libros" viewBox="0 0 24 24"><path d="M4.5 5.2h3.4v14.3H4.5zM9.6 5.2H13v14.3H9.6z"/><path d="m15.2 6.5 3.2-.8 3 13.9-3.3.6z"/></symbol>
+<symbol id="i-pieza" viewBox="0 0 24 24"><path d="M9.5 4.5h5v1.7a1.8 1.8 0 1 0 3.6 0V4.5h1.4v5h-1.7a1.8 1.8 0 1 0 0 3.6h1.7v6.4h-6v-1.7a1.8 1.8 0 1 0-3.6 0v1.7h-6v-6h1.7a1.8 1.8 0 1 0 0-3.6H4.4v-5h5.1Z"/></symbol>
+<symbol id="i-claqueta" viewBox="0 0 24 24"><rect x="3.2" y="4.4" width="17.6" height="15.2" rx="2.4"/><path d="M3.2 9.6h17.6"/><path d="m7.6 4.4-1.4 5.2M13 4.4l-1.4 5.2M18.4 4.4 17 9.6"/></symbol>
+<symbol id="i-lapiz" viewBox="0 0 24 24"><path d="M16.5 3.9 20.1 7.5 8.6 19H5v-3.6Z"/><path d="m14.2 6.2 3.6 3.6"/></symbol>
+<symbol id="i-papelera" viewBox="0 0 24 24"><path d="M4.6 6.8h14.8"/><path d="M9.2 6.8V4.6h5.6v2.2"/><path d="M6.6 6.8 7.5 20h9l.9-13.2"/><path d="M10.5 10.4v5.8M13.5 10.4v5.8"/></symbol>
+<symbol id="i-fiesta" viewBox="0 0 24 24"><path d="M3.4 20.6 8 9.2l6.8 6.8Z"/><path d="M13.4 3.6v2.2M19.6 5.4l-1.6 1.6M20.6 11.6h-2.2"/><path d="M11.8 9.4a3.4 3.4 0 0 1 4.8-4.8M14.6 12.2a3.4 3.4 0 0 0 4.8 0"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="m8.4 5.6 9.6 6.4-9.6 6.4Z" fill="currentColor" stroke-width="1.4"/></symbol>
+<symbol id="i-saludo" viewBox="0 0 24 24"><path d="M7.4 12.6V5.9a1.6 1.6 0 0 1 3.2 0v5.1"/><path d="M10.6 10.4V4.6a1.6 1.6 0 0 1 3.2 0v6.2"/><path d="M13.8 10.9V6.4a1.6 1.6 0 0 1 3.2 0v7.9c0 3.5-2.2 6.1-5.4 6.1-2.6 0-4-1.2-5.3-3.4L4.6 14a1.6 1.6 0 0 1 2.6-1.8Z"/></symbol>
+<symbol id="i-persona" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20.2a7 7 0 0 1 14 0"/></symbol>
+<symbol id="i-familia" viewBox="0 0 24 24"><circle cx="7.6" cy="7.8" r="2.9"/><circle cx="16.6" cy="7.8" r="2.9"/><path d="M2.8 19.4a4.8 4.8 0 0 1 9.6 0M11.6 19.4a4.8 4.8 0 0 1 9.6 0"/></symbol>
+<symbol id="i-numeros" viewBox="0 0 24 24"><path d="M9.4 4.2 7.6 19.8M16.4 4.2l-1.8 15.6"/><path d="M4.4 8.8h15.2M3.8 15.2H19"/></symbol>
+<symbol id="i-engranaje" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.9v2.4M12 18.7v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.9 12h2.4M18.7 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></symbol>
+<symbol id="i-pan" viewBox="0 0 24 24"><path d="M5.4 9.6c0-2.6 2.9-4.4 6.6-4.4s6.6 1.8 6.6 4.4c0 1.3-.8 2-1.8 2.2v6.2a1.4 1.4 0 0 1-1.4 1.4H8.6a1.4 1.4 0 0 1-1.4-1.4v-6.2c-1-.2-1.8-.9-1.8-2.2Z"/><path d="M9.4 5.6v6.3M14.6 5.6v6.3"/></symbol>
+<symbol id="i-bus" viewBox="0 0 24 24"><rect x="4.2" y="3.8" width="15.6" height="12.9" rx="2.6"/><path d="M4.2 11.4h15.6M8.2 7.4h7.6"/><path d="M7.4 16.7v2.1M16.6 16.7v2.1"/><circle cx="8.2" cy="14" r=".9" fill="currentColor" stroke="none"/><circle cx="15.8" cy="14" r=".9" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-carrito" viewBox="0 0 24 24"><path d="M2.8 4.2h2.6l2.5 10.4h9.4l2.1-7.4H6.6"/><circle cx="9.4" cy="18.6" r="1.5"/><circle cx="16.6" cy="18.6" r="1.5"/></symbol>
+<symbol id="i-salud" viewBox="0 0 24 24"><path d="M3.4 11.6h3.4l1.8-4.2 3 9 2.2-5.2 1.5 3 1.4-2.6h3.9"/></symbol>
+<symbol id="i-maletin" viewBox="0 0 24 24"><rect x="3.2" y="7.4" width="17.6" height="12" rx="2.4"/><path d="M8.8 7.4V5.8a1.9 1.9 0 0 1 1.9-1.9h2.6a1.9 1.9 0 0 1 1.9 1.9v1.6"/><path d="M3.2 12.6h17.6"/></symbol>
+<symbol id="i-clima" viewBox="0 0 24 24"><path d="M7.4 15.4a3.7 3.7 0 0 1 .5-7.4 5 5 0 0 1 9.4 1.3 3.4 3.4 0 0 1-.5 6.1"/><path d="M8.6 18.6l-.8 1.8M12 18.6l-.8 1.8M15.4 18.6l-.8 1.8"/></symbol>
+<symbol id="i-columnas" viewBox="0 0 24 24"><path d="M3.4 8.6 12 3.8l8.6 4.8"/><path d="M4.6 19.6h14.8"/><path d="M7 11.4v7M12 11.4v7M17 11.4v7"/></symbol>
+<symbol id="i-birrete" viewBox="0 0 24 24"><path d="M2.8 8.8 12 4.4l9.2 4.4-9.2 4.4Z"/><path d="M6.8 11v4.6c0 1.6 2.3 2.8 5.2 2.8s5.2-1.2 5.2-2.8V11"/><path d="M20.4 9.4v5"/></symbol>
+<symbol id="i-atras" viewBox="0 0 24 24"><path d="M4.4 12.4h11.2a4 4 0 0 1 0 8h-2.8"/><path d="m8.6 7.6-4.2 4.8 4.2 4.8"/><path d="M8.6 3.6h10.8"/></symbol>
+<symbol id="i-bandera" viewBox="0 0 22 16"><path d="M0 0h22v16H0z" fill="#BA0C2F" stroke="none"/><path d="M6 0h4v16H6z" fill="#fff" stroke="none"/><path d="M0 6h22v4H0z" fill="#fff" stroke="none"/><path d="M7 0h2v16H7z" fill="#00205B" stroke="none"/><path d="M0 7h22v2H0z" fill="#00205B" stroke="none"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M12 11.2v5"/><circle cx="12" cy="7.9" r="1" fill="currentColor" stroke="none"/></symbol>
+</defs></svg>
 <div class="pantalla" id="app"></div>
 <nav class="nav" id="nav"></nav>
 <script>
@@ -340,6 +597,18 @@ const DATOS = /*<DATOS>*/{"lecciones":[],"modulos":[],"lexico":{},"niveles":[],"
    se sube nada. Envuelto en try/catch porque en ventana privada localStorage
    lanza excepción y el estudiante no puede quedarse sin app por eso.
    =========================================================================== */
+/* ---------------------------------------------------------------------------
+   Los iconos. `ic("casa")` devuelve el SVG que apunta al juego incrustado en
+   el <body>. Los atributos de trazo van aqui, en el <svg> que hace el <use>:
+   el contenido del <symbol> los hereda, asi que un solo juego sirve para
+   cualquier color y cualquier tamano. Antes esto eran emoji.
+   --------------------------------------------------------------------------- */
+function ic(nombre, clase){
+  return `<svg class="ic${clase ? " " + clase : ""}" aria-hidden="true" focusable="false"`
+    + ` fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"`
+    + ` stroke-linejoin="round"><use href="#i-${nombre}"></use></svg>`;
+}
+
 const CLAVE = "norsk.v1";
 const BASE = {
   perfil:{nombre:"", metaDiaria:30, creado:""},
@@ -480,25 +749,25 @@ function nivelActual(){
    Logros. Existen para marcar hitos reales del aprendizaje, no para adornar.
    =========================================================================== */
 const LOGROS = [
-  {id:"primera", ic:"🌱", t:"Primera lección", d:"Terminaste tu primera lección.",
+  {id:"primera", ic:"brote", t:"Primera lección", d:"Terminaste tu primera lección.",
    ok:() => avanceCurso().hechas >= 1},
-  {id:"racha3", ic:"🔥", t:"Tres días seguidos", d:"La constancia es lo que enseña un idioma.",
+  {id:"racha3", ic:"fuego", t:"Tres días seguidos", d:"La constancia es lo que enseña un idioma.",
    ok:() => rachaViva() >= 3},
-  {id:"racha7", ic:"⚡", t:"Una semana entera", d:"Siete días sin fallar uno.",
+  {id:"racha7", ic:"rayo", t:"Una semana entera", d:"Siete días sin fallar uno.",
    ok:() => rachaViva() >= 7},
-  {id:"racha30", ic:"🏔️", t:"Un mes completo", d:"Treinta días seguidos estudiando.",
+  {id:"racha30", ic:"montana", t:"Un mes completo", d:"Treinta días seguidos estudiando.",
    ok:() => rachaViva() >= 30},
-  {id:"palabras50", ic:"📖", t:"Cincuenta palabras", d:"Ya sostienes una conversación básica.",
+  {id:"palabras50", ic:"libro", t:"Cincuenta palabras", d:"Ya sostienes una conversación básica.",
    ok:() => palabrasAprendidas() >= 50},
-  {id:"palabras200", ic:"📚", t:"Doscientas palabras", d:"Con esto se entiende el día a día.",
+  {id:"palabras200", ic:"libros", t:"Doscientas palabras", d:"Con esto se entiende el día a día.",
    ok:() => palabrasAprendidas() >= 200},
-  {id:"sonidos", ic:"🔤", t:"Los sonidos del norte", d:"Terminaste el módulo de pronunciación.",
+  {id:"sonidos", ic:"alfabeto", t:"Los sonidos del norte", d:"Terminaste el módulo de pronunciación.",
    ok:() => (MODULOS.sonidos||{lecciones:[]}).lecciones.every(c => estadoLeccion(c) === "hecha")},
-  {id:"modulo5", ic:"🧭", t:"Cinco módulos", d:"Ya llevas media base del idioma.",
+  {id:"modulo5", ic:"brujula", t:"Cinco módulos", d:"Ya llevas media base del idioma.",
    ok:() => DATOS.modulos.filter(m => m.lecciones.every(c => estadoLeccion(c) === "hecha")).length >= 5},
-  {id:"perfecta", ic:"💎", t:"Lección perfecta", d:"Una lección entera sin fallar ni una.",
+  {id:"perfecta", ic:"diamante", t:"Lección perfecta", d:"Una lección entera sin fallar ni una.",
    ok:() => Object.values(E.lecciones).some(l => l.estrellas >= 3)},
-  {id:"nivel10", ic:"🌟", t:"Nivel 10", d:"Diez niveles de experiencia.",
+  {id:"nivel10", ic:"chispa", t:"Nivel 10", d:"Diez niveles de experiencia.",
    ok:() => nivelJugador(E.xp) >= 10},
 ];
 function revisarLogros(){
@@ -627,8 +896,8 @@ function normalizar(texto){
 /* ===========================================================================
    Navegación
    =========================================================================== */
-const VISTAS = [["inicio","🏠","Inicio"],["curso","🗺️","Curso"],["repaso","🔁","Repaso"],
-                ["diccionario","📖","Palabras"],["perfil","📊","Perfil"]];
+const VISTAS = [["inicio","casa","Inicio"],["curso","mapa","Curso"],["repaso","repetir","Repaso"],
+                ["diccionario","libro","Palabras"],["perfil","grafico","Perfil"]];
 let vista = "inicio", sesion = null, pantallaExtra = null;
 
 function ir(v, extra){
@@ -642,9 +911,11 @@ function pintar(){
   const nav = document.getElementById("nav");
   if(sesion){ nav.style.display = "none"; app.innerHTML = vLeccion(); tras(); return; }
   nav.style.display = "";
-  nav.innerHTML = VISTAS.map(([id,ic,t]) =>
+  // Ojo: la variable del icono NO puede llamarse `ic` — taparia a la funcion
+  // ic() que dibuja el SVG, y la barra saldria con el nombre en vez del dibujo.
+  nav.innerHTML = VISTAS.map(([id,icono,rotulo]) =>
     `<button ${id===vista?'aria-current="page"':""} onclick="ir('${id}')">
-      <span class="ic">${ic}</span>${t}</button>`).join("");
+      ${ic(icono)}<span>${rotulo}</span></button>`).join("");
   const render = {inicio:vInicio, curso:vCurso, repaso:vRepaso,
                   diccionario:vDiccionario, perfil:vPerfil}[vista] || vInicio;
   app.innerHTML = render();
@@ -673,8 +944,8 @@ function cabecera(titulo, sub){
       <div><div class="rot">Nivel ${p.nivel}</div>
         <div style="font-weight:800;font-size:1.05rem">${esc(titulo)}</div></div>
       <div class="medallas">
-        <span class="medalla racha" title="Racha"><span class="ic">🔥</span>${rachaViva()}</span>
-        <span class="medalla xp" title="Experiencia"><span class="ic">⭐</span>${E.xp}</span>
+        <span class="medalla racha" title="Racha">${ic("fuego")}${rachaViva()}</span>
+        <span class="medalla xp" title="Experiencia">${ic("chispa")}${E.xp}</span>
       </div></div></div>
     ${sub ? `<p class="tenue mini" style="margin-top:calc(var(--s2)*-1)">${esc(sub)}</p>` : ""}`;
 }
@@ -702,8 +973,9 @@ function vInicio(){
         <h2>${E.xpHoy >= meta ? `${E.xpHoy} XP hoy` : `${E.xpHoy} de ${meta} XP`}</h2>
         <p class="tenue mini" style="margin:2px 0 0">${
           E.xpHoy >= meta ? "¡Meta cumplida! Lo de más suma para el nivel."
-          : `Te faltan ${meta - E.xpHoy} XP. Son unos ${Math.max(1, Math.ceil((meta-E.xpHoy)/JUEGO.xpAcierto/4))} minutos.`}</p></div>
-      <div class="anillo" style="--p:${pctMeta}"><b>${E.xpHoy >= meta ? "✓" : "🎯"}</b></div>
+          : (() => { const min = Math.max(1, Math.ceil((meta-E.xpHoy)/JUEGO.xpAcierto/4));
+              return `Te faltan ${meta - E.xpHoy} XP: ${min === 1 ? "un minuto" : "unos " + min + " minutos"}.`; })()}</p></div>
+      <div class="anillo" style="--p:${pctMeta}"><b>${E.xpHoy >= meta ? ic("check") : ic("diana")}</b></div>
     </div>
     <div class="barra"><i style="width:${p.pct}%"></i></div>
     <p class="micro tenue" style="margin:6px 0 0">Nivel ${p.nivel} · faltan ${p.falta} XP para el ${p.nivel+1}</p>
@@ -712,7 +984,7 @@ function vInicio(){
   // Lección recomendada
   h += `<div class="tarjeta acento"><div class="rot">Sigue por aquí</div>
     <h2 style="margin:2px 0 4px">${esc(sig.titulo)}</h2>
-    <p class="tenue mini">${esc(mod.icono || "")} ${esc(mod.titulo || "")} · ${esc(sig.objetivo)}</p>
+    <p class="tenue mini">${mod.icono ? ic(mod.icono) : ""} ${esc(mod.titulo || "")} · ${esc(sig.objetivo)}</p>
     <button class="pri blq" onclick="empezar('${sig.clave}')">
       ${E.lecciones[sig.clave] ? "Continuar" : "Empezar"} lección</button></div>`;
 
@@ -720,7 +992,7 @@ function vInicio(){
   if(pend > 0){
     h += `<div class="tarjeta"><div class="enc"><div><div class="rot">Repaso inteligente</div>
       <h2>${pend} ${plural(pend,"palabra lista","palabras listas")} para repasar</h2></div>
-      <span style="font-size:1.8rem">🔁</span></div>
+      ${ic("repetir","gg")}</div>
       <p class="tenue mini">Son las que estás a punto de olvidar. El sistema las eligió solo.</p>
       <button class="blq" onclick="ir('repaso')">Repasar ahora</button></div>`;
   }
@@ -739,11 +1011,11 @@ function vInicio(){
       <h2 style="margin-bottom:var(--s3)">Lo que se te atravesó</h2>` +
       errores.map(er => `<div class="ejemplo"><div class="tx">
         <div class="no">${esc(er.no)}</div><div class="es">${esc(er.es)}</div></div>
-        <button class="audio-btn chico" ${alPulsarDecir(er.no)}>🔊</button>
+        <button class="audio-btn chico" ${alPulsarDecir(er.no)}>${ic("volumen")}</button>
       </div>`).join("") + `</div>`;
   }
   if(!hayVoz()){
-    h += `<div class="aviso vio"><span>🔈</span><span>Tu dispositivo no tiene voz noruega
+    h += `<div class="aviso vio">${ic("volumen-no")}<span>Tu dispositivo no tiene voz noruega
       instalada, así que el audio está apagado. Se agrega ${comoInstalarVoz()}.
       Mientras tanto usa la pronunciación aproximada que aparece debajo de cada
       palabra.</span></div>`;
@@ -759,7 +1031,7 @@ function saludo(){
 function vBienvenida(){
   return `<div class="entra" style="padding-top:var(--s7)">
     <div class="centro" style="margin-bottom:var(--s6)">
-      <div style="font-size:3.5rem;line-height:1">🇳🇴</div>
+      <div class="bandera-hero">${ic("bandera")}</div>
       <h1 style="margin-top:var(--s3)">Norsk</h1>
       <p class="tenue">Curso de noruego para hispanohablantes.<br>De cero a nivel profesional.</p>
     </div>
@@ -775,9 +1047,9 @@ function vBienvenida(){
       </select>
       <button class="pri blq" style="margin-top:var(--s5)" onclick="crearPerfil()">Empezar</button>
     </div>
-    <div class="aviso"><span>🔒</span><span>Todo tu avance se guarda solo en este
+    <div class="aviso">${ic("candado")}<span>Todo tu avance se guarda solo en este
       dispositivo. No hay cuenta, no hay servidor y funciona sin internet.</span></div>
-    <div class="aviso"><span>📚</span><span>El curso enseña <b>bokmål</b>, la forma escrita
+    <div class="aviso">${ic("libros")}<span>El curso enseña <b>bokmål</b>, la forma escrita
       que usa la gran mayoría de los noruegos y la única que se evalúa en la prueba oficial
       para extranjeros.</span></div>
   </div>`;
@@ -811,7 +1083,7 @@ function vCurso(){
     }
     const hechas = mod.lecciones.filter(c => estadoLeccion(c) === "hecha").length;
     h += `<div class="modulo"><div class="mod-cab">
-        <span class="ic">${mod.icono}</span>
+        ${ic(mod.icono, "gg")}
         <div class="tx"><h2>${esc(mod.titulo)}</h2>
           <p class="tenue micro" style="margin:0">${esc(mod.descripcion)}</p></div>
         <span class="ficha ${hechas === mod.lecciones.length ? "on" : ""}">${hechas}/${mod.lecciones.length}</span>
@@ -822,9 +1094,9 @@ function vCurso(){
       const estrellas = guardada ? guardada.estrellas : 0;
       h += `<button class="nodo ${est}" ${est === "bloqueada" ? "disabled" : ""}
           onclick="empezar('${clave}')">
-        <span class="bola">${est === "hecha" ? "✓" : est === "bloqueada" ? "🔒" : "▶"}</span>
+        <span class="bola">${est === "hecha" ? ic("check") : est === "bloqueada" ? ic("candado") : ic("play")}</span>
         <span class="tx"><b>${esc(lec.titulo)}</b><span>${esc(lec.objetivo)}</span></span>
-        ${estrellas ? `<span class="estrellas">${"★".repeat(estrellas)}${"☆".repeat(3-estrellas)}</span>` : ""}
+        ${estrellas ? `<span class="estrellas">${ic("estrella").repeat(estrellas)}${ic("estrella-no").repeat(3-estrellas)}</span>` : ""}
       </button>`;
     }
     h += `</div></div>`;
@@ -882,10 +1154,10 @@ function vLeccion(){
   const pct = s.i / s.ejercicios.length * 100;
 
   let h = `<div class="lec-tope">
-      <button class="x" onclick="salirLeccion()" aria-label="Salir">✕</button>
+      <button class="x" onclick="salirLeccion()" aria-label="Salir">${ic("equis")}</button>
       <div class="barra"><i style="width:${pct}%"></i></div>
       ${s.repaso ? `<span class="ficha on">${s.i+1}/${s.ejercicios.length}</span>`
-        : `<span class="vidas-tope">${"♥".repeat(Math.max(0,s.vidas))}</span>`}
+        : `<span class="vidas-tope">${ic("corazon").repeat(Math.max(0,s.vidas))}</span>`}
     </div>`;
 
   h += `<div class="entra" style="padding-bottom:180px">`;
@@ -927,13 +1199,13 @@ function audioGrande(texto, etiqueta){
     ? ` data-autoaudio="${esc(texto)}" data-audio-clave="${s.inicio}#${s.i}"`
     : "";
   let h = `<button class="audio-btn"${solo} ${alPulsarDecir(texto)}
-    aria-label="Escuchar">🔊<span class="mini" style="margin-left:8px">${etiqueta||"Escuchar"}</span></button>`;
+    aria-label="Escuchar">${ic("volumen")}<span class="mini" style="margin-left:8px">${etiqueta||"Escuchar"}</span></button>`;
   if(!hayVoz()){
     // Sin voz noruega instalada, un ejercicio de escucha sería imposible de
     // responder. Se muestra el texto para que el ejercicio siga sirviendo, y
     // se dice por qué: enseñar mal es peor que no tener audio.
     h += `<div class="aviso vio" style="margin-top:calc(var(--s3)*-1)">
-      <span>🔇</span><span>Este dispositivo no tiene voz noruega, así que en vez de
+      ${ic("volumen-no")}<span>Este dispositivo no tiene voz noruega, así que en vez de
       oírlo lo vas a leer: <b>${esc(texto)}</b><br><span class="mini tenue">Para oírlo
       de verdad, instala la voz ${comoInstalarVoz()}.</span></span></div>`;
   }
@@ -945,7 +1217,7 @@ function cuerpoOpciones(e){
   if(e.tipo === "escuchar_opcion"){
     h += audioGrande(e.audio, "Toca para oír");
     h += `<p class="tenue mini centro" style="margin-top:calc(var(--s3)*-1)">
-      <button class="fantasma mini" ${alPulsarDecir(e.audio, 0.55)}>🐢 Más despacio</button></p>`;
+      <button class="fantasma mini" ${alPulsarDecir(e.audio, 0.55)}>${ic("tortuga")} Más despacio</button></p>`;
   } else if(e.contexto){
     h += `<div class="material${e.tipo==="completar"||e.tipo==="dialogo"?"":" grande"}">${esc(e.contexto)}</div>`;
   }
@@ -969,7 +1241,7 @@ function cuerpoEscrita(e){
   if(e.tipo === "escuchar_escribir"){
     h += audioGrande(e.audio, "Toca para oír");
     h += `<p class="centro" style="margin-top:calc(var(--s3)*-1)">
-      <button class="fantasma mini" ${alPulsarDecir(e.audio, 0.55)}>🐢 Más despacio</button></p>`;
+      <button class="fantasma mini" ${alPulsarDecir(e.audio, 0.55)}>${ic("tortuga")} Más despacio</button></p>`;
   } else if(e.contexto){
     h += `<div class="material grande">${esc(e.contexto)}</div>`;
   }
@@ -1047,7 +1319,7 @@ function cuerpoPronunciar(e){
   let h = `<div class="material grande">${esc(e.contexto || e.audio)}</div>`;
   h += audioGrande(e.audio, "Escúchalo");
   h += `<p class="centro"><button class="fantasma" ${alPulsarDecir(e.audio, 0.5)}>
-    🐢 Más despacio</button></p>`;
+    ${ic("tortuga")} Más despacio</button></p>`;
   if(e.pista) h += `<div class="tarjeta plana centro"><div class="rot">Aproximación</div>
     <div style="font-family:var(--mono);font-size:1.2rem;font-weight:700">${esc(e.pista)}</div>
     ${e.datos && e.datos.es ? `<div class="tenue mini">${esc(e.datos.es)}</div>` : ""}</div>`;
@@ -1103,13 +1375,13 @@ function panelVeredicto(e){
     : ESCRITA.includes(e.tipo) ? e.respuesta
     : (e.opciones||[])[e.correcta] || "";
   let h = `<div class="veredicto ${s.correcta ? "si" : "no"}"><div class="interior">
-    <div class="cab">${s.correcta ? "✓ ¡Correcto!" : "✗ No es esa"}</div>`;
+    <div class="cab">${s.correcta ? ic("check") + " ¡Correcto!" : ic("equis") + " No es esa"}</div>`;
   if(!s.correcta && correcto)
     h += `<div class="dato">Respuesta correcta: <b>${esc(correcto)}</b></div>`;
   if(e.explicacion) h += `<div class="dato">${esc(e.explicacion)}</div>`;
   if(e.audio) h += `<div class="fila-btn" style="margin-bottom:var(--s3)">
-    <button class="fantasma" ${alPulsarDecir(e.audio)}>🔊 Oír</button>
-    <button class="fantasma" ${alPulsarDecir(e.audio, 0.55)}>🐢 Despacio</button></div>`;
+    <button class="fantasma" ${alPulsarDecir(e.audio)}>${ic("volumen")} Oír</button>
+    <button class="fantasma" ${alPulsarDecir(e.audio, 0.55)}>${ic("tortuga")} Despacio</button></div>`;
   h += `<button class="pri blq" onclick="siguiente()" data-autofoco>Continuar</button>
     </div></div>`;
   return h;
@@ -1156,15 +1428,15 @@ function vResultado(){
 
   let h = `<div class="entra" style="padding-top:var(--s7)">`;
   if(sinVidas){
-    h += `<div class="centro"><div style="font-size:3.5rem">💔</div>
+    h += `<div class="centro"><div class="emblema malo">${ic("corazon-roto","xl")}</div>
       <h1>Se acabaron los corazones</h1>
       <p class="tenue">Fallaste ${s.fallos} veces. No pasa nada: repetir la lección es
       justamente lo que hace que se quede.</p></div>`;
   } else {
-    h += `<div class="centro"><div style="font-size:3.5rem">${estrellas===3?"🌟":"🎉"}</div>
+    h += `<div class="centro"><div class="emblema">${estrellas===3?ic("chispa","xl"):ic("fiesta","xl")}</div>
       <h1>${estrellas === 3 ? "¡Perfecta!" : "¡Lección terminada!"}</h1>
       <div style="font-size:2rem;color:var(--oro-vivo);letter-spacing:6px;margin:var(--s3) 0">
-        ${"★".repeat(estrellas)}${"☆".repeat(3-estrellas)}</div></div>`;
+        ${ic("estrella").repeat(estrellas)}${ic("estrella-no").repeat(3-estrellas)}</div></div>`;
   }
   h += `<div class="rejilla2" style="margin:var(--s5) 0">
     <div class="dato"><b>+${s.xpGanado || 0}</b><span>XP ganados</span></div>
@@ -1185,7 +1457,7 @@ function vResultado(){
       dif.map(id => { const w = LEXICO_POR_ID[id]; if(!w) return "";
         return `<div class="ejemplo"><div class="tx"><div class="no">${esc(textoNoruego(w))}</div>
           <div class="es">${esc(w.es||"")}</div></div>
-          <button class="audio-btn chico" ${alPulsarDecir(textoNoruego(w))}>🔊</button></div>`;
+          <button class="audio-btn chico" ${alPulsarDecir(textoNoruego(w))}>${ic("volumen")}</button></div>`;
       }).join("") + `</div>`;
   }
 
@@ -1224,7 +1496,7 @@ function vRepaso(){
           <b>${esc(textoNoruego(w))}</b><div class="es">${esc(w.es||"")}</div>
           <div class="pr">${esc(w.pron||"")}</div></div>
           <span class="ficha rojo">${t.fallos} ${plural(t.fallos,"fallo","fallos")}</span>
-          <button class="audio-btn chico" ${alPulsarDecir(textoNoruego(w))}>🔊</button>
+          <button class="audio-btn chico" ${alPulsarDecir(textoNoruego(w))}>${ic("volumen")}</button>
         </div>`; }).join("") + `</div>`;
   }
 
@@ -1249,7 +1521,7 @@ function vDiccionario(){
 
   const tipos = [["todo","Todo"],["sustantivos","Sustantivos"],["verbos","Verbos"],
                  ["adjetivos","Adjetivos"],["frases","Frases"],["numeros","Números"],
-                 ["favoritas","⭐ Marcadas"],["aprendidas","Aprendidas"]];
+                 ["favoritas","Marcadas"],["aprendidas","Aprendidas"]];
   let lista = [];
   if(filtroDic === "favoritas") lista = E.favoritas.map(id => LEXICO_POR_ID[id]).filter(Boolean);
   else if(filtroDic === "aprendidas")
@@ -1270,10 +1542,10 @@ function vDiccionario(){
   let h = cabecera("Palabras", "");
   h += `<div class="entra">
     <div class="fila-btn" style="margin-bottom:var(--s4)">
-      <button style="flex:1" onclick="ir('diccionario','gramatica')">🧩 Gramática</button>
-      <button style="flex:1" onclick="ir('diccionario','conversaciones')">💬 Conversaciones</button>
+      <button style="flex:1" onclick="ir('diccionario','gramatica')">${ic("pieza")} Gramática</button>
+      <button style="flex:1" onclick="ir('diccionario','conversaciones')">${ic("charla")} Conversaciones</button>
     </div>
-    <div class="buscador"><span class="lupa">🔍</span>
+    <div class="buscador"><span class="lupa">${ic("lupa")}</span>
       <input type="text" placeholder="Buscar en español o noruego…" value="${esc(busqueda)}"
         oninput="busqueda=this.value; refrescarLista()" autocomplete="off"></div>
     <div class="filtros">` + tipos.map(([v,t]) =>
@@ -1282,7 +1554,7 @@ function vDiccionario(){
   return h;
 }
 function filasDiccionario(lista){
-  if(!lista.length) return `<div class="vacio"><span class="big">🔍</span>
+  if(!lista.length) return `<div class="vacio">${ic("lupa","xl")}
     <p>No hay palabras con ese filtro.</p></div>`;
   return lista.map(w => {
     const id = w.id, fav = E.favoritas.includes(id), t = E.tarjetas[id];
@@ -1291,15 +1563,15 @@ function filasDiccionario(lista){
       : w._tipo === "verbos" ? `å ${w.inf} · ${w.pres} · ${w.pas} · ${w.perf}`
       : w._tipo === "adjetivos" ? `${w.base} · ${w.neutro} · ${w.plural}` : "";
     return `<div class="palabra-fila">
-      <button class="audio-btn chico" ${alPulsarDecir(textoNoruego(w))}>🔊</button>
+      <button class="audio-btn chico" ${alPulsarDecir(textoNoruego(w))}>${ic("volumen")}</button>
       <div class="tx"><b>${esc(textoNoruego(w))}</b>
         <div class="es">${esc(w.es||"")}</div>
         ${w.pron ? `<div class="pr">≈ ${esc(w.pron)}</div>` : ""}
         ${extra ? `<div class="pr">${esc(extra)}</div>` : ""}
         ${w.nota ? `<div class="micro tenue" style="margin-top:2px">${esc(w.nota)}</div>` : ""}</div>
-      ${t && t.reps >= 2 ? `<span class="ficha on">✓</span>` : ""}
+      ${t && t.reps >= 2 ? `<span class="ficha on">${ic("check")}</span>` : ""}
       <button class="fav ${fav?"on":""}" onclick="marcarFav('${id}')"
-        aria-label="Marcar">${fav ? "★" : "☆"}</button></div>`;
+        aria-label="Marcar">${fav ? ic("estrella") : ic("estrella-no")}</button></div>`;
   }).join("");
 }
 function refrescarLista(){
@@ -1345,7 +1617,7 @@ function vGramatica(){
         ${r.regla ? `<div class="caja"><span class="rot">La regla</span><br>
           <b style="font-family:var(--mono)">${esc(r.regla)}</b></div>` : ""}
         ${r.ejemplos.map(e => `<div class="ejemplo">
-          <button class="audio-btn chico" ${alPulsarDecir(e.no)}>🔊</button>
+          <button class="audio-btn chico" ${alPulsarDecir(e.no)}>${ic("volumen")}</button>
           <div class="tx"><div class="no">${esc(e.no)}</div>
           <div class="es">${esc(e.es)}</div>
           ${e.pron ? `<div class="pr">≈ ${esc(e.pron)}</div>` : ""}</div></div>`).join("")}
@@ -1358,12 +1630,12 @@ function vGramatica(){
   const sonidos = DATOS.lexico.sonidos || [];
   if(sonidos.length){
     h += `<div class="rot" style="margin:var(--s6) 0 var(--s3)">Pronunciación</div>`;
-    h += `<div class="aviso"><span>ℹ️</span><span>${esc(DATOS.notas.sonidos || "")}</span></div>`;
+    h += `<div class="aviso">${ic("info")}<span>${esc(DATOS.notas.sonidos || "")}</span></div>`;
     for(const s of sonidos){
       h += `<div class="tarjeta"><h3>${esc(s.letra)} — ${esc(s.nombre)}</h3>
         <p class="tenue mini" style="margin:var(--s2) 0">${esc(s.como)}</p>` +
         s.ejemplos.map(e => `<div class="ejemplo">
-          <button class="audio-btn chico" ${alPulsarDecir(e.no)}>🔊</button>
+          <button class="audio-btn chico" ${alPulsarDecir(e.no)}>${ic("volumen")}</button>
           <div class="tx"><div class="no">${esc(e.no)}</div><div class="es">${esc(e.es)}</div>
           <div class="pr">≈ ${esc(e.pron)}</div></div></div>`).join("") +
         `<div class="caja" style="background:var(--sup2);border-radius:var(--r2);
@@ -1385,7 +1657,7 @@ function vConversaciones(){
   for(const d of dial){
     h += `<button class="nodo" style="margin-bottom:var(--s2)"
       onclick="ir('diccionario','dialogo:${d.id}')">
-      <span class="bola">💬</span>
+      <span class="bola">${ic("charla")}</span>
       <span class="tx"><b>${esc(d.titulo)}</b><span>${esc(d.situacion)}</span></span>
       <span class="ficha">${esc(d.nivel)}</span></button>`;
   }
@@ -1397,7 +1669,7 @@ function vDialogo(id){
   let h = cabecera(d.titulo, "");
   h += `<div class="entra">
     <button class="fantasma" onclick="ir('diccionario','conversaciones')">← Conversaciones</button>
-    <div class="aviso"><span>🎬</span><span>${esc(d.situacion)}</span></div>
+    <div class="aviso">${ic("claqueta")}<span>${esc(d.situacion)}</span></div>
     <div class="fila-btn" style="margin-bottom:var(--s4)">
       <button class="pri" style="flex:1" onclick="leerDialogo('${d.id}')">▶ Escuchar todo</button>
     </div>`;
@@ -1406,7 +1678,7 @@ function vDialogo(id){
     h += `<div class="tarjeta ${mio?"acento":"plana"}" style="margin-bottom:var(--s2)">
       <div class="rot">${esc(l.quien)}</div>
       <div style="display:flex;gap:var(--s3);align-items:flex-start;margin-top:4px">
-        <button class="audio-btn chico" ${alPulsarDecir(l.no)}>🔊</button>
+        <button class="audio-btn chico" ${alPulsarDecir(l.no)}>${ic("volumen")}</button>
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:1.05rem">${esc(l.no)}</div>
           <div class="tenue mini">${esc(l.es)}</div>
@@ -1443,7 +1715,7 @@ function vPerfil(){
 
   if(panelPerfil === "resumen"){
     h += `<div class="tarjeta acento centro">
-      <div style="font-size:2.6rem">🇳🇴</div>
+      <div class="bandera-mini">${ic("bandera")}</div>
       <h2>${esc(E.perfil.nombre || "Estudiante")}</h2>
       <p class="tenue mini">Nivel ${p.nivel} · ${E.xp} XP · desde ${esc(E.perfil.creado || hoyISO())}</p>
       <div class="barra" style="margin-top:var(--s3)"><i style="width:${p.pct}%"></i></div>
@@ -1483,7 +1755,7 @@ function vPerfil(){
       LOGROS.map(l => `<div class="logro ${E.logros.includes(l.id)?"":"gris"}">
         <span class="ic">${l.ic}</span><div class="tx"><b>${esc(l.t)}</b>
         <span>${esc(l.d)}</span></div>
-        ${E.logros.includes(l.id) ? `<span class="ficha on">✓</span>` : ""}</div>`).join("")
+        ${E.logros.includes(l.id) ? `<span class="ficha on">${ic("check")}</span>` : ""}</div>`).join("")
       + `</div>`;
   }
 
@@ -1507,7 +1779,7 @@ function vPerfil(){
         : `No se encontró voz noruega en este dispositivo, así que el audio está
            apagado y solo verás la pronunciación aproximada. Se instala
            ${comoInstalarVoz()}.`}</p>
-      <button class="blq" ${alPulsarDecir('Hei! Jeg snakker norsk.')}>🔊 Probar el audio</button></div>
+      <button class="blq" ${alPulsarDecir('Hei! Jeg snakker norsk.')}>${ic("volumen")} Probar el audio</button></div>
     <div class="tarjeta"><div class="rot">Tu avance</div>
       <p class="tenue mini">Todo vive solo en este navegador. Si cambias de teléfono o borras
       los datos de navegación, se pierde. Sácale copia de vez en cuando.</p>
@@ -1596,7 +1868,7 @@ let tipoNuevo = "frases";
 function vAdmin(){
   const propios = (E.contenido && E.contenido.agregados) || {};
   const cuantos = Object.values(propios).reduce((s,g) => s + g.length, 0);
-  let h = `<div class="aviso"><span>✏️</span><span>Aquí puedes agregar palabras y frases sin
+  let h = `<div class="aviso">${ic("lapiz")}<span>Aquí puedes agregar palabras y frases sin
     tocar el código. Se guardan en este dispositivo y aparecen de una vez en el diccionario
     y en el repaso.</span></div>`;
   h += `<div class="tarjeta"><div class="rot">Agregar contenido</div>
@@ -1618,7 +1890,7 @@ function vAdmin(){
     for(const tipo in propios) for(const w of propios[tipo]){
       h += `<div class="palabra-fila"><div class="tx"><b>${esc(textoNoruego(w))}</b>
         <div class="es">${esc(w.es||"")}</div><div class="pr">${esc(tipo)}</div></div>
-        <button class="fav" onclick="borrarContenido('${esc(tipo)}','${esc(w.id)}')">🗑️</button></div>`;
+        <button class="fav" onclick="borrarContenido('${esc(tipo)}','${esc(w.id)}')">${ic("papelera")}</button></div>`;
     }
     h += `<div class="fila-btn" style="margin-top:var(--s4)">
       <button style="flex:1" onclick="exportarContenido()">Exportar para el curso oficial</button></div>

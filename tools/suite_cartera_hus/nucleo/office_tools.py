@@ -86,6 +86,109 @@ def hay_libreoffice():
     return buscar_soffice() is not None
 
 
+# LibreOffice se puede instalar A PEDAZOS. En Linux es normal que quede
+# `libreoffice-core` (el ejecutable) sin Writer, sin Calc y sin Draw: el
+# binario arranca, `buscar_soffice()` lo encuentra, y la conversión falla
+# con «source file could not be loaded» — que al auditor le suena a que su
+# archivo está dañado, cuando lo que falta es la mitad del programa.
+#
+# Cada módulo vive en su propia librería dentro de `program/`. Mirar si el
+# archivo está es instantáneo y no requiere arrancar LibreOffice.
+_MODULO_POR_LIBRERIA = {
+    "libswlo.so": "Writer (Word, HTML, texto)",
+    "libsclo.so": "Calc (Excel, CSV)",
+    "libsdlo.so": "Draw/Impress (PDF y PowerPoint)",
+}
+
+# Qué módulo hace falta según lo que se vaya a convertir.
+_LIBRERIA_POR_EXT = {
+    ".pdf": "libsdlo.so",
+    ".ppt": "libsdlo.so",
+    ".pptx": "libsdlo.so",
+    ".odp": "libsdlo.so",
+    ".xls": "libsclo.so",
+    ".xlsx": "libsclo.so",
+    ".ods": "libsclo.so",
+    ".csv": "libsclo.so",
+}
+
+# El paquete de Debian/Ubuntu que trae cada módulo, para poder decirle al
+# auditor exactamente qué instalar.
+_PAQUETE_POR_LIBRERIA = {
+    "libswlo.so": "libreoffice-writer",
+    "libsclo.so": "libreoffice-calc",
+    "libsdlo.so": "libreoffice-draw libreoffice-impress",
+}
+
+
+def _carpeta_programa(soffice):
+    """La carpeta `program/` de LibreOffice, siguiendo el enlace del binario."""
+    try:
+        real = os.path.realpath(soffice)
+    except OSError:
+        return None
+    carpeta = os.path.dirname(real)
+    # En Debian /usr/bin/soffice apunta a /usr/lib/libreoffice/program/soffice.
+    if os.path.isdir(carpeta) and os.path.basename(carpeta) == "program":
+        return carpeta
+    for cand in ("/usr/lib/libreoffice/program", "/usr/lib64/libreoffice/program"):
+        if os.path.isdir(cand):
+            return cand
+    return None
+
+
+def modulos_libreoffice_faltantes():
+    """Los módulos de LibreOffice que NO están instalados.
+
+    Devuelve una lista de nombres en español. Vacía significa que se puede
+    convertir. Si no se logra inspeccionar la instalación (Windows, macOS,
+    o una ruta rara), devuelve vacía: es preferible intentar la conversión
+    y que falle con su propio error, a inventarse un diagnóstico.
+    """
+    soffice = buscar_soffice()
+    if not soffice:
+        return []
+    carpeta = _carpeta_programa(soffice)
+    if not carpeta:
+        return []
+    # Si no está ninguna de las tres, lo más probable es que esta instalación
+    # no use este esquema de archivos (no que le falte todo). Solo se reporta
+    # cuando hay al menos una presente, o cuando la carpeta es claramente la
+    # de un LibreOffice de Linux.
+    faltan = [
+        nombre
+        for lib, nombre in _MODULO_POR_LIBRERIA.items()
+        if not os.path.exists(os.path.join(carpeta, lib))
+    ]
+    if len(faltan) == len(_MODULO_POR_LIBRERIA) and not os.path.exists(
+        os.path.join(carpeta, "services.rdb")
+    ):
+        return []
+    return faltan
+
+
+def libreoffice_puede_convertir(ext=""):
+    """¿LibreOffice puede abrir un archivo con esta extensión?
+
+    Devuelve `(True, "")` o `(False, motivo en español)`.
+    """
+    if not hay_libreoffice():
+        return False, MENSAJE_SIN_LO
+    carpeta = _carpeta_programa(buscar_soffice())
+    if not carpeta:
+        return True, ""
+    lib = _LIBRERIA_POR_EXT.get((ext or "").lower(), "libswlo.so")
+    if os.path.exists(os.path.join(carpeta, lib)):
+        return True, ""
+    return False, (
+        "LibreOffice está instalado pero le falta el módulo %s, que es el que "
+        "abre este tipo de archivo. No es que el archivo esté dañado. "
+        "En Windows: reinstale LibreOffice con la instalación completa. "
+        "En Linux: sudo apt-get install -y %s"
+        % (_MODULO_POR_LIBRERIA[lib], _PAQUETE_POR_LIBRERIA[lib])
+    )
+
+
 def _filtro_pdf(ext):
     return _EXT_FILTRO.get(ext.lower(), "writer_pdf_Export")
 
@@ -103,6 +206,9 @@ def a_pdf(ruta, carpeta=None, salida=None, pdfa=False, log=print):
         raise RuntimeError(MENSAJE_SIN_LO)
 
     ext = os.path.splitext(ruta)[1]
+    puede, motivo = libreoffice_puede_convertir(ext)
+    if not puede:
+        raise RuntimeError(motivo)
     base = os.path.splitext(os.path.basename(ruta))[0]
     if salida:
         final = salida

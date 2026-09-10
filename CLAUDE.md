@@ -80,6 +80,39 @@ Después de leer `BITACORA.md`, la PRIMERA respuesta de un chat nuevo debe:
   portales: para tocar esos recursos, entregar el comando PowerShell listo
   para copiar/pegar y pedir la salida al auditor.
 
+## ⭐ REGLAS FIJAS DEL ARCHIVO DE OBJECIONES PARA DGH (no se negocian)
+
+Las fijó el área de Cartera y valen para **todas** las entidades (FAMISANAR,
+Dispensario, ADRES, COOSALUD…). Están escritas acá porque una vez se
+incumplieron por vivir sólo en el chat. Los bots que las aplican son
+`tools/organizar_objeciones_*.py` sobre el motor común `tools/_cruce_dgh.py`,
+y `verificar_reglas()` las comprueba **sobre el archivo terminado** en cada
+corrida.
+
+1. **`CTNCENCOS` va vacía siempre.** Sin excepciones, aunque el cruce sepa el
+   centro de costo (el export del DGH trae el *nombre* y la columna es de
+   código). El dato sí se muestra en el reporte de cruce, como pista.
+2. **`CROTIPOBJ` se decide por FACTURA**, no por renglón: **0 = ADMINISTRATIVA**
+   (sólo TA/FA/SO/AU/CO…), **1 = MEDICA** (sólo CL), **2 = MIXTA** (CL junto con
+   administrativas).
+3. **`SLNSERPRO`: prohibido inventar códigos.** Todo código escrito debe existir
+   en el export del DGH **de esa factura**. Sin cruce confiable la celda queda
+   vacía.
+4. **El código de glosa va limpio:** `"TA08 01 TARIFAS-…"` → `TA0801`.
+5. **El archivo de OBJECIONES lleva el 100% de los renglones**, para que los
+   totales cuadren con lo que reportó la entidad. Los que no cruzaron van con
+   `SLNSERPRO` vacío para completarlos a mano — **nunca se borran filas** y
+   **nunca se sobrescribe una celda que el auditor ya llenó**.
+6. **Orden del cruce** (el motor es de puntaje, pero los desenlaces son estos):
+   nombre exacto y único en la factura manda, aunque el valor difiera por
+   tarifa; si el nombre no coincide pero el valor sí, cruza con confianza BAJA o
+   MEDIA; si varios servicios de la factura empatan y el nombre no desempata,
+   **no se adivina**: celda vacía y el renglón va a `REVISAR`.
+7. **Dos entregables por lote:** `OBJECIONES_<ENTIDAD>_<DDMMAAAA>.xlsx` (el que
+   se sube, 16 columnas) y `CRUCE_<ENTIDAD>_<DDMMAAAA>.xlsx` (respaldo, con la
+   hoja `REVISAR`: lo que quedó sin cruce, en BAJA o con alerta —incluidas las
+   de confianza MEDIA marcadas).
+
 ## Trabajo holístico y calidad total
 
 ### Principio de impacto sistémico

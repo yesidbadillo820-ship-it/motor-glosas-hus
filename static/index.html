@@ -1068,7 +1068,82 @@ input::placeholder,textarea::placeholder{color:var(--text4);font-weight:400}
 .refinar-status.err{color:#ef4444}
 
 /* ─── CONCILIACIÓN ─────────────────────────── */
-.concil-area{padding:1.5rem}
+.concil-area{flex:1;overflow-y:auto;padding:1.5rem;min-height:0}
+/* La mesa de conciliación: una tabla ancha que se recorre dentro de su
+   propia caja, para que el cuerpo de la página nunca se desborde. */
+.mesa-cifras{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.7rem}
+.mesa-cifras .c{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:.4rem .7rem;font-size:.78rem}
+.mesa-cifras .c b{display:block;font-size:.95rem;margin-top:.1rem}
+.mesa-tabla-wrap{overflow:auto;max-height:58vh;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg-card)}
+.mesa-tabla{width:100%;border-collapse:collapse;font-size:.76rem}
+.mesa-tabla th{position:sticky;top:0;z-index:1;background:var(--bg);text-align:left;padding:.45rem .5rem;border-bottom:1px solid var(--border);white-space:nowrap;font-weight:600}
+.mesa-tabla td{padding:.3rem .5rem;border-bottom:1px solid var(--border)}
+.mesa-tabla th.num,.mesa-tabla td.num{text-align:right}
+.mesa-tabla tr.falta{background:color-mix(in srgb,var(--c-amber,#d97706) 8%,transparent)}
+.mesa-tabla input,.mesa-tabla select{width:100%;min-width:80px;border:1px solid var(--border);border-radius:var(--r-sm,6px);padding:.2rem .35rem;font-size:.76rem;background:var(--bg-card);color:var(--text)}
+.mesa-tabla input.num{text-align:right}
+.mesa-tabla .serv{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.mesa-tabla .txt input{min-width:190px}
+.mesa-pend-0{color:var(--c-verde,#16a34a);font-weight:600}
+.mesa-pend-x{color:var(--c-red,#dc2626);font-weight:600}
+.mesa-todo{display:flex;gap:.15rem;margin-top:.15rem}
+.mesa-todo button{border:1px solid var(--border);background:var(--bg);border-radius:4px;font-size:.62rem;padding:.05rem .3rem;cursor:pointer;color:var(--text3)}
+.mesa-todo button:hover{border-color:var(--c-teal2);color:var(--text)}
+.mesa-nc{font-size:.68rem;color:var(--text3);white-space:nowrap}
+/* Limpieza de la tabla: filas alternas y menos peso visual en las líneas.
+   Con 146 renglones, la cuadrícula completa cansa y se pierde el renglón. */
+.mesa-tabla tbody tr:nth-child(even){background:color-mix(in srgb,var(--text3) 3%,transparent)}
+.mesa-tabla tbody tr:hover{background:color-mix(in srgb,var(--c-teal2) 6%,transparent)}
+.mesa-tabla td{border-bottom:1px solid color-mix(in srgb,var(--border) 55%,transparent)}
+.mesa-tabla .cod{font-variant-numeric:tabular-nums;white-space:nowrap}
+.mesa-tabla .num,.mesa-tabla input.num{font-variant-numeric:tabular-nums}
+/* El botón que despliega el motivo completo, sin sacar al auditor de la fila. */
+.mesa-abrir{border:0;background:none;cursor:pointer;color:var(--text3);font-size:.8rem;padding:.1rem .25rem;line-height:1}
+.mesa-abrir:hover{color:var(--c-teal2)}
+.mesa-detalle td{background:var(--bg);padding:.6rem .9rem;font-size:.78rem;line-height:1.45;white-space:pre-wrap}
+/* Insignia de soportes: tres estados, y «no sé» NO se pinta como «no hay». */
+.mesa-sop{font-size:.72rem;white-space:nowrap;cursor:default}
+.mesa-sop.si{color:var(--c-verde,#16a34a);font-weight:600}
+.mesa-sop.no{color:var(--text3)}
+.mesa-sop.duda{color:var(--c-amber,#d97706)}
+/* Panel lateral de gestión. */
+.mesa-drawer{position:fixed;inset:0;z-index:1200;display:flex;justify-content:flex-end}
+/* El `display:flex` de arriba le gana al atributo `hidden` (una clase pesa
+   más que la hoja del navegador), y el panel quedaba SIEMPRE presente con su
+   fondo invisible tapando la página entera: ningún clic funcionaba. */
+.mesa-drawer[hidden]{display:none}
+.mesa-drawer-fondo{position:absolute;inset:0;background:rgba(0,0,0,.35)}
+.mesa-drawer-caja{position:relative;width:min(560px,94vw);height:100%;background:var(--bg-card);
+  border-left:1px solid var(--border);display:flex;flex-direction:column;box-shadow:-8px 0 24px rgba(0,0,0,.18)}
+.mesa-drawer-caja header{display:flex;justify-content:space-between;align-items:center;gap:1rem;
+  padding:.9rem 1.1rem;border-bottom:1px solid var(--border)}
+.mesa-dr-cod{margin-left:.5rem;font-size:.76rem;color:var(--text3)}
+.mesa-drawer-cuerpo{flex:1;overflow-y:auto;padding:1.1rem;font-size:.82rem;line-height:1.5}
+.mesa-dr-seccion{margin-bottom:1.2rem}
+.mesa-dr-seccion h4{margin:0 0 .45rem;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
+.mesa-dr-caja{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:.6rem .75rem}
+.mesa-dr-dictamen{max-height:260px;overflow-y:auto}
+.mesa-dr-arch{display:flex;justify-content:space-between;gap:.6rem;padding:.28rem 0;border-bottom:1px solid var(--border)}
+.mesa-dr-arch{align-items:center;flex-wrap:wrap}
+/* Un problema del buscador de soportes NO se pinta como «no hay soportes».
+   Se ve como error, con su color, para que nadie lo lea como un dato. */
+.mesa-sop-err{display:block;padding:.5rem .6rem;border-radius:6px;
+  border:1px solid var(--c-red,#dc2626);color:var(--c-red,#dc2626);
+  background:color-mix(in srgb,var(--c-red,#dc2626) 8%,transparent);line-height:1.45}
+.mesa-sop-duda{display:block;padding:.5rem .6rem;border-radius:6px;
+  border:1px solid var(--c-amber,#d97706);color:var(--c-amber,#d97706);
+  background:color-mix(in srgb,var(--c-amber,#d97706) 8%,transparent);line-height:1.45}
+.mesa-subir{display:flex;flex-direction:column;gap:.45rem}
+.mesa-sub-cargando{display:flex;align-items:center;gap:.5rem;color:var(--text3)}
+.mesa-sub-ok{color:var(--c-green,#16a34a)}
+.mesa-spinner{width:.85rem;height:.85rem;border-radius:50%;flex:none;
+  border:2px solid var(--border);border-top-color:var(--sds-accent,#7c3aed);
+  animation:mesa-gira .7s linear infinite}
+@keyframes mesa-gira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.mesa-spinner{animation-duration:2.5s}}
+.mesa-dr-arch:last-child{border-bottom:0}
+.mesa-dr-com{border-left:2px solid var(--c-teal2);padding:.35rem .6rem;margin-bottom:.5rem;background:var(--bg)}
+.mesa-dr-com small{color:var(--text3);display:block;font-size:.7rem}
 .concil-grid{display:grid;grid-template-columns:340px 1fr;gap:1.5rem;margin-top:1rem}
 .stat-row{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
 .stat-mini{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:.8rem 1.2rem;min-width:110px}
@@ -2381,7 +2456,10 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           <span class="sn-item-label">Expediente</span>
         </button>
-        <button class="sn-item" data-solo-coordinacion="1" data-tip="Plata recuperada" onclick="sidebarTab(this,'plata')" id="sn-plata">
+        <!-- 04-09-2026: Yesid pidió quitarlos del menú («nunca tendrán utilidad»).
+             Se ocultan (como «Plantillas Gold»), no se borran: reversible quitando
+             el display:none, y sin tocar el panel ni el backend. -->
+        <button class="sn-item" data-solo-coordinacion="1" data-oculto="1" data-tip="Plata recuperada" onclick="sidebarTab(this,'plata')" id="sn-plata" style="display:none">
           <svg class="i i-md" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           <span class="sn-item-label">Plata recuperada</span>
         </button>
@@ -2399,7 +2477,8 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3"/></svg>
           <span class="sn-item-label">Automatización</span>
         </button>
-        <button class="sn-item" data-tip="Alertas" onclick="sidebarTab(this,'alertas')">
+        <!-- 04-09-2026: oculto a pedido de Yesid (ver nota arriba). Reversible. -->
+        <button class="sn-item" data-tip="Alertas" onclick="sidebarTab(this,'alertas')" style="display:none">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M6 8A6 6 0 0 1 18 8C18 15 21 17 21 17H3S6 15 6 8"/><path d="M10.3 21A1.94 1.94 0 0 0 13.7 21"/></svg>
           <span class="sn-item-label">Alertas</span>
           <span class="sn-badge" id="alert-badge-side" style="display:none">0</span>
@@ -2450,11 +2529,17 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 14l2 2 4-4"/></svg>
           <span class="sn-item-label">Glosas ADRES</span>
         </button>
+        <button class="sn-item" data-tip="Objeciones DGH: subí las glosas y el export del DGH y salen los dos archivos" onclick="sidebarTab(this,'objeciones-dgh')">
+          <svg class="i i-md" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          <span class="sn-item-label">Objeciones DGH</span>
+        </button>
         <button id="sn-pre-auditoria" class="sn-item" data-tip="Pre-Auditoría: lo que el HIS consulta antes de timbrar" onclick="sidebarTab(this,'pre-auditoria')">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 22S20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
           <span class="sn-item-label">Pre-Auditoría</span>
         </button>
-        <button class="sn-item" data-tip="Resumen mensual ejecutivo" onclick="sidebarTab(this,'resumen-mes')">
+        <!-- 04-09-2026: oculto a pedido de Yesid (ver nota arriba). Reversible.
+             También se quita de la barra consolidada de Reportes (pintarRepTabbars). -->
+        <button class="sn-item" data-tip="Resumen mensual ejecutivo" onclick="sidebarTab(this,'resumen-mes')" style="display:none">
           <svg class="i i-md" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <span class="sn-item-label">Resumen del mes</span>
         </button>
@@ -2462,7 +2547,8 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 22S20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z"/><path d="M9 12L11 14L15 10"/></svg>
           <span class="sn-item-label">Auditoría</span>
         </button>
-        <button class="sn-item" data-tip="Gobierno de IA (coordinación)" onclick="sidebarTab(this,'gobierno-ia')" id="sn-gobierno-ia">
+        <!-- 04-09-2026: oculto a pedido de Yesid (ver nota arriba). Reversible. -->
+        <button class="sn-item" data-tip="Gobierno de IA (coordinación)" onclick="sidebarTab(this,'gobierno-ia')" id="sn-gobierno-ia" style="display:none">
           <svg class="i i-md" viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M12 8v4M12 16h.01"/></svg>
           <span class="sn-item-label">Gobierno IA</span>
         </button>
@@ -3236,6 +3322,52 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
       </div>
     </div>
 
+
+    <!-- Objeciones DGH: los dos Excel entran, los dos archivos salen -->
+    <div class="panel" id="p-objeciones-dgh">
+      <div class="dash-area">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.6rem">
+          <div>
+            <div style="font-size:1.15rem;font-weight:700;color:var(--text)">Objeciones DGH</div>
+            <div style="font-size:.78rem;color:var(--text3)">Subí las glosas que mandó la entidad y el export de servicios del DGH: salen el archivo para cargar y el respaldo con lo que hay que revisar</div>
+          </div>
+        </div>
+
+        <!-- Los dos archivos -->
+        <div class="chart-card" style="padding:1.1rem;margin-bottom:1rem">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem">
+            <div>
+              <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:.25rem">1. Glosas de la entidad</label>
+              <div style="font-size:.72rem;color:var(--text3);margin-bottom:.35rem">El Excel que mandó la entidad (FAMISANAR, Dispensario, SAVIA, SALUD TOTAL, SANITAS, ADRES o el acta del portal VCO). Se reconoce solo. De EMSSANAR son los PDF: se pueden marcar varios. Del ADRES se puede agregar el homologador CUPS↔SOAT.</div>
+              <input type="file" id="obj-file-entidad" accept=".xlsx,.xlsm,.pdf" multiple onchange="objArchivoElegido()" style="width:100%;font-size:.8rem">
+              <div id="obj-cuantos" style="font-size:.72rem;color:var(--text3);margin-top:.3rem"></div>
+            </div>
+            <div>
+              <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:.25rem">2. Servicios facturados del DGH</label>
+              <div style="font-size:.72rem;color:var(--text3);margin-bottom:.35rem">El export con <code>FACTURA</code>, <code>SERVICIOS DGH</code> y <code>Vr_SERVICIO</code>. Sin él no hay cruce.</div>
+              <input type="file" id="obj-file-dgh" accept=".xlsx,.xlsm" onchange="objArchivoElegido()" style="width:100%;font-size:.8rem">
+            </div>
+          </div>
+          <div style="display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap;margin-top:1rem">
+            <div>
+              <label style="display:block;font-size:.78rem;font-weight:600;margin-bottom:.25rem">Entidad</label>
+              <select id="obj-entidad" style="padding:.42rem .6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.8rem">
+                <option value="">Reconocerla sola</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;font-size:.78rem;font-weight:600;margin-bottom:.25rem">Fecha de la objeción</label>
+              <input type="date" id="obj-fecha" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:.8rem">
+            </div>
+            <button class="btn btn-primary" id="obj-btn" onclick="objProcesar()" disabled>Armar el archivo</button>
+            <div id="obj-estado" style="font-size:.8rem;color:var(--text3)"></div>
+          </div>
+        </div>
+
+        <!-- Resultado -->
+        <div id="obj-resultado"></div>
+      </div>
+    </div>
 
     <!-- Glosas ADRES: el gestor escribe una factura y trae todo -->
     <div class="panel" id="p-glosas-adres">
@@ -4254,6 +4386,19 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             </div>
           </div>
 
+          <div id="admin-diagnostico-card" class="form-card" style="display:none;margin-top:1rem;border:1px solid #c7d2fe;background:#eef2ff">
+            <h3 style="color:#3730a3">📊 Por qué la confianza no sube <span style="color:#4f46e5">Solo SUPER_ADMIN</span></h3>
+            <p style="font-size:.78rem;color:#312e81;line-height:1.55;margin-bottom:.85rem">
+              Los números reales de esta base de datos, no supuestos: cuántas glosas
+              quedaron sin entidad identificada, si el catálogo de tarifas pactadas
+              está cargado, cuántas glosas tienen ya el veredicto de la EPS —de ahí
+              salen el precedente interno y los ejemplos que recibe la IA— y qué
+              confianza promedio da cada modelo. <b>Solo lee. No cambia nada.</b>
+            </p>
+            <button class="btn btn-primary" style="background:#4f46e5" onclick="cargarDiagnosticoCalidad()">Ver el diagnóstico</button>
+            <div id="diag-calidad-salida" style="margin-top:.9rem"></div>
+          </div>
+
           <div id="admin-reset-card" class="form-card" style="display:none;margin-top:1rem;border:1px solid #fecaca;background:#fff5f5">
             <h3 style="color:#991b1b">Zona peligrosa <span style="color:#dc2626">Solo SUPER_ADMIN</span></h3>
             <p style="font-size:.78rem;color:#7f1d1d;line-height:1.55;margin-bottom:.85rem">
@@ -4349,19 +4494,74 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
           </div>
 
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.5rem;margin-top:.7rem">
-            <div class="field"><label>NIT de la entidad</label><input type="text" id="armar-nit" placeholder="901541137"></div>
-            <div class="field"><label>Razón social</label><input type="text" id="armar-razon" placeholder="DISPENSARIO MEDICO"></div>
-            <div class="field"><label>Número de acta</label><input type="text" id="armar-acta" placeholder="710"></div>
-            <div class="field"><label>Periodo</label><input type="text" id="armar-periodo" placeholder="SEP 2026"></div>
+            <div class="field"><label>NIT de la entidad</label><input type="text" id="armar-nit" placeholder="ej: 901541137"></div>
+            <div class="field"><label>Razón social</label><input type="text" id="armar-razon" placeholder="ej: DISPENSARIO MEDICO"></div>
+            <div class="field"><label>Número de acta</label><input type="text" id="armar-acta" placeholder="ej: 710"></div>
+            <div class="field"><label>Periodo</label><input type="text" id="armar-periodo" placeholder="ej: SEP 2026"></div>
             <div class="field"><label>Fecha conciliación</label><input type="date" id="armar-fecha"></div>
           </div>
 
           <div id="armar-resumen" style="display:none;margin-top:.6rem"></div>
           <div class="auto-acciones" style="margin-top:.6rem">
             <button class="btn btn-ghost btn-sm" id="armar-btn-ver" onclick="armarVer()">Ver qué sale</button>
+            <button class="btn btn-sm" style="background:#7c3aed;color:#fff" id="armar-btn-mesa" onclick="mesaAbrir()">Abrir mesa en pantalla</button>
             <button class="btn btn-primary btn-sm" id="armar-btn-bajar" onclick="armarDescargar()">Armar y descargar acta</button>
           </div>
           <div class="auto-estado" id="armar-estado" style="margin-top:.4rem"></div>
+        </div>
+
+        <!-- LA MESA: el acta vive en el motor y se trabaja acá, renglón por
+             renglón. Cada cambio se guarda solo; el Excel sale al final. -->
+        <div class="form-card" style="margin-bottom:1rem" id="mesa-card">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+            <div>
+              <h3 style="margin:0 0 .3rem">🤝 Mesa de conciliación <span id="mesa-titulo" style="font-weight:400;color:var(--text3)"></span></h3>
+              <p style="margin:0;font-size:.8rem;color:var(--text3)" id="mesa-sub">Abrí una mesa desde el cuadro de arriba, o retomá una que dejaste a medias.</p>
+            </div>
+            <div class="auto-acciones" style="margin:0">
+              <select id="mesa-abiertas" onchange="mesaCargar(this.value)" style="max-width:280px">
+                <option value="">Retomar una mesa…</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" onclick="mesaListar()">Actualizar</button>
+            </div>
+          </div>
+
+          <div id="mesa-cuerpo" style="display:none;margin-top:.8rem">
+            <div id="mesa-cifras" class="mesa-cifras"></div>
+            <div class="mesa-tabla-wrap">
+              <table class="mesa-tabla" id="mesa-tabla">
+                <thead><tr>
+                  <th></th><th>#</th><th>Factura</th><th>Código</th><th>Servicio</th>
+                  <th title="Soportes de la factura en el archivo del hospital">📎</th>
+                  <th class="num">Glosado</th><th>Tipo</th>
+                  <th class="num">Acepta IPS</th><th class="num">Levanta EPS</th><th class="num">Ratifica</th>
+                  <th class="num">Pendiente</th><th>Texto de la conciliación</th><th>Nota crédito</th><th></th>
+                </tr></thead>
+                <tbody id="mesa-filas"></tbody>
+              </table>
+            </div>
+            <div class="auto-acciones" style="margin-top:.7rem">
+              <button class="btn btn-primary btn-sm" onclick="mesaDescargar()">Descargar acta completa</button>
+              <button class="btn btn-sm" style="background:#059669;color:#fff" onclick="mesaCerrar()">Cerrar la mesa</button>
+              <span id="mesa-estado" class="auto-estado" style="align-self:center"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel lateral: lo que hace falta para refutar una glosa EN la
+             audiencia, sin salir de la mesa ni hacer esperar a la EPS. -->
+        <div id="mesa-drawer" class="mesa-drawer" hidden>
+          <div class="mesa-drawer-fondo" onclick="mesaCerrarPanel()"></div>
+          <aside class="mesa-drawer-caja" role="dialog" aria-label="Gestión del renglón">
+            <header>
+              <div>
+                <b id="mesa-dr-factura">—</b>
+                <span id="mesa-dr-cod" class="mesa-dr-cod"></span>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="mesaCerrarPanel()">Cerrar</button>
+            </header>
+            <div class="mesa-drawer-cuerpo" id="mesa-dr-cuerpo"></div>
+          </aside>
         </div>
 
         <!-- El acta que se trabaja en Excel en la audiencia: se cuadra sola,
@@ -6605,11 +6805,14 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     pointer-events:none;
   }
   .card-doc.qg-ok .qg-seal{display:inline-block}
+  /* 08-09-2026: cuando el propio motor dice «NO RADICAR», el sello es rojo y
+     dice eso. Antes salía el verde en la misma card que la prohibición. */
+  .card-doc.qg-bloqueado .qg-seal{display:inline-block;background:#b91c1c;box-shadow:0 2px 8px rgba(185,28,28,.35)}
   /* En el dictamen el sello vive SOBRE la franja navy del hdr; se reserva
      espacio a la derecha para no tapar la fecha (el ID pesa más, por eso
      la regla va con #p-analizar). */
   .res-dictamen.card-doc .qg-seal{top:11px;border:1px solid rgba(255,255,255,.35)}
-  #p-analizar .res-dictamen.qg-ok .res-dictamen-hdr{padding-right:200px !important}
+  #p-analizar .res-dictamen.qg-ok .res-dictamen-hdr,#p-analizar .res-dictamen.qg-bloqueado .res-dictamen-hdr{padding-right:200px !important}
   /* Login en modo oscuro: pane derecho no debe quedar blanco brillante */
   body.dark .login-form-pane{background:var(--bg)}
   body.dark .login-hero{box-shadow:inset 0 0 0 100vmax rgba(0,0,0,.12)}
@@ -6822,6 +7025,8 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     .qg-seal{display:none}
     .card-doc.qg-ok .qg-seal{position:static;display:inline-block;float:right;background:#fff;
       color:#2E7D32;border:1.5px solid #2E7D32;box-shadow:none}
+    .card-doc.qg-bloqueado .qg-seal{position:static;display:inline-block;float:right;background:#fff;
+      color:#b91c1c;border:1.5px solid #b91c1c;box-shadow:none}
     .doc-membrete,.doc-footer{background:#fff !important}
     .doc-sello{color:#2E7D32 !important}
     #p-analizar .res-dictamen .res-dictamen-body{font-size:10pt !important;line-height:1.65 !important}
@@ -7212,6 +7417,27 @@ var _ultimo403 = 0;
   window.fetch = function(entrada, opciones){
     return original(entrada, opciones).then(function(res){
       try{
+        // ── 09-09-2026 — LA SESIÓN VENCIDA, DICHA COMO ES ────────────────
+        // El auditor abrió el motor por la mañana con la sesión de la noche
+        // anterior (el token dura 8 horas) y le salió un recuadro rojo que
+        // decía «Error · Credenciales inválidas o token expirado» — el texto
+        // crudo del servidor, escrito para un programador. La pantalla ya
+        // tenía el manejador bueno («Tu sesión venció, vuelve a iniciar
+        // sesión») pero solo lo llamaban unas pocas llamadas: hay 173 sitios
+        // que muestran errores y cada uno decidía por su cuenta.
+        //
+        // Va acá, en el mismo envoltorio del 403, porque es el único punto
+        // por el que pasan TODAS: da igual cuál de los 173 recibió el 401.
+        if (res && res.status === 401) {
+          var rutaAuth = '';
+          try { rutaAuth = (typeof entrada === 'string' ? entrada : (entrada && entrada.url) || ''); } catch(_){}
+          // El login mismo contesta 401 cuando la contraseña está mal: eso
+          // NO es una sesión vencida y su pantalla ya lo explica.
+          var soloRuta = String(rutaAuth).split('?')[0];
+          if (!/\/token$/.test(soloRuta)) {
+            if (typeof manejarSesionExpirada === 'function') manejarSesionExpirada();
+          }
+        }
         if (res && res.status === 403) {
           _ultimo403 = Date.now();
           var ruta = '';
@@ -8298,6 +8524,7 @@ document.addEventListener('keydown', function(e){
       'p-mis-glosas': 'loadMisGlosas', 'p-historial': 'loadHist',
       'p-alertas': 'loadAlertas', 'p-resumen-mes': 'loadResumenMes',
       'p-glosas-adres': 'loadGlosasAdres',
+      'p-objeciones-dgh': 'objCargar',
       'p-usuarios': 'loadUsuarios',
       'p-conciliacion': 'loadConciliaciones', 'p-audit': 'loadAudit',
       'p-mi-desempeno': 'cargarMiDesempeno', 'p-papelera': 'cargarPapelera',
@@ -8722,6 +8949,7 @@ function tab(btn,id){
   }
   if(id==='dashboard') loadDash();
   if(id==='glosas-adres') loadGlosasAdres();
+  if(id==='objeciones-dgh') objCargar();
   if(id==='resumen-mes') loadResumenMes();
   if(id==='pre-auditoria') preAudCargar();
   if(id==='mando'){ loadMando(); loadOperacion(); }
@@ -12079,6 +12307,200 @@ function poblarLandingInsights(metrics){
   if(box && (top.length > 0 || byTipo.length > 0)) box.style.display = '';
 }
 
+// ─── DIAGNÓSTICO DE CALIDAD (solo SUPER_ADMIN) ──────────────────
+// 09-09-2026. El endpoint /admin/diagnostico-calidad existe desde ayer,
+// pero pedirle al auditor que escriba esa URL en el navegador no sirve:
+// el navegador no manda el token y lo único que ve es
+// {"detail":"Token de autenticación requerido"}. Aquí sí, porque la
+// pantalla ya tiene la sesión iniciada. Y en vez del JSON crudo, se
+// pinta en español: cada número con la frase que dice qué significa.
+async function cargarDiagnosticoCalidad(){
+  var caja = document.getElementById('diag-calidad-salida');
+  if(!caja) return;
+  caja.innerHTML = '<div style="color:#4338ca;font-size:.82rem">Leyendo la base de datos…</div>';
+  try{
+    var r = await fetch('/admin/diagnostico-calidad', { headers: authH() });
+    if(!r.ok){
+      var det = '';
+      try{ det = (await r.json()).detail || ''; }catch(e){ det = await r.text(); }
+      caja.innerHTML = '<div style="color:#b91c1c;font-size:.82rem;background:#fef2f2;'
+        + 'border:1px solid #fecaca;border-radius:6px;padding:.65rem .8rem">'
+        + 'No se pudo leer el diagnóstico (código ' + r.status + '). ' + escHtml(String(det).substring(0,200))
+        + '</div>';
+      return;
+    }
+    caja.innerHTML = _pintarDiagnostico(await r.json());
+  }catch(e){
+    caja.innerHTML = '<div style="color:#b91c1c;font-size:.82rem;background:#fef2f2;'
+      + 'border:1px solid #fecaca;border-radius:6px;padding:.65rem .8rem">'
+      + 'No se pudo conectar con el servidor: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function _diagBloque(titulo, cuerpo, colorBorde){
+  return '<div style="background:#fff;border-left:3px solid ' + (colorBorde || '#6366f1')
+    + ';border-radius:6px;padding:.6rem .85rem;margin-bottom:.6rem">'
+    + '<div style="font-weight:700;color:#312e81;font-size:.78rem;text-transform:uppercase;'
+    + 'letter-spacing:.03em;margin-bottom:.3rem">' + titulo + '</div>'
+    + '<div style="font-size:.82rem;color:var(--text);line-height:1.55">' + cuerpo + '</div>'
+    + '</div>';
+}
+
+// Una tabla del diagnóstico. `columnas` es [clave, título, sufijo?]; la
+// primera va a la izquierda y las demás alineadas a la derecha, que es como
+// se leen las cifras.
+function _diagTabla(filas, columnas){
+  var thead = columnas.map(function(c, i){
+    return '<th style="text-align:' + (i ? 'right' : 'left') + ';padding:.2rem .5rem">'
+      + escHtml(c[1]) + '</th>';
+  }).join('');
+  var tbody = filas.map(function(f){
+    return '<tr>' + columnas.map(function(c, i){
+      var v = f[c[0]];
+      var txt = escHtml(v === null || v === undefined ? '—' : v) + (c[2] && v != null ? c[2] : '');
+      return '<td style="padding:.2rem .5rem;text-align:' + (i ? 'right' : 'left') + '">'
+        + (i === columnas.length - 1 || i === 2 ? '<b>' + txt + '</b>' : txt) + '</td>';
+    }).join('') + '</tr>';
+  }).join('');
+  return '<table style="width:100%;font-size:.8rem;border-collapse:collapse">'
+    + '<thead><tr style="color:var(--text3);font-size:.72rem;text-transform:uppercase">'
+    + thead + '</tr></thead><tbody>' + tbody + '</tbody></table>';
+}
+
+function _pintarDiagnostico(d){
+  if(!d || typeof d !== 'object') return '<div style="font-size:.82rem">Respuesta vacía.</div>';
+  var total = Number(d.glosas_analizadas || 0);
+  var html = '';
+
+  html += _diagBloque('Volumen', 'El motor ha analizado <b>' + total + '</b> glosas.'
+    + (total && total < 200
+      ? ' Con este volumen, el «precedente interno» —que exige una glosa YA levantada'
+        + ' con la misma EPS y el mismo tipo de código— va a coincidir pocas veces por'
+        + ' pura estadística, no porque algo esté roto.'
+      : ''));
+
+  if(d.nota) return html + _diagBloque('Nota', escHtml(d.nota), '#d97706');
+
+  if(d.eps){
+    var pct = Number(d.eps.pct_genericas || 0);
+    var lista = (d.eps.con_nombre_real || []).slice(0,10).map(function(x){
+      return '<li>' + escHtml(x.eps) + ' — ' + x.glosas + '</li>';
+    }).join('');
+    html += _diagBloque('Entidad pagadora',
+      '<b>' + d.eps.genericas + '</b> de ' + total + ' glosas (' + pct + '%) quedaron sin'
+      + ' entidad identificada («OTRA / SIN DEFINIR»).'
+      + (pct > 15
+        ? ' <b style="color:#b45309">Más de 1 de cada 7 es mucho.</b> Hasta el 09-09-2026'
+          + ' cualquier EPS sin contrato cargado SOLO se podía elegir como «OTRA»; con'
+          + ' el catálogo nuevo ya no. Las glosas viejas conservan el valor genérico.'
+        : '')
+      + (lista ? '<ul style="margin:.4rem 0 0 1.1rem;font-size:.8rem">' + lista + '</ul>' : ''),
+      pct > 15 ? '#d97706' : '#16a34a');
+  }
+
+  if(d.tarifas_pactadas_por_cups){
+    var nt = Number(d.tarifas_pactadas_por_cups.filas || 0);
+    html += _diagBloque('Tarifas pactadas por CUPS',
+      '<b>' + nt + '</b> filas cargadas. ' + escHtml(d.tarifas_pactadas_por_cups.diagnostico || '')
+      + (nt === 0
+        ? ' Cargar el Excel de tarifas de una sola EPS en la pantalla <b>Tarifas</b> sube'
+          + ' de inmediato la precisión de las glosas TA*, que son las más mecánicas.'
+        : ''),
+      nt === 0 ? '#dc2626' : '#16a34a');
+  }
+
+  if(d.contratos){
+    html += _diagBloque('Contratos',
+      'EPS con cláusulas extraídas: <b>' + d.contratos.eps_con_clausulas + '</b>. '
+      + 'Contratos registrados: <b>' + d.contratos.eps_con_registro_de_contrato + '</b>.');
+  }
+
+  if(d.veredicto_final_eps){
+    var v = d.veredicto_final_eps;
+    var porEstado = (v.por_estado || []).slice(0,8).map(function(x){
+      return '<li>' + escHtml(x.estado) + ' — ' + x.glosas + '</li>';
+    }).join('');
+    html += _diagBloque('Veredicto final de la EPS',
+      '<b>' + v.con_veredicto + '</b> de ' + total + ' (' + v.pct + '%) tienen registrado'
+      + ' si la EPS levantó, ratificó o aceptó. ' + escHtml(v.diagnostico || '')
+      + (porEstado ? '<ul style="margin:.4rem 0 0 1.1rem;font-size:.8rem">' + porEstado + '</ul>' : ''),
+      Number(v.pct || 0) < 30 ? '#d97706' : '#16a34a');
+
+    // 09-09-2026. Con 0 de 397, el diagnóstico solo señalaba el problema y
+    // dejaba al auditor sin saber qué hacer con él. Un tablero que diagnostica
+    // y no dice dónde se arregla se lee una vez y no se vuelve a abrir.
+    if(Number(v.pct || 0) < 30){
+      html += _diagBloque('◀ Qué hacer con esto',
+        '<b>Es lo que más rinde de toda esta lista, y no cuesta nada.</b> El motor '
+        + 'no puede aprender de su propio trabajo mientras no sepa cómo le fue: sin '
+        + 'una sola glosa levantada, el «precedente interno» —que vale 15 de los 100 '
+        + 'puntos de la Confianza— nunca se puede activar, y el banco de argumentos '
+        + 'ganadores que se le muestra a la IA como ejemplo está vacío.'
+        + '<div style="margin-top:.55rem;padding:.55rem .75rem;background:#f0fdf4;'
+        + 'border-left:3px solid #16a34a;border-radius:6px">'
+        + 'Se marca en <b>Mis Glosas</b>: marque las glosas con la casilla y use '
+        + '<b>⬆ EPS LEVANTÓ</b> o <b>❌ EPS RATIFICÓ</b>. Se puede de a 500 a la vez.'
+        + '</div>', '#16a34a');
+    }
+  }
+
+  // 09-09-2026, corrección. Este recuadro decía «Confianza promedio por
+  // modelo» y mostraba otra cosa: el promedio de `score`, que es la fórmula
+  // vieja de probabilidad de éxito. Daba 77% mientras el auditor veía 51% al
+  // pie del dictamen — y con ese número se habría decidido no cambiar de
+  // modelo. Ahora van los dos, cada uno con su nombre.
+  var conf = d.confianza_por_modelo || {};
+  var detalle = conf.detalle || [];
+  if(detalle.length){
+    html += _diagBloque('Confianza real por modelo',
+      _diagTabla(detalle, [
+        ['modelo','Modelo'], ['glosas','Glosas'],
+        ['confianza_promedio','Confianza','%'], ['peor','Peor','%'], ['mejor','Mejor','%'],
+      ])
+      + '<div style="margin-top:.45rem;color:var(--text3);font-size:.78rem">'
+      + escHtml(conf.diagnostico || '') + '</div>', '#16a34a');
+  } else {
+    html += _diagBloque('Confianza real por modelo',
+      '<b>' + (conf.glosas_con_confianza_guardada || 0) + '</b> de '
+      + (conf.de_un_total_de || 0) + ' glosas tienen guardada la Confianza —la misma '
+      + 'que sale al pie del dictamen—. '
+      + escHtml(conf.diagnostico || '')
+      + '<div style="margin-top:.5rem;padding:.5rem .7rem;background:#eff6ff;border-radius:6px;'
+      + 'font-size:.8rem;color:#1e3a8a">Analice unas glosas y vuelva a este botón: '
+      + 'ahí se verá qué modelo da mejor Confianza, con casos de este hospital.</div>',
+      '#d97706');
+  }
+
+  var exito = d.probabilidad_exito_por_modelo || [];
+  if(exito.length){
+    html += _diagBloque('Probabilidad de éxito (fórmula antigua)',
+      _diagTabla(exito, [['modelo','Modelo'], ['glosas','Glosas'], ['promedio','Promedio','%']])
+      + '<div style="margin-top:.45rem;color:var(--text3);font-size:.78rem">'
+      + 'Cuidado: <b>esto NO es la Confianza</b> del dictamen. Es una fórmula fija '
+      + 'por tipo de glosa (extemporánea 99, ratificación 92, urgencia 90, tarifa 75, '
+      + 'el resto 85, +5 si hay PDF): no mide qué tan bueno quedó el escrito ni sirve '
+      + 'para comparar modelos de IA. Se muestra solo porque es el número que quedó '
+      + 'guardado en las glosas viejas.</div>', '#94a3b8');
+  }
+
+  if(d.costo_ia && d.costo_ia.length){
+    var costos = d.costo_ia.map(function(x){
+      return '<li><b>' + escHtml(x.proveedor) + '</b>: ' + x.llamadas + ' llamadas · '
+        + 'USD $' + x.costo_total_usd + ' acumulado · $' + x.costo_promedio_usd + ' por llamada · '
+        + x.latencia_promedio_ms + ' ms · proyección a este volumen: <b>USD $'
+        + x.proyeccion_mensual_usd_a_este_volumen + '</b></li>';
+    }).join('');
+    html += _diagBloque('Costo real de la IA',
+      '<ul style="margin:0 0 0 1.1rem">' + costos + '</ul>');
+  } else {
+    html += _diagBloque('Costo real de la IA',
+      'Todavía no hay llamadas con costo registrado. El día que se pruebe otro proveedor'
+      + ' como principal, aunque sea con 20 o 30 glosas, el costo exacto de esa prueba'
+      + ' queda aquí en dólares: no hay que estimarlo.');
+  }
+  return html;
+}
+
 // ─── TEST SENTRY (solo SUPER_ADMIN) ─────────────────────────────
 async function dispararSentryTest(){
   if(USER_ROL !== 'SUPER_ADMIN'){
@@ -13935,6 +14357,14 @@ function aplicarPermisosDelMenu(){
   var puede = esDeCoordinacion();
   var items = document.querySelectorAll('[data-solo-coordinacion="1"]');
   for(var i = 0; i < items.length; i++){
+    // 07-09-2026: un botón marcado data-oculto se queda oculto aunque sea de
+    // coordinación. Es lo que pidió Yesid para «Plata recuperada»: sin esto,
+    // esta función le ganaba a su display:none y el botón reaparecía. El
+    // `getAttribute &&` deja pasar los elementos de mentira de las pruebas.
+    if(items[i].getAttribute && items[i].getAttribute('data-oculto') === '1'){
+      items[i].style.display = 'none';
+      continue;
+    }
     items[i].style.display = puede ? '' : 'none';
   }
   // Las secciones que quedan sin un solo botón visible tampoco deben dejar
@@ -13982,7 +14412,8 @@ function pintarRepTabbars(){
   if(verMando) tabs.push(['mando', '⚡ Mando']);
   tabs.push(['dashboard', '📊 Dashboard']);
   tabs.push(['glosas-adres', '📄 Glosas ADRES']);
-  tabs.push(['resumen-mes', '📅 Resumen del mes']);
+  // 04-09-2026: «Resumen del mes» salía dos veces (menú lateral y esta barra).
+  // Yesid pidió quitarlo: se saca también de acá. El panel sigue existiendo.
   document.querySelectorAll('.rep-tabbar-host').forEach(function(host){
     var activo = host.getAttribute('data-activo');
     host.innerHTML = '<div class="rep-tabbar">' + tabs.map(function(t){
@@ -16268,10 +16699,25 @@ async function loadContratos(){
     grid.innerHTML='';
     document.getElementById('n-contratos').textContent=data.length;
     data.forEach(function(c){
-      sel.innerHTML+='<option value="'+escHtml(c.eps)+'">'+escHtml(c.eps)+'</option>';
       hEps.innerHTML+='<option value="'+escHtml(c.eps)+'">'+escHtml(c.eps)+'</option>';
       grid.innerHTML+='<div class="contrato-card"><div class="contrato-eps">'+escHtml(c.eps)+'</div><div class="contrato-det">'+escHtml(c.detalles)+'</div></div>';
     });
+    // 09-09-2026 — el desplegable de Analizar NO puede limitarse a las EPS
+    // con contrato. SURA, SALUD TOTAL, EMSSANAR, SAVIA y MUTUAL SER son
+    // entidades reales sin contrato cargado, y sin esto solo se podían
+    // analizar como «OTRA / SIN DEFINIR»: todo dictamen suyo salía genérico.
+    // Va aparte de la grilla de contratos (arriba, que sí debe mostrar solo
+    // contratos de verdad) y no bloquea si falla: peor es nada, mejor es
+    // la lista completa.
+    try{
+      var r2 = await fetch('/contratos/eps-seleccionables', {headers:authH()});
+      if(r2.ok){
+        var eps = await r2.json();
+        (eps || []).forEach(function(nombre){
+          sel.innerHTML += '<option value="'+escHtml(nombre)+'">'+escHtml(nombre)+'</option>';
+        });
+      }
+    }catch(e){ avisarNoCargo('las entidades sin contrato', e); }
   }catch(e){ avisarNoCargo('los contratos', e); }
 }
 
@@ -16819,12 +17265,32 @@ async function analizar(modoOverride){
   _rehab();
 }
 
+// Los caminos en los que el dictamen NO lo escribió la IA: texto fijo del
+// área (ratificación, extemporánea, plantillas curadas), abstención por
+// falta de elementos, plantilla, o el argumento que dictó el auditor.
+var _SIN_IA = ['texto_fijo','plantilla','abstencion','directo_auditor'];
+function _dictamenLoEscribioLaIA(d){
+  var m = String((d && d.modelo_ia) || '').toLowerCase();
+  return _SIN_IA.indexOf(m) === -1;
+}
+
 function renderAccionIA(d){
-  // Banner premium con la decisión autónoma de la IA: DEFENDER_TOTAL,
-  // ACEPTAR_PARCIAL, ACEPTAR_TOTAL o REVISAR. Incluye botón para
-  // pre-cargar los campos del formulario con los montos sugeridos.
+  // Banner premium con la decisión: DEFENDER_TOTAL, ACEPTAR_PARCIAL,
+  // ACEPTAR_TOTAL o REVISAR. Incluye botón para pre-cargar los campos
+  // del formulario con los montos sugeridos.
+  //
+  // 09-09-2026 (caso 4). Este recuadro decía «💡 La IA recomienda defender
+  // íntegramente la glosa» en dictámenes donde la IA NUNCA CORRIÓ: en una
+  // ratificación el motor devuelve el texto fijo del área (modelo_ia =
+  // 'texto_fijo') y la acción sale de una tabla en Python, no de un
+  // análisis. Atribuírselo a la IA le da al auditor una segunda opinión
+  // que no existe — y encima la más convincente de las dos.
+  // Ahora el recuadro dice de dónde salió de verdad la decisión.
   if(!d || !d.accion_ia) return '';
   var accion = String(d.accion_ia).toUpperCase();
+  var conIA = _dictamenLoEscribioLaIA(d);
+  var quien = conIA ? 'La IA' : 'El texto fijo del área';
+  var titulo = conIA ? '💡 La IA recomienda' : '📋 Regla fija del área';
   var aceptar = Number(d.valor_aceptar_ia || 0);
   var defender = Number(d.valor_defender_ia || 0);
   var fmt = function(v){ return fmtCOP(Number(v||0)); };
@@ -16832,22 +17298,22 @@ function renderAccionIA(d){
     'DEFENDER_TOTAL': {
       bg: 'linear-gradient(135deg,#dcfce7,#bbf7d0)',
       border: '#16a34a', icon: '🛡', label: 'DEFENDER 100%',
-      texto: 'La IA recomienda defender íntegramente la glosa. La objeción de la EPS no procede.',
+      texto: quien + ' defiende íntegramente la glosa: la objeción de la entidad no procede.',
     },
     'ACEPTAR_PARCIAL': {
       bg: 'linear-gradient(135deg,#fef3c7,#fde68a)',
       border: '#d97706', icon: '◐', label: 'ACEPTACIÓN PARCIAL',
-      texto: 'La IA recomienda aceptar el excedente real y defender el resto.',
+      texto: quien + ' acepta el excedente real y defiende el resto.',
     },
     'ACEPTAR_TOTAL': {
       bg: 'linear-gradient(135deg,#fee2e2,#fecaca)',
       border: '#dc2626', icon: '✓', label: 'ACEPTAR 100%',
-      texto: 'La IA considera que la objeción de la EPS es procedente.',
+      texto: quien + ' da por procedente la objeción de la entidad.',
     },
     'REVISAR': {
       bg: 'linear-gradient(135deg,#e0e7ff,#c7d2fe)',
       border: '#4f46e5', icon: '❗', label: 'REVISAR MANUALMENTE',
-      texto: 'La IA detectó datos faltantes o inconsistentes — confirma manualmente.',
+      texto: quien + ' encontró datos faltantes o inconsistentes: confírmelo a mano.',
     },
   }[accion] || { bg:'#f3f4f6', border:'#9ca3af', icon:'?', label: accion, texto:'' };
   var detalle = '';
@@ -16870,7 +17336,7 @@ function renderAccionIA(d){
     + '<div style="font-size:1.6rem;line-height:1">' + meta.icon + '</div>'
     + '<div style="flex:1;min-width:0">'
     + '<div style="font-weight:800;color:' + meta.border + ';letter-spacing:.04em;font-size:.78rem;text-transform:uppercase">'
-    + '💡 La IA recomienda · ' + meta.label + '</div>'
+    + titulo + ' · ' + meta.label + '</div>'
     + '<div style="margin-top:.3rem;color:var(--text);font-size:.9rem">' + meta.texto + '</div>'
     + detalle
     + btnAplicar
@@ -16987,7 +17453,14 @@ function renderVerificacionCitas(v){
           + (i.sugerencia ? '<div style="font-size:.73rem;color:#365314;margin-top:.2rem;"><b>Sugerencia:</b> '+escHtml(i.sugerencia)+'</div>' : '')
           + '</div>';
       }).join('')
-    +'<div style="font-size:.7rem;color:var(--text3);margin-top:.4rem;font-style:italic;">El gestor decide si corrige o ignora — esto es solo orientativo.</div>'
+    // 08-09-2026 (caso 2). Este pie decía SIEMPRE «el gestor decide si corrige
+    // o ignora — esto es solo orientativo», incluso debajo de un hallazgo que
+    // el propio motor acababa de llamar GRAVE. Un defecto grave no es un
+    // consejo: el dictamen queda bloqueado y hay que corregirlo.
+    +(graves>0
+        ? '<div style="font-size:.72rem;color:#991b1b;margin-top:.4rem;font-weight:600;">'
+          + 'Esto NO es opcional: con un hallazgo grave el dictamen queda marcado como no listo para radicar.</div>'
+        : '<div style="font-size:.7rem;color:var(--text3);margin-top:.4rem;font-style:italic;">El gestor decide si corrige o ignora — esto es solo orientativo.</div>')
     +'</div>';
   return html;
 }
@@ -17693,6 +18166,223 @@ function renderRiesgoRatificacion(r){
 //   A = 0 issues · B = solo MEDIA · C = alguna ALTA.
 // CONFIANZA: % real de confianza.score*100 + recomendación del backend.
 // La prob. de éxito histórica queda como dato secundario (.exito-mini).
+// ─── LA EVIDENCIA DE LOS SOPORTES ────────────────────────────────────
+// 09-09-2026, la otra mitad del pedido de Yesid: «que cuando analicen una
+// glosa vean qué van a auditar». Para una glosa de TARIFAS eso es el renglón
+// del contrato; para una de SOPORTES —donde más plata se pierde— es esta
+// lista: qué exige la causal, qué hay en el expediente, qué se adjuntó ahora
+// y, sobre todo, qué falta.
+//
+// Igual que con las tarifas, el motor ya tenía los tres datos y los horneaba
+// como HTML dentro del dictamen. Acá se pintan como lo que son.
+function renderEvidenciaSoportes(ev){
+  if(!ev) return '';
+  var pide = ev.pide_la_causal || [];
+  var hay = ev.hay_en_el_expediente || [];
+  var adj = ev.se_adjunto_en_este_analisis || [];
+  var faltan = ev.faltan || [];
+  // Sin nada que decir, no se estorba: una glosa de tarifas sin requisitos
+  // de soporte y sin expediente indexado no necesita este recuadro.
+  if(!pide.length && !hay.length && !adj.length && !ev.no_se_pudo_consultar) return '';
+
+  var falta = faltan.length > 0;
+  var borde = ev.no_se_pudo_consultar ? '#3b82f6' : (falta ? '#dc2626' : '#10b981');
+  var fondo = ev.no_se_pudo_consultar ? 'linear-gradient(135deg,#eff6ff,#dbeafe)'
+            : (falta ? 'linear-gradient(135deg,#fef2f2,#fee2e2)'
+                     : 'linear-gradient(135deg,#f0fdf4,#ecfdf5)');
+  var titColor = ev.no_se_pudo_consultar ? '#1e40af' : (falta ? '#b91c1c' : '#047857');
+
+  function _lista(items, vacio){
+    if(!items.length) return '<div style="color:var(--text3);font-size:.8rem">' + vacio + '</div>';
+    return '<ul style="margin:0;padding-left:1.1rem;font-size:.82rem;line-height:1.6">'
+      + items.map(function(x){ return '<li>' + escHtml(x) + '</li>'; }).join('') + '</ul>';
+  }
+
+  var col = function(titulo, cuerpo){
+    return '<div style="flex:1 1 190px;min-width:0;background:#fff;border:1px solid var(--border);'
+      + 'border-radius:8px;padding:.6rem .75rem">'
+      + '<div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;'
+      + 'color:var(--text3);font-weight:700;margin-bottom:.35rem">' + titulo + '</div>'
+      + cuerpo + '</div>';
+  };
+
+  var columnas =
+      col('La causal ' + escHtml(ev.codigo_glosa || '') + ' exige',
+          _lista(pide.map(function(x){ return x.nombre; }), 'Esta causal no exige un soporte concreto.'))
+    + col('Hay en el expediente',
+          ev.no_se_pudo_consultar
+            ? '<div style="color:#1e40af;font-size:.8rem;font-weight:600">Todavía no se sabe</div>'
+            : _lista(hay.map(function(x){ return x.nombre + (x.archivo ? ' (' + x.archivo + ')' : ''); }),
+                     'Ninguno encontrado en el servidor.'))
+    + col('Se adjuntó en este análisis',
+          _lista(adj, 'Ningún PDF adjunto.'));
+
+  var remate = '';
+  if(ev.no_se_pudo_consultar){
+    remate = '<div style="margin-top:.6rem;padding:.55rem .8rem;border-radius:8px;background:#dbeafe;'
+      + 'border:1px solid #3b82f6;font-size:.85rem;color:#1e3a8a">'
+      + '<b>El buscador de soportes está a medio armar.</b> Que no aparezcan '
+      + 'documentos <b>no</b> quiere decir que la factura no tenga expediente. '
+      + 'Espere a que la pantalla de <b>Soportes</b> diga que terminó y vuelva a analizar.'
+      + '</div>';
+  } else if(falta){
+    remate = '<div style="margin-top:.6rem;padding:.55rem .8rem;border-radius:8px;background:#fee2e2;'
+      + 'border:1px solid #dc2626;font-size:.85rem;color:#7f1d1d">'
+      + '<b>Falta ' + escHtml(faltan.join(' o ')) + '.</b> '
+      + 'Este dictamen argumenta, pero no prueba: a la entidad le basta pedir el '
+      + 'documento para ratificar la glosa. Anéxelo antes de radicar.'
+      + '</div>';
+  } else if(pide.length){
+    remate = '<div style="margin-top:.6rem;padding:.55rem .8rem;border-radius:8px;background:#ecfdf5;'
+      + 'border:1px solid #10b981;font-size:.85rem;color:#065f46">'
+      + '<b>Está el soporte que la causal exige.</b> Nómbrelo en el escrito con su '
+      + 'folio y su fecha: la entidad no discute lo que está señalado.'
+      + '</div>';
+  }
+
+  return (
+    '<div class="card-premium" style="margin-top:1rem;padding:1rem 1.3rem;border:2px solid '
+    + borde + ';background:' + fondo + '">'
+    + '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.7rem">'
+    + '<div style="font-size:1.4rem;line-height:1">📎</div>'
+    + '<div><div style="font-weight:800;color:' + titColor + ';letter-spacing:.04em;'
+    + 'font-size:.78rem;text-transform:uppercase">Los soportes de esta glosa</div>'
+    + '<div style="font-size:.8rem;color:' + titColor + '">Factura '
+    + escHtml(ev.factura || '') + ' · lo que se exige, lo que hay y lo que falta.</div>'
+    + '</div></div>'
+    + '<div style="display:flex;gap:.6rem;flex-wrap:wrap">' + columnas + '</div>'
+    + remate
+    + '</div>'
+  );
+}
+
+// ─── LA EVIDENCIA DE LA TARIFA ───────────────────────────────────────
+// 09-09-2026, pedido de Yesid: «que cuando analicen una glosa vean qué van a
+// auditar, y si es por tarifas que aparezca el Excel de la tarifa pactada y
+// el valor para que ellos lo analicen».
+//
+// El motor ya cruzaba la factura contra las 19.051 filas del catálogo que
+// cargó el hospital, pero el resultado se pegaba como HTML DENTRO del
+// dictamen: la pantalla no podía pintarlo como tabla, y ese cuadro de trabajo
+// interno terminaba metido en el escrito que se radica ante la entidad.
+//
+// Acá se pinta como lo que es: el renglón exacto del contrato, con el archivo
+// de donde salió para que el auditor pueda ir a comprobarlo por su cuenta.
+function renderEvidenciaTarifa(ev){
+  if(!ev || !ev.fila_del_catalogo) return '';
+  var f = ev.fila_del_catalogo;
+  var c = ev.las_cifras_del_caso || {};
+  var faltan = c.no_se_pudo_leer || [];
+
+  // Cómo se pactó: un valor fijo, o un porcentaje sobre el SOAT.
+  var comoSePacto = f.valor_pactado ? fmtCOP(f.valor_pactado) : '—';
+  if(f.tipo_tarifa === 'SOAT_PORCENTAJE'){
+    var fa = Number(f.factor_ajuste || 0);
+    comoSePacto = 'SOAT ' + (fa > 0 ? '+' : '') + fa.toFixed(0) + '%'
+      + (f.valor_pactado ? ' → ' + fmtCOP(f.valor_pactado) : '');
+  }
+
+  var vigencia = '';
+  if(f.vigencia_desde || f.vigencia_hasta){
+    vigencia = (f.vigencia_desde ? fmtFechaCorta(f.vigencia_desde) : '—')
+             + ' a ' + (f.vigencia_hasta ? fmtFechaCorta(f.vigencia_hasta) : '—');
+  }
+
+  // El renglón del contrato: lo que el auditor va a mirar primero.
+  var ficha = [
+    ['Código en el contrato', escHtml(f.codigo_cups || f.codigo_ips || '—')],
+    ['Servicio', escHtml(f.descripcion || '—')],
+    ['Tarifa pactada', '<b style="color:#047857">' + comoSePacto + '</b>'],
+    ['Contrato', escHtml(f.contrato_numero || '—')],
+  ];
+  if(vigencia) ficha.push(['Vigencia', escHtml(vigencia)]);
+  if(f.modalidad) ficha.push(['Modalidad', escHtml(f.modalidad)]);
+  if(f.fuente_archivo) ficha.push(['Sale del archivo', '<span style="font-family:var(--font-mono);font-size:.76rem">' + escHtml(f.fuente_archivo) + '</span>']);
+
+  var fichaHtml = ficha.map(function(x){
+    return '<tr>'
+      + '<td style="padding:.3rem .6rem;color:var(--text3);white-space:nowrap;vertical-align:top">' + x[0] + '</td>'
+      + '<td style="padding:.3rem .6rem;color:var(--text)">' + x[1] + '</td>'
+      + '</tr>';
+  }).join('');
+
+  // Las cifras, una al lado de la otra. Lo que no se pudo leer se dice.
+  var _NO = '<span style="color:#b45309;font-weight:600">no se pudo leer</span>';
+  var cifras = [
+    ['Facturado por el HUS', c.facturado, '#0f172a'],
+    ['Pactado en el contrato', c.pactado, '#047857'],
+    ['Objetado por la entidad', c.objetado, '#b91c1c'],
+  ];
+  if(c.reconocido) cifras.push(['Reconocido por la entidad', c.reconocido, '#0369a1']);
+
+  var cifrasHtml = cifras.map(function(x){
+    return '<div style="flex:1 1 150px;min-width:0;background:#fff;border:1px solid var(--border);'
+      + 'border-radius:8px;padding:.55rem .7rem">'
+      + '<div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);'
+      + 'font-weight:700;margin-bottom:.2rem">' + x[0] + '</div>'
+      + '<div style="font-size:1.05rem;font-weight:800;color:' + (x[1] ? x[2] : '#b45309') + '">'
+      + (x[1] ? fmtCOP(x[1]) : _NO) + '</div>'
+      + '</div>';
+  }).join('');
+
+  // La diferencia: solo cuando se pudo calcular de verdad.
+  var difHtml = '';
+  if(c.diferencia !== null && c.diferencia !== undefined){
+    var d = Number(c.diferencia);
+    var sobra = d > 0;
+    difHtml = '<div style="margin-top:.6rem;padding:.55rem .8rem;border-radius:8px;'
+      + 'background:' + (sobra ? '#fef3c7' : '#ecfdf5') + ';border:1px solid '
+      + (sobra ? '#d97706' : '#10b981') + ';font-size:.85rem;color:'
+      + (sobra ? '#92400e' : '#065f46') + '">'
+      + (sobra
+          ? '<b>Se facturó ' + fmtCOP(Math.abs(d)) + ' por encima de lo pactado.</b> '
+            + 'Ese excedente es lo que la entidad puede sostener; el resto no.'
+          : (d === 0
+              ? '<b>Lo facturado coincide exactamente con lo pactado.</b> La objeción no tiene sustento tarifario.'
+              : '<b>Se facturó ' + fmtCOP(Math.abs(d)) + ' por DEBAJO de lo pactado.</b> '
+                + 'Revise: el hospital pudo estar cobrando de menos.'))
+      + '</div>';
+  } else {
+    difHtml = '<div style="margin-top:.6rem;padding:.55rem .8rem;border-radius:8px;background:#fffbeb;'
+      + 'border:1px solid #d97706;font-size:.85rem;color:#92400e">'
+      + '<b>No se puede calcular la diferencia</b> porque falta ' + escHtml(faltan.join(' y ') || 'un dato')
+      + '. Compruébelo en la factura antes de radicar: sin esa cifra, el cálculo del motor no se sostiene.'
+      + '</div>';
+  }
+
+  var homolog = '';
+  if(ev.homologacion){
+    homolog = '<div style="margin-top:.5rem;padding:.5rem .75rem;background:#eff6ff;border-left:3px solid #3b82f6;'
+      + 'border-radius:6px;font-size:.8rem;color:#1e3a8a">'
+      + '<b>Ojo: el cruce pasó por una homologación.</b> Se facturó '
+      + escHtml(ev.homologacion.codigo_entrada || '—') + ' y en el contrato el ítem figura como '
+      + escHtml(ev.homologacion.cups_oficial || ev.homologacion.codigo_ips_contrato || '—')
+      + '. ' + escHtml(ev.homologacion.norma || '') + '</div>';
+  }
+
+  return (
+    '<div class="card-premium" style="margin-top:1rem;padding:1rem 1.3rem;border:2px solid #10b981;'
+    + 'background:linear-gradient(135deg,#f0fdf4,#ecfdf5)">'
+    + '<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.7rem">'
+    + '<div style="font-size:1.4rem;line-height:1">📑</div>'
+    + '<div>'
+    + '<div style="font-weight:800;color:#047857;letter-spacing:.04em;font-size:.78rem;text-transform:uppercase">'
+    + 'Lo que usted va a auditar</div>'
+    + '<div style="font-size:.8rem;color:#065f46">El renglón del contrato que cargó el hospital, contra lo facturado.</div>'
+    + '</div></div>'
+    + '<div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.7rem">' + cifrasHtml + '</div>'
+    + difHtml
+    + homolog
+    + '<details style="margin-top:.7rem;border-top:1px dashed #a7f3d0;padding-top:.6rem">'
+    + '<summary style="cursor:pointer;font-size:.8rem;color:#047857;font-weight:700;outline:none">'
+    + 'Ver el renglón exacto del contrato</summary>'
+    + '<table style="width:100%;font-size:.82rem;border-collapse:collapse;margin-top:.5rem;'
+    + 'background:#fff;border-radius:6px;overflow:hidden">' + fichaHtml + '</table>'
+    + '</details>'
+    + '</div>'
+  );
+}
+
 function renderMedallasDictamen(d, scoreColor){
   var v = d.verificacion_citas;
   var issues = (v && v.issues) || [];
@@ -17784,6 +18474,13 @@ function renderResult(d){
   var _vc = d.verificacion_citas;
   var _seRevisó = !!(_vc && _vc.verificado !== false);
   var qgOk = !!(_vc && _seRevisó && !_qgIssues.some(function(i){ return i.severidad === 'ALTA'; }));
+  // 08-09-2026 — EL SELLO Y EL «⛔ NO RADICAR» NO PUEDEN CONVIVIR. En la
+  // prueba de cinco casos, cuatro salieron con el sello verde y, dos renglones
+  // abajo, la prohibición. El motor ahora manda `bloqueado_para_radicar` con
+  // sus motivos: si viene, el sello es rojo y dice lo que pasa.
+  var qgBloqueado = !!(d.bloqueado_para_radicar);
+  var qgMotivos = (d.motivos_bloqueo || []).join(' · ');
+  if(qgBloqueado) qgOk = false;
 
   var fechaLarga = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
 
@@ -17813,6 +18510,12 @@ function renderResult(d){
     +'</div></div>'
 
     + renderMedallasDictamen(d, scoreColor)
+    // 09-09-2026 — LA EVIDENCIA, ANTES QUE EL VEREDICTO. Va arriba del riesgo
+    // y de la recomendación a propósito: el auditor tiene que poder mirar el
+    // renglón del contrato y las cifras ANTES de leer qué concluyó el motor.
+    // Al revés, lee la conclusión y ya no revisa.
+    + renderEvidenciaTarifa(d.evidencia_tarifa)
+    + renderEvidenciaSoportes(d.evidencia_soportes)
     + (d.riesgo_ratificacion ? renderRiesgoRatificacion(d.riesgo_ratificacion) : '')
     + (d.accion_ia ? renderAccionIA(d) : '')
 
@@ -17839,8 +18542,10 @@ function renderResult(d){
          + 'que haga nada.</div>'
          + '</div>'
        : '')
-    +'<div class="res-dictamen card-doc'+(qgOk?' qg-ok':'')+'">'
-    +'<span class="qg-seal" title="Verificación de citas legales sin hallazgos graves">✓ VALIDADO POR QUALITY GATE</span>'
+    +'<div class="res-dictamen card-doc'+(qgOk?' qg-ok':'')+(qgBloqueado?' qg-bloqueado':'')+'">'
+    +(qgBloqueado
+        ? '<span class="qg-seal" title="'+escHtml(qgMotivos || 'El motor marcó este dictamen como no listo para radicar')+'">⛔ NO LISTO PARA RADICAR</span>'
+        : '<span class="qg-seal" title="Verificación de citas legales sin hallazgos graves">✓ VALIDADO POR QUALITY GATE</span>')
     +'<div class="res-dictamen-hdr"><span>Dictamen Jurídico — ESE HUS</span>'
     +'<span style="opacity:.85;font-weight:500;white-space:nowrap">'+fechaLarga+'</span>'
     +'</div>'
@@ -18090,6 +18795,9 @@ function imprimirLoteConsolidado(){
   var factura = (document.getElementById('f-factura') && document.getElementById('f-factura').value) || '—';
   var radicado = (document.getElementById('f-radicado') && document.getElementById('f-radicado').value) || '—';
   var eps = (document.getElementById('eps-sel') && document.getElementById('eps-sel').value) || '—';
+  // 08-09-2026: «OTRA / SIN DEFINIR» es el marcador del desplegable, no una
+  // entidad. En el documento impreso salía como si lo fuera.
+  if(/^OTRA(\s*[\/\-]\s*SIN\s+DEFINIR)?$/i.test(String(eps).trim())) eps = 'ENTIDAD PAGADORA SIN IDENTIFICAR';
   var etapa = (document.getElementById('etapa-v') && document.getElementById('etapa-v').value) || 'RESPUESTA A GLOSA';
   var fecha = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
   var fechaCorta = new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
@@ -19609,6 +20317,9 @@ function imprimirDictamen(){
   var fechaCorta=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
   var hora=new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
   var eps = (document.getElementById('eps-sel') && document.getElementById('eps-sel').value) || '—';
+  // 08-09-2026: «OTRA / SIN DEFINIR» es el marcador del desplegable, no una
+  // entidad. En el documento impreso salía como si lo fuera.
+  if(/^OTRA(\s*[\/\-]\s*SIN\s+DEFINIR)?$/i.test(String(eps).trim())) eps = 'ENTIDAD PAGADORA SIN IDENTIFICAR';
   var factura = (document.getElementById('f-factura') && document.getElementById('f-factura').value) || '—';
   var radicado = (document.getElementById('f-radicado') && document.getElementById('f-radicado').value) || '—';
   var etapa = (document.getElementById('etapa-v') && document.getElementById('etapa-v').value) || 'RESPUESTA A GLOSA';
@@ -20336,6 +21047,210 @@ async function loadDashCobranza(){
         '</tbody></table>'
       : '<div style="color:var(--text3);font-size:.78rem;text-align:center;padding:1rem">Sin facturas pendientes</div>';
   } catch(e){ avisarNoCargo('el tablero de cobranza', e); }
+}
+
+// ─── Objeciones DGH ───────────────────────────────────────────────────────
+// Las glosas de la entidad y el export del DGH entran, los dos archivos salen.
+// (EMSSANAR no manda Excel sino un PDF por factura: por eso se aceptan varios.)
+// El cruce lo hace el servidor
+// con los mismos bots de tools/, así que lo que se descarga acá es idéntico a
+// lo que sale por consola.
+var OBJ = { resultado: null, entidades: [] };
+
+async function objCargar(){
+  var sel = document.getElementById('obj-entidad');
+  var fecha = document.getElementById('obj-fecha');
+  if(fecha && !fecha.value) fecha.value = new Date().toISOString().slice(0,10);
+  if(!sel || OBJ.entidades.length) return;
+  try{
+    var r = await fetch('/objeciones-dgh/entidades', {headers: authH()});
+    if(!r.ok) return;
+    OBJ.entidades = await r.json();
+    OBJ.entidades.forEach(function(e){
+      var o = document.createElement('option');
+      o.value = e.id; o.textContent = e.nombre; o.title = e.ayuda;
+      sel.appendChild(o);
+    });
+  }catch(e){ /* el selector queda en «reconocerla sola», que es el caso normal */ }
+}
+
+function objArchivoElegido(){
+  var ent = document.getElementById('obj-file-entidad');
+  var dgh = document.getElementById('obj-file-dgh');
+  var btn = document.getElementById('obj-btn');
+  var listo = !!(ent && ent.files.length && dgh && dgh.files.length);
+  if(btn) btn.disabled = !listo;
+  var cuantos = document.getElementById('obj-cuantos');
+  if(cuantos) cuantos.textContent = (ent && ent.files.length > 1)
+    ? (ent.files.length + ' archivos marcados (uno por factura).') : '';
+  var estado = document.getElementById('obj-estado');
+  if(estado && !listo) estado.textContent = 'Faltan los archivos.';
+  else if(estado) estado.textContent = '';
+}
+
+async function objProcesar(){
+  var ent = document.getElementById('obj-file-entidad');
+  var dgh = document.getElementById('obj-file-dgh');
+  var btn = document.getElementById('obj-btn');
+  var estado = document.getElementById('obj-estado');
+  var caja = document.getElementById('obj-resultado');
+  if(!ent.files.length || !dgh.files.length){ estado.textContent = 'Faltan los archivos.'; return; }
+
+  btn.disabled = true;
+  estado.textContent = 'Cruzando… en archivos grandes puede tardar medio minuto.';
+  caja.innerHTML = '<div class="chart-card" style="padding:1.2rem;text-align:center;color:var(--text3);font-size:.85rem">Armando el archivo…</div>';
+  try{
+    var fd = new FormData();
+    // EMSSANAR manda un PDF por factura: van todos los que se hayan marcado.
+    for(var i = 0; i < ent.files.length; i++) fd.append('archivo_entidad', ent.files[i]);
+    fd.append('archivo_dgh', dgh.files[0]);
+    fd.append('entidad', document.getElementById('obj-entidad').value || '');
+    fd.append('fecha', document.getElementById('obj-fecha').value || '');
+    var r = await fetch('/objeciones-dgh/procesar', {method:'POST', headers: authH(), body: fd});
+    var d = await r.json();
+    if(!r.ok) throw new Error(d.detail || ('HTTP '+r.status));
+    OBJ.resultado = d;
+    estado.textContent = '';
+    objPintar(d);
+    toast('Archivo armado', d.objeciones+' objeciones de '+d.entidad, 'success');
+  }catch(e){
+    estado.textContent = '';
+    caja.innerHTML = '<div class="chart-card" style="padding:1.1rem;border-left:3px solid var(--c-red)">'
+      + '<div style="font-weight:700;margin-bottom:.3rem">No se pudo armar el archivo</div>'
+      + '<div style="font-size:.85rem;color:var(--text2)">' + objEsc(e.message) + '</div></div>';
+  }finally{ btn.disabled = false; }
+}
+
+async function objDescargar(btn, cual){
+  if(!OBJ.resultado) return;
+  var previo = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Bajando…';
+  try{
+    var url = '/objeciones-dgh/' + encodeURIComponent(OBJ.resultado.id) + '/' + cual;
+    var r = await fetch(url, {headers: authH()});
+    if(!r.ok){
+      var d = await r.json().catch(function(){ return {}; });
+      throw new Error(d.detail || ('HTTP '+r.status));
+    }
+    var blob = await r.blob();
+    var nombre = cual;
+    var cd = r.headers.get('Content-Disposition') || '';
+    var m = cd.match(/filename="?([^";]+)"?/);
+    if(m) nombre = m[1];
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = nombre;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+  }catch(e){
+    toast('No se pudo descargar', e.message, 'error');
+  }finally{ btn.disabled = false; btn.textContent = previo; }
+}
+
+function objEsc(t){
+  return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function objChip(texto, color){
+  return '<span style="display:inline-block;padding:.12rem .5rem;border-radius:999px;font-size:.7rem;'
+    + 'font-weight:700;background:' + color + '22;color:' + color + '">' + objEsc(texto) + '</span>';
+}
+
+var OBJ_COLOR = {'ALTA':'var(--c-green)','MEDIA':'var(--c-amber)','BAJA':'var(--c-red)','SIN CRUCE':'var(--c-red)'};
+
+function objPintar(d){
+  var caja = document.getElementById('obj-resultado');
+
+  var reglas = d.reglas_ok
+    ? '<div style="font-size:.8rem;color:var(--c-green)">✓ Reglas verificadas: CTNCENCOS vacía, ningún código inventado y CROTIPOBJ correcto en todas las facturas.</div>'
+    : '<div style="font-size:.8rem;color:var(--c-red)"><b>Reglas incumplidas:</b><br>' + d.fallas_reglas.map(objEsc).join('<br>') + '</div>';
+
+  var tarjetas = ['ALTA','MEDIA','BAJA','SIN CRUCE'].map(function(k){
+    return '<div style="text-align:center;padding:.5rem .8rem;border:1px solid var(--border);border-radius:10px;min-width:82px">'
+      + '<div style="font-size:1.3rem;font-weight:800;color:' + OBJ_COLOR[k] + '">' + (d.confianza[k]||0) + '</div>'
+      + '<div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.03em">' + k + '</div></div>';
+  }).join('');
+
+  var html = '<div class="chart-card" style="padding:1.1rem;margin-bottom:1rem">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.8rem;margin-bottom:.9rem">'
+    +   '<div>'
+    +     '<div style="font-size:1.05rem;font-weight:700">' + objEsc(d.entidad) + ' · ' + objEsc(d.fecha) + '</div>'
+    +     '<div style="font-size:.82rem;color:var(--text3)">' + d.objeciones + ' objeciones · '
+    +       d.facturas + ' factura(s) · ' + fmtCOP(d.valor_total) + '</div>'
+    +   '</div>'
+    +   '<div style="display:flex;gap:.45rem;flex-wrap:wrap">' + tarjetas + '</div>'
+    + '</div>'
+    + reglas
+    + '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem">'
+    +   '<button class="btn btn-primary" onclick="objDescargar(this,\'objeciones.xlsx\')" style="font-size:.82rem">⬇ ' + objEsc(d.nombre_objeciones) + '</button>'
+    +   '<button class="btn btn-ghost" onclick="objDescargar(this,\'cruce.xlsx\')" style="font-size:.82rem">⬇ ' + objEsc(d.nombre_cruce) + '</button>'
+    +   '<button class="btn btn-ghost" onclick="objDescargar(this,\'paquete.zip\')" style="font-size:.82rem">📦 Los dos (ZIP)</button>'
+    + '</div>'
+    + '<div style="font-size:.72rem;color:var(--text3);margin-top:.5rem">El archivo lleva los ' + d.objeciones
+    +   ' renglones: los que no cruzaron van con la celda del servicio vacía para completarlos a mano.</div>'
+    + '</div>';
+
+  // Lo que hay que mirar antes de subir
+  if(d.revisar && d.revisar.length){
+    html += '<div class="chart-card" style="padding:1.1rem;margin-bottom:1rem">'
+      + '<div style="font-weight:700;margin-bottom:.2rem">Para revisar (' + d.revisar.length + ')</div>'
+      + '<div style="font-size:.76rem;color:var(--text3);margin-bottom:.7rem">Cruce débil, sin cruce o con alerta. Todo esto está también en la hoja REVISAR del respaldo.</div>'
+      + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">'
+      + '<thead><tr style="text-align:left;color:var(--text3)">'
+      + '<th style="padding:.35rem .5rem">Factura</th><th style="padding:.35rem .5rem">Glosa</th>'
+      + '<th style="padding:.35rem .5rem;text-align:right">Valor</th>'
+      + '<th style="padding:.35rem .5rem">Dice la entidad</th><th style="padding:.35rem .5rem">Encontrado en el DGH</th>'
+      + '<th style="padding:.35rem .5rem">Confianza</th><th style="padding:.35rem .5rem">Qué revisar</th>'
+      + '</tr></thead><tbody>';
+    d.revisar.slice(0, 200).forEach(function(f){
+      html += '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:.35rem .5rem;white-space:nowrap">' + objEsc(f.factura) + '</td>'
+        + '<td style="padding:.35rem .5rem">' + objEsc(f.codigo_glosa) + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right;white-space:nowrap">' + fmtCOP(f.valor) + '</td>'
+        + '<td style="padding:.35rem .5rem">' + objEsc(f.servicio_entidad || f.codigo_entidad || '—') + '</td>'
+        + '<td style="padding:.35rem .5rem">' + objEsc(f.codigo_dgh ? (f.codigo_dgh + ' · ' + f.servicio_dgh) : '(sin cruce)') + '</td>'
+        + '<td style="padding:.35rem .5rem">' + objChip(f.confianza, OBJ_COLOR[f.confianza] || 'var(--text3)') + '</td>'
+        + '<td style="padding:.35rem .5rem;color:var(--text2)">' + objEsc(f.aviso) + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div>';
+    if(d.revisar.length > 200){
+      html += '<div style="font-size:.74rem;color:var(--text3);margin-top:.5rem">Se muestran las primeras 200; están todas en el archivo de respaldo.</div>';
+    }
+    html += '</div>';
+  }else{
+    html += '<div class="chart-card" style="padding:1.1rem;margin-bottom:1rem;font-size:.85rem;color:var(--c-green)">'
+      + '✓ No quedó nada por revisar: las ' + d.objeciones + ' objeciones tienen su servicio identificado.</div>';
+  }
+
+  // Por factura
+  if(d.por_factura && d.por_factura.length){
+    html += '<div class="chart-card" style="padding:1.1rem">'
+      + '<div style="font-weight:700;margin-bottom:.7rem">Por factura</div>'
+      + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">'
+      + '<thead><tr style="text-align:left;color:var(--text3)">'
+      + '<th style="padding:.35rem .5rem">Factura</th><th style="padding:.35rem .5rem;text-align:right">Objeciones</th>'
+      + '<th style="padding:.35rem .5rem;text-align:right">Valor</th>'
+      + '<th style="padding:.35rem .5rem;text-align:right">Sin código</th>'
+      + '<th style="padding:.35rem .5rem;text-align:right">Por revisar</th>'
+      + '<th style="padding:.35rem .5rem">Tipo</th></tr></thead><tbody>';
+    var TIPO = {0:'Administrativa', 1:'Médica', 2:'Mixta'};
+    d.por_factura.forEach(function(f){
+      html += '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:.35rem .5rem">' + objEsc(f.factura) + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + f.objeciones + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right;white-space:nowrap">' + fmtCOP(f.valor) + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + (f.sin_codigo || 0) + '</td>'
+        + '<td style="padding:.35rem .5rem;text-align:right">' + (f.revisar || 0) + '</td>'
+        + '<td style="padding:.35rem .5rem">' + objEsc(TIPO[f.tipo] || f.tipo) + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  caja.innerHTML = html;
 }
 
 // ─── Glosas ADRES ─────────────────────────────────────────────────────────
@@ -23647,6 +24562,9 @@ async function loadUsuarios(){
   // Token de integración: solo SUPER_ADMIN
   var tokCard = document.getElementById('admin-token-card');
   if(tokCard) tokCard.style.display = (USER_ROL === 'SUPER_ADMIN') ? 'block' : 'none';
+  // Diagnóstico de calidad: solo SUPER_ADMIN
+  var diagCard = document.getElementById('admin-diagnostico-card');
+  if(diagCard) diagCard.style.display = (USER_ROL === 'SUPER_ADMIN') ? 'block' : 'none';
 
   var tbody=document.getElementById('usuarios-body');
   tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3)">Cargando…</td></tr>';
@@ -24531,7 +25449,8 @@ function armarPintarParte(d){
     html += '<br><b style="color:var(--c-amber,#d97706)">' + d.total_avisos
       + ' casilla(s) que decide una persona:</b>';
     (d.avisos||[]).slice(0,6).forEach(function(a){
-      html += '<br>· ' + escHtml(a.factura) + ': ' + escHtml(a.motivo);
+      var cuantos = (a.renglones && a.renglones > 1) ? ' (' + a.renglones + ' renglones)' : '';
+      html += '<br>· ' + escHtml(a.factura) + cuantos + ': ' + escHtml(a.motivo);
     });
     if(d.total_avisos > 6) html += '<br>· … y ' + (d.total_avisos-6) + ' más, marcadas ◄ DEFINIR en el acta';
   } else {
@@ -24582,6 +25501,480 @@ async function armarDescargar(){
       : ' · todo tipificado';
     armarEstado('Acta descargada: ' + (parte.lineas||0) + ' líneas' + aviso + '.','auto-ok');
   }catch(e){ armarEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+
+// ── La mesa de conciliación: el acta se trabaja acá, guardada en el motor ──
+var MESA = null;
+
+function mesaEstado(msg, clase){
+  var e = document.getElementById('mesa-estado');
+  if(!e) return;
+  e.className = 'auto-estado ' + (clase||'');
+  e.innerHTML = msg;
+}
+
+async function mesaAbrir(){
+  var fd = armarDatos(); if(!fd) return;
+  armarEstado('Armando la mesa…','auto-corriendo');
+  try{
+    var r = await fetch('/conciliaciones/mesa/abrir', {method:'POST', headers: authH(), body: fd});
+    if(!r.ok){ var e = await r.json().catch(function(){return {}}); armarEstado(escHtml(e.detail||('HTTP '+r.status)),'auto-error'); return; }
+    MESA = await r.json();
+    armarEstado('Mesa abierta: ' + MESA.resumen.lineas + ' renglones. Se trabaja abajo.','auto-ok');
+    mesaPintar();
+    mesaListar();
+    document.getElementById('mesa-card').scrollIntoView({behavior:'smooth', block:'start'});
+  }catch(e){ armarEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+
+async function mesaListar(){
+  try{
+    var r = await fetch('/conciliaciones/mesa?limite=50', {headers: authH()});
+    if(!r.ok) return;
+    var ms = await r.json();
+    var sel = document.getElementById('mesa-abiertas');
+    sel.innerHTML = '<option value="">Retomar una mesa…</option>' + ms.map(function(m){
+      return '<option value="' + m.id + '">' + escHtml('#' + m.id + ' · acta ' + (m.numero_acta||'—')
+        + ' · ' + (m.razon_social||'').slice(0,28) + ' · ' + m.resumen.lineas + ' renglones'
+        + (m.estado === 'CERRADA' ? ' (cerrada)' : '')) + '</option>';
+    }).join('');
+  }catch(e){ /* la lista es una ayuda, no un bloqueo */ }
+}
+
+async function mesaCargar(id){
+  if(!id) return;
+  mesaEstado('Trayendo la mesa…','auto-corriendo');
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + id, {headers: authH()});
+    if(!r.ok){ var e0 = await r.json().catch(function(){return {}});
+      mesaEstado('No se pudo abrir esa mesa: ' + escHtml(e0.detail || ('HTTP ' + r.status)),'auto-error'); return; }
+    MESA = await r.json();
+    mesaPintar();
+    mesaEstado('','');
+  }catch(e){ mesaEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+
+function mesaPintar(){
+  if(!MESA) return;
+  var cerrada = MESA.estado === 'CERRADA';
+  document.getElementById('mesa-cuerpo').style.display = 'block';
+  document.getElementById('mesa-titulo').textContent =
+    '· acta ' + (MESA.numero_acta || '—') + ' · ' + (MESA.razon_social || '') + (cerrada ? ' · CERRADA' : '');
+  document.getElementById('mesa-sub').textContent = cerrada
+    ? 'Esta mesa está cerrada: se puede descargar el acta, pero no cambiar renglones.'
+    : 'Cada cambio se guarda solo. Los renglones en ámbar necesitan que una persona decida.';
+  mesaCifras();
+
+  var filas = MESA.lineas.map(function(l){
+    var falta = l.aviso ? ' class="falta"' : '';
+    var ro = cerrada ? ' disabled' : '';
+    var nc = l.cuenta_contable
+      ? escHtml(l.cuenta_contable + ' · ' + l.concepto_nota)
+      : (l.centro_costo ? '<span title="' + escHtml(l.centro_costo) + '">centro sin catálogo</span>' : '—');
+    return '<tr' + falta + ' data-id="' + l.id + '" title="' + escHtml(l.aviso || '') + '">'
+      + '<td><button class="mesa-abrir" title="Ver el motivo completo" onclick="mesaDesplegar(' + l.id + ', this)">▸</button></td>'
+      + '<td>' + escHtml(l.item) + '</td>'
+      + '<td class="cod">' + escHtml(l.factura) + '</td>'
+      + '<td class="cod">' + escHtml(l.cod_glosa) + '<br><small style="color:var(--text3)">' + escHtml(l.tipificacion) + '</small></td>'
+      + '<td><span class="serv" title="' + escHtml(l.descripcion) + '">' + escHtml(l.descripcion) + '</span></td>'
+      + '<td>' + mesaInsigniaSoportes(l.factura) + '</td>'
+      + '<td class="num">' + fmtCOP(l.glosa_inicial) + '</td>'
+      + '<td><select onchange="mesaGuardar(' + l.id + ', {tipo_glosa: this.value})"' + ro + '>'
+        + ['','ADMINISTRATIVA','MIXTA','MEDICO'].map(function(t){
+            return '<option value="' + t + '"' + (t === l.tipo_glosa ? ' selected' : '') + '>' + (t||'— definir —') + '</option>';
+          }).join('')
+        + '</select></td>'
+      + ['acepta_ips','levanta_entidad','ratificado'].map(function(campo, i){
+          var letra = ['A','L','R'][i];
+          return '<td class="num"><input type="number" min="0" step="1" class="num" value="' + (l[campo]||0) + '"'
+            + ' onchange="mesaGuardar(' + l.id + ', {' + campo + ': parseFloat(this.value)||0})"' + ro + '>'
+            + (cerrada ? '' : '<div class="mesa-todo"><button type="button" title="Poner toda la glosa acá"'
+                + ' onclick="mesaTodo(' + l.id + ', \'' + campo + '\')">todo ' + letra + '</button></div>')
+            + '</td>';
+        }).join('')
+      + '<td class="num"><span class="mesa-pend-' + (Math.abs(l.pendiente) < 0.01 ? '0' : 'x') + '" data-pend="' + l.id + '">'
+        + fmtCOP(l.pendiente) + '</span></td>'
+      + '<td class="txt"><input type="text" value="' + escHtml(l.texto_conciliacion) + '"'
+        + ' onchange="mesaGuardar(' + l.id + ', {texto_conciliacion: this.value})"' + ro + '></td>'
+      + '<td class="mesa-nc">' + nc + '</td>'
+      + '<td><button class="btn btn-ghost btn-sm" style="padding:.15rem .45rem;font-size:.7rem"'
+        + ' onclick="mesaGestionar(' + l.id + ')">Gestionar</button></td>'
+      + '</tr>'
+      + '<tr class="mesa-detalle" id="mesa-det-' + l.id + '" hidden><td colspan="15">'
+        + escHtml(l.descripcion || '(sin motivo)')
+        + (l.aviso ? '\n\n⚠ ' + escHtml(l.aviso) : '')
+      + '</td></tr>';
+  }).join('');
+  document.getElementById('mesa-filas').innerHTML = filas;
+  mesaTraerSoportes();
+}
+
+function mesaCifras(){
+  var r = MESA.resumen;
+  var c = [
+    ['Renglones', r.lineas], ['Facturas', r.facturas],
+    ['Glosado', fmtCOP(r.glosado)], ['Acepta IPS', fmtCOP(r.acepta_ips)],
+    ['Levanta EPS', fmtCOP(r.levanta_entidad)], ['Ratificado', fmtCOP(r.ratificado)],
+    ['Sin repartir', r.sin_repartir + ' renglón(es)'],
+    ['Falta decidir', r.con_aviso + ' renglón(es)']
+  ];
+  document.getElementById('mesa-cifras').innerHTML = c.map(function(x){
+    return '<div class="c">' + escHtml(x[0]) + '<b>' + x[1] + '</b></div>';
+  }).join('');
+}
+
+var MESA_SOPORTES = {};
+
+function mesaDesplegar(lineaId, boton){
+  var fila = document.getElementById('mesa-det-' + lineaId);
+  if(!fila) return;
+  fila.hidden = !fila.hidden;
+  boton.textContent = fila.hidden ? '▸' : '▾';
+}
+
+function mesaInsigniaSoportes(factura){
+  var s = MESA_SOPORTES[factura];
+  if(!s) return '<span class="mesa-sop duda" title="Todavía no se consultó">·</span>';
+  if(s.estado === 'CON_SOPORTES')
+    return '<span class="mesa-sop si" title="' + s.cuantos + ' archivo(s) en el archivo del hospital">📎 ' + s.cuantos + '</span>';
+  if(s.estado === 'SIN_SOPORTES')
+    return '<span class="mesa-sop no" title="No se encontraron soportes de esta factura">—</span>';
+  // INDEXANDO o SIN_INDICE: NO se dice «no tiene». Decirlo mientras el
+  // índice se arma manda a aceptar una glosa que sí estaba soportada.
+  return '<span class="mesa-sop duda" title="' + escHtml(s.detalle || 'Todavía no se sabe') + '">?</span>';
+}
+
+async function mesaTraerSoportes(){
+  if(!MESA) return;
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/soportes', {headers: authH()});
+    if(!r.ok) return;
+    MESA_SOPORTES = await r.json();
+    // Se repintan solo las insignias, no la tabla: el auditor puede estar
+    // escribiendo en un renglón mientras esto llega.
+    MESA.lineas.forEach(function(l){
+      var tr = document.querySelector('#mesa-filas tr[data-id="' + l.id + '"]');
+      if(tr && tr.cells[5]) tr.cells[5].innerHTML = mesaInsigniaSoportes(l.factura);
+    });
+  }catch(e){ /* las insignias son una ayuda, no un bloqueo */ }
+}
+
+function mesaCerrarPanel(){
+  var d = document.getElementById('mesa-drawer');
+  if(d) d.hidden = true;
+}
+
+async function mesaGestionar(lineaId){
+  if(!MESA) return;
+  var d = document.getElementById('mesa-drawer');
+  var cuerpo = document.getElementById('mesa-dr-cuerpo');
+  d.hidden = false;
+  cuerpo.innerHTML = '<p style="color:var(--text3)">Trayendo el detalle…</p>';
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/linea/' + lineaId, {headers: authH()});
+    if(!r.ok){
+      var e = await r.json().catch(function(){return {}});
+      cuerpo.innerHTML = '<p class="auto-error">' + escHtml(e.detail || ('HTTP ' + r.status)) + '</p>';
+      return;
+    }
+    mesaPintarPanel(await r.json());
+  }catch(e){ cuerpo.innerHTML = '<p class="auto-error">Error de conexión: ' + escHtml(e.message) + '</p>'; }
+}
+
+function mesaPintarPanel(d){
+  document.getElementById('mesa-dr-factura').textContent = d.factura || '—';
+  document.getElementById('mesa-dr-cod').textContent = d.cod_glosa || '';
+  var h = '';
+
+  h += '<div class="mesa-dr-seccion"><h4>Lo que objeta la EPS</h4>'
+     + '<div class="mesa-dr-caja">' + escHtml(d.descripcion || '(sin motivo)') + '</div></div>';
+
+  if(d.glosa){
+    h += '<div class="mesa-dr-seccion"><h4>Nuestro dictamen</h4><div class="mesa-dr-caja mesa-dr-dictamen">'
+       + (d.glosa.dictamen || '<i style="color:var(--text3)">Esta glosa todavía no tiene dictamen escrito.</i>')
+       + '</div><small style="color:var(--text3)">Estado: ' + escHtml(d.glosa.workflow_state || '—')
+       + ' · objetado ' + fmtCOP(d.glosa.valor_objetado)
+       + (d.glosa.valor_aceptado ? ' · aceptado ' + fmtCOP(d.glosa.valor_aceptado) : '') + '</small></div>';
+  } else if(d.nota){
+    h += '<div class="mesa-dr-seccion"><h4>Historial</h4><div class="mesa-dr-caja" style="color:var(--text3)">'
+       + escHtml(d.nota) + '</div></div>';
+  }
+
+  h += '<div class="mesa-dr-seccion"><h4>Soportes de la factura</h4><div class="mesa-dr-caja">'
+     + mesaPintarSoportes(d.soportes) + '</div></div>';
+
+  h += '<div class="mesa-dr-seccion"><h4>Subir un soporte</h4>'
+     + mesaCajaDeSubida(d.factura) + '</div>';
+
+  h += '<div class="mesa-dr-seccion"><h4>Comentarios del equipo</h4>';
+  if(d.glosa_id){
+    h += '<div style="display:flex;gap:.4rem;margin-bottom:.6rem">'
+       + '<input type="text" id="mesa-dr-nuevo" placeholder="Anotá algo para el equipo…" style="flex:1">'
+       + '<button class="btn btn-primary btn-sm" onclick="mesaComentar(' + d.linea_id + ')">Anotar</button></div>';
+    h += (d.comentarios||[]).length
+      ? d.comentarios.map(function(c){
+          return '<div class="mesa-dr-com">' + escHtml(c.texto)
+               + '<small>' + escHtml(c.autor) + (c.creado_en ? ' · ' + c.creado_en.slice(0,16).replace('T',' ') : '') + '</small></div>';
+        }).join('')
+      : '<span style="color:var(--text3)">Todavía nadie anotó nada sobre esta glosa.</span>';
+  } else {
+    h += '<span style="color:var(--text3)">Este renglón no está enlazado a una glosa del motor, '
+       + 'así que no hay dónde guardar comentarios.</span>';
+  }
+  h += '</div>';
+
+  document.getElementById('mesa-dr-cuerpo').innerHTML = h;
+  mesaCargarSubidos(d.factura);
+}
+
+// El indexador puede contestar cinco cosas distintas y NINGUNA se pinta en
+// blanco. Una lista vacía porque no hay soportes y una lista vacía porque
+// el buscador se cayó se ven igual si uno no lo dice, y en una audiencia
+// esa confusión hace aceptar una glosa que sí estaba soportada.
+function mesaPintarSoportes(s){
+  s = s || {};
+  if(s.estado === 'CON_SOPORTES'){
+    var lista = (s.archivos || []).filter(function(a){ return a && a.nombre; });
+    if(!lista.length){
+      // Dijo que había, pero no vino ninguno legible. Antes esto pintaba
+      // una caja vacía: «3 soportes» y tres renglones en blanco.
+      return '<span class="mesa-sop-err">El buscador dice que hay ' + (s.cuantos||0)
+           + ' soporte(s) pero no se pudo leer ninguno. NO quiere decir que la '
+           + 'factura no los tenga: quiere decir que no se pudieron mostrar.</span>';
+    }
+    var h = lista.map(function(a){
+      var kb = a.tamano_kb ? ' · ' + Math.round(a.tamano_kb) + ' KB' : '';
+      return '<div class="mesa-dr-arch"><span>' + escHtml(a.nombre) + '</span>'
+           + '<small style="color:var(--text3)">' + escHtml(a.tipo_codigo || a.tipo || '') + kb + '</small></div>';
+    }).join('');
+    if(s.cuantos > lista.length) h += '<small>… y ' + (s.cuantos - lista.length) + ' más</small>';
+    if(s.descartados) h += '<div class="mesa-sop-err">' + escHtml(s.detalle || '') + '</div>';
+    return h;
+  }
+  if(s.estado === 'SIN_SOPORTES')
+    return '<span style="color:var(--text3)">' + escHtml(s.detalle
+      || 'No se encontraron soportes de esta factura en el archivo.') + '</span>';
+  if(s.estado === 'DATOS_INVALIDOS' || s.estado === 'SIN_INDICE')
+    return '<span class="mesa-sop-err">' + escHtml(s.detalle
+      || 'No se pudo consultar el archivo de soportes.') + '</span>';
+  // INDEXANDO, o cualquier estado que no se conozca: nunca «no tiene».
+  return '<span class="mesa-sop-duda">Todavía no se puede saber: '
+       + escHtml(s.detalle || 'el buscador de soportes no está listo') + '</span>';
+}
+
+function mesaCajaDeSubida(factura){
+  return '<div class="mesa-subir" data-factura="' + escHtml(factura || '') + '">'
+    + '<div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">'
+    +   '<input type="file" id="mesa-sub-file" accept=".pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff,'
+    +     'application/pdf,image/png,image/jpeg,image/webp,image/tiff">'
+    +   '<input type="text" id="mesa-sub-nota" placeholder="¿para qué sirve? (opcional)" style="flex:1;min-width:12rem">'
+    +   '<button class="btn btn-primary btn-sm" id="mesa-sub-btn" onclick="mesaSubirSoporte()">Subir</button>'
+    + '</div>'
+    + '<small style="color:var(--text3)">Solo PDF e imágenes, hasta 50 MB. '
+    +   'Un Excel o un Word hay que pasarlo antes a PDF.</small>'
+    + '<div id="mesa-sub-estado"></div>'
+    + '<div id="mesa-sub-lista"></div></div>';
+}
+
+async function mesaCargarSubidos(factura){
+  var caja = document.getElementById('mesa-sub-lista');
+  if(!caja || !MESA) return;
+  caja.innerHTML = '<small style="color:var(--text3)">Buscando lo ya subido…</small>';
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/soportes-subidos?factura='
+                        + encodeURIComponent(factura || ''), {headers: authH()});
+    if(!r.ok){ caja.innerHTML = '<div class="mesa-sop-err">No se pudo leer lo subido (HTTP ' + r.status + ')</div>'; return; }
+    var xs = await r.json();
+    if(!Array.isArray(xs) || !xs.length){
+      caja.innerHTML = '<small style="color:var(--text3)">Todavía no se ha subido nada en esta mesa para esta factura.</small>';
+      return;
+    }
+    caja.innerHTML = xs.map(function(a){
+      var kb = a.tamano_bytes ? Math.round(a.tamano_bytes/1024) + ' KB' : '';
+      return '<div class="mesa-dr-arch">'
+        + '<a href="#" onclick="mesaBajarSoporte(' + a.id + ', event); return false">' + escHtml(a.nombre) + '</a>'
+        + '<small style="color:var(--text3)">' + kb + ' · ' + escHtml(a.subido_por || '') + '</small>'
+        + '<button class="btn btn-ghost btn-sm" title="Quitar" onclick="mesaQuitarSoporte(' + a.id + ')">✕</button>'
+        + (a.nota ? '<div style="width:100%"><small>' + escHtml(a.nota) + '</small></div>' : '')
+        + '</div>';
+    }).join('');
+  }catch(e){ caja.innerHTML = '<div class="mesa-sop-err">Error de conexión: ' + escHtml(e.message) + '</div>'; }
+}
+
+async function mesaSubirSoporte(){
+  var cont = document.querySelector('.mesa-subir');
+  var inp = document.getElementById('mesa-sub-file');
+  var btn = document.getElementById('mesa-sub-btn');
+  var est = document.getElementById('mesa-sub-estado');
+  if(!cont || !inp || !MESA) return;
+  var factura = cont.getAttribute('data-factura') || '';
+  var f = inp.files && inp.files[0];
+  if(!f){ est.innerHTML = '<div class="mesa-sop-err">Primero elija el archivo.</div>'; return; }
+
+  // El tope se comprueba ACÁ TAMBIÉN, antes de mandar: en la red del
+  // hospital, subir 40 MB para que el servidor los rechace son minutos
+  // perdidos con la EPS en la sala.
+  if(f.size > 50*1024*1024){
+    est.innerHTML = '<div class="mesa-sop-err">«' + escHtml(f.name) + '» pesa '
+      + (f.size/1048576).toFixed(1) + ' MB y el tope son 50 MB. Bájele el peso '
+      + 'con la caja de Herramientas PDF antes de subirlo.</div>';
+    return;
+  }
+  // Un escaneo de 40 MB por la red del hospital no es instantáneo. Sin este
+  // aviso, el auditor cree que se colgó y le da otra vez.
+  var pesado = f.size > 8*1024*1024;
+
+  // Estado de carga: el botón se bloquea para que un doble clic no suba el
+  // mismo soporte dos veces.
+  btn.disabled = true; inp.disabled = true;
+  var textoOriginal = btn.textContent;
+  btn.textContent = 'Subiendo…';
+  est.innerHTML = '<div class="mesa-sub-cargando"><span class="mesa-spinner"></span>'
+                + 'Subiendo «' + escHtml(f.name) + '»'
+                + (pesado ? ' (' + (f.size/1048576).toFixed(0) + ' MB — puede tardar, no cierre la ventana)' : '')
+                + '…</div>';
+  try{
+    var fd = new FormData();
+    fd.append('archivo', f);
+    fd.append('factura', factura);
+    fd.append('nota', (document.getElementById('mesa-sub-nota')||{}).value || '');
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/soportes-subidos',
+                        {method:'POST', headers: authH(), body: fd});
+    if(!r.ok){
+      var e = await r.json().catch(function(){return {}});
+      est.innerHTML = '<div class="mesa-sop-err">' + escHtml(e.detail || ('No se pudo subir (HTTP ' + r.status + ')')) + '</div>';
+      return;
+    }
+    est.innerHTML = '<div class="mesa-sub-ok">Subido.</div>';
+    inp.value = '';
+    var nota = document.getElementById('mesa-sub-nota'); if(nota) nota.value = '';
+    mesaCargarSubidos(factura);
+    if(typeof mesaTraerSoportes === 'function') mesaTraerSoportes();
+  }catch(e){
+    est.innerHTML = '<div class="mesa-sop-err">Error de conexión: ' + escHtml(e.message) + '</div>';
+  }finally{
+    btn.disabled = false; inp.disabled = false; btn.textContent = textoOriginal;
+  }
+}
+
+async function mesaBajarSoporte(id, ev){
+  if(ev) ev.preventDefault();
+  if(!MESA) return;
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/soportes-subidos/' + id, {headers: authH()});
+    if(!r.ok){ toast('No se pudo bajar el soporte (HTTP ' + r.status + ')', 'error'); return; }
+    var blob = await r.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = (r.headers.get('content-disposition')||'').split('filename="')[1]?.split('"')[0] || 'soporte';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  }catch(e){ toast('Error de conexión: ' + e.message, 'error'); }
+}
+
+async function mesaQuitarSoporte(id){
+  if(!MESA) return;
+  if(!confirm('¿Quitar este soporte de la mesa?')) return;
+  var cont = document.querySelector('.mesa-subir');
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/soportes-subidos/' + id,
+                        {method:'DELETE', headers: authH()});
+    if(!r.ok){
+      var e = await r.json().catch(function(){return {}});
+      toast(e.detail || ('No se pudo quitar (HTTP ' + r.status + ')'), 'error');
+      return;
+    }
+    mesaCargarSubidos(cont ? cont.getAttribute('data-factura') : '');
+  }catch(e){ toast('Error de conexión: ' + e.message, 'error'); }
+}
+
+async function mesaComentar(lineaId){
+  var campo = document.getElementById('mesa-dr-nuevo');
+  var texto = (campo && campo.value || '').trim();
+  if(!texto){ toast('Falta el texto','Escribí el comentario antes de anotarlo','warning'); return; }
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/linea/' + lineaId + '/comentario', {
+      method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({texto: texto})
+    });
+    if(!r.ok){
+      var e = await r.json().catch(function(){return {}});
+      toast('No se guardó', escHtml(e.detail || ('HTTP ' + r.status)), 'error'); return;
+    }
+    mesaGestionar(lineaId);
+  }catch(e){ toast('Error de conexión', escHtml(e.message), 'error'); }
+}
+
+async function mesaGuardar(lineaId, cambios){
+  if(!MESA) return;
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/linea/' + lineaId, {
+      method:'PATCH', headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify(cambios)
+    });
+    if(!r.ok){
+      var e = await r.json().catch(function(){return {}});
+      mesaEstado('No se guardó: ' + escHtml(e.detail||('HTTP '+r.status)),'auto-error');
+      return;
+    }
+    var d = await r.json();
+    var linea = MESA.lineas.filter(function(l){ return l.id === lineaId; })[0];
+    if(linea){ Object.assign(linea, cambios); linea.pendiente = d.pendiente; }
+    MESA.resumen = d.resumen;
+    var celda = document.querySelector('[data-pend="' + lineaId + '"]');
+    if(celda){
+      celda.textContent = fmtCOP(d.pendiente);
+      celda.className = 'mesa-pend-' + (Math.abs(d.pendiente) < 0.01 ? '0' : 'x');
+    }
+    mesaCifras();
+    mesaEstado('Guardado.','auto-ok');
+  }catch(e){ mesaEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+
+function mesaTodo(lineaId, campo){
+  var l = MESA.lineas.filter(function(x){ return x.id === lineaId; })[0];
+  if(!l) return;
+  var cambios = {acepta_ips:0, levanta_entidad:0, ratificado:0};
+  cambios[campo] = l.glosa_inicial;
+  mesaGuardar(lineaId, cambios).then(function(){ mesaPintar(); });
+}
+
+async function mesaDescargar(){
+  if(!MESA) return;
+  mesaEstado('Armando el acta…','auto-corriendo');
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/acta.xlsm', {headers: authH()});
+    if(!r.ok){ var e1 = await r.json().catch(function(){return {}});
+      mesaEstado('No se pudo generar el acta: ' + escHtml(e1.detail || ('HTTP ' + r.status)),'auto-error'); return; }
+    var blob = await r.blob(), url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = 'ACTA_SINAC_' + (MESA.numero_acta || MESA.id) + '.xlsm';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    mesaEstado('Acta descargada.','auto-ok');
+  }catch(e){ mesaEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
+}
+
+async function mesaCerrar(){
+  if(!MESA) return;
+  var r0 = MESA.resumen;
+  var aviso = r0.sin_repartir
+    ? 'Quedan ' + r0.sin_repartir + ' renglón(es) sin repartir. '
+    : '';
+  if(!confirm(aviso + '¿Cerrar la mesa? Después no se pueden cambiar los renglones.')) return;
+  mesaEstado('Cerrando…','auto-corriendo');
+  try{
+    var r = await fetch('/conciliaciones/mesa/' + MESA.id + '/cerrar', {method:'POST', headers: authH()});
+    if(!r.ok){ var e2 = await r.json().catch(function(){return {}});
+      mesaEstado('No se pudo cerrar: ' + escHtml(e2.detail || ('HTTP ' + r.status)),'auto-error'); return; }
+    var d = await r.json();
+    MESA.estado = 'CERRADA';
+    mesaPintar(); mesaListar();
+    var msg = 'Mesa cerrada. Se guardaron ' + (d.aprendido ? d.aprendido.nuevas : 0)
+      + ' tipificación(es) para la próxima.';
+    if(d.aviso_memoria) msg = escHtml(d.aviso_memoria);
+    mesaEstado(msg, d.aviso_memoria ? 'auto-error' : 'auto-ok');
+  }catch(e){ mesaEstado('Error de conexión: ' + escHtml(e.message),'auto-error'); }
 }
 
 // ── Acta de la mesa (Excel): revisar cuadre, optimizar e imprimir ──
@@ -25446,10 +26839,10 @@ function _spotComandos(query){
     'analizar':'analizar','analiz':'analizar',
     'mis glosas':'mis-glosas','pendientes':'mis-glosas',
     'historial':'historial',
-    'alertas':'alertas','vencidas':'alertas',
+    // 04-09-2026: «Alertas» y «Resumen del mes» se ocultaron del menú a pedido
+    // de Yesid; se quitan también de los atajos de Ctrl+K para no reabrirlos.
     'dashboard':'dashboard','tablero':'dashboard',
     'adres':'glosas-adres','glosas adres':'glosas-adres','paquete':'glosas-adres',
-    'resumen del mes':'resumen-mes','resumen mes':'resumen-mes','resumen':'resumen-mes',
     'auditoria':'audit','auditoría':'audit','audit log':'audit',
     'usuarios':'usuarios','equipo':'usuarios',
     'contratos':'contratos',

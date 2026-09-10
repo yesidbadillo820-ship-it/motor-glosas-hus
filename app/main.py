@@ -1,3 +1,4 @@
+import asyncio as _asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -29,6 +30,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
+from app.core.cabeceras_seguridad import CabecerasDeSeguridad
 from app.core.correlation import CorrelationIdMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
@@ -38,7 +40,7 @@ from app.database import engine, Base, SessionLocal
 from app.models.db import ContratoRecord, UsuarioRecord
 from app.core.config import get_settings, check_security_config
 from app.auth import get_password_hash
-from app.core.logging_utils import logger
+from app.core.logging_utils import clave_para_log, logger
 from app.core.sentry_init import init_sentry
 from app.services.posthog_service import init_posthog
 
@@ -165,7 +167,6 @@ async def lifespan(app: FastAPI):
     # SSL drops o pausas por inactividad. Antes el startup fallaba en
     # frío y el contenedor nunca respondía. Ahora reintentamos hasta 5
     # veces con backoff exponencial (2s, 4s, 8s, 16s, 32s = ~1 min total).
-    import time as _time
     from sqlalchemy.exc import OperationalError, DBAPIError
 
     _max_intentos_db = 5
@@ -187,7 +188,14 @@ async def lifespan(app: FastAPI):
                 f"DB no disponible (intento {_intento}/{_max_intentos_db}): "
                 f"{type(e).__name__}. Reintento en {espera}s."
             )
-            _time.sleep(espera)
+            # 09-09-2026 — ERA `_time.sleep()`, Y ESTO CORRE DENTRO DEL
+            # `lifespan`, que es async. Un sleep normal no cede el turno: se
+            # queda el hilo entero. Con la base caída, los cinco reintentos
+            # suman 2+4+8+16 = 30 segundos en los que el servidor no puede
+            # ni contestar el /health ni aceptar una conexión: parece muerto
+            # cuando en realidad está esperando. `asyncio.sleep` espera igual
+            # pero deja respirar al resto.
+            await _asyncio.sleep(espera)
 
     db = SessionLocal()
     cfg = get_settings()
@@ -335,6 +343,26 @@ async def lifespan(app: FastAPI):
             pass
         logger.warning(f"MIGRACIÓN numero_radicado: {e}")
 
+    # 09-09-2026 — LA CONFIANZA QUE SE VE EN PANTALLA, GUARDADA.
+    # Se calculaba, se mostraba y se botaba. Con 397 glosas analizadas, la
+    # pregunta del área —«¿qué modelo de IA da mejor Confianza?»— no se podía
+    # contestar con datos porque el número no quedaba en ninguna parte. (La
+    # columna `score`, que sí existía, es la fórmula vieja de probabilidad de
+    # éxito: otra cosa.) Las glosas viejas quedan en NULL, que es la verdad:
+    # de ellas no se guardó y no se puede inventar hacia atrás.
+    try:
+        if _tiene_tabla("historial") and not _tiene_columna("historial", "confianza_score"):
+            logger.warning("MIGRACIÓN: Agregando columnas de confianza a historial")
+            db.execute(text("ALTER TABLE historial ADD COLUMN confianza_score REAL"))
+            db.execute(text("ALTER TABLE historial ADD COLUMN confianza_nivel VARCHAR(10)"))
+            db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN confianza: {e}")
+
     try:
         if _tiene_tabla("historial") and not _tiene_columna("historial", "request_id"):
             logger.warning("MIGRACIÓN: Agregando columnas a historial")
@@ -437,6 +465,9 @@ async def lifespan(app: FastAPI):
         ("paquetes_adres", "catalogo_centros", "TEXT"),
         ("glosas_adres", "cuenta_valor", "BOOLEAN DEFAULT 1"),
         ("facturas_adres", "valor_glosado_oficial", "DOUBLE PRECISION"),
+        # Pre-auditoría (07-09-2026): devoluciones extra autorizadas por
+        # coordinación por encima del tope de 3 (excepción con testigo).
+        ("preaud_facturas", "devoluciones_extra", "INTEGER DEFAULT 0"),
     ]
     for tabla, col_name, col_ddl in _ADRES_MISSING_COLUMNS:
         try:
@@ -876,6 +907,50 @@ async def lifespan(app: FastAPI):
 
     # IM F1.3: tabla nueva `lotes_importacion` — la crea Base.metadata
     # .create_all automaticamente si no existe. No requiere ALTER TABLE.
+
+    # La mesa de conciliación enlaza cada renglón con su glosa del motor,
+    # para poder abrir el historial y los comentarios desde la audiencia.
+    # La tabla ya existía sin esta columna: create_all() no la agrega.
+    try:
+        if _tiene_tabla("mesa_conciliacion_lineas") and not _tiene_columna(
+            "mesa_conciliacion_lineas", "glosa_id"
+        ):
+            logger.warning("MIGRACIÓN: Agregando columna 'glosa_id' a mesa_conciliacion_lineas")
+            db.execute(text("ALTER TABLE mesa_conciliacion_lineas ADD COLUMN glosa_id INTEGER"))
+            db.commit()
+    except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"MIGRACIÓN mesa_conciliacion_lineas glosa_id: {e}")
+
+    # Los soportes de la mesa pasaron de guardarse como base64 en la base a
+    # guardarse en disco (08-09-2026): los escaneos de cartera pesan 25-40 MB
+    # y cargarlos en memoria tumbaba el contenedor, que corre con 640 MB.
+    # `contenido_b64` se deja para poder seguir leyendo lo ya subido.
+    _SOPORTES_MESA_NUEVAS = [
+        ("ruta_relativa", "VARCHAR(400)"),
+        ("sha256", "VARCHAR(64)"),
+    ]
+    for col_name, col_ddl in _SOPORTES_MESA_NUEVAS:
+        try:
+            if _tiene_tabla("soportes_mesa") and not _tiene_columna("soportes_mesa", col_name):
+                logger.warning(f"MIGRACIÓN: Agregando columna '{col_name}' a soportes_mesa")
+                db.execute(text(f"ALTER TABLE soportes_mesa ADD COLUMN {col_name} {col_ddl}"))
+                db.commit()
+        except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            logger.warning(f"MIGRACIÓN soportes_mesa {col_name}: {e}")
+
+    # `contenido_b64` nació NOT NULL. Ahora los soportes nuevos no lo usan,
+    # así que la restricción impediría guardarlos. SQLite no sabe quitar un
+    # NOT NULL con ALTER, y rehacer la tabla por esto sería desproporcionado:
+    # el servicio escribe cadena vacía en su lugar. Se anota para que nadie
+    # se sorprenda al ver esa columna vacía en las filas nuevas.
 
     # RustDesk: 2 columnas opcionales en usuarios para acceso remoto
     _USUARIOS_RUSTDESK = [
@@ -1378,11 +1453,15 @@ async def lifespan(app: FastAPI):
         _gem = os.getenv("GEMINI_API_KEY", "")
         _grq = os.getenv("GROQ_API_KEY", "")
         _prim = os.getenv("PRIMARY_AI", "groq")
+        # 09-09-2026: antes se logueaban los 10 primeros caracteres de cada
+        # clave. No alcanzan para usarla, pero sí dicen de qué proveedor y de
+        # qué tipo es, y le ahorran la mitad del trabajo a quien tenga una
+        # copia parcial. Lo único que hace falta saber acá es si está.
         logger.info(
             f"[IA-PROVIDERS] primary={_prim} (dictamen: groq+anthropic) | "
-            f"groq={'OK ' + _grq[:10] + '...' if _grq else 'AUSENTE'} | "
-            f"anthropic={'OK ' + _ant[:10] + '...' if _ant else 'AUSENTE'} | "
-            f"gemini(solo OCR)={'OK ' + _gem[:10] + '...' if _gem else 'AUSENTE'}"
+            f"groq={clave_para_log(_grq)} | "
+            f"anthropic={clave_para_log(_ant)} | "
+            f"gemini(solo OCR)={clave_para_log(_gem)}"
         )
     except Exception as _e_diag:
         logger.warning(f"[IA-PROVIDERS] no se pudo loguear estado: {_e_diag}")
@@ -1539,8 +1618,10 @@ Obtener token en `/api/auth/login`.
     """,
     version="5.5.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    # Ver `Settings.docs_publicos`: apagadas salvo que se pidan expresamente.
+    docs_url="/docs" if cfg.docs_publicos else None,
+    redoc_url="/redoc" if cfg.docs_publicos else None,
+    openapi_url="/openapi.json" if cfg.docs_publicos else None,
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -1550,8 +1631,17 @@ allowed_origins = cfg.get_allowed_origins()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    # 09-09-2026 — FALTABA «PUT», Y HAY CUATRO ENDPOINTS QUE LO USAN:
+    # metadatos de contrato, notas privadas de una glosa, presets de filtros y
+    # el estado de las sugerencias. Hoy la pantalla se sirve desde este mismo
+    # servidor —mismo origen— así que CORS no se aplica y no se nota; el día
+    # que la pantalla salga de otro dominio, esos cuatro empiezan a fallar sin
+    # explicación, porque el navegador ni siquiera manda la petición.
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
+    # El identificador de la petición, para que la pantalla pueda mostrarlo
+    # cuando algo falla y el auditor tenga qué pasarnos.
+    expose_headers=["X-Request-ID"],
 )
 
 # R61 P2: GZip para responses >1KB. Reduce ~70% el peso de payloads
@@ -1560,6 +1650,10 @@ app.add_middleware(
 # de CPU supera el ahorro de bytes.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(CorrelationIdMiddleware)
+# 09-09-2026: el motor no enviaba NINGUNA cabecera de seguridad. Ver
+# app/core/cabeceras_seguridad.py — cada una tapa una forma concreta de
+# atacar a quien tiene la sesión abierta.
+app.add_middleware(CabecerasDeSeguridad)
 
 
 # Ronda 50 Paso 10: middleware de tenant.
@@ -1608,6 +1702,7 @@ from app.api.routers.auth_router import router as auth_router
 from app.api.routers.glosas import router as glosas_router
 from app.api.routers.glosas_adres import router as glosas_adres_router
 from app.api.routers.automatizaciones import router as automatizaciones_router
+from app.api.routers.objeciones_dgh import router as objeciones_dgh_router
 from app.api.routers.inteligencia import router as inteligencia_router
 from app.api.routers.bots import router as bots_router
 from app.api.routers.gobierno_ia import router as gobierno_ia_router
@@ -1682,6 +1777,7 @@ app.include_router(quality_gate_stats_router)  # Ola 1: estado del Quality Gate
 app.include_router(glosas_router)
 app.include_router(glosas_adres_router)  # Paquetes de glosas del ADRES
 app.include_router(automatizaciones_router)
+app.include_router(objeciones_dgh_router)
 app.include_router(inteligencia_router)
 app.include_router(bots_router)
 app.include_router(gobierno_ia_router)
@@ -1778,8 +1874,10 @@ app.include_router(soportes_auto_router)
 app.include_router(validador_adres_router)
 
 from app.api.routers.diagnostico import router as diagnostico_router
+from app.api.routers.diagnostico_calidad import router as diagnostico_calidad_router
 
 app.include_router(diagnostico_router)
+app.include_router(diagnostico_calidad_router)
 # OJO: auditor_forense (analiza soportes) y auditoria_forense (busca por IP)
 # son DOS cosas distintas. La limpieza de mayo los confundió y dejó la
 # pantalla del Auditor Forense llamando a una ruta que no existía.
