@@ -73,6 +73,9 @@ jobs:
           # pytest no está en requirements.txt; el runner lo necesita para correr
           # la suite. pytest-asyncio para los tests async (@pytest.mark.asyncio).
           pip install pytest pytest-asyncio
+          # 10-09-2026 — pytest-xdist reparte la suite entre los núcleos del
+          # runner. Medido en la suite completa: de 13 min a 3 min 38 s.
+          pip install pytest-xdist
 
       # LibreOffice completo (Writer/Calc/Draw/Impress) y extract-msg. El
       # mismo script sirve en un contenedor de desarrollo, para que la suite
@@ -87,8 +90,27 @@ jobs:
           # -v + --tb=long para ver el error específico en CI sin acceso interactivo.
           # --maxfail=5 para no inundar logs si hay errores en cascada.
           # tee a /tmp para tener log aunque pytest crashee antes del junit.
+          #
+          # 10-09-2026 — LA SUITE EN PARALELO. «Tengo que esperar hasta 15
+          # minutos que un PR pase una validación» (Yesid). Eran 13 minutos
+          # reales, y con cada conflicto había que volver a esperarlos.
+          #
+          # `-n auto` reparte entre los núcleos del runner. `--dist loadfile`
+          # NO es un adorno: reparte por ARCHIVO, así que todas las pruebas
+          # de un mismo archivo caen en el mismo proceso. Sin eso, dos
+          # pruebas que comparten la base de datos de prueba o un archivo
+          # temporal se pisan y la suite empieza a fallar por razones que no
+          # tienen nada que ver con el código — cambiar quince minutos de
+          # espera por un verde poco fiable sería peor que no hacer nada.
+          #
+          # Medido sobre la suite completa antes de ponerlo:
+          #   en serie ............................. 13 min
+          #   -n 4 (reparto por prueba) ............ más lento, se pisan
+          #   -n 4 --dist loadfile ................. 3 min 38 s, 12.587 en
+          #                                          verde, cero falladas
           set -o pipefail
           python -m pytest tests/ -v --tb=long --maxfail=5 \
+            -n auto --dist loadfile \
             --junitxml=junit.xml \
             -o "junit_family=xunit2" 2>&1 | tee /tmp/pytest-output.log
 

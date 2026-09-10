@@ -91,6 +91,46 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — Se acabaron los quince minutos de espera (y los conflictos)
+
+Con las palabras de Yesid: «*tengo que esperar hasta 15 minutos que un PR pase
+una validación y aparte de eso todos salen con conflictos*». Las dos cosas eran
+ciertas y las dos tenían arreglo.
+
+**Los conflictos no eran mala suerte: era siempre el mismo archivo.** Cada rama
+agrega su entrada del día al mismo sitio de la bitácora, así que git ve dos
+textos distintos en el mismo renglón y se planta. En un solo día hubo que
+resolverlo **ocho veces**, siempre igual: conservando las dos entradas.
+
+Ahora lo hace git solo. Una línea en `.gitattributes` —`BITACORA.md
+merge=union`— le dice que en este archivo se quede con **los dos** lados en vez
+de parar. Funciona porque la bitácora solo crece: nadie reescribe una entrada
+vieja. **Probado antes de ponerlo**: dos ramas escribiendo en el mismo renglón,
+cero conflictos, las dos entradas ahí. Se le aplicó también al CHANGELOG.
+
+**Y los quince minutos eran trece.** La suite ahora se reparte entre los
+núcleos del runner:
+
+| | Tiempo |
+|---|---|
+| Como corría | **13 min** |
+| Repartida por prueba | **más lento** — se pisan entre ellas |
+| Repartida **por archivo** | **3 min 38 s** |
+
+**3,6 veces más rápido**, con las 12.587 pruebas en verde y ninguna fallada.
+
+Repartir **por archivo** no es un adorno: hace que todas las pruebas de un
+mismo archivo caigan en el mismo proceso. Sin eso, dos que comparten la base de
+prueba o un archivo temporal se pisan y la suite empieza a fallar por razones
+que no tienen que ver con el código. Cambiar quince minutos de espera por un
+verde poco fiable habría sido peor que no hacer nada — por eso la primera
+medición, la que salía «más lento», se midió de nuevo en vez de descartarla.
+
+6 pruebas nuevas que vigilan **las dos banderas juntas**: una sin la otra es
+peor que ninguna.
+
+---
+
 ### 10-09-2026 — Un código de medicamento se leía como el valor de la factura
 
 Trabajando una glosa real del Dispensario (factura HUS0000541440, 8 conceptos,
