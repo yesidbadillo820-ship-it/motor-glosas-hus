@@ -90,25 +90,56 @@ EPS_CONOCIDAS: tuple[str, ...] = (
 # Así que la regla une por IDENTIDAD, no por parecido: dos nombres son la
 # misma entidad si uno es el comienzo del otro y lo que sobra NO distingue.
 _FORMA_JURIDICA: frozenset[str] = frozenset(
-    {"EPS", "SA", "SAS", "S", "A", "LTDA", "ESE", "IPS", "ARS", "CIA"}
+    {
+        "EPS",
+        "SA",
+        "SAS",
+        "S",
+        "A",
+        "LTDA",
+        "ESE",
+        "IPS",
+        "ARS",
+        "CIA",
+        # 10-09-2026 — «FUNDACION» va DELANTE del nombre y por eso rompía la
+        # comparación: «SALUD MIA» y «FUNDACION SALUD MIA EPS CONTRIBUTIVO»
+        # salían como dos entidades. Es una forma jurídica, igual que S.A.S.,
+        # y la malla contractual conoce a esa entidad como «SALUD MIA».
+        "FUNDACION",
+    }
 )
 
-# Palabras que NO son adorno: si aparecen en la diferencia entre dos nombres,
-# son dos entidades distintas y se dejan las dos.
-_TOKENS_QUE_DISTINGUEN: frozenset[str] = frozenset(
-    {
-        "UVT",  # unidad de liquidación del SOAT anterior a la reforma de 2023
-        "UVB",  # la que rige desde entonces
-        "CONTRIBUTIVO",  # régimen: cambia la norma aplicable
-        "SUBSIDIADO",
-        # 10-09-2026 — ADRES estuvo un rato en esta lista. Se sacó porque
-        # Cartera lo respondió expresamente: «ADRES nada de otros nombres».
-        # Todo lo de ADRES en este hospital entra por accidentes de tránsito,
-        # así que un «ADRES» pelado y un «ADRES ACCIDENTES DE TRANSITO» son
-        # el mismo renglón y van en una sola línea del desplegable.
-        # (El motor tiene además el flujo de baja de cartera de la Res.
-        # 577/2019, pero eso no llega como glosa con otro nombre de pagador.)
-    }
+# 10-09-2026 — AQUÍ ESTUVO UN ERROR MÍO, Y ESTÁ ESCRITO A PROPÓSITO.
+#
+# Yesid pidió desde el principio «un único nombre consolidado por entidad», y
+# su regla decía expresamente «o separaciones por UVT/UVB». Yo las dejé
+# separadas de todos modos, razonando que la unidad del SOAT cambiaba la
+# tarifa. Miré el motor y esa razón era falsa:
+#
+#   · El motor liquida SOLO en UVB (`uvb.py`: UVB 2026 = $12.110). No existe
+#     ni una tarifa en UVT en todo el código.
+#   · Su propia normativa lo dice: «Reemplaza el uso de UVT (2023-2024). Todos
+#     los valores tarifarios SOAT se expresan ahora en UVB».
+#   · Las bases de tarifa de la malla son SOAT, SOAT_UVB, SOAT_SMLV, PROPIA,
+#     PACTADA y MIXTA. No hay SOAT_UVT.
+#
+# Y del régimen: AXA COLPATRIA, ALIANZA MEDELLÍN y PROTEGER **no están en la
+# malla contractual**, así que su nombre no elige ningún contrato. FUNDACION
+# SALUD MIA EPS sí, y la malla la conoce como «SALUD MIA»: unirlas la mejora.
+#
+# COOSALUD sí tiene dos contratos (subsidiado y contributivo, números
+# distintos), pero eso NO se resuelve por el desplegable —que ya muestra un
+# solo «COOSALUD»— sino por los alias de la malla contra el texto de la
+# glosa. Ese mecanismo no se toca.
+#
+# La lista no desaparece: SE INVIERTE. Antes decía «estas palabras separan dos
+# entidades»; ahora dice «estas palabras son solo una variante de la MISMA».
+#
+# Hacía falta porque «… SOAT UVT» y «… SOAT UVB» no son uno el comienzo del
+# otro: se separan en la última palabra. Sin esta lista quedaban como dos
+# entidades aunque nada las distinga de verdad.
+_VARIANTES_DE_LA_MISMA_ENTIDAD: frozenset[str] = frozenset(
+    {"UVT", "UVB", "CONTRIBUTIVO", "SUBSIDIADO"}
 )
 
 _RE_NO_ALFANUMERICO = re.compile(r"[^A-Z0-9]+")
@@ -133,13 +164,31 @@ def _misma_clave(ka: tuple[str, ...], kb: tuple[str, ...]) -> bool:
 
     Separada para que la unión normalice cada nombre UNA vez y no una vez por
     comparación: el historial crece, la lista del desplegable no.
+
+    Son la misma entidad en dos casos:
+
+    1. **Una es el comienzo de la otra.** «SALUD TOTAL» y «SALUD TOTAL EPS»;
+       «DISPENSARIO MEDICO» y «… BUCARAMANGA».
+    2. **Se separan al final y lo que las separa es solo una variante.**
+       «… SOAT UVT» y «… SOAT UVB»; «… CONTRIBUTIVO» y «… SUBSIDIADO».
+
+    Lo que NO las une: separarse al final en cualquier otra palabra. «SALUD
+    TOTAL» y «SALUD MIA» comparten «SALUD» y ahí se acaba el parecido.
     """
     if not ka or not kb:
         return False
     corta, larga = (ka, kb) if len(ka) <= len(kb) else (kb, ka)
-    if larga[: len(corta)] != corta:
+    if larga[: len(corta)] == corta:
+        return True
+    # Se separaron antes del final: solo son la misma si TODO lo que difiere
+    # es una variante conocida (la unidad del SOAT, el régimen).
+    comun = 0
+    while comun < len(corta) and corta[comun] == larga[comun]:
+        comun += 1
+    if comun == 0:
         return False
-    return not (set(larga[len(corta) :]) & _TOKENS_QUE_DISTINGUEN)
+    diferencia = set(corta[comun:]) | set(larga[comun:])
+    return bool(diferencia) and diferencia <= _VARIANTES_DE_LA_MISMA_ENTIDAD
 
 
 def misma_entidad(a: str, b: str) -> bool:
@@ -159,6 +208,34 @@ def misma_entidad(a: str, b: str) -> bool:
     return _misma_clave(_clave_de_entidad(a), _clave_de_entidad(b))
 
 
+# «OTRA / SIN DEFINIR» es el marcador del desplegable, no una entidad.
+#
+# 10-09-2026 — en la captura de Yesid salía DOS veces: arriba como marcador y
+# otra vez dentro de la lista. La ruta lo filtraba del historial pero no de
+# los contratos cargados, así que un contrato guardado con ese nombre se
+# colaba. Se filtra acá adentro, donde ningún llamador puede olvidarlo.
+_MARCADORES_QUE_NO_SON_ENTIDAD: frozenset[str] = frozenset(
+    {"", "OTRA", "SIN DEFINIR", "OTRA / SIN DEFINIR", "OTRA/SIN DEFINIR", "OTRA - SIN DEFINIR"}
+)
+
+
+def _limpios(lista) -> list[str]:
+    """Los nombres de una fuente, en mayúscula, sin vacíos ni el marcador.
+
+    Conserva el ORDEN en que vienen: la ruta manda el historial ordenado por
+    cuántas glosas tiene cada grafía, y así gana la que de verdad se usa.
+    """
+    vistos: set[str] = set()
+    salida: list[str] = []
+    for nombre in lista or ():
+        n = (nombre or "").strip().upper()
+        if not n or n in _MARCADORES_QUE_NO_SON_ENTIDAD or n in vistos:
+            continue
+        vistos.add(n)
+        salida.append(n)
+    return salida
+
+
 def eps_seleccionables(
     *otras_listas: "list[str] | tuple[str, ...]",
     preferidas: "list[str] | tuple[str, ...] | None" = None,
@@ -170,22 +247,45 @@ def eps_seleccionables(
     «Sin repetidos» incluye la misma entidad escrita de dos maneras
     (ver `misma_entidad`): de cada grupo sobrevive UN nombre.
 
-    `preferidas` es el nombre que gana cuando hay empate — el llamador manda
-    ahí las entidades CON CONTRATO CARGADO, porque ese es el nombre con el
-    que está firmado el contrato y el que debe salir citado en el dictamen.
-    Después manda el catálogo curado, y de último lo que venga del historial,
-    que es la fuente más sucia.
+    **Cuál de los nombres sobrevive.** Gana el primero que entra:
+
+    1. `preferidas` — las entidades CON CONTRATO CARGADO. Ese es el nombre con
+       el que está FIRMADO el contrato y el que debe salir citado.
+    2. Las demás listas, en el orden en que las manda el llamador. La ruta
+       manda el historial ordenado por cuántas glosas tiene cada grafía, así
+       que gana el nombre con el que de verdad están escritas las glosas.
+    3. El catálogo curado, de último y solo para completar: nunca agrega un
+       renglón si los datos reales ya nombran a esa entidad.
     """
     salida: list[str] = []
     claves: list[tuple[str, ...]] = []
-    for lista in (preferidas or (), EPS_CONOCIDAS, *otras_listas):
-        for nombre in sorted(
-            {(n or "").strip().upper() for n in (lista or ()) if (n or "").strip()}
-        ):
-            clave = _clave_de_entidad(nombre)
-            if any(_misma_clave(clave, ya) for ya in claves):
-                continue
-            salida.append(nombre)
-            claves.append(clave)
+
+    def _agregar(nombre: str, del_catalogo: bool) -> None:
+        clave = _clave_de_entidad(nombre)
+        if not clave:
+            return
+        for ya in claves:
+            if _misma_clave(clave, ya):
+                return
+            # El catálogo curado NO agrega renglones. En el desplegable real
+            # salía «SALUD MIA» (de esta lista fija, sin una glosa detrás)
+            # junto a «FUNDACION SALUD MIA EPS CONTRIBUTIVO»: dos renglones
+            # para una entidad. El nombre corto existe solo para que la
+            # entidad se pueda ELEGIR cuando no hay ningún dato suyo; si los
+            # datos reales ya la nombran, estorba.
+            if del_catalogo and ya[: len(clave)] == clave:
+                return
+        salida.append(nombre)
+        claves.append(clave)
+
+    # El orden manda: lo primero que entra es el nombre que sobrevive.
+    for nombre in _limpios(preferidas):
+        _agregar(nombre, del_catalogo=False)
+    for lista in otras_listas:
+        for nombre in _limpios(lista):
+            _agregar(nombre, del_catalogo=False)
+    for nombre in sorted(_limpios(EPS_CONOCIDAS)):
+        _agregar(nombre, del_catalogo=True)
+
     salida.sort()
     return salida
