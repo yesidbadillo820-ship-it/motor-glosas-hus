@@ -91,6 +91,57 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — La cláusula del contrato ya no sale mal transcrita, y el comparador dejó de regalar notas
+
+**1) El dictamen citaba el contrato y le cambiaba las cifras.**
+
+En el mismo caso, el dictamen transcribió la CLÁUSULA SEGUNDA del contrato
+440-DIGSA y salió radicado así:
+
+> «…ES POR LA SUMA DE TRES MIL DOSCIENTOS TREINTA Y CINCO MILLONES CINCUENTA
+> MIL PESOS MCTE **(el valor objetado consignado en el expediente)**, VALOR
+> QUE SE ENCUENTRA RESPALDADO CON EL CDP NO 58925 … POR CINCUENTA MIL PESOS
+> M/CTE **(el valor objetado consignado en el expediente)**…»
+
+Es el motor mordiéndose la cola. Él tiene una red que borra las cifras de
+plata que la IA se inventa y las cambia por esa frase. Pero **no sabía que
+las cláusulas del contrato son legítimas** — se las inyecta él mismo al
+modelo, sacadas del contrato firmado. Como esas cifras no venían en la glosa,
+las tomó por inventadas y las pisó, dentro de una transcripción literal.
+
+Citar mal un contrato es peor que no citarlo: la entidad abre **su propio
+contrato**, ve que no dice eso, y todo el dictamen pierde el peso.
+
+Ahora las cifras de la cláusula, del valor facturado y del valor pactado
+entran como legítimas y la transcripción sale igualita al contrato.
+
+Y de paso, la otra mitad: cuando la cifra **sí** es inventada, el paréntesis
+se borra completo en vez de quedar «CINCUENTA MIL PESOS MCTE (el valor
+objetado consignado en el expediente)», que no significa nada y delata el
+retoque. El paréntesis después de una suma en letras está para repetirla en
+números; si el número no se sostiene, lo honesto es que no haya paréntesis.
+
+**2) El comparador de IAs le ponía 9/9 a un dictamen que el motor rechazó.**
+
+El programa que compara Groq contra Gemini sobre la misma glosa le había dado
+**nueve aciertos de nueve** a un dictamen que el propio motor había mandado a
+revisión humana: puntaje 70, confianza REVISAR, y en su registro la
+advertencia *«el dictamen no abordó 2 de 2 conceptos»*. La nota solo miraba si
+aparecían ciertas palabras — y aparecían, en el encabezado, sin que el
+dictamen argumentara nada.
+
+Una nota que le dice «excelente» a lo que el motor rechaza no sirve para
+escoger proveedor: sirve para escoger mal. Ahora la nota trae siempre dos
+mitades juntas: los hechos del caso (que salieron de los papeles) **y el
+veredicto del propio motor** — su puntaje, su nivel de confianza, si bloqueó
+el dictamen para radicar y las diez advertencias que suelta mientras trabaja
+(conceptos sin responder, cláusulas evadidas, plata inventada, cantidades
+inventadas, documentos que no existen…).
+
+Un proveedor solo sale **LIMPIO** si acierta todo **y** el motor no le objetó
+nada. Ese mismo dictamen que sacaba 9/9 ahora sale **CON PEGAS**, con el
+motivo escrito debajo.
+
 ### 10-09-2026 — El dictamen dejó de inventar mililitros y renglones de factura
 
 Del mismo caso (objeción 189801). La entidad objetó el IOBITRIDOL diciendo

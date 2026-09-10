@@ -1,5 +1,31 @@
 # Registro de cambios
 
+## Sesión 10-sep-2026 (4) — La cláusula citada sin retoques, y la rúbrica del comparador con dientes
+
+- **`app/services/glosa_service.py`** — `_neutralizar_valores_inventados()`
+  pisaba las cifras de las cláusulas del contrato inyectadas por el propio
+  motor (`_clausulas_contrato`, clave `texto_literal`), porque no venían en
+  la glosa. Resultado radicado: «TRES MIL DOSCIENTOS TREINTA Y CINCO MILLONES
+  CINCUENTA MIL PESOS MCTE (el valor objetado consignado en el expediente)».
+  Ahora `_extras_legitimos` incluye `_texto_clausulas`, `_val_fact_str` y
+  `_val_pact_str`. Y `_RE_PARENTESIS_NEUTRALIZADO` borra el paréntesis entero
+  cuando la cifra sí era inventada, en vez de dejar la frase neutra donde
+  debía ir un número; limpieza de dobles espacios y espacio-antes-de-coma.
+- **`tools/comparar_proveedores_ia.py`** — la rúbrica dejó de ser word
+  matching puro. Nuevos `Veredicto`, `CapturaDeAvisos` (handler sobre el
+  logger `motor_glosas`, nivel WARNING) y `_veredicto_del_motor()`, que leen
+  `score`, `confianza`, `bloqueado_para_radicar`, `motivos_bloqueo` y las 10
+  marcas de `AVISOS_QUE_DESCALIFICAN` (verificadas contra el código del
+  motor, no supuestas). `_correr()` devuelve el veredicto, `_tabla()` marca
+  LIMPIO / CON PEGAS y lista los reproches. Décima comprobación: el letrero
+  rojo de conceptos sin responder.
+- **Pruebas** — `tests/test_services/test_clausula_citada_sin_retoques.py`
+  (10) y 8 casos nuevos en `tests/test_tools/test_comparar_proveedores_ia.py`,
+  incluido uno que falla si alguien renombra una marca del motor y la rúbrica
+  se queda escuchando marcas muertas (verificado reinyectando el defecto).
+  8.470 pruebas de servicios, tools, utils y frontend en verde.
+
+
 ## Sesión 10-sep-2026 (3) — `check_medidas_no_fabricadas`: dosis, unidades y números de ítem inventados
 
 Mismo caso (objeción 189801, causal FA0701 del IOBITRIDOL). El dictamen

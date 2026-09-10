@@ -168,3 +168,150 @@ class TestLaEntradaSeArmaDeVerdad:
         fuente = (RAIZ / "tools" / "comparar_proveedores_ia.py").read_text(encoding="utf-8")
         assert "2026-07-24" in fuente
         assert "2026-08-25" in fuente
+
+
+# ── La rúbrica dejó de ser blanda (10-09-2026) ──────────────────────────────
+#
+# La primera versión le puso 9/9 a un dictamen que el propio motor había
+# mandado a revisión humana: score 70, confianza REVISAR, y en el log su
+# propia advertencia «[SUBCONCEPTOS-OMITIDOS] el dictamen no abordó 2/2
+# concepto(s)». Solo miraba si aparecían ciertas palabras, y aparecían — en
+# el encabezado, sin que el dictamen argumentara nada.
+
+
+class ResultadoDeAquelDia:
+    """Lo que el motor devolvió con el dictamen que sacó 9/9."""
+
+    score = 70.0
+    confianza = {"nivel": "REVISAR"}
+    bloqueado_para_radicar = False
+    motivos_bloqueo: list = []
+
+
+DICTAMEN_QUE_ENGAÑO_LA_RUBRICA = (
+    "GLOSA SO4201 Y FA0701 · CONTRATO 440-DIGSA/DMBUG-2025 · TARIFA SOAT SMLV "
+    "-20% · TOTAL OBJETADO $ 55.985.100 · SE SOLICITA LA FACTURA DE COMPRA Y "
+    "LA COTIZACIÓN AVALADA. SE SOLICITA EL LEVANTAMIENTO TOTAL DE LA GLOSA."
+)
+
+
+class TestLaRubricaYaNoSeDejaEngañar:
+    def test_acierta_las_palabras_pero_queda_con_pegas(self):
+        from tools.comparar_proveedores_ia import (
+            COMPROBACIONES,
+            CapturaDeAvisos,
+            _tabla,
+            _veredicto_del_motor,
+        )
+
+        captura = CapturaDeAvisos()
+        captura.lineas = [
+            "[SUBCONCEPTOS-OMITIDOS] el dictamen no abordó 2/2 concepto(s): ['SO4201', 'FA0701']"
+        ]
+        veredicto = _veredicto_del_motor(ResultadoDeAquelDia(), captura)
+        notas = [c.evaluar(DICTAMEN_QUE_ENGAÑO_LA_RUBRICA) for c in COMPROBACIONES]
+
+        # Sigue acertando las palabras — ese no era el problema.
+        assert sum(1 for ok, _ in notas if ok) == len(COMPROBACIONES)
+        # Pero ahora se dice que el motor lo objetó.
+        assert veredicto.objeta
+        assert "dejó conceptos de la glosa sin responder" in veredicto.reproches()
+
+        salida = _tabla(
+            {
+                "groq": {
+                    "modelo": "gpt-oss-120b",
+                    "segundos": 12.3,
+                    "dictamen": DICTAMEN_QUE_ENGAÑO_LA_RUBRICA,
+                    "veredicto": veredicto,
+                    "notas": notas,
+                }
+            }
+        )
+        assert "CON PEGAS" in salida
+        assert "LIMPIO  ·" not in salida
+        assert "70/100 REVISAR" in salida
+        assert "dejó conceptos de la glosa sin responder" in salida
+
+    def test_un_dictamen_sin_pegas_si_sale_limpio(self):
+        from tools.comparar_proveedores_ia import COMPROBACIONES, Veredicto, _tabla
+
+        notas = [(True, "") for _ in COMPROBACIONES]
+        salida = _tabla(
+            {
+                "gemini": {
+                    "modelo": "gemini-3-flash",
+                    "segundos": 8.0,
+                    "dictamen": "…",
+                    "veredicto": Veredicto(score=92.0, confianza="ALTA"),
+                    "notas": notas,
+                }
+            }
+        )
+        assert "LIMPIO" in salida
+        assert "CON PEGAS" not in salida
+        assert "⛔" not in salida
+
+    def test_el_bloqueo_para_radicar_pesa_aunque_todo_lo_demas_este_bien(self):
+        from tools.comparar_proveedores_ia import Veredicto
+
+        v = Veredicto(
+            score=95.0,
+            confianza="ALTA",
+            bloqueado=True,
+            motivos=("falta el soporte de la lista de precios",),
+        )
+        assert v.objeta
+        assert "el motor lo BLOQUEÓ para radicar" in v.reproches()
+        assert "motivo de bloqueo: falta el soporte de la lista de precios" in v.reproches()
+
+    def test_un_dictamen_impecable_no_tiene_reproches(self):
+        from tools.comparar_proveedores_ia import Veredicto
+
+        v = Veredicto(score=98.0, confianza="ALTA")
+        assert not v.objeta
+        assert v.reproches() == []
+
+
+class TestLasMarcasQueEscuchaExistenDeVerdad:
+    """Una rúbrica que escucha marcas que ya nadie escribe vuelve a ser blanda.
+
+    Si alguien renombra `[SUBCONCEPTOS-OMITIDOS]` en el motor, esto se cae y
+    obliga a actualizar el comparador en el mismo cambio.
+    """
+
+    def test_cada_marca_aparece_en_el_codigo_del_motor(self):
+        from pathlib import Path
+
+        from tools.comparar_proveedores_ia import AVISOS_QUE_DESCALIFICAN
+
+        raiz = Path(__file__).resolve().parents[2] / "app"
+        fuente = "\n".join(
+            f.read_text(encoding="utf-8", errors="ignore") for f in raiz.rglob("*.py")
+        ).upper()
+        for marca in AVISOS_QUE_DESCALIFICAN:
+            assert marca.upper() in fuente, (
+                f"el comparador espera la marca {marca!r} en el registro del "
+                "motor, y ya no existe: la rúbrica dejaría pasar ese defecto"
+            )
+
+    def test_la_captura_traduce_la_marca_a_castellano(self):
+        from tools.comparar_proveedores_ia import CapturaDeAvisos
+
+        c = CapturaDeAvisos()
+        c.lineas = [
+            "[PLATA-INVENTADA] el modelo escribió: ['$ 1.200.000']",
+            "[QG] Escalando a humano tras 3 intentos. Mejor score: 70",
+            "algo perfectamente normal que no descalifica nada",
+        ]
+        salida = c.descalificantes()
+        assert "escribió cifras de plata que nadie le dio" in salida
+        assert "el Quality Gate lo mandó a revisión humana" in salida
+        assert len(salida) == 2
+
+    def test_no_repite_la_misma_queja_dos_veces(self):
+        from tools.comparar_proveedores_ia import CapturaDeAvisos
+
+        c = CapturaDeAvisos()
+        c.lineas = ["[PLATA-INVENTADA] una", "[PLATA-INVENTADA] otra"]
+        assert len(c.descalificantes()) == 1

@@ -1916,6 +1916,13 @@ _RE_MONTO_DICTAMEN = re.compile(
 _MIN_DIGITOS_MONTO = 4  # ignora cifras chicas ("$10", "$0.00") y porcentajes
 _FRASE_VALOR_NEUTRO = "el valor objetado consignado en el expediente"
 
+# «($3.235.050.000)» pisado queda «(el valor objetado consignado en el
+# expediente)». Ese paréntesis sobra: se borra entero.
+_RE_PARENTESIS_NEUTRALIZADO = re.compile(
+    r"\s*[(\[]\s*" + re.escape(_FRASE_VALOR_NEUTRO) + r"\s*[)\]]",
+    re.IGNORECASE,
+)
+
 # ── Ronda 14 (Bug K): constantes legítimas que el system prompt enseña a la IA ──
 # Regresión introducida por el sanitizer Bug J de ronda 13: cuando el dictamen
 # escribía "UVB 2026 = $12.110" (constante del manual SOAT incluida
@@ -2037,6 +2044,16 @@ def _neutralizar_valores_inventados(
             lambda m: m.group(1).lower() + " " + _FRASE_VALOR_NEUTRO,
             resultado,
         )
+        # 10-09-2026 — LA FRASE ENTRE PARÉNTESIS NUNCA SUENA A NADA.
+        # El paréntesis después de una suma escrita en letras existe para
+        # repetirla en números: «…CINCUENTA MIL PESOS MCTE ($50.000)». Pisar
+        # esa cifra deja «…CINCUENTA MIL PESOS MCTE (el valor objetado
+        # consignado en el expediente)», que además de no significar nada
+        # delata el retoque. Si la cifra no se puede sostener, lo honesto es
+        # que el paréntesis desaparezca y la suma en letras quede sola.
+        resultado = _RE_PARENTESIS_NEUTRALIZADO.sub("", resultado)
+        resultado = re.sub(r"[ \t]{2,}", " ", resultado)
+        resultado = re.sub(r"\s+([,.;:])", r"\1", resultado)
         logger.warning(
             f"[VALOR-INVENTADO] {n_neutralizados} cifra(s) monetaria(s) "
             f"NO presente(s) en el input del usuario → neutralizada(s). "
@@ -12326,10 +12343,36 @@ class GlosaService:
             # ═══════════════════════════════════════════════════════════
             try:
                 _texto_glosa_input = str(getattr(data, "tabla_excel", "") or "")
+                # 10-09-2026 — LA CLÁUSULA DEL CONTRATO TAMBIÉN ES LEGÍTIMA.
+                # El caso: el dictamen citó la CLÁUSULA SEGUNDA del contrato
+                # 440-DIGSA y salió así radicado:
+                #
+                #   «…ES POR LA SUMA DE TRES MIL DOSCIENTOS TREINTA Y CINCO
+                #    MILLONES CINCUENTA MIL PESOS MCTE (el valor objetado
+                #    consignado en el expediente), RESPALDADO CON EL CDP NO
+                #    58925 … POR CINCUENTA MIL PESOS M/CTE (el valor objetado
+                #    consignado en el expediente)…»
+                #
+                # Las cifras de esa cláusula no venían en la glosa, así que
+                # esta red las tomó por inventadas y las pisó — dentro de una
+                # transcripción literal del contrato. Una cláusula citada mal
+                # es peor que no citarla: la entidad abre su propio contrato,
+                # ve que no dice eso, y el dictamen entero pierde el peso.
+                # Las cláusulas se las inyecta el motor al prompt (arriba,
+                # `_clausulas_contrato`): sus cifras son del contrato firmado,
+                # no de la imaginación del modelo.
+                _texto_clausulas = " ".join(
+                    str(c.get("texto_literal") or c.get("texto") or "")
+                    for c in (_clausulas_contrato or [])
+                    if isinstance(c, dict)
+                )
                 _extras_legitimos = (
                     str(getattr(data, "numero_factura", "") or ""),
                     str(getattr(data, "numero_radicado", "") or ""),
                     str(getattr(data, "numero_contrato", "") or ""),
+                    _texto_clausulas,
+                    str(_val_fact_str or ""),
+                    str(_val_pact_str or ""),
                 )
                 _dictamen_sin_valor_falso = _neutralizar_valores_inventados(
                     dictamen,
