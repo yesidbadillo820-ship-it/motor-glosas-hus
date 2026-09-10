@@ -207,6 +207,17 @@ class Settings(BaseSettings):
     # (degradación elegante total). Override por env:
     # GLOSA_CAMPOS_ESTRUCTURADOS=true.
     glosa_campos_estructurados: bool = False
+    # 09-09-2026 — LA DOCUMENTACIÓN DE LA API, APAGADA POR DEFECTO.
+    # `/docs` y `/redoc` estaban abiertos a cualquiera: publican el mapa
+    # completo del motor —cada ruta, cada parámetro, cada forma de dato— sin
+    # pedir contraseña. No es una brecha por sí sola (todo lo de adentro sigue
+    # exigiendo token), pero es el plano del edificio pegado en la puerta: le
+    # ahorra a cualquiera el trabajo de averiguar por dónde entrar.
+    #
+    # Apagado por defecto, a propósito: lo seguro tiene que ser lo que pasa
+    # cuando nadie configura nada. Para verlas en desarrollo, poner
+    # DOCS_PUBLICOS=1 en el .env.
+    docs_publicos: bool = False
 
     # Token compartido del agente local de lotes (tools/agente_lotes.py).
     # El agente corre headless en el PC del hospital y no puede usar JWT
