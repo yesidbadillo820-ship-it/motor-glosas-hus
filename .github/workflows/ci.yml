@@ -269,7 +269,7 @@ jobs:
           echo "test     = ${{ needs.test-ok.result }}"
           echo "security = ${{ needs.security.result }}"
           if [ "${{ needs.lint.result }}" != "success" ] \
-             || [ "${{ needs.test.result }}" != "success" ] \
+             || [ "${{ needs.test-ok.result }}" != "success" ] \
              || [ "${{ needs.security.result }}" != "success" ]; then
             echo "::error::Alguno de los tres pasos no terminó bien. No se puede fusionar."
             exit 1

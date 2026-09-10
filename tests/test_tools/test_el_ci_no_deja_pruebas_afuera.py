@@ -23,6 +23,7 @@ suma dé la suite entera: ni una prueba de menos, ni una repetida.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -156,3 +157,45 @@ class TestElNombreQueLaRamaExige:
 
     def test_ci_ok_pasa_por_el_agregador(self):
         assert "test-ok" in self._ci()["jobs"]["ci-ok"]["needs"]
+
+
+class TestNingunTrabajoMiraAOtroQueNoEspera:
+    """Un `needs.X.result` sin declarar `X` en `needs` falla SIEMPRE, y callado.
+
+    10-09-2026, y lo pagué en la misma tarde. Al hacer que `ci-ok` pasara por
+    el agregador, cambié el `echo` de `needs.test` a `needs.test-ok` y **se me
+    quedó la condición mirando el viejo**. GitHub no da error de sintaxis:
+    devuelve la cadena vacía, la comparación con «success» falla, y el paso
+    reporta ROJO en cada corrida — con todo lo demás en verde.
+
+    Es el mismo tipo de defecto que el del nombre del chequeo obligatorio: no
+    se ve como un error de configuración, se ve como si el código estuviera
+    mal. Y uno se pone a buscar donde no es.
+
+    Esta prueba recorre TODOS los trabajos y comprueba que cada `needs.X` que
+    usan esté declarado. No comprueba una lista de nombres: se adapta sola si
+    mañana se agrega otro trabajo.
+    """
+
+    def test_todas_las_referencias_estan_declaradas(self):
+        d = yaml.safe_load(CI.read_text(encoding="utf-8"))
+        rotas = []
+        for nombre, job in d["jobs"].items():
+            declarados = set(job.get("needs") or [])
+            cuerpo = yaml.safe_dump(job)
+            for usado in sorted(set(re.findall(r"needs\.([A-Za-z0-9_-]+)\.result", cuerpo))):
+                if usado not in declarados:
+                    rotas.append(f"«{nombre}» usa needs.{usado} sin declararlo en needs")
+        assert not rotas, (
+            "esto devuelve vacío y deja el chequeo en rojo en TODAS las corridas: "
+            + "; ".join(rotas)
+        )
+
+    def test_ci_ok_comprueba_los_tres_que_espera(self):
+        """Si mira menos de los que espera, algo rojo pasaría por verde."""
+        texto = CI.read_text(encoding="utf-8")
+        d = yaml.safe_load(texto)
+        for trabajo in d["jobs"]["ci-ok"]["needs"]:
+            assert f"needs.{trabajo}.result" in texto, (
+                f"«ci-ok» espera a {trabajo} pero no mira su resultado: podría pasar en rojo"
+            )
