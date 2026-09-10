@@ -49,6 +49,7 @@ contexto adicional en el flujo clásico.
 from __future__ import annotations
 
 from app.core.config import espera_maxima
+from app.services.modelos_anthropic import temperatura_si_aplica
 import os
 import json
 import logging
@@ -120,7 +121,7 @@ class Agent:
                         json={
                             "model": modelo,
                             "max_tokens": self.max_tokens,
-                            "temperature": self.temperature,
+                            **temperatura_si_aplica(modelo, self.temperature),
                             "system": self.system_prompt,
                             "messages": messages,
                         },
@@ -158,7 +159,7 @@ class Agent:
                         json={
                             "model": modelo,
                             "max_tokens": self.max_tokens,
-                            "temperature": self.temperature,
+                            **temperatura_si_aplica(modelo, self.temperature),
                             "system": self.system_prompt,
                             "tools": self.tools,
                             "messages": messages,
@@ -294,7 +295,7 @@ async def ejecutar_auditor(
     """Ejecuta el Auditor Agent con los datos del caso. Devuelve el dict
     completo del agente: {texto, json, uso, error}."""
     api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
-    modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+    modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
 
     user_prompt = f"""DATOS DEL CASO:
 

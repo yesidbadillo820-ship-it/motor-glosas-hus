@@ -150,7 +150,7 @@ class Settings(BaseSettings):
     # responde al facturador mientras espera frente a la pantalla y tiene un
     # techo duro de 10 segundos, así que usa un modelo rápido de una pasada.
     preauditoria_modelo: str = "llama-3.3-70b-versatile"
-    anthropic_model: str = "claude-sonnet-4-5"
+    anthropic_model: str = "claude-sonnet-5"
     # Modelo Gemini para OCR de PDF escaneados (no escribe dictamenes).
     #
     # 19-08-2026. Tercer modelo que se muere en este archivo: primero

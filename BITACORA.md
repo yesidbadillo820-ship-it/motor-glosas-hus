@@ -91,6 +91,49 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — El respaldo de IA estaba viejo y caro, y cambiarlo casi lo rompe
+
+El motor tenía fijado `claude-sonnet-4-5` como modelo de Anthropic. Es de la
+generación anterior **y cuesta más** que el actual: 3,00 / 15,00 dólares por
+millón de palabras contra 2,00 / 10,00 del Sonnet 5. Más viejo y más caro a
+la vez.
+
+Hoy eso no se ve en la factura porque el motor principal es Groq y Anthropic
+solo entra cuando Groq falla. Pero por eso mismo importa: el respaldo es el
+que atiende el día malo.
+
+**Yo le dije a Yesid que era «una línea». Estaba equivocado.** La generación
+actual de modelos **rechaza el parámetro `temperature` con error 400**, y el
+motor se lo manda en las **diez** llamadas que le hace a Anthropic. Cambiar
+solo el nombre habría convertido «si Groq falla, responde Anthropic» en «si
+Groq falla, no responde nadie» — y no se habría notado hasta el día que Groq
+fallara, que es el peor día para enterarse.
+
+Así que el envío de `temperature` no se borró: se volvió **condicional**. Con
+un modelo de la generación anterior se manda exactamente igual que antes; con
+uno de la actual se omite. Ningún camino queda peor que hoy, y quien fije
+`ANTHROPIC_MODEL` a mano a un modelo viejo lo sigue teniendo igual.
+
+**Y de paso aparecieron tres errores de plata en la tabla de precios**, que es
+la que alimenta el informe de costos:
+
+- Los tres modelos **Opus estaban a 15,00 / 75,00**, que es el precio de la
+  generación Opus 3. Valen 5,00 / 25,00: el informe **triplicaba** su costo.
+- El **Haiku sin fecha** no estaba en la tabla, aunque es el nombre que usa el
+  motor para el «ping» de estado. Caía al valor por defecto y se costeaba a
+  3,00 en vez de 1,00.
+- El modelo nuevo no tenía precio propio; sin agregarlo también habría caído
+  al defecto, un 50% por encima de lo real.
+
+22 pruebas nuevas. La central no comprueba que el modelo cambió: comprueba que
+**con el modelo nuevo NO se manda `temperature` y con el viejo SÍ**, y que los
+nombres parecidos (`claude-sonnet-4-5` y `claude-sonnet-5`) no se confunden.
+Otra recorre todo el código buscando llamadas a Anthropic con `temperature`
+fija — no comprueba una lista, así que avisa sola si mañana alguien agrega una
+llamada nueva copiando y pegando.
+
+---
+
 ### 10-09-2026 — La misma EPS salía dos veces en el desplegable
 
 Yesid abrió «EPS / Entidad Pagadora» del botón Analizar y contó los pares:

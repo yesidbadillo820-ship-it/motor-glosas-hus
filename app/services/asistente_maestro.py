@@ -35,6 +35,7 @@ Y la IA encadena: buscar_glosa → buscar_soportes → auditar_factura.
 """
 
 from __future__ import annotations
+from app.services.modelos_anthropic import temperatura_si_aplica
 import os
 import json
 import logging
@@ -621,7 +622,7 @@ async def chat_con_asistente(
       }
     """
     api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
-    modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+    modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
     if not api_key:
         return {"respuesta": "", "error": "Anthropic API key no configurada"}
     if not mensajes:
@@ -693,7 +694,7 @@ async def chat_con_asistente(
                     json={
                         "model": modelo,
                         "max_tokens": 4000,
-                        "temperature": 0.2,
+                        **temperatura_si_aplica(modelo, 0.2),
                         "system": system_final,
                         "tools": tools_finales,
                         "messages": msgs_anthropic,
