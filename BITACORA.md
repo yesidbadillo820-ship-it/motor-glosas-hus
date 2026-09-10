@@ -91,6 +91,45 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — Un código de medicamento se leía como el valor de la factura
+
+Trabajando una glosa real del Dispensario (factura HUS0000541440, 8 conceptos,
+$55.985.100 objetados), el dictamen salió con un recuadro rojo que decía:
+
+> «La entidad objeta $55.985.100 sobre una factura de **$224.249**. No se puede
+> glosar un valor que nunca se facturó.»
+
+**La factura valía $126.565.918.** El «$224.249» salió de `224249-2`, que es el
+**código del IOBITRIDOL**. El patrón que busca «FACTURADAS ‹número›» se saltó el
+fin de renglón y agarró el código del medicamento que venía debajo.
+
+**Lo peligroso no es el número mal leído.** Es que ese recuadro le dice al
+auditor que tiene el caso ganado sin discutir el fondo. Si lo radica, la entidad
+abre la factura, ve los 126 millones y ya no le cree **nada más** del escrito —
+que es justo el flanco que el propio Quality Gate enumera: «el documento se
+contradice solo → tumbo sin entrar en el fondo».
+
+Ahora un número pegado a un código no se lee como plata. Un código se reconoce
+por sus bordes: `224249-2` lleva un guion y otro dígito detrás; `FMQ6476` lleva
+letras delante. La plata no. Y cuando no hay dato, queda en cero: sin dato es
+honesto, un dato falso arma un recuadro que miente.
+
+**Y buscándolo aparecieron dos huecos más, de antes:**
+
+- El patrón de «OBJETADO» exigía un **espacio** y la entidad escribe **dos
+  puntos**: «VALOR OBJETADO: $103.000» no se leía.
+- No cubría los verbos. «SE RECONOCIÓ SOLO $90.000» daba cero, porque solo
+  buscaba «RECONOCIDO». En los verbos el «$» es obligatorio a propósito:
+  «objeto» sin tilde también es un sustantivo.
+
+14 pruebas nuevas con el texto real de la objeción. La mitad vigila que no se
+cuele un código; la otra mitad, que la plata de verdad se siga leyendo — si el
+arreglo se pasa de estricto, esas se caen.
+
+---
+
+---
+
 ### 10-09-2026 — Lote del Dispensario del 09 de septiembre: cargado el GI-33-5462-2026
 
 **Lo que llegó.** El export `GLOSAS_Y_DEVOLUCIONES_09_SEPTIEMBRE` traía 761

@@ -340,6 +340,44 @@ def _facturado_linea_cups(texto: str, cups: str) -> float:
     return valores[-1]
 
 
+# 10-09-2026 — UN CÓDIGO NO ES PLATA.
+#
+# Caso real de Yesid, factura HUS0000541440. La objeción decía:
+#
+#     «...presentan diferencias con las cantidades que fueron FACTURADAS
+#      224249-2 IOBITRIDOL 300MG/50ML (XENETIX)...»
+#
+# El patrón que busca «FACTURADAS <número>» se saltó el fin de renglón y
+# tomó «224249», que es el CÓDIGO del medicamento, como el valor de la
+# factura. El dictamen salió con un recuadro rojo diciéndole al auditor que
+# «la entidad objeta $55.985.100 sobre una factura de $224.249» — cuando la
+# factura de verdad valía $126.565.918.
+#
+# Lo peligroso no es el número: es que ese recuadro le dice al auditor que
+# tiene ganado el caso sin discutir el fondo. Si lo radica, la entidad abre
+# la factura, ve los $126 millones y ya no le cree nada más del escrito.
+#
+# Un código se reconoce por sus bordes: «224249-2» lleva pegado un guion y
+# otro dígito; «FMQ6476» lleva letras delante. La plata no.
+_RE_BORDE_DE_CODIGO_ANTES = re.compile(r"[A-Za-z0-9]$")
+_RE_BORDE_DE_CODIGO_DESPUES = re.compile(r"^(?:-\d|[A-Za-z])")
+
+
+def _es_pedazo_de_un_codigo(texto: str, ini: int, fin: int) -> bool:
+    """¿El número que capturé es en realidad parte de un código?
+
+    Mira lo que tiene pegado a los lados. Si antes hay una letra o un dígito
+    («FMQ6476», «HUS541440») o después viene «-<dígito>» o una letra
+    («224249-2», «20013906-1»), no es un monto: es un código de
+    medicamento, de material o de factura.
+    """
+    antes = texto[max(0, ini - 1) : ini]
+    despues = texto[fin : fin + 2]
+    if antes and _RE_BORDE_DE_CODIGO_ANTES.search(antes):
+        return True
+    return bool(despues and _RE_BORDE_DE_CODIGO_DESPUES.search(despues))
+
+
 def _extraer_valores_glosa(texto: str, cups: Optional[str] = None) -> dict:
     """Extrae valores de COP mencionados en el texto libre de la glosa.
 
@@ -413,23 +451,33 @@ def _extraer_valores_glosa(texto: str, cups: Optional[str] = None) -> dict:
         # La palabra "VALOR" o "UNITARIO" antes de CONTRATADO evita falsos
         # positivos con "TARIFA CONTRATADA CON EPS" (mención general).
         r"(?:VALOR|UNITARIO)\s+(?:UNITARIO\s+)?CONTRATAD[OA][^\d$]{0,140}\$?\s*([\d][\d\.,]{3,})",
-        r"RECONOCID[OA]S?\s+(?:SOLO\s+)?(?:POR\s+|EN\s+|:\s*)?\$?\s*([\d][\d\.,]{3,})",
+        r"RECONOCID[OA]S?[:\s]+(?:SOLO\s+)?(?:POR\s+|EN\s+)?\$?\s*([\d][\d\.,]{3,})",
         r"ACEPTAD[OA]S?\s+(?:POR\s+|EN\s+)?\$?\s*([\d][\d\.,]{3,})",
         r"VALOR\s+ACEPTADO[:\s]+\$?\s*([\d][\d\.,]{3,})",
         # "PAGA $X", "CUBRE $X"
         r"PAGAD[OA]S?\s+(?:POR\s+)?\$?\s*([\d][\d\.,]{3,})",
+        # 10-09-2026 — la entidad también lo escribe en pasado: «SE
+        # RECONOCIÓ SOLO $90.000». El patrón de arriba busca RECONOCIDO,
+        # así que esa frase daba cero. El «$» es obligatorio a propósito.
+        r"RECONOCI(?:Ó|O)\s+(?:SOLO\s+)?(?:POR\s+|EN\s+)?\$\s*([\d][\d\.,]{3,})",
+        r"ACEPT(?:Ó|O)\s+(?:SOLO\s+)?(?:POR\s+|EN\s+)?\$\s*([\d][\d\.,]{3,})",
     ]
     patrones_obj = [
         r"OBJET[ÁA]NDOSE\s+(?:UNA\s+DIFERENCIA\s+DE\s+)?\$?\s*([\d][\d\.,]{3,})",
-        r"OBJETAD[OA]S?\s+(?:POR\s+)?\$?\s*([\d][\d\.,]{3,})",
+        r"OBJETAD[OA]S?[:\s]+(?:POR\s+)?\$?\s*([\d][\d\.,]{3,})",
         r"DIFERENCIA\s+(?:DE\s+)?\$?\s*([\d][\d\.,]{3,})",
-        r"GLOSAD[OA]S?\s+(?:POR\s+)?\$?\s*([\d][\d\.,]{3,})",
+        r"GLOSAD[OA]S?[:\s]+(?:POR\s+)?\$?\s*([\d][\d\.,]{3,})",
+        # Idem, en pasado. «OBJETO» sin tilde es también un sustantivo
+        # («el objeto del contrato»), por eso el «$» no es opcional.
+        r"OBJET(?:Ó|O)\s+(?:POR\s+|EN\s+)?\$\s*([\d][\d\.,]{3,})",
+        r"GLOS(?:Ó|O)\s+(?:POR\s+|EN\s+)?\$\s*([\d][\d\.,]{3,})",
     ]
 
     def _primer_match(patrones: list) -> float:
         for pat in patrones:
-            m = re.search(pat, t)
-            if m:
+            for m in re.finditer(pat, t):
+                if _es_pedazo_de_un_codigo(t, m.start(1), m.end(1)):
+                    continue
                 v = _val(m.group(1))
                 if v > 0:
                     return v
