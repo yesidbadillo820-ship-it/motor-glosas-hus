@@ -1038,6 +1038,70 @@ escrito sin una prueba detrás.
 32 pruebas nuevas y comprobación en navegador.
 
 ---
+### 09-09-2026 — Por qué no llegaban los soportes: el límite de 260 caracteres de Windows
+
+La corrida de las 178 facturas para radicar trajo soportes de **solo 3**. La
+causa no era la lista de rutas (ya estaban todas) sino dos fallas del buscador:
+**(1)** los errores al leer carpetas se estaban **silenciando** — si Windows
+negaba el acceso, el bot seguía como si la carpeta estuviera vacía, sin dejar
+rastro; **(2)** las rutas de radicación digital anidan
+`año\mes\EPS\envío\IMG\factura\archivo.pdf` y se pasan del **límite de 260
+caracteres** de Windows (MAX_PATH), así que el sistema negaba el acceso a las
+carpetas más profundas — justo donde están los PDF. Es lo mismo que hacía
+fallar los `Get-ChildItem -Recurse` en la consola.
+
+Se corrigió: el bot ahora usa el formato de **ruta extendida** de Windows para
+recorrer y para copiar (sin límite de longitud), y **avisa** cuántas carpetas
+no pudo leer y por qué, en vez de callarlo. Además se agregó
+`--explorar-soportes <ruta>`, un diagnóstico que recorre una carpeta y dice qué
+hay adentro (cuántos archivos, cuántos traen número de factura, hasta qué
+profundidad, qué no se pudo leer y ejemplos de nombres) — para entender un
+servidor nuevo sin ir a ciegas. Van 23 pruebas del clasificador.
+
+**Lo que reveló el diagnóstico (mismo día):** con el arreglo, el bot recorrió
+~100.000 carpetas de los 12 servidores y quedó claro dónde está el hueco:
+**Radicación Digital solo llega hasta enero de 2025** (esa carpeta tiene un
+solo mes, «01. ENERO», con 13.035 archivos de facturas de diciembre 2024), y
+el servidor SINAC 2025 arranca en septiembre. O sea que de las radicaciones de
+**febrero a agosto de 2025** —donde cae el grueso de este lote— no hay
+soportes en ninguna de las rutas conocidas. Quedan por revisar cuatro
+servidores que nunca se habían mirado: `Z:` (cartera y glosas, con carpetas
+«02.FEBRERO» y «DEVOLUCIONES 2025»), `\\Prime\FACTURACIÓN` (dos carpetas de
+consulta), la carpeta `recepcion` de radicación 2026 y `CORRESPONDENCIA`. Para
+no seguir a ciegas, el diagnóstico ahora acepta **varias rutas de una vez** y
+un **`--buscar HUS<n>`** que rastrea una factura y dice en qué carpeta exacta
+aparece. Van 26 pruebas.
+
+**HALLADOS (mismo día):** el rastreo destapó dónde estaban los soportes de
+2025: en el servidor de **FACTURACIÓN**, no en los de radicación —
+`\\Prime\FACTURACIÓN\CONSULTA FACTURACION 2\...\FACTURACION UT\2025\04. Abril\RADICACION DE ABRIL\COOSALUD\KARIN\ABRIL\ENV-208739-OK-C\IMG\HUS359567\`,
+con la misma forma de siempre (`COOSALUD\<gestora>\ENV-...\IMG\HUS<n>`).
+95 coincidencias de las 3 facturas de prueba. Esa carpeta quedó agregada a la
+lista fija del bot, así que la corrida del lote ya no necesita banderas.
+
+**CERRADO: 178 de 178 con soportes.** Con esa ruta agregada, la corrida final
+del lote para radicar quedó completa: las 178 facturas con su carpeta armada
+en el formato del cargue (`<Régimen>\<lote>\RIPS\` + `IMG\HUS<n>\`) y sus
+soportes adentro, en
+`\\Prime\servidor_cartera_glosas\SERVIDOR GLOSAS\F\PARA RADICAR COOSALUD`.
+Reparto: 157 Subsidiado, 16 Contributivo, 4 sin clasificar (facturas viejas
+sin RIPS en la carpeta) y 1 «Otro (05)» (paciente no afiliado). Quedan 19
+facturas con diferencia real de fechas entre el RIPS y la factura, marcadas en
+rojo en el Excel de auditoría, para revisar antes de radicar.
+
+
+### 09-09-2026 — Las carpetas ya salen con el formato del cargue de COOSALUD
+
+El auditor pidió los soportes de ~176 facturas para re-radicar, y mostró cómo
+deben quedar: no una carpeta por factura con todo revuelto, sino el **formato
+que pide el portal** — `<Régimen>\<lote>\RIPS\` con los JSON planos
+(`HUS<n>.json` y `CUV_HUS<n>.json`, renombrados desde el share) y
+`<Régimen>\<lote>\IMG\HUS<n>\` con los soportes del servicio. Se agregó al
+bot la opción **`--lote`** que arma justamente eso (con el nombre del radicado
+o con fecha y hora), y la opción **`--lista`** para pasarle un TXT con las
+facturas (un listado de 176 no cabe en la línea de comandos). Verificado
+contra la carpeta real de la HUS349680: los 10 soportes quedaron en su IMG y
+los dos JSON en RIPS con el nombre correcto. Van 19 pruebas.
 
 
 ### 08-09-2026 (cierre 3) — la pantalla Objeciones DGH ya sirve para TODAS las entidades
