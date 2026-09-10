@@ -101,15 +101,13 @@ _TOKENS_QUE_DISTINGUEN: frozenset[str] = frozenset(
         "UVB",  # la que rige desde entonces
         "CONTRIBUTIVO",  # régimen: cambia la norma aplicable
         "SUBSIDIADO",
-        # ADRES no es solo accidentes de tránsito: en este hospital tiene
-        # además la baja de cartera de la Res. 577/2019, que es otra ruta de
-        # pago (`bots_hus.py`, grupo ADRES). Un «ADRES» pelado y un «ADRES
-        # ACCIDENTES DE TRANSITO» no son el mismo renglón de cartera. Esto NO
-        # rompe la unión de «ADRES ACCIDENTES DE TRANSITO» con
-        # «ADRES-ACCIDENTES DE TRANSITO»: ahí la diferencia es un guion y no
-        # sobra ninguna palabra.
-        "ACCIDENTES",
-        "TRANSITO",
+        # 10-09-2026 — ADRES estuvo un rato en esta lista. Se sacó porque
+        # Cartera lo respondió expresamente: «ADRES nada de otros nombres».
+        # Todo lo de ADRES en este hospital entra por accidentes de tránsito,
+        # así que un «ADRES» pelado y un «ADRES ACCIDENTES DE TRANSITO» son
+        # el mismo renglón y van en una sola línea del desplegable.
+        # (El motor tiene además el flujo de baja de cartera de la Res.
+        # 577/2019, pero eso no llega como glosa con otro nombre de pagador.)
     }
 )
 
