@@ -189,14 +189,19 @@ async def _correr(proveedor: str) -> tuple[str, str, float]:
         gemini_api_key=cfg.gemini_api_key,
         primary_ai=proveedor,
     )
+    # Los nombres y los tipos son los de `GlosaInput`, no los que uno supondría:
+    # el texto de la glosa va en `tabla_excel` (se llama así desde que se pegaba
+    # desde Excel) y `valor_aceptado` es TEXTO, no número. La primera versión de
+    # este archivo se equivocó en los dos y las dos IAs «no respondieron» sin
+    # haber llegado a llamarlas.
     entrada = GlosaInput(
         eps="DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANGA",
-        texto_glosa=GLOSA_PATRON,
+        tabla_excel=GLOSA_PATRON,
         etapa="INICIAL",
         numero_factura="HUS0000541440",
         fecha_radicacion="2026-07-24",
         fecha_recepcion="2026-08-25",
-        valor_aceptado=0,
+        valor_aceptado="0",
     )
     t0 = time.time()
     resultado = await servicio.analizar(entrada)
