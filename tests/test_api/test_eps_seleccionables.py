@@ -136,3 +136,58 @@ class TestExigeSesion:
 
         with TestClient(app) as c:
             assert c.get("/contratos/eps-seleccionables").status_code == 401
+
+
+class TestNoSaleLaMismaEntidadDosVeces:
+    """10-09-2026 — el desplegable real de Yesid traía ocho renglones de más.
+
+    Los nombres repetidos no son un error de la lista fija: son registros
+    REALES escritos distinto (unos vienen de un contrato cargado, otros del
+    historial) y la unión solo descartaba el texto idéntico.
+    """
+
+    def test_salud_total_y_salud_total_eps_son_un_solo_renglon(self, client, db_session):
+        _seed_glosa(db_session, "SALUD TOTAL EPS")
+        eps = client.get("/contratos/eps-seleccionables").json()
+        assert "SALUD TOTAL" in eps
+        assert "SALUD TOTAL EPS" not in eps
+
+    def test_sura_y_sura_eps_son_un_solo_renglon(self, client, db_session):
+        _seed_glosa(db_session, "SURA EPS")
+        eps = client.get("/contratos/eps-seleccionables").json()
+        assert eps.count("SURA") == 1
+        assert "SURA EPS" not in eps
+
+    def test_el_guion_de_adres_no_crea_una_segunda_entidad(self, client, db_session):
+        _seed_glosa(db_session, "ADRES ACCIDENTES DE TRANSITO")
+        _seed_glosa(db_session, "ADRES-ACCIDENTES DE TRANSITO", valor=2000)
+        eps = client.get("/contratos/eps-seleccionables").json()
+        assert len([e for e in eps if e.startswith("ADRES")]) == 1
+
+    def test_el_dispensario_sale_con_el_nombre_del_contrato_firmado(self, client, db_session):
+        """El dictamen debe citar el nombre con el que está firmado."""
+        oficial = "DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANGA"
+        _seed_contrato(db_session, oficial)
+        eps = client.get("/contratos/eps-seleccionables").json()
+        assert oficial in eps
+        assert "DISPENSARIO MEDICO" not in eps
+        assert len([e for e in eps if "DISPENSARIO" in e]) == 1
+
+    def test_uvt_y_uvb_siguen_siendo_dos_renglones(self, client, db_session):
+        """Fundirlas dejaría la tarifa del SOAT mal calculada."""
+        _seed_glosa(db_session, "LA PREVISORA S A COMPANIA DE SEGUROS SOAT - UVT")
+        _seed_glosa(db_session, "LA PREVISORA S A COMPANIA DE SEGUROS SOAT UVB", valor=2000)
+        eps = client.get("/contratos/eps-seleccionables").json()
+        assert len([e for e in eps if e.startswith("LA PREVISORA")]) == 2
+
+    def test_contributivo_y_subsidiado_siguen_siendo_dos_renglones(self, client, db_session):
+        """El régimen cambia la norma aplicable."""
+        _seed_glosa(db_session, "PROTEGER EPS S.A.S. CONTRIBUTIVO")
+        _seed_glosa(db_session, "PROTEGER EPS S.A.S. SUBSIDIADO", valor=2000)
+        eps = client.get("/contratos/eps-seleccionables").json()
+        assert len([e for e in eps if e.startswith("PROTEGER")]) == 2
+
+    def test_una_entidad_nueva_de_verdad_sigue_entrando(self, client, db_session):
+        """La regla une duplicados; no puede tapar una entidad nueva."""
+        _seed_glosa(db_session, "COMFAMA")
+        assert "COMFAMA" in client.get("/contratos/eps-seleccionables").json()
