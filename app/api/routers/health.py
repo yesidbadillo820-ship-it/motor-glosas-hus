@@ -17,7 +17,10 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from sqlalchemy import text
+
 from app.api.deps import get_usuario_actual
+from app.core.logging_utils import logger
 from app.core.config import get_settings
 from app.database import SessionLocal, get_db
 from app.models.db import GlosaRecord, TareaDiariaRecord, UsuarioRecord
@@ -32,7 +35,32 @@ _STARTUP_TIME = time.time()
 
 
 @router.get("/health")
-def health():
+def health(db: Session = Depends(get_db)):
+    """El pulso del motor. Lo consulta el balanceador, no una persona.
+
+    09-09-2026 — ANTES DECÍA «ok» AUNQUE LA BASE ESTUVIERA CAÍDA.
+    Solo devolvía la versión y el banner: no tocaba nada. El balanceador leía
+    «ok» y le seguía mandando trabajo a una instancia que no podía guardar ni
+    leer una glosa. El auditor veía errores sueltos sin entender por qué,
+    porque para el sistema esa instancia estaba sana.
+
+    Ahora hace la pregunta más barata que existe —`SELECT 1`— y si la base no
+    contesta devuelve **503**, que es lo que el balanceador entiende como
+    «sacame de la rotación». La respuesta dice cuál de las dos cosas falló,
+    para no salir a adivinar.
+    """
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as e:  # noqa: BLE001 — cualquier fallo de BD es «no sano»
+        logger.error(f"[HEALTH] la base no responde: {type(e).__name__}: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "degradado",
+                "motivo": "la base de datos no responde",
+                "version": cfg.app_version,
+            },
+        )
     return {
         "status": "ok",
         "version": cfg.app_version,
