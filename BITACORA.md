@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 09-09-2026
+**Última actualización:** 10-09-2026
 
 ---
 
@@ -90,6 +90,46 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 10-09-2026 — COOSALUD: separar lo que de verdad tiene que ver un médico
+
+**El problema.** El archivo `GLOSAS_Y_DEVOLUCIONES_09_SEPTIEMBRE.xlsx` trae
+**761 facturas revueltas** de tres pagadores distintos y **54.027 renglones**
+de detalle. Mandarle eso a un médico auditor es mandarle a buscar una aguja:
+el 94 % de esos renglones son de tarifas y facturación, que contesta cartera,
+no el médico.
+
+**Lo que se hizo.** Se dejó **solo COOSALUD** (560 facturas — se sacaron las
+200 del Dispensario Médico del Ejército y la 1 del Hospital Naval) y de ahí se
+separó, renglón por renglón, lo que sí es criterio clínico:
+
+- **CALIDAD / pertinencia (códigos CL): 1.207 ítems en 134 facturas,
+  $545.837.942.** Aquí la EPS dice «ese servicio no era pertinente» y toca
+  justificar clínicamente por qué sí se necesitaba. Lo más grueso es
+  **estancia y observación de urgencias** (675 ítems, $383,3 mill),
+  medicamentos ($45,7 mill) y apoyo diagnóstico ($35,3 mill).
+- **SOPORTES (códigos SO): 236 ítems en 49 facturas, $57.430.094.** Estas
+  quedaron en hoja aparte **a propósito**: no se pueden contestar sin ver el
+  documento. Lo que hay que buscar es concreto —**epicrisis** (129 ítems,
+  $25,7 mill, 5 facturas), hoja de administración de medicamentos (52 ítems),
+  soporte del apoyo diagnóstico (16), lecturas de imágenes (9)—. El auditor
+  envía los soportes y ahí sí se analizan. **No se inventa un soporte que no
+  se ha visto.**
+
+Todo salió en **`CALIDAD Y SOPORTES COOSALUD 09-09-2026.xlsx`**, con hoja de
+instrucciones, las dos hojas de ítems (con columnas amarillas en blanco para
+que el médico escriba su respuesta) y una hoja **POR FACTURA** con las 156
+facturas para repartir el trabajo. **Todas vencen el 24/09/2026.**
+
+**Lo que NO se pudo decir, y hay que decirlo.** La columna
+**PROFESIONAL(MEDICO) viene vacía en las 560 facturas de COOSALUD**. Los
+únicos 8 nombres del archivo (LAURA DIAZ y ZULAY GONZALEZ) están en facturas
+del **Dispensario**, que eran justo las que había que omitir. Así que **no se
+asignó médico**: habría que inventarlo. La columna quedó en blanco en la hoja
+POR FACTURA para que el área la llene. Es el mismo hueco que ya había
+aparecido con el paquete del 14-08.
+
+---
 
 ### 09-09-2026 (tarde, 13) — «…ENTRE LAS PARTES ENTRE LAS PARTES»
 
@@ -12834,6 +12874,19 @@ valor leido del PDF o con el objetado.
 
 ## 3) PENDIENTE
 
+### COOSALUD — calidad y soportes del 09-09 (entregado el 10-09)
+- **DECISIÓN SUYA: quién es el médico de cada factura.** Las 156 facturas con
+  ítems de calidad/soportes no traen PROFESIONAL(MEDICO) en el archivo. Hay que
+  llenar esa columna en la hoja **POR FACTURA** de
+  `CALIDAD Y SOPORTES COOSALUD 09-09-2026.xlsx` antes de repartir.
+- **Enviar los soportes de 49 facturas** ($57.430.094) para poder analizarlas.
+  El grueso son **5 facturas que piden epicrisis** (HUS542135, HUS538173,
+  HUS541871, HUS541781, HUS540430 — $25,7 mill entre las cinco).
+- **Las 134 facturas de calidad** ($545.837.942) van para el médico auditor.
+  Las gruesas: HUS543423 ($61,7 mill), HUS545287 ($54,3 mill — 414 ítems),
+  HUS540907 ($27,1 mill), HUS534364 ($23,1 mill), HUS539866 ($22,4 mill).
+- **Todas vencen el 24/09/2026.**
+
 ### Diagnóstico de fondo del 09-09 — las cuatro causas reales de la confianza baja
 Encontradas revisando el código con evidencia (no son opiniones). Ordenadas
 de la que más cuesta a la que menos:
@@ -13908,6 +13961,16 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
 
 ## 4) PARA MAÑANA
 
+**COOSALUD 09-09 — repartir calidad y pedir los soportes.** Llenar la columna
+del médico en la hoja POR FACTURA, mandarle a auditoría médica las 134
+facturas de calidad y buscar los soportes de las 49 (empezando por las 5
+epicrisis). Vence el 24/09.
+
+**COOSALUD 07-09 — lo primero.** Correr el portal con las 4 listas (vence el
+14/09) y, en paralelo, bajar de DGH la base de servicios del 26/06 al 02/08
+para poder regenerar los dos OBJECIONES con los códigos de DGH. Si el área ya
+dictó el texto de cobertura, se deja fijo en el bot y se cierra HUS545379.
+
 
 ### ⛔ Motor de Glosas — lo PRIMERO, y no cuesta nada
 
@@ -13942,11 +14005,6 @@ facturas y el consolidado de la MISMA remesa de la EPS, y trabajarla de punta a
 punta hasta bajar el acta. Es lo único que dice si sirve en una audiencia. Si
 al cerrar sale «No se pudo cerrar», ahora la pantalla muestra el motivo exacto:
 copiarlo al chat.
-
-**COOSALUD 07-09 — lo primero.** Correr el portal con las 4 listas (vence el
-14/09) y, en paralelo, bajar de DGH la base de servicios del 26/06 al 02/08
-para poder regenerar los dos OBJECIONES con los códigos de DGH. Si el área ya
-dictó el texto de cobertura, se deja fijo en el bot y se cierra HUS545379.
 
 ### Cuidados médicos de la familiar — lo primero
 1. Radicar el **Borrador A** (impulso a la Supersalud) por el correo oficial
