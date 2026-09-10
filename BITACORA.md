@@ -91,6 +91,50 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — Lote del Dispensario del 09 de septiembre: cargado el GI-33-5462-2026
+
+**Lo que llegó.** El export `GLOSAS_Y_DEVOLUCIONES_09_SEPTIEMBRE` traía 761
+facturas de cuatro entidades. Del Dispensario eran **200**; el resto (COOSALUD
+y Hospital Naval) se dejó por fuera.
+
+**Lo que se cargó.** 196 facturas y **273 objeciones por $55.222.292**, en una
+corrida de 100 minutos. Quedaron todas con su respuesta en el portal: 186
+directas, 2 sin diálogo de confirmación, y las demás resueltas en el repaso
+—la del piloto ya estaba, una se reintentó y entró, y otra el portal la
+reportó como finalizada—. El paquete quedó en
+`D:\USUARIO CARTERA\Documents\GI-33-5462-2026\` con el Excel, el reporte
+y el PDF de evidencias.
+
+**Las de calidad y pertinencia salieron del cargue, como manda la directriz.**
+Son **18 objeciones de 8 facturas por $3.922.641**, y esta vez el técnico las
+había dejado con su médico asignado en el export, así que se repartieron:
+**LAURA DIAZ** (3 facturas) y **ZULAY GONZALEZ** (5 facturas). Se les entregó
+un Excel con una hoja por profesional, con el número de objeción tal como
+aparece en la grilla y lo que la EPS reclama en sus propias palabras.
+
+**Lo que el portal dejó ver de paso.** Cinco facturas avisaron que les quedan
+glosas por contestar. Descontando las de calidad que dejamos a propósito,
+sobran **12 objeciones que no vinieron en este export** —ocho de ellas en la
+HUS0000549861—, seguramente de una recepción anterior. Hay que buscarlas en el
+portal y traerlas en el próximo lote.
+
+**Soportes: se analizaron cinco y se dijo la verdad de cada uno.** El auditor
+mandó los documentos y el resultado fue disparejo: la orden médica de la
+HUS0000550614 ($997.235) sirve completa y el informe radiológico de la
+HUS0000547474 sirve; el resultado de patología de la HUS0000548414 sustenta la
+biopsia pero **no** la colposcopia; el reporte de la HUS0000550812 cubre una de
+las once monitorizaciones cobradas; y en la HUS0000549713, tras revisar las 232
+páginas de la historia, aparecen cuatro glucometrías con resultado de las
+quince cobradas: **se recomendó aceptar esa glosa** en vez de arriesgar una
+ratificación.
+
+**Y una regla nueva de redacción, pedida por el auditor:** en las glosas de
+tarifas la respuesta va **sin una sola cifra**. Dar el valor facturado y el
+pactado le sirve al pagador para hacer la resta y ratificar por la diferencia;
+el hospital gana por el título contractual —el código está pactado en el anexo
+que ambas partes firmaron—, no por la aritmética.
+
+
 ### 10-09-2026 — Un solo renglón por entidad: yo me había saltado la regla
 
 Yesid abrió el desplegable y volvió a contar repetidas. Tenía razón, y esta
@@ -14113,6 +14157,26 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     al tórax se le descontaron $7.800 cuando se aceptó por $758.700.
 
 ### Dispensario — respuesta de glosas SIMED y conciliación
+0. **(10-09) Las 18 de calidad del lote 09-sep, con los médicos.** LAURA DIAZ
+   (HUS0000546722, 547328, 548588) y ZULAY GONZALEZ (549063, 549713, 549861,
+   551822, 551985). Ya tienen su Excel con una hoja por profesional. Falta que
+   respondan para poder cargarlas a mano, y ojo con la **549713**, que además
+   tiene cinco objeciones de soportes: hay que trabajarla completa.
+0-bis. **(10-09) Las 12 objeciones que el portal reclama y no vinieron en el
+   export.** Están en HUS0000549861 (ocho), HUS0000551425 (dos),
+   HUS0000549713 y HUS0000551822 (una cada una). Buscarlas en el portal o en
+   DGH y traerlas en el próximo export.
+0-ter. **(10-09) Soportes que faltan por enviar.** El reporte de la colposcopia
+   de la HUS0000548414 ($354.385); los diez reportes restantes de la
+   HUS0000550812 ($2.340.570); y los tres administrativos, que no son clínicos:
+   lista de precios de la HUS0000549861, lista y cotización firmada de la
+   HUS0000545590, y la resolución interna de tarifas del traslado de la
+   HUS0000545118.
+0-quater. **(10-09) Las 26 pendientes de la plataforma que quedaron por fuera
+   del lote.** El auditor pidió dejarlas por ahora. Son 18 sin rastro en
+   ningún registro —entre ellas la HUS0000548808 por $9.788.922— más las siete
+   que ya veníamos arrastrando y la HUS0000545286 ($12.351.616), que **ya tiene
+   respuesta generada en el lote del 04-sep** y solo falta cargarla.
 0. **(04-09, lo primero de mañana) Correr el lote del 04 de septiembre.** El
    Excel ya está entregado (`respuestas_glosa_DISPENSARIO_04SEP_FINAL.xlsx`,
    88 respuestas / 63 facturas / $17.060.666). Dos pasos, en el equipo de
