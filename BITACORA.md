@@ -91,6 +91,57 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — MUTUAL SER: lote del 7 de septiembre y entrada a la pantalla
+
+**El botón no lo pasó, y estaba bien que no lo pasara.** MUTUAL SER no era una
+de las entidades que la pantalla conoce: hay bots para *responder* sus glosas
+en el portal, pero ninguno que armara el archivo de objeciones para el DGH. Al
+no reconocer los encabezados, la pantalla se negó a procesar en vez de
+entregar un archivo mal armado. Ya se le hizo el bot y **MUTUAL es la novena
+entidad de la pantalla**.
+
+**Lo que tiene de particular el archivo de MUTUAL.** Su columna se llama
+«SERVICIO» pero **no trae el nombre, trae el código**. El nombre del servicio
+viaja escondido dentro del texto de la observación:
+
+    "La tecnología 903883 - GLUCOSA SEMIAUTOMATIZADA [GLUCOMETRIA] no se
+     encuentra dentro del contrato número 20352."
+
+El bot lo rescata de ahí para que el cruce tenga con qué desempatar. Cuando la
+observación no lo nombra, el cruce se apoya sólo en el código y el valor, y si
+no alcanza el renglón queda vacío para completarlo a mano: no se adivina.
+El valor también viene distinto — como texto con signo de pesos («$ 304.500»).
+
+**EL LOTE: 139 objeciones · 1 factura (HUS0000544271) · $26.636.056.**
+Cruzaron las 139 (134 en ALTA y 5 en MEDIA); **ninguna quedó sin código** y
+sólo **1 renglón** salió marcado en REVISAR. Las cuatro reglas verificadas
+sobre el archivo terminado.
+
+**LA ANOMALÍA DE ESTE LOTE, para que Cartera la mire.** MUTUAL está objetando
+el **95,1 % de la factura entera**: $26.636.056 de $27.998.156 facturados.
+Sólo deja pasar $1.362.100. El motivo casi siempre es el mismo, «no se
+encuentra dentro del contrato número 20352»:
+
+| Código | Renglones | Valor | Motivo |
+|---|---:|---:|---|
+| TA0201 | 81 | $13.839.182 | el servicio no está en el contrato |
+| TA2901 | 24 | $10.495.858 | la tarifa facturada no coincide con la pactada |
+| TA0601 | 33 | $2.119.116 | dispositivos médicos |
+| FA1305 | 1 | $181.900 | servicio no habilitado |
+
+Los dos renglones más gruesos son diferencias de tarifa: **$6.315.666**
+(107M01) y **$3.021.764** (110A01). Vale la pena revisar si de verdad esos
+servicios están fuera del contrato 20352 o si MUTUAL está aplicando un
+contrato equivocado: objetar el 95 % de una cuenta es mucho.
+
+**Lo que le quedó al auditor por confirmar.** Un solo renglón:
+**HUS0000544271 · TA0201 · $146.400** — MUTUAL lo llama «ACIDO LACTICO
+LLACTATO POR METODO ENZIMATICO» y en el DGH ese renglón es **«LACTATO
+ARTERIAL» (19624G)**. El código y el valor unitario ($73.200) coinciden
+exacto, pero el nombre no, así que quedó marcado en vez de darse por bueno.
+
+No hay renglones repetidos y ninguna glosa se pasa del saldo de la factura.
+
 ### 10-09-2026 — El respaldo de IA estaba viejo y caro, y cambiarlo casi lo rompe
 
 El motor tenía fijado `claude-sonnet-4-5` como modelo de Anthropic. Es de la
@@ -12964,6 +13015,15 @@ valor leido del PDF o con el objetado.
 ---
 
 ## 3) PENDIENTE
+
+### MUTUAL SER (10-09)
+- **Revisar el contrato 20352.** MUTUAL objetó el 95,1 % de la factura
+  HUS0000544271 diciendo que casi nada está pactado. Confirmar si es cierto o
+  si están aplicando otro contrato.
+- **HUS0000544271 · TA0201 · $146.400:** confirmar que «ACIDO LACTICO
+  LLACTATO POR METODO ENZIMATICO» (MUTUAL) es el mismo «LACTATO ARTERIAL»
+  (19624G) del DGH. Todo cuadra menos el nombre.
+
 
 ### COOSALUD — calidad y soportes del 09-09 (entregado el 10-09)
 - **DECISIÓN SUYA: quién es el médico de cada factura.** Las 156 facturas con
