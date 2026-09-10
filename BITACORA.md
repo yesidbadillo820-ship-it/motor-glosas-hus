@@ -146,6 +146,8 @@ Probado contra los dos extremos: el dictamen que de verdad salió mal saca
 
 ---
 
+---
+
 ### 10-09-2026 — Un código de medicamento se leía como el valor de la factura
 
 Trabajando una glosa real del Dispensario (factura HUS0000541440, 8 conceptos,
