@@ -91,6 +91,52 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — La misma EPS salía dos veces en el desplegable
+
+Yesid abrió «EPS / Entidad Pagadora» del botón Analizar y contó los pares:
+**SALUD TOTAL** y **SALUD TOTAL EPS**, **SURA** y **SURA EPS**, **ADRES
+ACCIDENTES DE TRANSITO** y **ADRES-ACCIDENTES DE TRANSITO**, **DISPENSARIO
+MEDICO** y **DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO
+BUCARAMANGA**. Ocho renglones para cuatro entidades.
+
+No era un error de la lista fija del motor: son registros **reales** escritos
+distinto —unos vienen de un contrato cargado, otros del historial— y la unión
+solo descartaba el texto **idéntico**. Para el auditor eso es peor que feo:
+dos renglones que parecen dos entidades obligan a adivinar cuál elegir, y
+elegir mal manda el dictamen con el nombre que la EPS no reconoce.
+
+**Lo que impedía el arreglo fácil.** Quitar sufijos a lo bruto habría costado
+plata, porque hay sufijos que **sí** distinguen:
+
+- **UVT / UVB** es la unidad con la que se liquida el SOAT (UVB rige desde la
+  reforma de 2023; UVT es la anterior). Fundir «SOAT - UVT» con «SOAT UVB»
+  deja la tarifa mal calculada — y La Previsora es el pagador con más glosas
+  del export real.
+- **CONTRIBUTIVO / SUBSIDIADO** es el régimen, y con él la norma aplicable.
+- **ADRES** no es solo accidentes de tránsito: en este hospital tiene además
+  la baja de cartera de la Res. 577/2019. Son rutas de pago distintas.
+
+Así que la regla une por **identidad**, no por parecido: dos nombres son la
+misma entidad si uno es el comienzo del otro *y lo que sobra no distingue*.
+Un «AXA … SOAT» pelado **no** se funde con «AXA … SOAT UVB»: el nombre corto
+no dice qué unidad es, y suponerlo sería inventar la tarifa. Se dejan los dos
+y elige el auditor.
+
+**Cuál de los dos nombres sobrevive.** Gana el nombre con el que está
+**firmado el contrato**, que es el que la entidad reconoce y el que debe salir
+citado en el dictamen; después el catálogo curado; de último el historial, que
+es la fuente más sucia. Por eso el Dispensario pasa a verse con su nombre
+oficial largo y no con la sigla.
+
+Esto **no toca la búsqueda del contrato**: la malla contractual resuelve por
+nombre canónico y alias, no por texto exacto.
+
+29 pruebas nuevas en el servicio y 7 en la ruta; 4 de las de la ruta fallan
+sin el arreglo. Una de ellas recorre el catálogo curado entero y avisa si la
+regla se vuelve demasiado laxa y llega a fundir dos entidades de verdad.
+
+---
+
 ### 10-09-2026 — COOSALUD: separar lo que de verdad tiene que ver un médico
 
 **El problema.** El archivo `GLOSAS_Y_DEVOLUCIONES_09_SEPTIEMBRE.xlsx` trae
