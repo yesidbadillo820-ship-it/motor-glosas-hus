@@ -1,5 +1,36 @@
 # Registro de cambios
 
+## Sesión 10-sep-2026 (5) — CI: reparto por duración medida, cuatro máquinas
+
+Las tres máquinas del reparto por nombre tardaban 2m34 / 3m51 / **4m46**: dos
+terminaban y esperaban a la tercera, y el reloj lo marca la más lenta. El
+reparto era por nombre de archivo (impares/pares) y los archivos no duran lo
+mismo — `tests/test_api/test_preauditoria.py` se lleva 96 s él solo.
+
+- **`scripts/repartir_pruebas.py`** (nuevo) — reparto goloso LPT por duración
+  medida: el archivo más pesado a la máquina más liviana. Determinista
+  (desempate por ruta, y a igual carga gana el grupo de menor número). Los
+  archivos sin medir valen la **mediana**, así que una prueba nueva entra
+  igual y nunca se queda por fuera. Sin tabla de duraciones reparte por
+  cantidad, que es exactamente lo que había antes. Subcomandos: `--grupos/
+  --grupo` (lo que consume el CI), `--resumen` y `--medir junit.xml [...]`
+  para rehacer las mediciones desde los artefactos del propio CI.
+- **`tests/duraciones_pruebas.json`** (nuevo, 60 KB) — 1.071 archivos medidos.
+- **`.github/workflows/ci.yml`** — matriz `grupo: [1, 2, 3, 4]`, nombre
+  «Tests (pytest · grupo N de 4)», y el paso de pruebas pasó del `case` de
+  bash a `mapfile -t OBJETIVO < <(python scripts/repartir_pruebas.py …)`. El
+  agregador `test-ok` no cambia: `needs.test.result` resume la matriz entera,
+  así que agregar o quitar grupos no toca nada más.
+- **Pruebas** — `tests/test_tools/test_repartir_pruebas.py` (19) y
+  `test_el_ci_no_deja_pruebas_afuera.py` reescrito sobre el nuevo reparto
+  (26): cobertura archivo por archivo, sin repetidos, sin grupos vacíos,
+  determinismo, balance ≤1,25×, degradación sin tabla, y avisos de tabla
+  vieja (cobertura ≥50 %, fantasmas ≤20 %).
+- **Medido** (2 núcleos, `taskset -c 0,1`): grupos de 141 / 133 / 127 / 128 s
+  contra los 286 s de la peor de las tres anteriores. Suite completa
+  12.718 pruebas en verde.
+
+
 ## Sesión 10-sep-2026 (4) — La cláusula citada sin retoques, y la rúbrica del comparador con dientes
 
 - **`app/services/glosa_service.py`** — `_neutralizar_valores_inventados()`

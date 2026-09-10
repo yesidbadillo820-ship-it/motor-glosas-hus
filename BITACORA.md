@@ -91,6 +91,57 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — El CI: de casi 5 minutos a unos 3
+
+Quedó a medias en la mañana. Se había repartido la suite en tres máquinas y
+bajó de 13 minutos a unos 5, pero ahí se atascó — y la razón, viéndolo, era
+obvia:
+
+| Máquina | Tardó |
+|---|---|
+| api-1 | 2 min 34 s |
+| api-2 | 3 min 51 s |
+| resto | **4 min 46 s** ← esta marcaba el reloj |
+
+**Dos máquinas terminaban y se quedaban mirando a la tercera.** El reloj lo
+marca la más lenta, no el promedio, así que la mitad del tiempo comprado se
+perdía esperando. Y el motivo es que el reparto era **por nombre de archivo**
+—los impares a un grupo, los pares al otro— y los archivos no duran lo mismo:
+uno solo, `test_preauditoria.py`, se lleva minuto y medio él solo.
+
+**Lo que se hizo:** repartir por lo que cada archivo **tarda de verdad**. Se
+midió la suite completa archivo por archivo, la tabla quedó guardada en el
+repositorio, y ahora el reparto le da el archivo más pesado a la máquina que
+va más liviana. Son cuatro máquinas y quedan **parejas al 1 %**:
+
+| Máquina | Trabajo |
+|---|---|
+| 1 | 227,7 s |
+| 2 | 227,7 s |
+| 3 | 227,7 s |
+| 4 | 227,7 s |
+
+Medido acá con dos núcleos, como los del CI: la más lenta tarda **141 s**
+contra los 286 s que tardaba la peor de las tres de antes. En el CI, que
+corre algo más rápido, eso deja las pruebas cerca de **1 min 50 s**; con el
+minuto y cuarto de instalación, **el trabajo completo queda en unos 3
+minutos**.
+
+**Tres cosas que se cuidaron, porque son las que muerden:**
+
+1. **Ningún archivo se queda sin correr ni corre dos veces.** Se comprueba
+   archivo por archivo en cada corrida. Un verde que no probó nada es peor
+   que quince minutos de espera.
+2. **El reparto salió del archivo de configuración del CI** y quedó en un
+   programa aparte que **sí se puede probar**. La lógica metida en esa
+   configuración es la que nadie revisa hasta el día que falla.
+3. **Una prueba nueva que todavía no está medida entra igual**, con la
+   duración del montón. Nunca se queda por fuera.
+
+Si con el tiempo el reparto se desbalancea porque se agregaron muchas
+pruebas, se vuelven a medir con un comando y ya. Las pruebas avisan si la
+tabla se puso vieja.
+
 ### 10-09-2026 — La cláusula del contrato ya no sale mal transcrita, y el comparador dejó de regalar notas
 
 **1) El dictamen citaba el contrato y le cambiaba las cifras.**
