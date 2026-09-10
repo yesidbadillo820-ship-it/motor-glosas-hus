@@ -91,6 +91,58 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — Cada causal con SU valor, y dejar de decir «soporte completo» cuando no se sabe
+
+Dos defectos que salieron del caso real de la factura **HUS0000541440**
+(objeción N° 189801, la de Sanidad Militar). Los dos hacían que el motor
+dijera con seguridad cosas que no le constaban.
+
+**1) Los dos bloques del dictamen decían $55.985.100.**
+
+La objeción trae **ocho renglones**: siete de **SO4201** (soportes) por
+**$55.882.100** y uno de **FA0701** (cantidades de medicamento, el
+IOBITRIDOL) por **$103.000**. El dictamen sacaba los dos bloques con el
+total de la glosa entera. O sea: un bloque de ciento tres mil pesos
+afirmando que está contestando cincuenta y cinco millones. La entidad lee
+eso y entiende que el hospital no supo qué le glosaron.
+
+El motor sí intentaba repartir, pero se rendía apenas veía una cifra antes
+del primer código, porque «huele a total global». En la objeción de verdad
+esa cifra es el **VALOR FACTURA del encabezado** — y con eso el reparto no
+llegaba ni a intentarse nunca.
+
+Ahora se reparte así: un mismo código puede salir varias veces (SO4201 sale
+siete), a cada aparición se le atribuye la cifra que viene detrás, y las de
+un mismo código se suman. **Y luego se comprueba contra el papel de la
+entidad:** si el texto declara un TOTAL OBJETADO, la suma de todas las
+causales tiene que dar exactamente eso. Si cuadra, el reparto está probado y
+no hubo que suponer nada. Si no cuadra, el motor **no adivina**: deja los
+bloques como estaban antes.
+
+En la objeción real cuadra al peso: SO4201 $55.882.100 + FA0701 $103.000 =
+$55.985.100.
+
+**2) El panel verde que decía «Está el soporte que la causal exige».**
+
+La SO4201 de esta objeción pide, siete veces y con todas las letras,
+*«NO SE EVIDENCIA FRA DE COMPRA Y COTIZACION AVALADA POR SANIDAD MILITAR»*.
+El motor mostraba el panel **en verde**, diciendo que el soporte exigido
+estaba, porque para las causales de la familia SO usaba por defecto
+«historia clínica y epicrisis» — que sí estaban adjuntas. Historia clínica
+había; **factura de compra y cotización avalada, no**. El auditor podía
+mandar la respuesta confiado y perder los cincuenta y cinco millones.
+
+Ahora hay una lista corta de causales cuyo soporte **el motor no puede ver
+desde acá** (la lista de precios pactada, la factura de compra del material,
+la cotización avalada, los soportes del recobro ante ADRES/ARL, la
+constancia de envío del trámite). Para esas, el panel **no se pone verde**:
+avisa con nombre y apellido qué documento hay que conseguir a mano. Cuando
+la causal sí pide historia clínica o epicrisis y están, sigue en verde
+igual que siempre.
+
+**Comprobado:** 35 pruebas nuevas y viejas de estos dos puntos en verde, y
+831 pruebas relacionadas de catálogo, soportes y evidencia sin romperse.
+
 ### 10-09-2026 — El CI en tres máquinas: de 7 min 20 s a unos 4
 
 Yesid, viendo el reloj: «*¿dónde está ese supuesto 3 minutos?*». Tenía razón

@@ -18530,16 +18530,24 @@ function renderEvidenciaSoportes(ev){
   var hay = ev.hay_en_el_expediente || [];
   var adj = ev.se_adjunto_en_este_analisis || [];
   var faltan = ev.faltan || [];
+  // 10-09-2026 — lo que la causal exige y el motor NO sabe buscar. Va aparte
+  // de `faltan` a propósito: «no lo puedo ver» no es «no está».
+  var noLoVeo = ev.pide_y_no_lo_veo || [];
   // Sin nada que decir, no se estorba: una glosa de tarifas sin requisitos
   // de soporte y sin expediente indexado no necesita este recuadro.
-  if(!pide.length && !hay.length && !adj.length && !ev.no_se_pudo_consultar) return '';
+  if(!pide.length && !noLoVeo.length && !hay.length && !adj.length && !ev.no_se_pudo_consultar) return '';
 
   var falta = faltan.length > 0;
-  var borde = ev.no_se_pudo_consultar ? '#3b82f6' : (falta ? '#dc2626' : '#10b981');
-  var fondo = ev.no_se_pudo_consultar ? 'linear-gradient(135deg,#eff6ff,#dbeafe)'
+  // Con documentos que el motor no puede verificar, el recuadro NO sale
+  // verde. El verde dice «esto está resuelto», y sobre lo que no se pudo
+  // mirar eso es una tranquilidad falsa — la que costó dar por probados
+  // $55.882.100 en la objeción del Dispensario.
+  var hayDuda = ev.no_se_pudo_consultar || noLoVeo.length > 0;
+  var borde = hayDuda ? '#3b82f6' : (falta ? '#dc2626' : '#10b981');
+  var fondo = hayDuda ? 'linear-gradient(135deg,#eff6ff,#dbeafe)'
             : (falta ? 'linear-gradient(135deg,#fef2f2,#fee2e2)'
                      : 'linear-gradient(135deg,#f0fdf4,#ecfdf5)');
-  var titColor = ev.no_se_pudo_consultar ? '#1e40af' : (falta ? '#b91c1c' : '#047857');
+  var titColor = hayDuda ? '#1e40af' : (falta ? '#b91c1c' : '#047857');
 
   function _lista(items, vacio){
     if(!items.length) return '<div style="color:var(--text3);font-size:.8rem">' + vacio + '</div>';
@@ -18557,7 +18565,8 @@ function renderEvidenciaSoportes(ev){
 
   var columnas =
       col('La causal ' + escHtml(ev.codigo_glosa || '') + ' exige',
-          _lista(pide.map(function(x){ return x.nombre; }), 'Esta causal no exige un soporte concreto.'))
+          _lista(pide.map(function(x){ return x.nombre; }).concat(noLoVeo),
+                 'Esta causal no exige un soporte concreto.'))
     + col('Hay en el expediente',
           ev.no_se_pudo_consultar
             ? '<div style="color:#1e40af;font-size:.8rem;font-weight:600">Todavía no se sabe</div>'
@@ -18580,6 +18589,15 @@ function renderEvidenciaSoportes(ev){
       + '<b>Falta ' + escHtml(faltan.join(' o ')) + '.</b> '
       + 'Este dictamen argumenta, pero no prueba: a la entidad le basta pedir el '
       + 'documento para ratificar la glosa. Anéxelo antes de radicar.'
+      + '</div>';
+  } else if(noLoVeo.length){
+    remate = '<div style="margin-top:.6rem;padding:.55rem .8rem;border-radius:8px;background:#dbeafe;'
+      + 'border:1px solid #3b82f6;font-size:.85rem;color:#1e3a8a">'
+      + '<b>Esto el motor no lo puede revisar por usted:</b> '
+      + escHtml(noLoVeo.join(' · ')) + '. '
+      + 'No son documentos clínicos, así que no están en el expediente que el motor indexa. '
+      + '<b>Búsquelos y anéxelos antes de radicar</b> — es literalmente lo que la entidad está pidiendo, '
+      + 'y ningún argumento jurídico los reemplaza.'
       + '</div>';
   } else if(pide.length){
     remate = '<div style="margin-top:.6rem;padding:.55rem .8rem;border-radius:8px;background:#ecfdf5;'

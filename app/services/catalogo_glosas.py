@@ -54,11 +54,63 @@ def soportes_que_pide(codigo: str) -> tuple[str, ...]:
     c = str(codigo or "").strip().upper()
     if not c:
         return ()
+    # 10-09-2026 — si lo que esta causal exige es un documento que el
+    # indexador NO sabe reconocer, se devuelve vacío EN VEZ de caer en la
+    # regla general de la familia. Caer daba una respuesta cómoda y falsa:
+    # SO4201 pide la lista de precios y terminaba pidiendo historia clínica,
+    # que sí estaba, y el panel declaraba resuelto lo que no lo estaba.
+    if c in SOPORTE_QUE_EL_MOTOR_NO_VE:
+        return ()
     for largo in (4, 2):
         pedido = SOPORTE_QUE_PIDE_LA_CAUSAL.get(c[:largo])
         if pedido:
             return pedido
     return ()
+
+
+# ─── LO QUE LA CAUSAL PIDE Y EL MOTOR NO PUEDE VER ───────────────────────
+# 10-09-2026. Caso real: SO4201, «ausencia/inconsistencia de LISTA DE PRECIOS».
+# El mapa de arriba no tenía esa causal, así que caía en la regla general de
+# la familia SO y le pedía **historia clínica y epicrisis**. Como las dos
+# estaban en el expediente, el panel concluía:
+#
+#     «Está el soporte que la causal exige.»
+#
+# Y era falso. Lo que el Dispensario pedía, textual y siete veces, era otra
+# cosa: «NO SE EVIDENCIA FRA DE COMPRA Y COTIZACIÓN AVALADA POR SANIDAD
+# MILITAR». Ni la historia clínica ni la epicrisis prueban eso.
+#
+# Lo grave no es que faltara el dato: es que el motor daba una tranquilidad
+# falsa sobre $55.882.100. Con «no lo sé» el auditor va y lo busca; con «está
+# el soporte» radica confiado y la entidad ratifica pidiendo el documento.
+#
+# El indexador solo reconoce documentos clínicos y de facturación (historia,
+# epicrisis, RIPS, CUV, factura…). Una lista de precios, una factura de compra
+# o una cotización avalada NO están en su vocabulario, y no se pueden inventar
+# como si estuvieran. Este mapa nombra esos documentos para poder DECIRLO.
+SOPORTE_QUE_EL_MOTOR_NO_VE: dict[str, tuple[str, ...]] = {
+    # Lista de precios: es documento comercial, no clínico.
+    "SO4201": (
+        "la lista de precios pactada (anexo tarifario del contrato)",
+        "la factura de compra del material",
+        "la cotización avalada por la entidad",
+    ),
+    # Recobros: los soportes de recobro viven fuera del expediente clínico.
+    "SO4701": ("los soportes del recobro ante ADRES/ARL",),
+    # Evidencia del envío del trámite: es una constancia de radicación.
+    "SO4801": ("la constancia del envío del trámite",),
+}
+
+
+def soporte_que_el_motor_no_ve(codigo: str) -> tuple[str, ...]:
+    """Los documentos que esta causal exige y que el indexador NO sabe buscar.
+
+    Se devuelven en palabras, no como tipos del indexador, justamente porque
+    no existen ahí. Sirven para decirle al auditor QUÉ tiene que revisar él
+    mismo — que es más útil que un «no encontrado» genérico y mucho más
+    honesto que dar por bueno un documento clínico que no prueba nada.
+    """
+    return SOPORTE_QUE_EL_MOTOR_NO_VE.get(str(codigo or "").strip().upper(), ())
 
 
 # ─── CATÁLOGO DE GLOSAS POR FACTURACIÓN (FA) ─────────────────────────────

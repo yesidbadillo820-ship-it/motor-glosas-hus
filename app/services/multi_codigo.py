@@ -304,42 +304,117 @@ def _sanitizar_argumento(
 # y ante la menor sombra se devuelve vacío y todo sigue como antes.
 
 
+_RE_MONTO = re.compile(r"\$\s*[\d][\d\.,]*")
+_RE_TOTAL_DECLARADO = re.compile(
+    r"TOTAL\s+(?:OBJETADO|GLOSADO)\s*:?\s*(\$\s*[\d][\d\.,]*)", re.IGNORECASE
+)
+
+
+def _a_numero(monto: str) -> float:
+    """«$ 6.898.700,00» → 6898700.0. Devuelve 0.0 si no se puede leer."""
+    s = re.sub(r"[^\d,\.]", "", monto or "").strip(".,")
+    if not s:
+        return 0.0
+    if "," in s and "." in s:
+        s = (
+            s.replace(".", "").replace(",", ".")
+            if s.rfind(",") > s.rfind(".")
+            else s.replace(",", "")
+        )
+    elif re.fullmatch(r"\d+[.,]\d{1,2}", s):
+        s = s.replace(",", ".")
+    else:
+        s = s.replace(".", "").replace(",", "")
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
+
+def _formatear(valor: float) -> str:
+    return "$ " + f"{valor:,.0f}".replace(",", ".")
+
+
 def valores_por_codigo(texto_glosa: str, codigos: list[str]) -> dict[str, str]:
-    """Reparte los montos del texto entre los códigos, solo si es evidente.
+    """Cuánto le corresponde a CADA causal. `{}` si no se puede saber con certeza.
 
-    Devuelve {} —y entonces no se cambia nada— salvo que se cumpla TODO:
+    10-09-2026 — POR QUÉ SE REESCRIBIÓ.
+    ------------------------------------
+    Caso real de Yesid, objeción N° 189801 de la factura HUS0000541440: OCHO
+    renglones, SIETE de SO4201 (soportes, $55.882.100) y UNO de FA0701
+    (cantidades de medicamento, $103.000). El dictamen salió con **los dos
+    bloques diciendo $55.985.100** — el total de la glosa entera. Un bloque de
+    ciento tres mil pesos afirmando que contesta cincuenta y cinco millones.
+    La entidad lo lee como que el hospital no entendió qué le glosaron.
 
-      · cada código aparece en el texto;
-      · ningún monto queda ANTES del primer código (un monto al frente suele
-        ser el total de la glosa, no el de un código);
-      · hay al menos dos montos y a cada código le toca EXACTAMENTE UNO en su
-        tramo, contando desde su código hasta el siguiente;
-      · los montos son distintos entre sí (si se repiten, lo más probable es
-        que sea un único valor global escrito varias veces).
+    La versión anterior se rendía (devolvía `{}`) apenas encontraba una cifra
+    ANTES del primer código, porque «huele a total global». En la objeción de
+    verdad esa cifra es el VALOR FACTURA del encabezado, y el reparto nunca
+    llegaba a intentarse.
+
+    CÓMO SE REPARTE AHORA, y por qué esto no es adivinar
+    -----------------------------------------------------
+    Cada código puede aparecer VARIAS veces (SO4201 sale siete). A cada
+    aparición se le atribuye el primer monto que venga después, antes de la
+    siguiente aparición de cualquier código. Los de un mismo código se suman.
+
+    Y entonces viene lo que convierte esto en un hecho comprobable: **si el
+    texto declara un TOTAL OBJETADO, la suma de todas las causales tiene que
+    dar exactamente eso**. Si cuadra, la atribución es correcta y no hay nada
+    que suponer. Si no cuadra, se devuelve `{}` — mejor que cada bloque
+    muestre el total conocido a que muestre una cifra inventada.
+
+    Sin total declarado se conserva la regla vieja, estrecha: un monto por
+    código, todos distintos, ninguno antes del primero.
     """
     if not texto_glosa or len(codigos) < 2:
         return {}
 
-    posiciones: list[tuple[int, str]] = []
+    # Todas las apariciones de todos los códigos, en orden de aparición.
+    apariciones: list[tuple[int, int, str]] = []
     for codigo in codigos:
-        m = re.search(r"\b" + re.escape(codigo) + r"\b", texto_glosa, re.IGNORECASE)
-        if not m:
+        encontrado = False
+        for m in re.finditer(r"\b" + re.escape(codigo) + r"\b", texto_glosa, re.IGNORECASE):
+            apariciones.append((m.start(), m.end(), codigo))
+            encontrado = True
+        if not encontrado:
             return {}  # falta un código en el texto: no se reparte nada
-        posiciones.append((m.start(), codigo))
-    posiciones.sort()
+    apariciones.sort()
 
-    patron_monto = re.compile(r"\$\s*[\d][\d\.,]*")
-    if patron_monto.search(texto_glosa[: posiciones[0][0]]):
-        return {}  # hay plata antes del primer código: huele a total global
+    # A cada aparición, el primer monto de su tramo.
+    suma: dict[str, float] = {c: 0.0 for c in codigos}
+    hubo_monto = False
+    for i, (_ini, fin, codigo) in enumerate(apariciones):
+        limite = apariciones[i + 1][0] if i + 1 < len(apariciones) else len(texto_glosa)
+        m = _RE_MONTO.search(texto_glosa[fin:limite])
+        if m:
+            suma[codigo] += _a_numero(m.group(0))
+            hubo_monto = True
+    if not hubo_monto:
+        return {}
 
+    declarado = _RE_TOTAL_DECLARADO.search(texto_glosa)
+    if declarado:
+        # El camino de la certeza: cuadrar contra lo que la entidad declaró.
+        total_declarado = _a_numero(declarado.group(1))
+        # Un peso de diferencia por redondeos no invalida el reparto; más, sí.
+        if total_declarado > 0 and abs(sum(suma.values()) - total_declarado) <= 1:
+            return {c: _formatear(v) for c, v in suma.items() if v > 0}
+        return {}
+
+    # Sin total declarado, la regla estrecha de siempre: exactamente un monto
+    # por código, ninguno antes del primero, y todos distintos entre sí.
+    if _RE_MONTO.search(texto_glosa[: apariciones[0][0]]):
+        return {}
+    if len(apariciones) != len(codigos):
+        return {}  # con repeticiones y sin total no hay cómo comprobarlo
     reparto: dict[str, str] = {}
-    for i, (inicio, codigo) in enumerate(posiciones):
-        fin = posiciones[i + 1][0] if i + 1 < len(posiciones) else len(texto_glosa)
-        montos = patron_monto.findall(texto_glosa[inicio:fin])
+    for i, (_ini, fin, codigo) in enumerate(apariciones):
+        limite = apariciones[i + 1][0] if i + 1 < len(apariciones) else len(texto_glosa)
+        montos = _RE_MONTO.findall(texto_glosa[fin:limite])
         if len(montos) != 1:
             return {}  # ninguno o varios: no se puede atribuir con certeza
         reparto[codigo] = "$ " + montos[0].lstrip("$").strip().rstrip(".,")
-
     if len(set(reparto.values())) != len(reparto):
         return {}  # montos repetidos: probablemente un solo valor global
     return reparto

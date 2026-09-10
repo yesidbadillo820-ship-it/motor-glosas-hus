@@ -1,5 +1,37 @@
 # Registro de cambios
 
+## Sesión 10-sep-2026 (2) — Cada causal con su valor, y el panel de soportes que dejó de mentir
+
+Los dos defectos salieron de la objeción real N° 189801 (factura
+HUS0000541440): ocho renglones, siete SO4201 por $55.882.100 y uno FA0701 por
+$103.000.
+
+- **`app/services/multi_codigo.py`** — `valores_por_codigo()` reescrita. Antes
+  abortaba (`{}`) al ver cualquier monto antes del primer código, y en la
+  objeción real ese monto es el VALOR FACTURA del encabezado: el reparto no se
+  intentaba nunca y los dos bloques del dictamen salían con el total global.
+  Ahora acumula **todas** las apariciones de cada código (SO4201 aparece
+  siete veces) atribuyendo el primer monto de cada tramo, y **cuadra la suma
+  contra el `TOTAL OBJETADO` declarado en el propio texto** (±1 peso). Si
+  cuadra, el reparto está probado contra el papel de la entidad; si no, se
+  devuelve `{}` en vez de adivinar. Sin total declarado se conserva la regla
+  estrecha anterior. Helpers `_a_numero()` / `_formatear()` para los formatos
+  colombianos (`$ 6.898.700,00`).
+- **`app/services/catalogo_glosas.py`** — `SOPORTE_QUE_EL_MOTOR_NO_VE` y
+  `soporte_que_el_motor_no_ve()`. SO4201 exige lista de precios pactada,
+  factura de compra y cotización avalada — documentos que no están en el
+  índice de radicación ni en los PDF del análisis. `soportes_que_pide()`
+  devuelve `()` para esos códigos en vez de caer al patrón de la familia SO
+  (historia clínica/epicrisis), que es lo que ponía el panel en verde.
+- **`app/api/routers/analizar.py`** — `_evidencia_de_los_soportes()` agrega
+  `pide_y_no_lo_veo`.
+- **`static/index.html`** — `renderEvidenciaSoportes()` nombra esos documentos
+  en la columna de exigidos y `hayDuda` impide que el panel se pinte en verde.
+- **Pruebas** — `tests/test_services/test_cada_causal_con_su_valor.py` (15) y
+  `tests/test_frontend/test_lo_que_el_motor_no_puede_ver.py` (8). Los 12 casos
+  de `test_gl206_valor_por_codigo.py` siguen pasando.
+
+
 ## Sesión 09-sep-2026 (tarde, 8) — `evidencia_soportes`: la mitad que faltaba del panel de análisis
 
 El pedido original («que vean qué van a auditar, o también si es por tarifas
