@@ -91,6 +91,57 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — Analizar glosa ahora acompaña, ya no interroga
+
+Yesid lo pidió con estas palabras: **«que no se comporte como un formulario
+automatizado; que actúe como un compañero de equipo que guía el análisis paso
+a paso»**. Y puso tres reglas: un dato a la vez, cero suposiciones, y **nada
+de dictamen hasta terminar de recoger**.
+
+La pantalla abría con diez casillas a la vez. Ahora abre conversando: saluda,
+pregunta **una sola cosa**, espera la respuesta, la repite para que el gestor
+vea que se entendió, y sigue con la siguiente. En este orden: entidad → etapa
+→ las dos fechas → factura y radicado → valor aceptado → el concepto de la
+glosa → soportes. Al final muestra un resumen de todo antes de analizar.
+
+**No reemplaza el formulario: lo llena.** Cada respuesta escribe en el mismo
+campo de siempre y al terminar dispara el mismo análisis. Quien prefiera el
+formulario de toda la vida lo tiene a un clic, con lo ya contestado adentro.
+Nada de lo que funcionaba cambió.
+
+**Por qué la conversación no usa IA.** La lista de datos es fija y siempre la
+misma. Un guion determinista no cuesta un peso, contesta al instante y —lo
+importante— **no puede saltarse un paso ni inventarse uno**. La IA entra donde
+de verdad aporta: en el análisis del final, que es el que ya existía.
+
+**Las preguntas cortas de validación** avisan de lo que no cuadra sin sacar
+conclusiones: si la glosa figura recibida antes de radicada la factura, si
+faltan las fechas (sin ellas no se puede revisar la extemporaneidad, que
+muchas veces es lo que gana el caso), si falta la factura, o si el concepto
+quedó sospechosamente corto. **La guía nunca declara una glosa extemporánea**:
+eso lo decide el motor, que sabe contar días hábiles y tiene los festivos
+cargados. Hay una prueba que lo vigila.
+
+**Dos defectos que solo se vieron abriendo el navegador**, no leyendo el
+código:
+
+- Las burbujas usaban un gris fijo del sistema de diseño (`#F5F7FA`) y el
+  fondo del motor en tema claro es `#F8FAFC`: **el mismo color**. Se volvían
+  invisibles. Ahora usan las variables del propio motor, que sí cambian con el
+  tema, más un borde que las delinea siempre.
+- El blanco sobre el azul de las respuestas daba **3,68:1** de contraste y el
+  mínimo legible es 4,5:1. Con el azul 700 da **5,75:1**. Son las respuestas
+  del propio gestor: tiene que poder releerlas.
+
+21 pruebas nuevas. No leen el HTML como texto: **ejecutan el guion con Node**
+y recorren los siete pasos comprobando que en cada uno haya UNA sola pregunta
+pendiente a la vista, que lo saltado se vea como pendiente y no como un dato,
+y que el botón de analizar **no aparezca antes de tiempo**. Además se recorrió
+el flujo entero en un navegador de verdad: los ocho campos del formulario
+quedan llenos con lo que se conversó.
+
+---
+
 ### 10-09-2026 — El respaldo de IA estaba viejo y caro, y cambiarlo casi lo rompe
 
 El motor tenía fijado `claude-sonnet-4-5` como modelo de Anthropic. Es de la
