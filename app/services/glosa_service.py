@@ -974,7 +974,11 @@ def _tarifa_con_respaldo(
     if not m:
         return t  # no afirma un porcentaje: nada que verificar
     up = t.upper()
-    if any(n in up for n in _TARIFAS_NEUTRAS) and not m:
+    # 09-09-2026 — CONDICIÓN IMPOSIBLE, RETIRADA. Decía `... and not m`, y
+    # tres renglones arriba hay un `if not m: return t`: si se llega hasta
+    # acá, `m` SIEMPRE tiene valor. O sea que la guarda de las tarifas
+    # neutras nunca se aplicaba. Se deja el chequeo que sí importa.
+    if any(n in up for n in _TARIFAS_NEUTRAS):
         return t
 
     def _porcentajes(s: str) -> set:
@@ -9028,22 +9032,61 @@ class GlosaService:
         usa_plantilla = plantilla is not None and len(self._subconceptos_actuales) < 2
         # 01-09-2026 (PRUEBA 5) — ¿hay con qué responder? Se decide acá, antes
         # de elegir camino, porque la abstención es un camino más: sin IA.
+        #
+        # 09-09-2026 — EL CUPS TENÍA QUE ESTAR AQUÍ Y NUNCA LLEGABA.
+        # Abajo, `_glosa_sin_elementos` corta en seco cuando hay un CUPS
+        # verificado: un servicio identificado ES un elemento, y con él no hay
+        # nada de qué abstenerse. Pero el CUPS se extraía 270 líneas más
+        # abajo, DENTRO de la rama de la IA —o sea, después de que esta
+        # decisión ya estaba tomada— y aquí se leía con `locals().get()`, que
+        # devolvía None siempre. El atajo del CUPS nunca se activó.
+        #
+        # Consecuencia: el motor podía negarse a responder una glosa que sí
+        # traía el servicio identificado, y devolver el texto de abstención en
+        # vez de una defensa. Se extrae acá, y la rama de la IA reutiliza este
+        # valor en vez de volver a calcularlo.
+        cups_verificado = ""
+        try:
+            from app.main import _extraer_cups_servicio as _extcups_pre
+
+            _c_pre, _ = _extcups_pre(texto_base, "")
+            cups_verificado = _c_pre or ""
+        except Exception as _e_cp:
+            # Sin extractor no se bloquea nada: queda vacío y la rama de la IA
+            # vuelve a intentarlo con su propio respaldo, como siempre.
+            logger.debug(f"[CUPS-PRE] no extraído antes de la abstención: {_e_cp}")
+
         _abstenerse = False
         try:
             # El formulario también trae evidencia: fechas (con ellas la
             # extemporaneidad SÍ se calcula), una tabla de Excel del
             # expediente, o una decisión ya tomada por el gestor (aceptar,
             # ratificar). Con cualquiera de esas, hay con qué responder.
+            # 09-09-2026 — SE QUITÓ `locals().get("tabla_excel")`.
+            # No existe ninguna variable local con ese nombre en este método
+            # (el texto pegado vive en `data.tabla_excel`, y de ahí sale
+            # `texto_base` al principio), así que esa línea devolvía None
+            # siempre: era código muerto.
+            #
+            # Y NO se arregla apuntándola a `data.tabla_excel`: ese campo es
+            # obligatorio en el formulario (`min_length=3`), o sea que
+            # `_hay_algo_mas` daría True SIEMPRE y la abstención no volvería a
+            # activarse nunca. La abstención existe por un caso real —la
+            # PRUEBA 5, FA0205: sin evidencia no se llama a la IA— y apagarla
+            # sería peor que el defecto.
+            #
+            # Lo que esa línea quería mirar ya lo mira quien corresponde:
+            # `_glosa_sin_elementos(texto_base, …)`, dos renglones abajo, se
+            # dedica justamente a decidir si ese texto trae elementos.
             _hay_algo_mas = bool(
                 getattr(data, "fecha_radicacion", None)
                 or getattr(data, "fecha_recepcion", None)
-                or (locals().get("tabla_excel") or "").strip()
                 or es_ratificacion
                 or es_extemporanea
                 or modo_resp != "defender"
             )
             _abstenerse = (not _hay_algo_mas) and _glosa_sin_elementos(
-                texto_base, contexto_pdf or "", str(locals().get("cups_verificado") or "")
+                texto_base, contexto_pdf or "", cups_verificado
             )
         except Exception as _e_ab:
             logger.debug(f"[ABSTENCION] predicado no evaluado: {_e_ab}")
@@ -9315,12 +9358,15 @@ class GlosaService:
             # que trae números de ingreso/HC/folio que no son CUPS).
             # Ronda 47 fix: aceptar códigos alfanuméricos con sufijos tipo
             # '39147B-18', '372301H', 'FMQ6296', '19914262-04' (CUM medicamentos).
-            cups_verificado = ""
+            # Ya se extrajo arriba, antes de decidir la abstención. Solo se
+            # reintenta si aquello no dio nada (p. ej. import circular en el
+            # arranque), y entonces entra el respaldo de abajo.
             try:
-                from app.main import _extraer_cups_servicio as _extcups
+                if not cups_verificado:
+                    from app.main import _extraer_cups_servicio as _extcups
 
-                _c, _ = _extcups(texto_base, "")
-                cups_verificado = _c or ""
+                    _c, _ = _extcups(texto_base, "")
+                    cups_verificado = _c or ""
             except Exception:
                 # Fallback al regex viejo (solo dígitos) — no bloquear si hay
                 # un problema de import circular durante startup.
@@ -10485,7 +10531,7 @@ class GlosaService:
                     servicio_ia,
                     texto_glosa=texto_base,
                     contexto_pdf=contexto_pdf,
-                    cups=str(locals().get("cups_verificado") or ""),
+                    cups=cups_verificado,
                 )
             except Exception as _e_si:
                 logger.debug(f"[SERVICIO-INVENTADO] guarda no aplicada: {_e_si}")
@@ -11333,7 +11379,7 @@ class GlosaService:
                 # 01-09-2026 — el renglón del servicio ya no lo escribe el modelo.
                 servicio=(
                     _linea_servicio_determinista(
-                        str(locals().get("cups_verificado") or ""),
+                        cups_verificado,
                         servicio_ia,
                         texto_base,
                         str(locals().get("codigo_det") or ""),
