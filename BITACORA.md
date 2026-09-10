@@ -136,6 +136,105 @@ Ahí el bot no junta nada, los deja todos y avisa.
 2. **TA0201 · $146.400** — MUTUAL lo llama «ACIDO LACTICO LLACTATO POR METODO
    ENZIMATICO» y el DGH lo tiene como «LACTATO ARTERIAL» (19624G). El código y
    el valor unitario coinciden exacto; sólo el nombre difiere.
+### 10-09-2026 — Un solo renglón por entidad: yo me había saltado la regla
+
+Yesid abrió el desplegable y volvió a contar repetidas. Tenía razón, y esta
+vez el error mío no fue de tiempos sino de fondo: **su regla número 1 decía
+expresamente «o separaciones por UVT/UVB»**, y yo las dejé separadas de todos
+modos, razonando que la unidad del SOAT cambiaba la tarifa.
+
+**Fui a mirar el motor y esa razón era falsa:**
+
+- El motor liquida **solo en UVB** (`uvb.py`: UVB 2026 = $12.110). No existe
+  ni una tarifa en UVT en todo el código.
+- Su propia normativa lo dice: «Reemplaza el uso de UVT (2023-2024). Todos los
+  valores tarifarios SOAT se expresan ahora en UVB».
+- Las bases de tarifa de la malla son SOAT, SOAT_UVB, SOAT_SMLV, PROPIA,
+  PACTADA y MIXTA. **No hay SOAT_UVT.**
+- Y del régimen: **AXA COLPATRIA, ALIANZA MEDELLÍN y PROTEGER no están en la
+  malla contractual**, así que su nombre no elige ningún contrato.
+
+El desplegable pasa de **41 renglones a 34**. Se unen las tres AXA, las dos
+Previsora, las dos Alianza, las dos Proteger y las dos Fundación Salud Mía
+—que además la malla conoce como «SALUD MIA», así que unirlas hace que sí
+encuentre su ficha—.
+
+**Dos cosas más que salieron de la misma captura:**
+
+- **«OTRA / SIN DEFINIR» aparecía DOS veces**: arriba como marcador y otra vez
+  dentro de la lista. El filtro que lo saca se aplicaba al historial pero no a
+  los contratos cargados. Ahora se filtra en un solo sitio, para todas las
+  fuentes, donde ningún llamador puede olvidarlo.
+- **El Dispensario salía con la sigla** `DISPENSARIO MEDICO`, que es un nombre
+  que escribí yo en una lista fija, en vez del oficial largo, que tiene **332
+  glosas reales** y con el que está firmado el 440-DIGSA/DMBUG-2025. Ahora la
+  ruta manda el historial **ordenado por cuántas glosas tiene cada grafía**:
+  manda el dato, no mi lista. Y el catálogo curado pasa a completar solamente
+  — nunca agrega un renglón si los datos reales ya nombran a esa entidad.
+
+**Lo que NO se tocó, y por qué.** COOSALUD sí tiene dos contratos de verdad
+(subsidiado y contributivo, números distintos). Pero eso no lo decide el
+desplegable —que ya muestra un solo «COOSALUD»— sino los alias de la malla
+leyendo el texto de la glosa. Ese mecanismo sigue igual.
+
+Las pruebas que exigían lo contrario **se invirtieron con el motivo escrito
+adentro**, no se borraron: queda anotado que el motor no liquida en UVT y que
+esas tres entidades no están en la malla, para que nadie —yo el primero—
+vuelva a separarlas «por si acaso». La evidencia del código manda sobre la
+precaución.
+
+---
+
+### 10-09-2026 — Analizar glosa ahora acompaña, ya no interroga
+
+Yesid lo pidió con estas palabras: **«que no se comporte como un formulario
+automatizado; que actúe como un compañero de equipo que guía el análisis paso
+a paso»**. Y puso tres reglas: un dato a la vez, cero suposiciones, y **nada
+de dictamen hasta terminar de recoger**.
+
+La pantalla abría con diez casillas a la vez. Ahora abre conversando: saluda,
+pregunta **una sola cosa**, espera la respuesta, la repite para que el gestor
+vea que se entendió, y sigue con la siguiente. En este orden: entidad → etapa
+→ las dos fechas → factura y radicado → valor aceptado → el concepto de la
+glosa → soportes. Al final muestra un resumen de todo antes de analizar.
+
+**No reemplaza el formulario: lo llena.** Cada respuesta escribe en el mismo
+campo de siempre y al terminar dispara el mismo análisis. Quien prefiera el
+formulario de toda la vida lo tiene a un clic, con lo ya contestado adentro.
+Nada de lo que funcionaba cambió.
+
+**Por qué la conversación no usa IA.** La lista de datos es fija y siempre la
+misma. Un guion determinista no cuesta un peso, contesta al instante y —lo
+importante— **no puede saltarse un paso ni inventarse uno**. La IA entra donde
+de verdad aporta: en el análisis del final, que es el que ya existía.
+
+**Las preguntas cortas de validación** avisan de lo que no cuadra sin sacar
+conclusiones: si la glosa figura recibida antes de radicada la factura, si
+faltan las fechas (sin ellas no se puede revisar la extemporaneidad, que
+muchas veces es lo que gana el caso), si falta la factura, o si el concepto
+quedó sospechosamente corto. **La guía nunca declara una glosa extemporánea**:
+eso lo decide el motor, que sabe contar días hábiles y tiene los festivos
+cargados. Hay una prueba que lo vigila.
+
+**Dos defectos que solo se vieron abriendo el navegador**, no leyendo el
+código:
+
+- Las burbujas usaban un gris fijo del sistema de diseño (`#F5F7FA`) y el
+  fondo del motor en tema claro es `#F8FAFC`: **el mismo color**. Se volvían
+  invisibles. Ahora usan las variables del propio motor, que sí cambian con el
+  tema, más un borde que las delinea siempre.
+- El blanco sobre el azul de las respuestas daba **3,68:1** de contraste y el
+  mínimo legible es 4,5:1. Con el azul 700 da **5,75:1**. Son las respuestas
+  del propio gestor: tiene que poder releerlas.
+
+21 pruebas nuevas. No leen el HTML como texto: **ejecutan el guion con Node**
+y recorren los siete pasos comprobando que en cada uno haya UNA sola pregunta
+pendiente a la vista, que lo saltado se vea como pendiente y no como un dato,
+y que el botón de analizar **no aparezca antes de tiempo**. Además se recorrió
+el flujo entero en un navegador de verdad: los ocho campos del formulario
+quedan llenos con lo que se conversó.
+
+---
 
 ### 10-09-2026 — MUTUAL SER: lote del 7 de septiembre y entrada a la pantalla
 
