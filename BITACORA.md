@@ -91,6 +91,60 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — Gemini vuelve al dictamen, y se puede comparar con datos
+
+Yesid pidió alternativas gratis: los tokens de Claude los paga él y una tanda
+de glosas de prueba se los comió.
+
+**Lo primero que revisé le ahorra tiempo:** en Groq **ya está en el techo**. El
+`gpt-oss-120b` que usa es el modelo insignia de Groq — no hay uno mejor allí, y
+cambiar de modelo dentro de Groq no le va a mejorar el dictamen.
+
+**Lo segundo:** Cerebras era la alternativa obvia (un millón de tokens al día),
+pero **su tier gratis sin tarjeta terminó en agosto de 2026**. Callejón sin
+salida.
+
+**Lo tercero, y es el que sirve:** Gemini. Y la llave **ya estaba configurada**
+en el motor, usándose solo para leer PDFs escaneados. El número que decide:
+
+| | Groq gratis | Gemini gratis |
+|---|---|---|
+| Tokens por minuto | **8.000** | **250.000** |
+
+Los prompts de este motor pesan unos **21.000 tokens**. En el tier gratis de
+Groq **una sola glosa no cabe en el límite del minuto**.
+
+**La puerta la había cerrado él mismo**, y estaba escrito en el código con sus
+palabras (junio de 2026): «*no las veo trabajando y de pago ya tenemos Claude*».
+Las dos mitades de esa frase cambiaron: ahora esos tokens los paga el hospital,
+y el modelo es de otra generación. Así que se reabrió — y no estaba bloqueado,
+estaba **borrado**: hubo que escribir el proveedor de nuevo.
+
+El modelo con el que Gemini **redacta** es un ajuste APARTE del que usa para
+**leer escaneos**. Son tareas distintas: el bueno para un escaneo no tiene por
+qué ser el bueno para un escrito jurídico, y cambiar uno no puede cambiar el
+otro sin querer.
+
+**Y sobre «cuál da mejor dictamen»: eso no se opina, se mide.** Quedó
+`tools/comparar_proveedores_ia.py`, que corre **la misma glosa** por cada
+proveedor y los pone lado a lado. El caso patrón es real —la factura
+HUS0000541440— y las respuestas correctas salieron de los papeles, no de una
+suposición: la factura electrónica y la recepción de objeción N° 189801.
+
+No puntúa «qué tan bonito escribe». Cuenta **nueve hechos verificables**: si
+reconoce el contrato, si usa la tarifa pactada, si responde los ocho conceptos,
+si contesta las dos causales, si no se inventa el valor de la factura, si no
+declara extemporánea una glosa que no lo está, si no llama CUPS al código de un
+insumo, si no repite el disparate del iobitridol, y si nombra lo que la entidad
+de verdad pide. **Cada fila lleva escrito de qué papel salió.**
+
+Por defecto corre **solo los gratis**: Anthropic se paga y no entra sin pedirlo
+expresamente.
+
+Probado contra los dos extremos: el dictamen que de verdad salió mal saca
+**1 de 9**; el correcto, **9 de 9**. 22 pruebas nuevas.
+
+---
 ### 10-09-2026 — Se acabaron los quince minutos de espera (y los conflictos)
 
 Con las palabras de Yesid: «*tengo que esperar hasta 15 minutos que un PR pase
