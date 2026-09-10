@@ -2260,6 +2260,63 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
 }
 .search-trigger:hover{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.2)}
 .search-trigger .kbd{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.8)}
+
+/* ── GUÍA CONVERSACIONAL AL ANALIZAR (10-09-2026) ─────────────────────── */
+.pa-modos{display:flex;gap:var(--sds-sp-1);margin-bottom:var(--sds-sp-3)}
+.pa-modo{flex:1;padding:var(--sds-sp-2);border:1px solid var(--border,#e2e8f0);
+  background:transparent;border-radius:var(--sds-radius-md);cursor:pointer;
+  font-size:.74rem;font-weight:600;color:var(--text3,#64748b);
+  transition:var(--sds-transition-fast)}
+.pa-modo.sel{background:var(--sds-blue-50);border-color:var(--sds-blue-500);color:var(--sds-blue-700)}
+.pa-hilo{max-height:46vh;overflow-y:auto;padding-right:var(--sds-sp-1);
+  margin-bottom:var(--sds-sp-3);display:flex;flex-direction:column;gap:var(--sds-sp-2)}
+.pa-burbuja{padding:var(--sds-sp-2) var(--sds-sp-3);border-radius:var(--sds-radius-lg);
+  font-size:.8rem;line-height:1.45;max-width:92%}
+/* La burbuja del motor usa las variables DEL MOTOR (--bg-card, --border,
+   --text), no los grises del sistema de diseño. Motivo, visto en pantalla:
+   --sds-gray-50 es #F5F7FA fijo y el fondo del motor en tema claro es
+   #F8FAFC — el mismo color. La burbuja desaparecía. Estas tres sí cambian
+   con el tema, así que se ve en claro y en oscuro. */
+.pa-bot{background:var(--bg-card,#fff);color:var(--text,#0f172a);
+  border:1px solid var(--border,#e2e8f0);align-self:flex-start;
+  border-bottom-left-radius:var(--sds-radius-sm)}
+/* Azul 700 y no 500: medido en pantalla, el blanco sobre --sds-blue-500
+   (#1E88E5) da 3,68:1 y el mínimo legible es 4,5:1. El 700 da 5,75:1.
+   Son las respuestas del propio gestor: tiene que poder releerlas. */
+.pa-yo{background:var(--sds-blue-700);color:#fff;align-self:flex-end;
+  border-bottom-right-radius:var(--sds-radius-sm)}
+.pa-yo i{color:rgba(255,255,255,.75)}
+.pa-actual{border-left:3px solid var(--sds-blue-500)}
+.pa-ayuda{display:block;margin-top:var(--sds-sp-1);font-size:.72rem;color:var(--text3,#64748b)}
+.pa-paso{display:flex;flex-direction:column;gap:var(--sds-sp-2)}
+.pa-input{width:100%;padding:var(--sds-sp-2);border:1px solid var(--border,#e2e8f0);
+  border-radius:var(--sds-radius-md);font-size:.8rem;font-family:inherit;
+  background:var(--bg-card,#fff);color:var(--text,#0f172a)}
+.pa-dos{display:flex;flex-direction:column;gap:var(--sds-sp-2)}
+.pa-ops{display:flex;flex-direction:column;gap:var(--sds-sp-1)}
+.pa-op{padding:var(--sds-sp-2) var(--sds-sp-3);border:1px solid var(--border,#e2e8f0);
+  background:var(--bg-card,#fff);color:var(--text,#0f172a);
+  border-radius:var(--sds-radius-md);cursor:pointer;
+  font-size:.8rem;text-align:left;transition:var(--sds-transition-fast)}
+.pa-op:hover{background:var(--sds-blue-50);border-color:var(--sds-blue-500)}
+.pa-btn-ancho{width:100%}
+.pa-pie{display:flex;gap:var(--sds-sp-3);justify-content:center;flex-wrap:wrap}
+.pa-link{background:none;border:none;color:var(--text3,#64748b);font-size:.74rem;
+  cursor:pointer;text-decoration:underline;padding:var(--sds-sp-1)}
+.pa-opc{font-weight:400;color:var(--text3,#94a3b8);text-transform:none}
+.pa-resumen{border:1px solid var(--border,#e2e8f0);border-radius:var(--sds-radius-md);
+  background:var(--bg-card,#fff);overflow:hidden}
+.pa-res-fila{display:flex;justify-content:space-between;gap:var(--sds-sp-3);
+  padding:var(--sds-sp-2) var(--sds-sp-3);font-size:.76rem;
+  border-bottom:1px solid var(--border,#e2e8f0)}
+.pa-res-fila:last-child{border-bottom:none}
+.pa-res-fila span{color:var(--text3,#64748b)}
+.pa-vacio{color:var(--text3,#94a3b8);font-weight:400}
+.pa-aviso{padding:var(--sds-sp-2) var(--sds-sp-3);border-radius:var(--sds-radius-md);
+  font-size:.76rem;line-height:1.4}
+.pa-aviso-revisar{background:var(--sds-revisar-bg);color:var(--sds-revisar)}
+.pa-aviso-falta{background:var(--sds-amber-bg);color:var(--sds-amber)}
+@media (max-width:640px){.pa-hilo{max-height:38vh}.pa-burbuja{max-width:100%}}
 </style>
 <!-- SINAC Design System 2.0 — Plan de Transformación, Ola 3 -->
 <link rel="stylesheet" href="/static/sinac-ds.css">
@@ -2606,6 +2663,27 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
     <div class="panel active" id="p-analizar">
       <div class="sidebar">
         <div class="sb-body pa-compact">
+
+          <!-- 10-09-2026 · GUÍA CONVERSACIONAL ─────────────────────────────
+               Pedido de Yesid: que el motor acompañe al gestor paso a paso
+               en vez de mostrarle diez casillas de una. Un dato a la vez, y
+               NADA de análisis hasta tener el contexto completo.
+
+               No reemplaza el formulario: lo LLENA. Cada respuesta escribe
+               en el mismo campo de siempre (#eps-sel, #f-rad, #f-glosa…) y
+               al final se dispara el mismo `analizar()`. Quien prefiera el
+               formulario de toda la vida lo tiene a un clic, con todo lo
+               que ya haya contestado adentro. -->
+          <div class="pa-modos">
+            <button type="button" class="pa-modo sel" id="pa-modo-guia" onclick="paCambiarModo('guia')">Guiado</button>
+            <button type="button" class="pa-modo" id="pa-modo-form" onclick="paCambiarModo('form')">Formulario</button>
+          </div>
+          <div id="pa-guia">
+            <div id="pa-guia-hilo" class="pa-hilo" aria-live="polite"></div>
+            <div id="pa-guia-paso" class="pa-paso"></div>
+          </div>
+
+          <div id="pa-form-clasico" hidden>
           <!-- BLOQUE 1 · PAGADOR + PROCESO (unificado, compacto) -->
           <div class="sb-section pa-sec-clean">
             <div class="field pa-field-tight">
@@ -2715,6 +2793,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
               </label>
             </div>
           </details>
+          </div><!-- /#pa-form-clasico -->
         </div>
         <div class="sb-footer">
           <button class="btn btn-primary" id="btn-analizar" onclick="analizar()" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;">
@@ -16686,6 +16765,267 @@ function setTono(el){
   document.getElementById('tono-v').value=el.dataset.v;
 }
 
+
+// ─── GUÍA CONVERSACIONAL AL ANALIZAR ──────────────────────────────────────
+// 10-09-2026. Pedido de Yesid, con sus palabras: «que no se comporte como un
+// formulario automatizado; que actúe como un compañero de equipo que guía el
+// análisis paso a paso».
+//
+// Tres reglas que él fijó y que acá se cumplen POR CONSTRUCCIÓN, no por
+// buena voluntad del modelo:
+//
+//   1. Un dato a la vez. Nunca la plantilla completa de golpe.
+//   2. Cero suposiciones: si el gestor no lo dijo, el campo queda vacío.
+//   3. Dictamen pausado: no se analiza NADA hasta terminar de recoger.
+//
+// Por qué esta guía NO usa la IA para conversar: la lista de datos es fija y
+// siempre la misma. Un guion determinista no cuesta un peso, no se inventa un
+// paso ni se salta otro, y contesta al instante. La IA entra donde de verdad
+// aporta — en el análisis del final, que es el que ya existe.
+var PA_GUIA = { i: 0, datos: {}, arrancada: false };
+
+// El orden es el que pidió Yesid. `campo` es el input de siempre que llena
+// cada paso: la guía no guarda datos aparte, escribe en el formulario real.
+function paGuiaPasos(){
+  return [
+    { id:'eps',      campo:'eps-sel',   tipo:'eps',
+      pregunta:'¿Qué EPS o entidad nos está glosando?',
+      eco:function(v){ return 'Glosa de <b>' + escHtml(v) + '</b>.'; } },
+    { id:'etapa',    campo:'etapa-v',   tipo:'etapa',
+      pregunta:'¿En qué etapa vamos con esta glosa?',
+      eco:function(v){ return 'Etapa <b>' + escHtml(v) + '</b>.'; } },
+    { id:'fechas',   tipo:'fechas',
+      pregunta:'Ahora las dos fechas: ¿cuándo se radicó la factura y cuándo nos llegó la glosa?',
+      ayuda:'Son el único par de datos que decide si la glosa entró en término. Si no las tiene a la mano, siga sin ellas.',
+      opcional:true },
+    { id:'factura',  tipo:'factura',
+      pregunta:'¿Cuál es el número de factura?',
+      ayuda:'El radicado es opcional — si lo tiene, mejor.' },
+    { id:'valor',    campo:'f-valacp',  tipo:'valor',
+      pregunta:'¿Se aceptó algún valor de esta glosa?',
+      ayuda:'Si no se aceptó nada, déjelo en 0.',
+      opcional:true },
+    { id:'texto',    campo:'f-glosa',   tipo:'texto',
+      pregunta:'Péguele el concepto de la glosa, tal cual lo mandó la EPS.',
+      ayuda:'Con código, descripción, valores y la justificación que ellos escribieron. Entre más literal, mejor sale la defensa.' },
+    { id:'soportes', tipo:'soportes',
+      pregunta:'¿Le anexamos soportes en PDF?',
+      ayuda:'Historia clínica, epicrisis, orden médica, la tarifa pactada… Es opcional.',
+      opcional:true }
+  ];
+}
+
+// Las preguntas cortas de validación. NO sacan conclusiones jurídicas: la
+// extemporaneidad la decide el motor, que sabe contar días hábiles y tiene
+// los festivos cargados (`extemporaneidad_texto.py`). Acá solo se avisa de
+// lo que es imposible o de lo que falta.
+function paGuiaAvisos(d){
+  var avisos = [];
+  if(d.f_rad && d.f_rec && d.f_rec < d.f_rad){
+    avisos.push({t:'revisar', txt:'La glosa figura recibida ANTES de radicada la factura. Una de las dos fechas está al revés.'});
+  }
+  if(!d.f_rad || !d.f_rec){
+    avisos.push({t:'falta', txt:'Sin las dos fechas el motor no puede revisar si la glosa está extemporánea — que muchas veces es lo que gana el caso.'});
+  }
+  if(d.texto && d.texto.replace(/\s+/g,' ').trim().length < 40){
+    avisos.push({t:'revisar', txt:'El concepto quedó muy corto. ¿Eso fue todo lo que mandó la EPS?'});
+  }
+  if(!d.factura){
+    avisos.push({t:'falta', txt:'Sin número de factura no se pueden cruzar los soportes ni el contrato de esa atención.'});
+  }
+  return avisos;
+}
+
+// Pintor puro: recibe el estado y devuelve el HTML del hilo. Separado a
+// propósito para poder ejecutarlo en una prueba sin navegador.
+function paGuiaPintarHilo(estado){
+  var pasos = paGuiaPasos(), h = '';
+  h += '<div class="pa-burbuja pa-bot">Listo, vamos a analizarla. Se la pido de a poquito: <b>un dato a la vez</b>, y no opino nada hasta tenerlo todo.</div>';
+  for(var k = 0; k < estado.i && k < pasos.length; k++){
+    var p = pasos[k], v = estado.datos['_eco_' + p.id];
+    h += '<div class="pa-burbuja pa-bot">' + escHtml(p.pregunta) + '</div>';
+    h += '<div class="pa-burbuja pa-yo">' + (v || '<i>lo dejamos pendiente</i>') + '</div>';
+  }
+  if(estado.i < pasos.length){
+    var act = pasos[estado.i];
+    h += '<div class="pa-burbuja pa-bot pa-actual">' + escHtml(act.pregunta)
+       + (act.ayuda ? '<span class="pa-ayuda">' + escHtml(act.ayuda) + '</span>' : '')
+       + '</div>';
+  }
+  return h;
+}
+
+// El resumen del final, con los avisos. Tampoco toca el DOM: se prueba sola.
+function paGuiaPintarResumen(d){
+  var filas = [
+    ['Entidad', d.eps], ['Etapa', d.etapa],
+    ['Radicación', d.f_rad], ['Recepción', d.f_rec],
+    ['Factura', d.factura], ['Radicado', d.radicado],
+    ['Valor aceptado', d.valor ? fmtCOP(d.valor) : '$ 0'],
+    ['Soportes', d.n_soportes ? (d.n_soportes + ' PDF') : 'ninguno']
+  ];
+  var h = '<div class="pa-burbuja pa-bot"><b>Esto es lo que tenemos.</b> Revíselo antes de que lo mande a analizar.</div>';
+  h += '<div class="pa-resumen">';
+  for(var k = 0; k < filas.length; k++){
+    var val = filas[k][1];
+    h += '<div class="pa-res-fila"><span>' + escHtml(filas[k][0]) + '</span><b>'
+       + (val ? escHtml(String(val)) : '<i class="pa-vacio">sin dato</i>') + '</b></div>';
+  }
+  h += '</div>';
+  var avisos = paGuiaAvisos(d);
+  for(var j = 0; j < avisos.length; j++){
+    h += '<div class="pa-aviso pa-aviso-' + avisos[j].t + '">' + escHtml(avisos[j].txt) + '</div>';
+  }
+  return h;
+}
+
+function paCambiarModo(modo){
+  var guia = document.getElementById('pa-guia');
+  var form = document.getElementById('pa-form-clasico');
+  var bg = document.getElementById('pa-modo-guia'), bf = document.getElementById('pa-modo-form');
+  if(!guia || !form) return;
+  var esGuia = (modo === 'guia');
+  guia.hidden = !esGuia;
+  form.hidden = esGuia;
+  if(bg) bg.classList.toggle('sel', esGuia);
+  if(bf) bf.classList.toggle('sel', !esGuia);
+  if(esGuia && !PA_GUIA.arrancada) paGuiaArrancar();
+}
+
+function paGuiaArrancar(){
+  PA_GUIA = { i:0, datos:{}, arrancada:true };
+  paGuiaRender();
+}
+
+function paGuiaRender(){
+  var hilo = document.getElementById('pa-guia-hilo');
+  var caja = document.getElementById('pa-guia-paso');
+  if(!hilo || !caja) return;
+  var pasos = paGuiaPasos();
+  if(PA_GUIA.i >= pasos.length){
+    hilo.innerHTML = paGuiaPintarHilo(PA_GUIA) + paGuiaPintarResumen(PA_GUIA.datos);
+    caja.innerHTML =
+      '<button type="button" class="btn btn-primary pa-btn-ancho" onclick="paGuiaLanzar()">Analizar con IA</button>' +
+      '<button type="button" class="pa-link" onclick="paGuiaAtras()">Corregir el último dato</button>';
+    hilo.scrollTop = hilo.scrollHeight;
+    return;
+  }
+  hilo.innerHTML = paGuiaPintarHilo(PA_GUIA);
+  caja.innerHTML = paGuiaControl(pasos[PA_GUIA.i]);
+  hilo.scrollTop = hilo.scrollHeight;
+  var foco = caja.querySelector('input,textarea,select');
+  if(foco && foco.type !== 'file') foco.focus();
+}
+
+function paGuiaControl(p){
+  var saltar = p.opcional
+    ? '<button type="button" class="pa-link" onclick="paGuiaResponder(null)">Seguir sin este dato</button>' : '';
+  var atras = PA_GUIA.i > 0
+    ? '<button type="button" class="pa-link" onclick="paGuiaAtras()">Atrás</button>' : '';
+  var pie = '<div class="pa-pie">' + saltar + atras + '</div>';
+  if(p.tipo === 'eps'){
+    var sel = document.getElementById('eps-sel');
+    var ops = sel ? sel.innerHTML : '<option value="">(no se pudieron cargar las entidades)</option>';
+    return '<select id="pg-eps" class="pa-input">' + ops + '</select>'
+         + '<button type="button" class="btn btn-primary pa-btn-ancho" onclick="paGuiaResponder(document.getElementById(\'pg-eps\').value)">Continuar</button>' + pie;
+  }
+  if(p.tipo === 'etapa'){
+    return '<div class="pa-ops">'
+      + '<button type="button" class="pa-op" onclick="paGuiaResponder(\'INICIAL\')">Respuesta inicial</button>'
+      + '<button type="button" class="pa-op" onclick="paGuiaResponder(\'RATIFICACION\')">Ratificación</button>'
+      + '<button type="button" class="pa-op" onclick="paGuiaResponder(\'RESPUESTA\')">Segunda respuesta</button>'
+      + '</div>' + pie;
+  }
+  if(p.tipo === 'fechas'){
+    return '<div class="pa-dos">'
+      + '<label class="pa-lbl-tiny">Radicación de la factura<input type="date" id="pg-rad" class="pa-input"/></label>'
+      + '<label class="pa-lbl-tiny">Recepción de la glosa<input type="date" id="pg-rec" class="pa-input"/></label>'
+      + '</div>'
+      + '<button type="button" class="btn btn-primary pa-btn-ancho" onclick="paGuiaResponder({rad:document.getElementById(\'pg-rad\').value,rec:document.getElementById(\'pg-rec\').value})">Continuar</button>' + pie;
+  }
+  if(p.tipo === 'factura'){
+    return '<div class="pa-dos">'
+      + '<label class="pa-lbl-tiny">N.º de factura<input type="text" id="pg-fac" class="pa-input" placeholder="HUS0000541440"/></label>'
+      + '<label class="pa-lbl-tiny">N.º de radicado <span class="pa-opc">opcional</span><input type="text" id="pg-radic" class="pa-input"/></label>'
+      + '</div>'
+      + '<button type="button" class="btn btn-primary pa-btn-ancho" onclick="paGuiaResponder({factura:document.getElementById(\'pg-fac\').value,radicado:document.getElementById(\'pg-radic\').value})">Continuar</button>' + pie;
+  }
+  if(p.tipo === 'valor'){
+    return '<input type="number" id="pg-val" class="pa-input" min="0" placeholder="0"/>'
+      + '<button type="button" class="btn btn-primary pa-btn-ancho" onclick="paGuiaResponder(document.getElementById(\'pg-val\').value)">Continuar</button>' + pie;
+  }
+  if(p.tipo === 'texto'){
+    return '<textarea id="pg-txt" class="pa-input" rows="7" placeholder="Pegue aquí el texto de la glosa…"></textarea>'
+      + '<button type="button" class="btn btn-primary pa-btn-ancho" onclick="paGuiaResponder(document.getElementById(\'pg-txt\').value)">Continuar</button>' + pie;
+  }
+  // soportes: se reusa el input de archivos de siempre, sin moverlo de sitio.
+  return '<button type="button" class="pa-op pa-btn-ancho" onclick="document.getElementById(\'f-pdf\').click()">Elegir los PDF</button>'
+    + '<div id="pg-pdf-info" class="pa-ayuda"></div>'
+    + '<button type="button" class="btn btn-primary pa-btn-ancho" onclick="paGuiaResponder(\'ok\')">Continuar</button>' + pie;
+}
+
+// Cada respuesta se escribe en el campo de siempre. Si el gestor la salta,
+// el campo se queda como estaba: nada se inventa.
+function paGuiaResponder(v){
+  var p = paGuiaPasos()[PA_GUIA.i];
+  if(!p) return;
+  var d = PA_GUIA.datos, eco = null;
+  function _set(id, val){ var e = document.getElementById(id); if(e) e.value = val; }
+  if(v !== null && v !== undefined && v !== ''){
+    if(p.tipo === 'eps'){ d.eps = v; _set('eps-sel', v); eco = escHtml(v); }
+    else if(p.tipo === 'etapa'){
+      d.etapa = v; _set('etapa-v', v);
+      eco = {INICIAL:'Respuesta inicial', RATIFICACION:'Ratificación', RESPUESTA:'Segunda respuesta'}[v] || escHtml(v);
+    }
+    else if(p.tipo === 'fechas'){
+      d.f_rad = v.rad || ''; d.f_rec = v.rec || '';
+      _set('f-rad', d.f_rad); _set('f-rec', d.f_rec);
+      eco = (d.f_rad || '—') + ' → ' + (d.f_rec || '—');
+      if(!d.f_rad && !d.f_rec) eco = null;
+    }
+    else if(p.tipo === 'factura'){
+      d.factura = (v.factura || '').trim(); d.radicado = (v.radicado || '').trim();
+      _set('f-factura', d.factura); _set('f-radicado', d.radicado);
+      eco = d.factura ? escHtml(d.factura) : null;
+      if(eco && d.radicado) eco += ' · rad. ' + escHtml(d.radicado);
+    }
+    else if(p.tipo === 'valor'){
+      d.valor = Number(v) || 0; _set('f-valacp', d.valor);
+      eco = fmtCOP(d.valor);
+    }
+    else if(p.tipo === 'texto'){
+      d.texto = String(v); _set('f-glosa', d.texto);
+      var corto = d.texto.replace(/\s+/g, ' ').trim();
+      eco = escHtml(corto.length > 120 ? corto.slice(0, 120) + '…' : corto);
+    }
+    else if(p.tipo === 'soportes'){
+      var f = document.getElementById('f-pdf');
+      d.n_soportes = (f && f.files) ? f.files.length : 0;
+      eco = d.n_soportes ? (d.n_soportes + ' PDF anexados') : null;
+    }
+  }
+  d['_eco_' + p.id] = eco;
+  if(!eco && !p.opcional && p.tipo !== 'soportes'){
+    var caja = document.getElementById('pa-guia-paso');
+    if(caja && !caja.querySelector('.pa-aviso')){
+      caja.insertAdjacentHTML('afterbegin',
+        '<div class="pa-aviso pa-aviso-revisar">Ese dato hace falta para el análisis. Si no lo tiene, cámbiese al formulario y sígalo a mano.</div>');
+    }
+    return;
+  }
+  PA_GUIA.i++;
+  paGuiaRender();
+}
+
+function paGuiaAtras(){
+  if(PA_GUIA.i > 0) PA_GUIA.i--;
+  paGuiaRender();
+}
+
+function paGuiaLanzar(){
+  if(typeof analizar === 'function') analizar();
+}
+
 // ─── CONTRATOS ────────────────────────────────────────────────────────────
 async function loadContratos(){
   try{
@@ -16718,8 +17058,17 @@ async function loadContratos(){
         });
       }
     }catch(e){ avisarNoCargo('las entidades sin contrato', e); }
+    // La guía conversacional copia este desplegable en su primer paso. Si
+    // ya está pintada y todavía va en ese paso, se repinta para que las
+    // entidades aparezcan sin que el gestor tenga que recargar.
+    try{ if(PA_GUIA && PA_GUIA.arrancada && PA_GUIA.i === 0) paGuiaRender(); }catch(e){}
   }catch(e){ avisarNoCargo('los contratos', e); }
 }
+
+// La guía arranca sola: la pantalla de Analizar abre en modo Guiado.
+document.addEventListener('DOMContentLoaded', function(){
+  try{ if(document.getElementById('pa-guia')) paGuiaArrancar(); }catch(e){}
+});
 
 // ─── CONTRATOS · Metadatos enriquecidos (editor admin) ───────────────────
 // Llena las 12 columnas del PR #106 que consume el inyector
