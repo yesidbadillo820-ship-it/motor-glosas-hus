@@ -422,3 +422,177 @@ class TestCli:
             ]
         )
         assert rc == 1
+
+
+# ---------------------------------------------------------------------------
+# Doble glosa: el mismo servicio objetado bajo dos conceptos
+# ---------------------------------------------------------------------------
+
+
+def _obj(cxc, cod_servicio, cantidad, valor, codigo, concepto="X", observacion=""):
+    """Una objeción ya leída, como la devuelve `leer_mutual`."""
+    return {
+        "fila_excel": 0,
+        "cxc": cxc,
+        "codigo": codigo,
+        "cod_servicio": cod_servicio,
+        "servicio": "",
+        "cantidad": cantidad,
+        "concepto": concepto,
+        "observacion": observacion,
+        "valor": valor,
+    }
+
+
+class TestDobleGlosa:
+    """El caso del lote del 7-sep: sumar todas las filas daba $26.636.056
+    cuando MUTUAL reportó $24.462.346."""
+
+    def test_mismo_servicio_bajo_dos_conceptos_se_cuenta_una_vez(self):
+        objeciones = [
+            _obj("HUS0000544271", "FMQ0463", 1, 244400, "TA0201"),
+            _obj("HUS0000544271", "FMQ0463", 1, 244400, "TA0601"),
+        ]
+        quedan = org.fusionar_dobles_glosas(objeciones)
+        assert len(quedan) == 1
+        assert quedan[0]["valor"] == 244400
+        assert quedan[0]["fusionadas"] == [("TA0601", 244400)]
+
+    def test_con_valores_distintos_manda_el_mayor(self):
+        """389002: glosado por tarifa ($54.594) y por no estar habilitado
+        ($181.900). MUTUAL sólo cuenta el mayor."""
+        objeciones = [
+            _obj("HUS0000544271", "389002", 1, 54594, "TA2901"),
+            _obj("HUS0000544271", "389002", 1, 181900, "FA1305"),
+        ]
+        quedan = org.fusionar_dobles_glosas(objeciones)
+        assert len(quedan) == 1
+        assert quedan[0]["valor"] == 181900
+        assert quedan[0]["codigo"] == "FA1305"
+        assert quedan[0]["fusionadas"] == [("TA2901", 54594)]
+
+    def test_no_junta_cantidades_distintas_del_mismo_servicio(self):
+        """FMQ0178 se factura en dos renglones (x23 y x5): son dos glosas."""
+        objeciones = [
+            _obj("HUS0000544271", "FMQ0178", 23, 23000, "TA0201"),
+            _obj("HUS0000544271", "FMQ0178", 23, 23000, "TA0601"),
+            _obj("HUS0000544271", "FMQ0178", 5, 4000, "TA0201"),
+            _obj("HUS0000544271", "FMQ0178", 5, 4000, "TA0601"),
+        ]
+        quedan = org.fusionar_dobles_glosas(objeciones)
+        assert sorted(o["valor"] for o in quedan) == [4000, 23000]
+
+    def test_no_junta_servicios_de_facturas_distintas(self):
+        objeciones = [
+            _obj("HUS0000000001", "FMQ0463", 1, 244400, "TA0201"),
+            _obj("HUS0000000002", "FMQ0463", 1, 244400, "TA0601"),
+        ]
+        assert len(org.fusionar_dobles_glosas(objeciones)) == 2
+
+    def test_el_mismo_codigo_repetido_NO_se_fusiona(self):
+        """Dos renglones de verdad con el mismo código —como las 9 terapias
+        respiratorias del Dispensario— no son doble glosa: juntarlos sería
+        borrar una objeción real. Se dejan y se avisa."""
+        objeciones = [
+            _obj("HUS0000544271", "939403", 1, 851, "TA5701"),
+            _obj("HUS0000544271", "939403", 1, 851, "TA5701"),
+        ]
+        avisos: list[str] = []
+        quedan = org.fusionar_dobles_glosas(objeciones, avisar=avisos.append)
+        assert len(quedan) == 2
+        assert avisos and "NO se fusiona" in avisos[0]
+
+    def test_un_servicio_solo_no_se_toca(self):
+        objeciones = [_obj("HUS0000544271", "903883", 1, 304500, "TA0201")]
+        quedan = org.fusionar_dobles_glosas(objeciones)
+        assert len(quedan) == 1
+        assert "fusionadas" not in quedan[0]
+
+    def test_conserva_el_orden_original(self):
+        objeciones = [
+            _obj("HUS0000544271", "AAA", 1, 100, "TA0201"),
+            _obj("HUS0000544271", "BBB", 1, 200, "TA0201"),
+            _obj("HUS0000544271", "BBB", 1, 200, "TA0601"),
+            _obj("HUS0000544271", "CCC", 1, 300, "TA0201"),
+        ]
+        quedan = org.fusionar_dobles_glosas(objeciones)
+        assert [o["cod_servicio"] for o in quedan] == ["AAA", "BBB", "CCC"]
+
+
+class TestLaDobleGlosaLlegaAlArchivo:
+    FILAS_DOBLES = [
+        [
+            "HUS0000544271",
+            "FMQ0463",
+            1,
+            "$\xa0244.400",
+            "Consultas, interconsultas y atenciones (visitas) domiciliarias - TARIFAS",
+            "TA0201",
+            "La tecnología FMQ0463 - SISTEMA DE SUCCION CERRADA NO 12 no se "
+            "encuentra dentro del contrato número 20352.",
+        ],
+        [
+            "HUS0000544271",
+            "FMQ0463",
+            1,
+            "$\xa0244.400",
+            "Dispositivos médicos - TARIFAS",
+            "TA0601",
+            "La tecnología FMQ0463 - SISTEMA DE SUCCION CERRADA NO 12 no se "
+            "encuentra dentro del contrato número 20352.",
+        ],
+    ]
+
+    def _correr(self, tmp_path):
+        entrada = _xlsx(tmp_path / "MUTUAL.xlsx", filas=self.FILAS_DOBLES)
+        dgh = _xlsx_dgh(
+            tmp_path / "dgh.xlsx",
+            [
+                ["QX9999", "SISTEMA DE SUCCION CERRADA NO 12", "FMQ0463", "SUCCION",
+                 "HUS0000544271", 1, 244400, 900000],
+            ],
+        )  # fmt: skip
+        salida = tmp_path / "OBJECIONES.xlsx"
+        assert (
+            org.main(
+                [
+                    "--entrada",
+                    str(entrada),
+                    "--servicios-dgh",
+                    str(dgh),
+                    "--salida",
+                    str(salida),
+                    "--consolidado",
+                    "--fecha",
+                    "2026-09-07",
+                ]
+            )
+            == 0
+        )
+        return _leer_objeciones(salida)
+
+    def test_el_archivo_trae_un_solo_renglon(self, tmp_path):
+        filas = self._correr(tmp_path)
+        assert len(filas) == 1
+        assert filas[0]["CROVALOBJ"] == 244400
+
+    def test_el_otro_codigo_queda_anotado_en_la_observacion(self, tmp_path):
+        """No se pierde: el auditor tiene que poder ver bajo qué más lo objetaron."""
+        filas = self._correr(tmp_path)
+        assert "también glosado como TA0601 $244400" in filas[0]["CRDOBSERV"]
+
+    def test_el_codigo_absorbido_cuenta_para_el_tipo_de_la_factura(self, tmp_path):
+        """TA0201 y TA0601 son administrativos: la factura sigue en 0."""
+        filas = self._correr(tmp_path)
+        assert filas[0]["CROTIPOBJ"] == 0
+
+    def test_una_glosa_clinica_absorbida_deja_la_factura_mixta(self):
+        """Si el código que se absorbe es CL, la factura es mixta: la glosa
+        clínica existe aunque no se cuente su plata dos veces."""
+        objeciones = [
+            _obj("HUS0000544271", "AAA", 1, 500, "TA0201"),
+            _obj("HUS0000544271", "AAA", 1, 300, "CL0101"),
+        ]
+        quedan = org.fusionar_dobles_glosas(objeciones)
+        filas = org.construir_filas(quedan, _fecha())
+        assert filas[0]["CROTIPOBJ"] == 2
