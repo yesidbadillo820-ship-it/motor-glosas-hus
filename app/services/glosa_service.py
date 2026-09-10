@@ -15356,7 +15356,12 @@ class GlosaService:
                 intentos.append(("anthropic", self._llamar_anthropic))
             if ya_incluido != "groq" and self.groq:
                 intentos.append(("groq", self._llamar_groq_con_retry))
-            if ya_incluido != "gemini" and self.gemini:
+            # `getattr` y no `self.gemini` a secas: hay pruebas —y caminos
+            # degradados— que arman el servicio con `GlosaService.__new__()`,
+            # saltándose el __init__, y solo le ponen los atributos que van a
+            # usar. Leer uno que no existe reventaba la cadena entera con un
+            # AttributeError, justo en el momento de elegir proveedor.
+            if ya_incluido != "gemini" and getattr(self, "gemini", None):
                 intentos.append(("gemini", self._llamar_gemini_con_retry))
 
         if modelo_override and self.anthropic_key:
@@ -15371,7 +15376,7 @@ class GlosaService:
             # Fallback: Anthropic (calidad) despues.
             intentos = [("groq", self._llamar_groq_con_retry)]
             _agregar_fallbacks(intentos, "groq")
-        elif self.primary_ai == "gemini" and self.gemini:
+        elif self.primary_ai == "gemini" and getattr(self, "gemini", None):
             # El auditor eligió Gemini: es gratis y con mucho más margen por
             # minuto que el gratis de Groq. Se respeta igual que los otros.
             intentos = [("gemini", self._llamar_gemini_con_retry)]

@@ -131,3 +131,41 @@ class TestMismoContratoQueLosOtrosProveedores:
         corta = visto["max_tokens"]
         await s._llamar_gemini_con_retry("sys", "user", llamada_corta=False)
         assert corta < visto["max_tokens"]
+
+
+class TestNoRevientaConUnServicioAMedioArmar:
+    """El defecto que el CI cazó el 10-09-2026, y por qué existe esta clase.
+
+    Al agregar Gemini a la cadena de respaldos escribí `if self.gemini:` a
+    secas. Dos pruebas viejas arman el servicio con
+    `GlosaService.__new__(GlosaService)` —saltándose el `__init__`— y le
+    ponen a mano solo los atributos que van a usar. Leer uno que no existe
+    reventaba con AttributeError **justo al elegir proveedor**: no en una
+    prueba rara, sino en el momento en que el motor decide a quién llamar.
+
+    Se lee con `getattr(..., None)`. Esta clase lo vigila.
+    """
+
+    def _a_medio_armar(self):
+        """Un servicio como el que arman esas pruebas: sin pasar por __init__."""
+        s = GlosaService.__new__(GlosaService)
+        s.primary_ai = "groq"
+        s.groq = object()
+        s.anthropic_key = ""
+        return s
+
+    def test_elegir_proveedor_no_revienta_sin_el_atributo(self):
+        s = self._a_medio_armar()
+        assert not hasattr(s, "gemini"), "la prueba dejó de reproducir el caso"
+        # Lo mismo que hace `_llamar_ia` al armar la cadena de respaldos.
+        assert getattr(s, "gemini", None) is None
+
+    def test_el_codigo_no_lee_gemini_a_pelo(self):
+        """Si alguien lo vuelve a escribir sin `getattr`, esta prueba avisa."""
+        import inspect
+
+        fuente = inspect.getsource(GlosaService._llamar_ia)
+        assert 'getattr(self, "gemini", None)' in fuente
+        assert "and self.gemini:" not in fuente, (
+            "leer self.gemini a secas revienta con un servicio a medio armar"
+        )
