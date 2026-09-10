@@ -91,6 +91,36 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 09-09-2026 (tarde, 12) — Una regresión mía, vista y corregida el mismo día
+
+Yesid probó una factura real del Dispensario (HUS0000541440, 8 conceptos) y
+**dos análisis de la MISMA factura salieron con la entidad escrita distinto**:
+uno decía «DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANGA» y
+el otro «DMBUG», con un aviso amarillo de «entidad pagadora corregida» que no
+corregía nada.
+
+**Lo causé yo esa misma tarde**, arreglando lo de los regímenes especiales.
+Dos errores:
+
+1. **Agregué «SANIDAD MILITAR» como nombre de entidad, y no lo es.** Es un
+   régimen, y aparece en prosa corriente: la glosa decía «cotización
+   **avalada por sanidad militar**», que describe quién debe avalar, no
+   quién paga. Peor todavía: con ese término, una glosa de FAMISANAR que lo
+   mencionara se habría respondido con el contrato del Dispensario.
+
+2. **El motor comparaba los nombres tal cual.** El desplegable trae el
+   nombre oficial largo y el catálogo usa la sigla: no comparten ni una letra
+   seguida, así que los daba por entidades distintas y «corregía» una que ya
+   estaba bien elegida. Ahora compara por el nombre canónico, que es lo que
+   de verdad decide qué contrato se carga — y eso sirve para todas las
+   entidades, no solo para esta.
+
+6 pruebas nuevas, 4 fallan sin el arreglo. Y se retiró de las pruebas del
+arreglo anterior el caso que exigía lo contrario, dejando escrito por qué: la
+evidencia de producción manda sobre un beneficio hipotético.
+
+---
+
 ### 09-09-2026 (tarde, 11) — Se dejaron de publicar pedazos de las claves, y el contenedor ya no corre como administrador
 
 Tercera tanda de los análisis de código. Cuatro cosas que no rompían nada
@@ -138,6 +168,42 @@ rendimiento ni cambia el arranque.
 18 pruebas nuevas, 17 fallan sin el arreglo. Una de ellas **recorre todo el
 código buscando recortes de credenciales**: no comprueba una lista, así que
 avisa sola si mañana aparece otro.
+
+---
+
+### 09-09-2026 (tarde, 10) — El arranque se ahogaba solo y el «pulso» del motor mentía
+
+Segunda tanda de los análisis de código de Yesid. Tres cosas, todas del
+mismo tipo: el motor se comportaba distinto de como decía comportarse.
+
+**1 · El arranque se quedaba mudo hasta medio minuto.** Cuando el motor
+arranca intenta conectarse a la base, y si no puede reintenta cinco veces
+esperando cada vez más (2, 4, 8, 16 segundos). Esa espera estaba hecha con
+una instrucción que **congela el programa entero**: durante esos 30 segundos
+el motor no contestaba absolutamente nada — ni siquiera para decir «estoy
+arrancando». Desde afuera parecía muerto. Ahora espera igual, pero dejando
+respirar al resto.
+
+**2 · El «pulso» del motor decía que estaba sano con la base caída.** Hay
+una dirección que el sistema consulta cada pocos segundos para saber si el
+motor está vivo (`/health`). Contestaba «ok» **sin mirar la base de datos**.
+O sea que con la base caída seguía diciendo que todo bien, y el sistema le
+seguía mandando trabajo a un motor que no podía guardar ni leer una glosa —
+el auditor veía errores sueltos sin entender por qué. Ahora hace la pregunta
+más barata que existe a la base y, si no contesta, avisa que está caído y
+dice cuál de las dos cosas falló.
+
+**3 · Cuatro pantallas quedarían rotas el día que el portal se mude.** La
+lista de permisos del navegador no incluía uno de los tipos de petición que
+el motor usa en cuatro sitios (metadatos de contrato, notas privadas de una
+glosa, filtros guardados y estado de las sugerencias). Hoy no se nota porque
+la pantalla se sirve desde el mismo servidor; el día que salga de otro
+dominio, esos cuatro dejarían de funcionar sin dar explicación. Se agregó, y
+además se dejó una prueba que **compara la lista de permisos contra lo que
+el motor de verdad ofrece**: si mañana alguien agrega una pantalla con un
+tipo nuevo, la prueba avisa sola.
+
+15 pruebas nuevas, 8 fallan sin el arreglo.
 ### 09-09-2026 (tarde, 9) — El motor podía negarse a responder una glosa que SÍ tenía el servicio
 
 Yesid mandó dos análisis del código con ~136 hallazgos. Se verificaron uno

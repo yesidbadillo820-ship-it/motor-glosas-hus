@@ -1,3 +1,4 @@
+import asyncio as _asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -166,7 +167,6 @@ async def lifespan(app: FastAPI):
     # SSL drops o pausas por inactividad. Antes el startup fallaba en
     # frío y el contenedor nunca respondía. Ahora reintentamos hasta 5
     # veces con backoff exponencial (2s, 4s, 8s, 16s, 32s = ~1 min total).
-    import time as _time
     from sqlalchemy.exc import OperationalError, DBAPIError
 
     _max_intentos_db = 5
@@ -188,7 +188,14 @@ async def lifespan(app: FastAPI):
                 f"DB no disponible (intento {_intento}/{_max_intentos_db}): "
                 f"{type(e).__name__}. Reintento en {espera}s."
             )
-            _time.sleep(espera)
+            # 09-09-2026 — ERA `_time.sleep()`, Y ESTO CORRE DENTRO DEL
+            # `lifespan`, que es async. Un sleep normal no cede el turno: se
+            # queda el hilo entero. Con la base caída, los cinco reintentos
+            # suman 2+4+8+16 = 30 segundos en los que el servidor no puede
+            # ni contestar el /health ni aceptar una conexión: parece muerto
+            # cuando en realidad está esperando. `asyncio.sleep` espera igual
+            # pero deja respirar al resto.
+            await _asyncio.sleep(espera)
 
     db = SessionLocal()
     cfg = get_settings()
@@ -1624,8 +1631,17 @@ allowed_origins = cfg.get_allowed_origins()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    # 09-09-2026 — FALTABA «PUT», Y HAY CUATRO ENDPOINTS QUE LO USAN:
+    # metadatos de contrato, notas privadas de una glosa, presets de filtros y
+    # el estado de las sugerencias. Hoy la pantalla se sirve desde este mismo
+    # servidor —mismo origen— así que CORS no se aplica y no se nota; el día
+    # que la pantalla salga de otro dominio, esos cuatro empiezan a fallar sin
+    # explicación, porque el navegador ni siquiera manda la petición.
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
+    # El identificador de la petición, para que la pantalla pueda mostrarlo
+    # cuando algo falla y el auditor tenga qué pasarnos.
+    expose_headers=["X-Request-ID"],
 )
 
 # R61 P2: GZip para responses >1KB. Reduce ~70% el peso de payloads
