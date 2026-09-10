@@ -8505,6 +8505,21 @@ def _en_pesos_colombianos(crudo: str) -> str:
     return "$ " + f"{int(limpio):,}".replace(",", ".")
 
 
+def _motivo_del_fallo(e: BaseException) -> str:
+    """El motivo de un fallo, que nunca puede quedar vacío.
+
+    10-09-2026. En el log del hospital salía «IA anthropic falló: .» — un
+    punto y nada más. El error era un corte de conexión, y esos vienen SIN
+    texto: `str(e)` devuelve la cadena vacía. El auditor veía que algo falló
+    y no tenía ni una palabra que buscar.
+
+    El nombre del tipo nunca está vacío, así que siempre se antepone.
+    """
+    texto = str(e).strip()
+    tipo = type(e).__name__
+    return f"{tipo}: {texto}" if texto else tipo
+
+
 class GlosaService:
     def __init__(
         self,
@@ -14894,13 +14909,32 @@ class GlosaService:
 
         # Ronda 49: retry con backoff para timeouts transitorios de red
         # (connection reset, stream idle timeout, protocolo). Hasta 3 intentos.
-        _ERRORES_TRANSITORIOS = (
-            httpx.ReadTimeout,
-            httpx.ConnectTimeout,
-            httpx.PoolTimeout,
-            httpx.RemoteProtocolError,
-            httpx.ReadError,
-        )
+        # 10-09-2026 — ANTHROPIC FALLABA SIN DECIR POR QUÉ, Y SIN REINTENTAR.
+        #
+        # En el PC del hospital, cada llamada a Anthropic salía así en el log:
+        #
+        #     IA anthropic falló: . Intentando siguiente proveedor…
+        #
+        # Un punto después de los dos puntos: el motivo venía VACÍO. Y fallaba
+        # en medio segundo, o sea que no pasó por los tres reintentos.
+        #
+        # La causa: esta lista nombraba los errores de red UNO POR UNO y se
+        # dejó por fuera `httpx.ConnectError`, que es justo el que lanza una
+        # conexión cortada por el host remoto — el «WinError 10054» que el
+        # propio panel de Diagnóstico le venía mostrando al auditor. Al no
+        # estar en la lista, no se reintentaba: se propagaba de una.
+        #
+        # Ahora se atrapa `httpx.TransportError`, que es la clase MADRE de
+        # todos ellos (ConnectError, ConnectTimeout, ReadTimeout, ReadError,
+        # WriteError, WriteTimeout, PoolTimeout, RemoteProtocolError,
+        # ProxyError…). Enumerarlos a mano fue el error: cada vez que httpx
+        # agregue uno, esta lista volvería a quedarse corta en silencio.
+        #
+        # Lo que importa para el hospital: cuando la red del HUS corta la
+        # conexión con Anthropic —y la corta— el motor lo reintenta en vez de
+        # rendirse al primer intento. Y si aun así falla, ahora dice cuál fue
+        # el error en vez de dejar un punto.
+        _ERRORES_TRANSITORIOS = (httpx.TransportError,)
         # Headers: si activamos cache con TTL=1h necesitamos el beta header
         # 'extended-cache-ttl-2025-04-11'. Si no, payload normal.
         _headers = {
@@ -15439,7 +15473,12 @@ class GlosaService:
                 )
                 if nombre == "anthropic":
                     _causa_anthropic = str(e)[:200]
-                logger.warning(f"IA {nombre} falló: {e}. Intentando siguiente proveedor…")
+                # `{e}` a secas dejaba «falló: .» cuando el error venía sin
+                # texto (pasa con los cortes de conexión). El TIPO nunca está
+                # vacío, así que el auditor siempre se lleva algo que buscar.
+                logger.warning(
+                    f"IA {nombre} falló: {_motivo_del_fallo(e)}. Intentando siguiente proveedor…"
+                )
                 continue
 
         logger.error(f"Todos los proveedores IA fallaron: {ultimo_error}")
