@@ -584,6 +584,52 @@ class TestProcesar:
         assert r.nombre_objeciones == "OBJECIONES_MUTUAL_07092026.xlsx"
         assert r.nombre_cruce == "CRUCE_MUTUAL_07092026.xlsx"
 
+    def test_mutual_no_cuenta_dos_veces_la_misma_glosa(self):
+        """La pantalla tiene que dar lo MISMO que la consola.
+
+        MUTUAL lista el mismo servicio bajo dos conceptos (TA0201 y TA0601)
+        pero en su total lo cuenta una vez. En el lote del 7-sep, sumar las dos
+        filas daba $26.636.056 cuando la entidad reportó $24.462.346.
+        """
+        doble = _excel(
+            "CONSOLIDADO",
+            [
+                "Número de factura",
+                "SERVICIO",
+                "Cantidad facturada",
+                "Valor glosado",
+                "Concepto de glosa",
+                "Código de glosa",
+                "Observacion",
+            ],
+            [
+                [
+                    "HUS0000548556",
+                    "FMQ0113",
+                    1,
+                    "$\xa05.800",
+                    "Consultas, interconsultas y atenciones (visitas) domiciliarias - TARIFAS",
+                    "TA0201",
+                    "La tecnología FMQ0113 - CATETER INTRAVENOSO 20 no se encuentra "
+                    "dentro del contrato número 20352.",
+                ],
+                [
+                    "HUS0000548556",
+                    "FMQ0113",
+                    1,
+                    "$\xa05.800",
+                    "Dispositivos médicos - TARIFAS",
+                    "TA0601",
+                    "La tecnología FMQ0113 - CATETER INTRAVENOSO 20 no se encuentra "
+                    "dentro del contrato número 20352.",
+                ],
+            ],
+        )
+        r = svc.procesar(doble, _dgh(), fecha="2026-09-07")
+        assert r.objeciones == 1
+        assert r.valor_total == 5800  # no 11.600
+        assert r.reglas_ok
+
     def test_mutual_ubica_el_servicio_por_el_nombre_de_la_observacion(self):
         """El DGH tiene la glucometría como 903883H; MUTUAL manda 903883 y el
         nombre sólo aparece dentro del texto de la observación."""

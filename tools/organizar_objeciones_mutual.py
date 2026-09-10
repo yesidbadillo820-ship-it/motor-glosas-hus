@@ -29,12 +29,33 @@ con qué desempatar. Cuando la observación no lo trae ("El servicio facturado
 389002 no se encuentra habilitado"), el cruce se apoya sólo en el código y el
 valor, y si no alcanza el renglón va a REVISAR sin adivinar nada.
 
+DOBLE GLOSA: EL MISMO SERVICIO BAJO DOS CONCEPTOS. MUTUAL lista un servicio
+una vez por cada concepto de glosa que le aplica, pero en su total lo cuenta
+**una sola vez, por el mayor de los valores**:
+
+    FMQ0463  x1  $244.400  TA0201  "Consultas… - TARIFAS"
+    FMQ0463  x1  $244.400  TA0601  "Dispositivos médicos - TARIFAS"
+    389002   x1  $ 54.594  TA2901  "Recargos no pactados - TARIFAS"
+    389002   x1  $181.900  FA1305  "…no se encuentra habilitado"
+
+Sumar todas las filas infla la glosa: en el lote del 7 de septiembre daba
+$26.636.056 cuando MUTUAL reportó **$24.462.346** — $2.173.710 de más. Por eso
+`fusionar_dobles_glosas()` deja un renglón por (factura, servicio, cantidad)
+con el valor mayor, y anota los demás códigos en CRDOBSERV: no se pierde
+ninguna glosa, sólo se deja de contar dos veces la misma. Es el mismo trato
+que el bot de EMSSANAR le da a sus dobles glosas.
+
+Si dentro de un grupo se repite el MISMO código, eso ya no es doble glosa sino
+una repetición legítima (dos renglones de verdad, como los del Dispensario) y
+el bot NO fusiona: los deja y avisa.
+
 REGLAS FIJAS DEL FORMATO (ver CLAUDE.md, valen para todas las entidades):
     CTNCENCOS  → siempre vacía
     CROTIPOBJ  → por factura: 0 = ADMINISTRATIVA, 1 = MEDICA, 2 = MIXTA
     SLNSERPRO  → prohibido inventar: sin cruce confiable, celda vacía
-    El archivo lleva el 100% de los renglones; los no cruzados van con la
-    celda vacía para completarlos a mano.
+    Ningún renglón se descarta por no haber cruzado: va igual, con la celda
+    vacía para completarlo a mano. Lo único que se junta es la doble glosa
+    de arriba, y precisamente para que el total cuadre con el de MUTUAL.
 
 USO:
     py tools\\organizar_objeciones_mutual.py ^
@@ -204,12 +225,27 @@ def crotipobj_factura(grupos: set[str]) -> int:
     return 0
 
 
-def construir_crdobserv(codigo: str, concepto: str, observacion: str, valor: int) -> str:
-    """CRDOBSERV = ``<código> <concepto>: <observación>$<valor>``."""
+def construir_crdobserv(
+    codigo: str,
+    concepto: str,
+    observacion: str,
+    valor: int,
+    fusionadas: list[tuple[str, int]] | None = None,
+) -> str:
+    """CRDOBSERV = ``<código> <concepto>: <observación>$<valor>``.
+
+    Si el renglón absorbió otras glosas del mismo servicio (doble glosa), se
+    anotan al final con su valor, para que no se pierda de vista bajo qué
+    otros conceptos lo objetó MUTUAL.
+    """
     partes = [p for p in (concepto, observacion) if p]
     texto = ": ".join(partes) if len(partes) == 2 else (partes[0] if partes else "")
     prefijo = f"{codigo} " if codigo else ""
-    return f"{prefijo}{texto}${valor}"
+    cola = ""
+    if fusionadas:
+        detalle = ", ".join(f"{c} ${v}" for c, v in fusionadas)
+        cola = f" (también glosado como {detalle})"
+    return f"{prefijo}{texto}${valor}{cola}"
 
 
 # ─── Lectura del Excel de MUTUAL ─────────────────────────────────────────────
@@ -292,6 +328,55 @@ def leer_mutual(ruta: Path, hoja: str | None = None) -> list[dict]:
         wb.close()
 
 
+# ─── Doble glosa: el mismo servicio bajo dos conceptos ───────────────────────
+
+
+def fusionar_dobles_glosas(objeciones: list[dict], avisar=None) -> list[dict]:
+    """Deja un renglón por (factura, servicio, cantidad), con el valor MAYOR.
+
+    MUTUAL objeta un mismo servicio una vez por cada concepto que le aplica
+    —el mismo dispositivo sale como «Consultas… - TARIFAS» (TA0201) y como
+    «Dispositivos médicos - TARIFAS» (TA0601)— pero en su total lo cuenta una
+    sola vez. Sumar las dos filas infla la glosa; el archivo que se sube al
+    DGH quedaría reclamando más de lo que la entidad realmente objetó.
+
+    El renglón que sobrevive es el de mayor valor, y los otros códigos quedan
+    anotados en `fusionadas` para que CRDOBSERV los muestre. Nada se pierde.
+
+    Cuando dentro de un grupo se repite el MISMO código de glosa, no es doble
+    glosa sino una repetición legítima (dos renglones de verdad de la misma
+    cuenta): ahí el bot NO fusiona y avisa, porque juntarlos sí sería borrar
+    una objeción.
+    """
+    grupos: dict[tuple, list[dict]] = defaultdict(list)
+    for o in objeciones:
+        grupos[(o["cxc"], o["cod_servicio"], o["cantidad"])].append(o)
+
+    conservar: set[int] = set()
+    for clave, items in grupos.items():
+        if len(items) == 1:
+            conservar.add(id(items[0]))
+            continue
+        codigos = [o["codigo"] for o in items]
+        if len(set(codigos)) != len(codigos):
+            # Un código repetido: son renglones distintos, no doble glosa.
+            if avisar is not None:
+                avisar(
+                    f"  ⚠ {clave[1]} x{clave[2]} aparece {len(items)} veces con el "
+                    f"código {codigos[0]} repetido: NO se fusiona (se cuentan todas). "
+                    "Verificá el total contra el acta de MUTUAL."
+                )
+            conservar.update(id(o) for o in items)
+            continue
+        ganador = max(items, key=lambda o: o["valor"] or 0)
+        ganador["fusionadas"] = [(o["codigo"], o["valor"] or 0) for o in items if o is not ganador]
+        conservar.add(id(ganador))
+        # Los códigos absorbidos siguen contando para el tipo de la factura.
+        ganador["codigos_absorbidos"] = [o["codigo"] for o in items if o is not ganador]
+
+    return [o for o in objeciones if id(o) in conservar]
+
+
 # ─── Armado de los renglones ─────────────────────────────────────────────────
 
 
@@ -305,7 +390,10 @@ def construir_filas(
     consec: dict[str, int] = {}
     grupos: dict[str, set[str]] = defaultdict(set)
     for o in objeciones:
-        grupos[o["cxc"]].add((o["codigo"] or "")[:2].upper())
+        # Los códigos que absorbió la fusión son glosas reales de la factura:
+        # cuentan para decidir si es administrativa, médica o mixta.
+        for cod in [o["codigo"], *o.get("codigos_absorbidos", [])]:
+            grupos[o["cxc"]].add((cod or "")[:2].upper())
 
     filas: list[dict] = []
     for o in objeciones:
@@ -357,7 +445,11 @@ def construir_filas(
                 "CTNCENCOS": None,
                 "CROVALOBJ": o["valor"],
                 "CRDOBSERV": construir_crdobserv(
-                    o["codigo"], o["concepto"], o["observacion"], o["valor"]
+                    o["codigo"],
+                    o["concepto"],
+                    o["observacion"],
+                    o["valor"],
+                    o.get("fusionadas"),
                 ),
                 "CROTIPOBJ": crotipobj_factura(grupos[o["cxc"]]),
             }
@@ -515,6 +607,35 @@ def main(argv: list[str] | None = None) -> int:
             len(sin_nombre),
             ", ".join(str(o["fila_excel"]) for o in sin_nombre[:10]),
         )
+
+    bruto = sum(o["valor"] or 0 for o in objeciones)
+    antes = len(objeciones)
+    objeciones = fusionar_dobles_glosas(objeciones, avisar=logger.warning)
+    fusionados = antes - len(objeciones)
+    if fusionados:
+        neto = sum(o["valor"] or 0 for o in objeciones)
+        logger.info(
+            "  Doble glosa: %d renglón(es) repetían un servicio ya objetado bajo otro "
+            "concepto. Se cuenta una sola vez, por el mayor valor.",
+            fusionados,
+        )
+        logger.info(
+            "    sumando todas las filas: $%s  →  glosa real: $%s  (%s menos).",
+            f"{bruto:,}",
+            f"{neto:,}",
+            f"${bruto - neto:,}",
+        )
+        for o in objeciones:
+            for cod, val in o.get("fusionadas", []):
+                logger.info(
+                    "      %s x%s: se cuenta %s $%s y se absorbe %s $%s",
+                    o["cod_servicio"],
+                    o["cantidad"],
+                    o["codigo"],
+                    f"{o['valor']:,}",
+                    cod,
+                    f"{val:,}",
+                )
 
     trazas: list[dict] = []
     filas = construir_filas(objeciones, _parse_fecha(args.fecha), servicios_dgh, trazas)

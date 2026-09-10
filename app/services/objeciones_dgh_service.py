@@ -406,7 +406,10 @@ def _filas_saludtotal(
 def _filas_mutual(
     bot, rutas: list[Path], ruta_dgh: Path, fecha: datetime, servicios, trazas
 ) -> list[dict]:
-    return bot.construir_filas(bot.leer_mutual(_uno(rutas)), fecha, servicios, trazas)
+    # MUTUAL lista el mismo servicio bajo varios conceptos de glosa pero lo
+    # cuenta una sola vez: sin fusionar, el archivo reclamaría de más.
+    objeciones = bot.fusionar_dobles_glosas(bot.leer_mutual(_uno(rutas)))
+    return bot.construir_filas(objeciones, fecha, servicios, trazas)
 
 
 def _filas_sanitas(
