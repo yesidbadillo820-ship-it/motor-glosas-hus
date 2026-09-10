@@ -142,7 +142,13 @@ def eps_seleccionables(
         for r in db.query(GlosaRecord.eps).distinct().all()
         if r[0] and r[0].strip() and r[0].strip().upper() not in _generico
     ]
-    return _unir(con_contrato, en_historial)
+    # `preferidas` = las que tienen contrato cargado. Cuando la misma entidad
+    # está escrita de dos maneras (el caso de Yesid del 10-09-2026: SALUD
+    # TOTAL / SALUD TOTAL EPS, DISPENSARIO MEDICO / DIRECCION DE SANIDAD
+    # EJERCITO - DISPENSARIO MEDICO BUCARAMANGA), sobrevive el nombre con el
+    # que está FIRMADO el contrato: es el que la entidad reconoce y el que
+    # debe salir citado en el dictamen.
+    return _unir(en_historial, preferidas=con_contrato)
 
 
 @router.get("/exportar.csv")
