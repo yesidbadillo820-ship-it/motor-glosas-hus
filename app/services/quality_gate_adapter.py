@@ -232,6 +232,11 @@ async def ejecutar_con_quality_gate(
         max_intentos=3,
         modelos_fallback=modelos_orden,
         clausulas_contrato=clausulas_contrato,
+        # El prompt completo es la única lista fiel de lo que la IA de verdad
+        # vio: la glosa, el contexto contractual y el texto de los soportes
+        # que se hayan podido leer. Con esto, el check de cantidades solo
+        # acusa lo que nadie le entregó.
+        fuentes_adicionales=[user_prompt],
     )
 
 

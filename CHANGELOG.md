@@ -1,5 +1,34 @@
 # Registro de cambios
 
+## Sesión 10-sep-2026 (3) — `check_medidas_no_fabricadas`: dosis, unidades y números de ítem inventados
+
+Mismo caso (objeción 189801, causal FA0701 del IOBITRIDOL). El dictamen
+radicado afirmaba «EL ÍTEM 13 DE LA FACTURA INDICA LA ADQUISICIÓN DE CINCO
+UNIDADES DE 100 ML CADA UNA, TOTALIZANDO 500 ML» sobre un medicamento de
+50 ML. `check_valores_no_fabricados` no lo veía: solo mira cifras con `$` y
+separador de miles.
+
+- **`app/services/quality_gate/post_validator.py`** — nuevo
+  `check_medidas_no_fabricadas()` (severidad ERROR, check 12 del post-gate).
+  Extrae del dictamen y de la fuente todas las parejas *(número, unidad)*
+  —`_PAT_MEDIDA` con unidades canonizadas (CC≡ML, GR≡G≡GRS, UG≡MCG)—, los
+  `ÍTEM/RENGLÓN/FOLIO n` (`_PAT_ITEM`) y los conteos de envase
+  (`_PAT_CONTEO`), y marca lo que está en el dictamen y no en la fuente.
+  `_ANTES_QUE_NO_ES_MEDIDA` evita leer «ANEXO 3 G» como gramos;
+  `UN`/`UNA`/`UNO` quedan fuera de `_NUMERO_EN_LETRAS` a propósito (en
+  español son artículo, no cuenta) porque un ERROR falso cuesta una
+  regeneración de IA y una escalada a humano.
+- **`post_validar_dictamen()`, `ejecutar_quality_gate()`** — parámetro nuevo
+  `fuentes_adicionales: list[str] | None`.
+- **`app/services/quality_gate_adapter.py`** — pasa `[user_prompt]`, que es la
+  lista fiel de lo que la IA vio (glosa + contexto contractual + texto de los
+  soportes leídos). Así el check solo acusa lo que nadie le entregó.
+- **Pruebas** — `tests/test_services/test_medidas_que_nadie_conto.py` (18),
+  incluida una que corre los 4 dictámenes reales de `tests/benchmark/casos.json`
+  y dos que fallan si alguien desconecta el check del gate (verificado
+  reinyectando el defecto). 8.754 pruebas de servicios y API en verde.
+
+
 ## Sesión 10-sep-2026 (2) — Cada causal con su valor, y el panel de soportes que dejó de mentir
 
 Los dos defectos salieron de la objeción real N° 189801 (factura

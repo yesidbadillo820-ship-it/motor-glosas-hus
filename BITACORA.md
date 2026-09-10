@@ -91,6 +91,45 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — El dictamen dejó de inventar mililitros y renglones de factura
+
+Del mismo caso (objeción 189801). La entidad objetó el IOBITRIDOL diciendo
+que *según nota operatoria se utilizan 40 CC, la hoja de gastos registra
+frasco de 100 ML / 50 ML, por lo tanto no se reconoce el cobro de 4
+unidades*. Y el dictamen salió a defender el cobro con esta frase:
+
+> «EL **ÍTEM 13** DE LA FACTURA INDICA LA ADQUISICIÓN DE **CINCO UNIDADES DE
+> 100 ML CADA UNA, TOTALIZANDO 500 ML**»
+
+Nada de eso existe. El medicamento es de **50 ML** — lo dice la descripción
+del propio renglón, «IOBITRIDOL 300MG/50ML». Ni el ítem 13, ni las cinco
+unidades, ni los 500 ML estaban en algo que el motor hubiera leído. Es decir:
+el hospital le discutía a la entidad con una cuenta inventada, y encima se la
+atribuía a un renglón concreto de la factura. La entidad abre la factura, ve
+que el ítem 13 no dice eso, y ahí se pierde la glosa **y la credibilidad de
+los otros siete renglones**.
+
+El motor ya vigilaba las cifras de plata inventadas, pero solo las que llevan
+signo de pesos y separador de miles. «500 ML» y «ÍTEM 13» pasaban de largo.
+
+Ahora hay una revisión que compara **toda cantidad con unidad** del dictamen
+—mililitros, miligramos, gramos, unidades, frascos, ampollas— y **todo número
+de ítem, renglón o folio** contra lo que de verdad se le entregó al modelo (la
+glosa completa y el texto de los soportes que alcanzó a leer). Lo que no
+aparezca en ninguna parte se marca como grave y el dictamen no sale: se
+reintenta o se manda a revisión humana.
+
+Está hecha para no molestar sin razón: centímetro cúbico y mililitro se toman
+como lo mismo (40 CC = 40 ML), el gramo vale escrito «G», «GR» o «GRS», los
+numerales de las normas no se confunden con dosis («ANEXO 3 G» no son tres
+gramos), y «un frasco» se lee como el artículo que es, no como una cuenta.
+
+**Comprobado sobre papel real:** en el dictamen completo de ese caso —seis mil
+caracteres, con la cláusula del contrato, el CDP y treinta y seis citas de
+normas— señala **exactamente las tres invenciones y ninguna cosa más**. Y los
+cuatro dictámenes reales de producción que el motor guarda de banco de pruebas
+pasan limpios.
+
 ### 10-09-2026 — Cada causal con SU valor, y dejar de decir «soporte completo» cuando no se sabe
 
 Dos defectos que salieron del caso real de la factura **HUS0000541440**

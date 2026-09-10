@@ -413,6 +413,199 @@ def check_sin_placeholders_crudos(texto_dictamen: str) -> PostCheckResult:
     return PostCheckResult(ok=True, severidad="INFO", razon="sin placeholders crudos")
 
 
+# ── Dosis, cantidades y números de ítem inventados ────────────────────────
+#
+# 10-09-2026 — El caso que lo pidió. Objeción N° 189801, causal FA0701 sobre
+# el IOBITRIDOL. La entidad objetó así, con todas sus letras:
+#
+#   «SE OBJETA MEDIO DE CONTRASTE UTILIZADO SEGUN NOTA OPERATORIA SE UTILIZA
+#    40CC LA HOJA DE GASTOS REGISTRA FRASCO DE 100 ML 50 ML POR LO TANTO NO
+#    SE RECONOCE COBRO DE 4 UNIDADES»
+#
+# y el dictamen que salió a defender el cobro dijo:
+#
+#   «EL ÍTEM 13 DE LA FACTURA INDICA LA ADQUISICIÓN DE CINCO UNIDADES DE
+#    100 ML CADA UNA, TOTALIZANDO 500 ML»
+#
+# El ítem 13, las cinco unidades y los 500 ML **no están en ninguna parte de
+# lo que se le entregó al modelo**. El medicamento es de 50 ML: lo dice la
+# propia descripción del renglón, «IOBITRIDOL 300MG/50ML». O sea que el
+# dictamen le discute a la entidad con una cuenta que se inventó, y encima
+# se la atribuye a un renglón de la factura que nadie leyó. La entidad abre
+# la factura, ve que el ítem 13 no dice eso, y el hospital pierde la glosa y
+# la credibilidad de las otras siete.
+#
+# `check_valores_no_fabricados` no lo veía: solo mira cifras de plata con
+# separador de miles. «500 ML» y «ÍTEM 13» pasaban de largo.
+#
+# Palabras que van delante de un número y NO anuncian una medida. Sin esto,
+# «ANEXO 3 G» o «NUMERAL 5 L» de una norma se leerían como gramos y litros.
+_ANTES_QUE_NO_ES_MEDIDA = (
+    "ANEXO",
+    "NUMERAL",
+    "LITERAL",
+    "ART",
+    "ARTICULO",
+    "ARTÍCULO",
+    "PARAGRAFO",
+    "PARÁGRAFO",
+    "INCISO",
+    "CAPITULO",
+    "CAPÍTULO",
+    "TITULO",
+    "TÍTULO",
+    "LEY",
+    "DECRETO",
+    "RESOLUCION",
+    "RESOLUCIÓN",
+    "CIRCULAR",
+    "ACUERDO",
+)
+
+# Centímetro cúbico y mililitro son lo mismo, y el gramo se escribe de tres
+# formas. Si no se unifican, un dictamen que dice «40 ML» sobre una glosa que
+# dice «40CC» quedaría acusado de inventar.
+_UNIDAD_CANONICA = {
+    "CC": "ML",
+    "ML": "ML",
+    "CM3": "ML",
+    "MG": "MG",
+    "MGS": "MG",
+    "MCG": "MCG",
+    "UG": "MCG",
+    "G": "G",
+    "GR": "G",
+    "GRS": "G",
+    "KG": "KG",
+    "UI": "UI",
+    "MEQ": "MEQ",
+    "L": "L",
+}
+_UNIDADES = "|".join(sorted(_UNIDAD_CANONICA, key=len, reverse=True))
+
+_PAT_MEDIDA = re.compile(
+    r"(?:(?P<antes>[A-ZÁÉÍÓÚÑ]+)\s+)?"
+    r"(?P<num>\d+(?:[.,]\d+)?)\s?"
+    r"(?P<uni>" + _UNIDADES + r")\b",
+    re.IGNORECASE,
+)
+
+# «ÍTEM 13», «RENGLÓN No. 4», «FOLIO 27»: señalar un renglón concreto de un
+# documento es afirmar que se leyó ese renglón.
+_PAT_ITEM = re.compile(
+    r"\b(?:[ÍI]TEM|RENGL[ÓO]N|FOLIO)\s*(?:N[oº°]?\.?\s*)?(\d{1,4})\b",
+    re.IGNORECASE,
+)
+
+# «UN FRASCO», «UNA AMPOLLA»: en español eso casi siempre es el artículo, no
+# una cuenta. Se dejan por fuera a propósito — acusar de inventada la prosa
+# normal costaría una regeneración de IA y una escalada a humano por nada.
+_NUMERO_EN_LETRAS = {
+    "DOS": "2",
+    "TRES": "3",
+    "CUATRO": "4",
+    "CINCO": "5",
+    "SEIS": "6",
+    "SIETE": "7",
+    "OCHO": "8",
+    "NUEVE": "9",
+    "DIEZ": "10",
+    "ONCE": "11",
+    "DOCE": "12",
+}
+_ENVASES = (
+    r"UNIDADES?|FRASCOS?|AMPOLLAS?|VIALES?|TABLETAS?|CAPSULAS?|CÁPSULAS?"
+    r"|BOLSAS?|CAJAS?|SOBRES?|JERINGAS?"
+)
+_PAT_CONTEO = re.compile(
+    r"\b(?P<num>\d{1,4}|" + "|".join(_NUMERO_EN_LETRAS) + r")\s+(?P<envase>" + _ENVASES + r")\b",
+    re.IGNORECASE,
+)
+
+
+def _numero_normalizado(bruto: str) -> str:
+    """«5», «CINCO», «05», «5,0» → «5». Deja el decimal si de verdad lo hay."""
+    s = (bruto or "").strip().upper()
+    if s in _NUMERO_EN_LETRAS:
+        return _NUMERO_EN_LETRAS[s]
+    s = s.replace(",", ".")
+    try:
+        valor = float(s)
+    except ValueError:
+        return s
+    return str(int(valor)) if valor == int(valor) else str(valor)
+
+
+def _medidas_del_texto(texto: str) -> set[tuple[str, str]]:
+    """Todas las cantidades con unidad, ítems y conteos de un texto.
+
+    Se devuelven normalizadas —(«500», «ML»), («13», «ITEM»), («5», «UNIDAD»)—
+    para poder comparar dictamen contra fuente sin que la redacción estorbe.
+    """
+    encontradas: set[tuple[str, str]] = set()
+    if not texto:
+        return encontradas
+
+    for m in _PAT_MEDIDA.finditer(texto):
+        antes = (m.group("antes") or "").upper()
+        if antes in _ANTES_QUE_NO_ES_MEDIDA:
+            continue
+        unidad = _UNIDAD_CANONICA[m.group("uni").upper()]
+        encontradas.add((_numero_normalizado(m.group("num")), unidad))
+
+    for m in _PAT_ITEM.finditer(texto):
+        encontradas.add((_numero_normalizado(m.group(1)), "ITEM"))
+
+    for m in _PAT_CONTEO.finditer(texto):
+        encontradas.add((_numero_normalizado(m.group("num")), "UNIDAD"))
+
+    return encontradas
+
+
+def check_medidas_no_fabricadas(
+    texto_dictamen: str,
+    texto_glosa_input: str | None,
+    fuentes_adicionales: list[str] | None = None,
+) -> PostCheckResult:
+    """Dosis, cantidades o números de ítem del dictamen que nadie le dio a la IA.
+
+    Mismo criterio que `check_valores_no_fabricados`, pero para lo que no
+    lleva signo de pesos: mililitros, miligramos, unidades, frascos, «ÍTEM 13».
+    Si una medida aparece en la glosa o en cualquiera de las fuentes que se le
+    pasaron al modelo (el prompt completo, con el texto de los soportes que se
+    hayan leído), es legítima. Si no aparece en ninguna, el dictamen la
+    fabricó y esto es ERROR: se radica un documento que la entidad desmiente
+    abriendo la factura.
+    """
+    if not texto_dictamen:
+        return PostCheckResult(ok=True, severidad="INFO", razon="texto vacío")
+
+    fuente = texto_glosa_input or ""
+    for extra in fuentes_adicionales or []:
+        if extra:
+            fuente += "\n" + extra
+    if not fuente.strip():
+        return PostCheckResult(ok=True, severidad="INFO", razon="sin input con qué comparar")
+
+    de_la_fuente = _medidas_del_texto(fuente)
+    fabricadas = sorted(_medidas_del_texto(texto_dictamen) - de_la_fuente)
+    if fabricadas:
+        muestra = ", ".join(
+            f"ítem {n}" if u == "ITEM" else (f"{n} unidad(es)" if u == "UNIDAD" else f"{n} {u}")
+            for n, u in fabricadas[:4]
+        )
+        return PostCheckResult(
+            ok=False,
+            severidad="ERROR",
+            razon=(
+                f"{len(fabricadas)} cantidad(es) del dictamen no están en lo que "
+                f"se le entregó a la IA: {muestra}. La entidad lo desmiente "
+                "abriendo la factura."
+            ),
+        )
+    return PostCheckResult(ok=True, severidad="INFO", razon="cantidades consistentes con el input")
+
+
 def check_datos_clinicos_usados(
     texto_dictamen: str,
     texto_glosa_input: str | None,
@@ -468,6 +661,7 @@ def post_validar_dictamen(
     texto_glosa_input: str | None = None,
     valor_objetado_input: str | int | float | None = None,
     clausulas_contrato: list[dict] | None = None,
+    fuentes_adicionales: list[str] | None = None,
 ) -> PostValidationResult:
     """Ejecuta todos los post-checks del dictamen ya generado por la IA.
 
@@ -476,6 +670,9 @@ def post_validar_dictamen(
         eps: nombre de la EPS (para context en verificador de citas)
         es_ratificacion: si True, acepta coda procesal
         es_extemporanea: si True, acepta coda procesal
+        fuentes_adicionales: todo lo demás que la IA sí vio (el prompt
+            completo con el texto de los soportes leídos). Sirve para no
+            acusar de inventadas las cantidades que vienen de un soporte.
 
     Returns:
         PostValidationResult con .aprobado=True si TODOS los checks ERROR pasaron,
@@ -534,6 +731,16 @@ def post_validar_dictamen(
         # 11. Datos clínicos del caso ignorados → WARN (score, no bloquea).
         checks["datos_clinicos"] = check_datos_clinicos_usados(
             texto, texto_glosa_input=texto_glosa_input
+        )
+
+        # 12. Dosis, cantidades y números de ítem inventados (10-09-2026:
+        #     «CINCO UNIDADES DE 100 ML… TOTALIZANDO 500 ML» sobre un
+        #     medicamento de 50 ML que nadie contó). Igual de grave que una
+        #     cifra de plata fabricada, y hasta hoy no lo miraba nadie.
+        checks["medidas_fabricadas"] = check_medidas_no_fabricadas(
+            texto,
+            texto_glosa_input=texto_glosa_input,
+            fuentes_adicionales=fuentes_adicionales,
         )
 
     # Score: 100 - 30 por cada ERROR, -10 por cada WARN
