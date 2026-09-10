@@ -8543,9 +8543,25 @@ class GlosaService:
         # de Fly), se normaliza a "groq" para no dejar el motor sin
         # proveedor primario válido.
         self.primary_ai = (primary_ai or "anthropic").lower()
-        if self.primary_ai in ("gemini", "openrouter"):
+        # 10-09-2026 — GEMINI VUELVE AL DICTAMEN.
+        #
+        # Salió en junio de 2026 con esta razón de Yesid: «no las veo
+        # trabajando y de pago ya tenemos Claude». Las dos mitades de esa
+        # frase cambiaron:
+        #
+        #   · «de pago ya tenemos Claude» — ahora los tokens de Claude los
+        #     paga él, y una tanda de glosas de prueba se los comió.
+        #   · «no las veo trabajando» — era otra generación del modelo.
+        #
+        # Y el tier gratis de Gemini da 250.000 tokens por minuto contra los
+        # 8.000 del gratis de Groq. Los prompts de este motor pesan unos
+        # 21.000: en Groq gratis **una sola glosa no cabe en el minuto**.
+        #
+        # OpenRouter sigue afuera: no hay llave configurada ni evidencia de
+        # que sirva. Si llega ese valor, se normaliza como antes.
+        if self.primary_ai == "openrouter":
             logger.warning(
-                f"[IA] primary_ai={self.primary_ai!r} ya no genera dictámenes "
+                "[IA] primary_ai='openrouter' no genera dictámenes "
                 "(proveedor retirado jun-2026). Normalizando a 'groq'."
             )
             self.primary_ai = "groq"
@@ -8563,11 +8579,16 @@ class GlosaService:
         self.groq_model_fallback_1 = groq_model_fallback_1 or _cfg.groq_model_fallback_1
         self.groq_model_fallback_2 = groq_model_fallback_2 or _cfg.groq_model_fallback_2
         self.groq_model_fallback_3 = groq_model_fallback_3 or _cfg.groq_model_fallback_3
-        # Google Gemini se conserva ÚNICAMENTE para lectura de PDFs
-        # escaneados: OCR (pdf_service.extraer_con_ocr) y la cadena
-        # multimodal del pdf_fallback_patch (A=Anthropic → B=Gemini PDF →
-        # C=Gemini Vision). NO participa en la generación de dictámenes
-        # vía _llamar_ia.
+        # Google Gemini hace dos cosas distintas y conviene no confundirlas:
+        #
+        #   · Lectura de PDFs escaneados — OCR (`pdf_service.extraer_con_ocr`)
+        #     y la cadena multimodal del `pdf_fallback_patch` (A=Anthropic →
+        #     B=Gemini PDF → C=Gemini Vision). Usa `gemini_model`.
+        #   · Redacción de dictámenes, desde el 10-09-2026, cuando
+        #     `PRIMARY_AI=gemini`. Usa `gemini_model_dictamen`, que es OTRO
+        #     ajuste a propósito: el modelo bueno para leer un escaneo no
+        #     tiene por qué ser el bueno para redactar un escrito jurídico,
+        #     y cambiar uno no puede cambiar el otro sin querer.
         from app.services.gemini_service import GeminiService
 
         gem_key = gemini_api_key or os.getenv("GEMINI_API_KEY", "")
@@ -8575,6 +8596,7 @@ class GlosaService:
             GeminiService(api_key=gem_key, default_model=gemini_model) if gem_key else None
         )
         self.gemini_model = gemini_model or _cfg.gemini_model
+        self.gemini_model_dictamen = _cfg.gemini_model_dictamen
 
     async def analizar(
         self,
@@ -14514,6 +14536,61 @@ class GlosaService:
         )
         return [m for m in candidatos if m and not (m in vistos or vistos.add(m))]
 
+    async def _llamar_gemini_con_retry(
+        self, system: str, user: str, max_intentos: int = 3, llamada_corta: bool = False
+    ) -> tuple[str, str]:
+        """Llama a Gemini para REDACTAR un dictamen. Devuelve (texto, modelo).
+
+        10-09-2026 — Gemini vuelve al dictamen. Salió en junio de 2026 y las
+        dos razones de entonces cambiaron: los tokens de Claude ahora los paga
+        el hospital, y el modelo es de otra generación. El tier gratis de
+        Gemini da 250.000 tokens por minuto contra los 8.000 del gratis de
+        Groq; los prompts de este motor pesan unos 21.000, así que en Groq
+        gratis una sola glosa no cabe en el minuto.
+
+        Mismo contrato que los otros dos proveedores —(system, user) entra,
+        (texto, modelo) sale— y si falla LEVANTA, para que la cadena de
+        `_llamar_ia` pruebe el siguiente. No se traga errores: un dictamen
+        vacío servido en silencio es peor que un fallo visible.
+
+        `llamada_corta` marca las llamadas auxiliares (auto-crítica,
+        refinamiento). Se le baja el techo de salida, igual que hace Groq con
+        su reasoning_effort: no tiene sentido pagar 3.000 tokens de salida
+        para una respuesta de dos renglones.
+        """
+        if not self.gemini:
+            raise RuntimeError("GEMINI_API_KEY no configurada")
+
+        modelo = self.gemini_model_dictamen or self.gemini_model
+        max_tokens = 1200 if llamada_corta else 3000
+        ultimo: Exception = RuntimeError("Gemini no respondió")
+
+        for intento in range(max_intentos):
+            try:
+                texto, modelo_usado = await self.gemini.completar(
+                    system=system,
+                    user=user,
+                    modelo=modelo,
+                    temperature=0.10,
+                    max_tokens=max_tokens,
+                )
+                if not (texto or "").strip():
+                    # Respuesta vacía: para el motor es un fallo, no un
+                    # dictamen. Si se devolviera, el auditor vería una hoja
+                    # en blanco con sello de validado.
+                    raise RuntimeError("Gemini devolvió una respuesta vacía")
+                return texto, f"gemini/{modelo_usado or modelo}"
+            except Exception as e:  # noqa: BLE001 — se reintenta y se relanza
+                ultimo = e
+                if intento < max_intentos - 1:
+                    espera = 2**intento
+                    logger.warning(
+                        f"[IA] Gemini falló (intento {intento + 1}/{max_intentos}): {e}. "
+                        f"Reintento en {espera}s."
+                    )
+                    await asyncio.sleep(espera)
+        raise ultimo
+
     async def _llamar_groq_con_retry(
         self, system: str, user: str, max_intentos: int = 4, llamada_corta: bool = False
     ) -> tuple[str, str]:
@@ -15269,11 +15346,18 @@ class GlosaService:
         # PDFs escaneados (pdf_service + pdf_fallback_patch) y NO entra
         # aqui; OpenRouter salio del proyecto.
         def _agregar_fallbacks(intentos: list, ya_incluido: str) -> None:
-            """Agrega los proveedores restantes en orden de preferencia."""
+            """Agrega los proveedores restantes en orden de preferencia.
+
+            Gemini va de último entre los respaldos a propósito: entró al
+            dictamen el 10-09-2026 y todavía no tiene historial en producción.
+            Quien lo quiera de primero lo pone en PRIMARY_AI.
+            """
             if ya_incluido != "anthropic" and self.anthropic_key:
                 intentos.append(("anthropic", self._llamar_anthropic))
             if ya_incluido != "groq" and self.groq:
                 intentos.append(("groq", self._llamar_groq_con_retry))
+            if ya_incluido != "gemini" and self.gemini:
+                intentos.append(("gemini", self._llamar_gemini_con_retry))
 
         if modelo_override and self.anthropic_key:
             # modelo_override SIEMPRE va a Anthropic (Opus/Haiku especifico)
@@ -15287,6 +15371,11 @@ class GlosaService:
             # Fallback: Anthropic (calidad) despues.
             intentos = [("groq", self._llamar_groq_con_retry)]
             _agregar_fallbacks(intentos, "groq")
+        elif self.primary_ai == "gemini" and self.gemini:
+            # El auditor eligió Gemini: es gratis y con mucho más margen por
+            # minuto que el gratis de Groq. Se respeta igual que los otros.
+            intentos = [("gemini", self._llamar_gemini_con_retry)]
+            _agregar_fallbacks(intentos, "gemini")
         else:
             # primary_ai desconocido o sin proveedor disponible para el
             # primary elegido: Groq (gratis/rapido) -> Anthropic (calidad).

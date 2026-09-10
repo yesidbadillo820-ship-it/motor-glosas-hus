@@ -164,6 +164,12 @@ class Settings(BaseSettings):
     # no se muera. Si alguna vez se necesita fijar uno, poner GEMINI_MODEL en
     # el .env con un nombre de la lista de `?key=...&models`.
     gemini_model: str = "gemini-flash-latest"
+    # 10-09-2026 — el modelo con el que Gemini REDACTA dictámenes, aparte del
+    # que usa para leer PDFs escaneados. Son tareas distintas: el bueno para
+    # un escaneo no tiene por qué ser el bueno para un escrito jurídico, y
+    # cambiar uno no puede cambiar el otro sin querer. Solo se usa cuando
+    # PRIMARY_AI=gemini.
+    gemini_model_dictamen: str = "gemini-flash-latest"
 
     allowed_origins: str = "http://localhost:3000,http://localhost:8000"
     smtp_host: str = "smtp.gmail.com"
