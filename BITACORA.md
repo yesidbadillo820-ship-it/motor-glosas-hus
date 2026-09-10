@@ -91,6 +91,55 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — Un solo renglón por entidad: yo me había saltado la regla
+
+Yesid abrió el desplegable y volvió a contar repetidas. Tenía razón, y esta
+vez el error mío no fue de tiempos sino de fondo: **su regla número 1 decía
+expresamente «o separaciones por UVT/UVB»**, y yo las dejé separadas de todos
+modos, razonando que la unidad del SOAT cambiaba la tarifa.
+
+**Fui a mirar el motor y esa razón era falsa:**
+
+- El motor liquida **solo en UVB** (`uvb.py`: UVB 2026 = $12.110). No existe
+  ni una tarifa en UVT en todo el código.
+- Su propia normativa lo dice: «Reemplaza el uso de UVT (2023-2024). Todos los
+  valores tarifarios SOAT se expresan ahora en UVB».
+- Las bases de tarifa de la malla son SOAT, SOAT_UVB, SOAT_SMLV, PROPIA,
+  PACTADA y MIXTA. **No hay SOAT_UVT.**
+- Y del régimen: **AXA COLPATRIA, ALIANZA MEDELLÍN y PROTEGER no están en la
+  malla contractual**, así que su nombre no elige ningún contrato.
+
+El desplegable pasa de **41 renglones a 34**. Se unen las tres AXA, las dos
+Previsora, las dos Alianza, las dos Proteger y las dos Fundación Salud Mía
+—que además la malla conoce como «SALUD MIA», así que unirlas hace que sí
+encuentre su ficha—.
+
+**Dos cosas más que salieron de la misma captura:**
+
+- **«OTRA / SIN DEFINIR» aparecía DOS veces**: arriba como marcador y otra vez
+  dentro de la lista. El filtro que lo saca se aplicaba al historial pero no a
+  los contratos cargados. Ahora se filtra en un solo sitio, para todas las
+  fuentes, donde ningún llamador puede olvidarlo.
+- **El Dispensario salía con la sigla** `DISPENSARIO MEDICO`, que es un nombre
+  que escribí yo en una lista fija, en vez del oficial largo, que tiene **332
+  glosas reales** y con el que está firmado el 440-DIGSA/DMBUG-2025. Ahora la
+  ruta manda el historial **ordenado por cuántas glosas tiene cada grafía**:
+  manda el dato, no mi lista. Y el catálogo curado pasa a completar solamente
+  — nunca agrega un renglón si los datos reales ya nombran a esa entidad.
+
+**Lo que NO se tocó, y por qué.** COOSALUD sí tiene dos contratos de verdad
+(subsidiado y contributivo, números distintos). Pero eso no lo decide el
+desplegable —que ya muestra un solo «COOSALUD»— sino los alias de la malla
+leyendo el texto de la glosa. Ese mecanismo sigue igual.
+
+Las pruebas que exigían lo contrario **se invirtieron con el motivo escrito
+adentro**, no se borraron: queda anotado que el motor no liquida en UVT y que
+esas tres entidades no están en la malla, para que nadie —yo el primero—
+vuelva a separarlas «por si acaso». La evidencia del código manda sobre la
+precaución.
+
+---
+
 ### 10-09-2026 — Analizar glosa ahora acompaña, ya no interroga
 
 Yesid lo pidió con estas palabras: **«que no se comporte como un formulario

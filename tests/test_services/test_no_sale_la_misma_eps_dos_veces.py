@@ -92,8 +92,27 @@ class TestLosDuplicadosQueVioElAuditor:
         assert len(dispensarios) == 1, dispensarios
 
 
-class TestLosSufijosQueSiDistinguen:
-    """Fundir estos costaría plata: la unidad del SOAT y el régimen."""
+class TestLosSufijosQueYoCreiQueDistinguian:
+    """10-09-2026 — esta clase decía lo contrario, y estaba equivocada.
+
+    Yesid pidió desde el primer mensaje «un único nombre consolidado por
+    entidad», y su regla decía expresamente «o separaciones por UVT/UVB». Yo
+    las dejé separadas razonando que la unidad del SOAT cambiaba la tarifa.
+    Fui a mirar el motor y la razón era falsa:
+
+      · Liquida SOLO en UVB (`uvb.py`: UVB 2026 = $12.110). No hay ni una
+        tarifa en UVT en todo el código.
+      · Su normativa lo dice: «Reemplaza el uso de UVT (2023-2024). Todos los
+        valores tarifarios SOAT se expresan ahora en UVB».
+      · Las bases de tarifa de la malla son SOAT, SOAT_UVB, SOAT_SMLV, PROPIA,
+        PACTADA y MIXTA. No existe SOAT_UVT.
+
+    Y del régimen: AXA COLPATRIA, ALIANZA MEDELLÍN y PROTEGER **no están en la
+    malla contractual**, así que su nombre no elige ningún contrato.
+
+    Queda escrito para que nadie —yo el primero— vuelva a separarlas «por si
+    acaso»: la evidencia del código manda sobre la precaución.
+    """
 
     @pytest.mark.parametrize(
         "a,b,por_que",
@@ -101,42 +120,70 @@ class TestLosSufijosQueSiDistinguen:
             (
                 "AXA COLPATRIA SEGUROS S.A. SOAT - UVT",
                 "AXA COLPATRIA SEGUROS S.A. SOAT UVB",
-                "UVT y UVB son unidades distintas de liquidación del SOAT",
-            ),
-            (
-                "LA PREVISORA S A COMPAÑIA DE SEGUROS SOAT - UVT",
-                "LA PREVISORA S A COMPAÑIA DE SEGUROS SOAT UVB",
-                "idem, y es el pagador con más glosas del export real",
-            ),
-            (
-                "PROTEGER EPS S.A.S. CONTRIBUTIVO",
-                "PROTEGER EPS S.A.S. SUBSIDIADO",
-                "el régimen cambia la norma aplicable",
-            ),
-            (
-                "ALIANZA MEDELLIN ANTIOQUIA EPS SAS CONTRIBUTIVO",
-                "ALIANZA MEDELLIN ANTIOQUIA EPS SAS SUBSIDIADO",
-                "idem",
+                "el motor no liquida en UVT; AXA no está en la malla",
             ),
             (
                 "AXA COLPATRIA SEGUROS S.A. SOAT",
                 "AXA COLPATRIA SEGUROS S.A. SOAT UVB",
-                "el nombre pelado no dice la unidad; suponerla sería inventar la tarifa",
+                "el nombre pelado y el de la unidad son el mismo pagador",
+            ),
+            (
+                "LA PREVISORA S A COMPAÑIA DE SEGUROS SOAT - UVT",
+                "LA PREVISORA S A COMPAÑIA DE SEGUROS SOAT UVB",
+                "idem, y la guarda de SOAT ya impide que le den un contrato que no es de SOAT",
+            ),
+            (
+                "PROTEGER EPS S.A.S. CONTRIBUTIVO",
+                "PROTEGER EPS S.A.S. SUBSIDIADO",
+                "PROTEGER no está en la malla: el nombre no elige contrato",
+            ),
+            (
+                "ALIANZA MEDELLIN ANTIOQUIA EPS SAS CONTRIBUTIVO",
+                "ALIANZA MEDELLIN ANTIOQUIA EPS SAS SUBSIDIADO",
+                "ALIANZA tampoco está en la malla",
             ),
         ],
     )
-    def test_no_se_funden(self, a, b, por_que):
-        assert not misma_entidad(a, b), por_que
+    def test_ahora_si_se_unen(self, a, b, por_que):
+        assert misma_entidad(a, b), por_que
 
-    def test_las_dos_previsoras_siguen_en_la_lista(self):
+    def test_del_desplegable_real_queda_un_solo_axa(self):
         salida = eps_seleccionables(DESPLEGABLE_REAL)
-        assert "LA PREVISORA S A COMPAÑIA DE SEGUROS SOAT - UVT" in salida
-        assert "LA PREVISORA S A COMPAÑIA DE SEGUROS SOAT UVB" in salida
+        assert len([e for e in salida if e.startswith("AXA")]) == 1
 
-    def test_los_dos_regimenes_de_proteger_siguen(self):
+    def test_una_sola_previsora(self):
         salida = eps_seleccionables(DESPLEGABLE_REAL)
-        assert "PROTEGER EPS S.A.S. CONTRIBUTIVO" in salida
-        assert "PROTEGER EPS S.A.S. SUBSIDIADO" in salida
+        assert len([e for e in salida if e.startswith("LA PREVISORA")]) == 1
+
+    def test_un_solo_proteger_y_una_sola_alianza(self):
+        salida = eps_seleccionables(DESPLEGABLE_REAL)
+        assert len([e for e in salida if e.startswith("PROTEGER")]) == 1
+        assert len([e for e in salida if e.startswith("ALIANZA")]) == 1
+
+    def test_salud_mia_sale_una_sola_vez(self):
+        """«FUNDACION» va delante y rompía la comparación: eran dos renglones.
+
+        La malla contractual conoce a esa entidad como «SALUD MIA», así que
+        unirlas no solo limpia el desplegable: hace que sí encuentre su ficha.
+        """
+        assert misma_entidad("SALUD MIA", "FUNDACION SALUD MIA EPS CONTRIBUTIVO")
+        salida = eps_seleccionables(
+            ["FUNDACION SALUD MIA EPS CONTRIBUTIVO", "FUNDACION SALUD MIA EPS SUBSIDIADO"]
+        )
+        assert len([e for e in salida if "SALUD MIA" in e]) == 1
+
+    def test_el_regimen_de_coosalud_no_se_decide_acá(self):
+        """COOSALUD sí tiene dos contratos, pero eso lo resuelven los alias.
+
+        La malla elige entre el subsidiado y el contributivo leyendo el TEXTO
+        de la glosa, no el renglón del desplegable — que ya muestra un solo
+        «COOSALUD» y así se queda.
+        """
+        from app.services import malla_contractual as malla
+
+        contratos = malla.contratos_de("COOSALUD")
+        assert len(contratos) >= 2, "la malla dejó de tener los dos contratos de COOSALUD"
+        assert len({c.numero for c in contratos}) >= 2
 
 
 class TestNoFundeEntidadesDistintas:
@@ -195,10 +242,24 @@ class TestQueNombreSobrevive:
         assert oficial in salida
         assert "DISPENSARIO MEDICO" not in salida
 
-    def test_sin_contrato_gana_el_catalogo_curado_sobre_el_historial(self):
+    def test_sin_contrato_gana_el_nombre_que_de_verdad_se_usa(self):
+        """Cambió a propósito el 10-09-2026: antes ganaba el catálogo fijo.
+
+        El caso que lo obligó: «DIRECCION DE SANIDAD EJERCITO - DISPENSARIO
+        MEDICO BUCARAMANGA» tiene 332 glosas reales y «DISPENSARIO MEDICO» es
+        una entrada que escribí yo. Ganaba la mía. Ahora la ruta manda el
+        historial ordenado por cuántas glosas tiene cada grafía, y manda el
+        dato, no mi lista.
+        """
         salida = eps_seleccionables(["SALUD TOTAL EPS"])
-        assert "SALUD TOTAL" in salida
-        assert "SALUD TOTAL EPS" not in salida
+        assert "SALUD TOTAL EPS" in salida, "el nombre con datos detrás tiene que sobrevivir"
+        assert "SALUD TOTAL" not in salida, "y el del catálogo no puede duplicarlo"
+
+    def test_el_nombre_del_catalogo_sigue_saliendo_si_no_hay_ningun_dato(self):
+        """Para eso existe el catálogo: que una EPS sin datos se pueda elegir."""
+        salida = eps_seleccionables([])
+        for eps in ("SURA", "SALUD TOTAL", "MUTUAL SER", "EMSSANAR", "SAVIA"):
+            assert eps in salida
 
 
 class TestLoQueYaFuncionabaSigueFuncionando:

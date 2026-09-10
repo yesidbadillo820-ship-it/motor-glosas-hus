@@ -147,16 +147,16 @@ class TestNoSaleLaMismaEntidadDosVeces:
     """
 
     def test_salud_total_y_salud_total_eps_son_un_solo_renglon(self, client, db_session):
+        """Sobrevive el nombre con glosas detrás, no el del catálogo fijo."""
         _seed_glosa(db_session, "SALUD TOTAL EPS")
         eps = client.get("/contratos/eps-seleccionables").json()
-        assert "SALUD TOTAL" in eps
-        assert "SALUD TOTAL EPS" not in eps
+        assert len([e for e in eps if e.startswith("SALUD TOTAL")]) == 1
+        assert "SALUD TOTAL EPS" in eps
 
     def test_sura_y_sura_eps_son_un_solo_renglon(self, client, db_session):
         _seed_glosa(db_session, "SURA EPS")
         eps = client.get("/contratos/eps-seleccionables").json()
-        assert eps.count("SURA") == 1
-        assert "SURA EPS" not in eps
+        assert len([e for e in eps if e.startswith("SURA")]) == 1
 
     def test_el_guion_de_adres_no_crea_una_segunda_entidad(self, client, db_session):
         _seed_glosa(db_session, "ADRES ACCIDENTES DE TRANSITO")
@@ -173,19 +173,37 @@ class TestNoSaleLaMismaEntidadDosVeces:
         assert "DISPENSARIO MEDICO" not in eps
         assert len([e for e in eps if "DISPENSARIO" in e]) == 1
 
-    def test_uvt_y_uvb_siguen_siendo_dos_renglones(self, client, db_session):
-        """Fundirlas dejaría la tarifa del SOAT mal calculada."""
+    def test_uvt_y_uvb_son_un_solo_renglon(self, client, db_session):
+        """10-09-2026: esta prueba decía lo contrario y estaba equivocada.
+
+        El motor liquida SOLO en UVB (`uvb.py`). No existe ni una tarifa en
+        UVT en todo el código, y las bases de la malla son SOAT, SOAT_UVB,
+        SOAT_SMLV, PROPIA, PACTADA y MIXTA — no hay SOAT_UVT. El sufijo no
+        cambia nada; son el mismo pagador.
+        """
         _seed_glosa(db_session, "LA PREVISORA S A COMPANIA DE SEGUROS SOAT - UVT")
         _seed_glosa(db_session, "LA PREVISORA S A COMPANIA DE SEGUROS SOAT UVB", valor=2000)
         eps = client.get("/contratos/eps-seleccionables").json()
-        assert len([e for e in eps if e.startswith("LA PREVISORA")]) == 2
+        assert len([e for e in eps if e.startswith("LA PREVISORA")]) == 1
 
-    def test_contributivo_y_subsidiado_siguen_siendo_dos_renglones(self, client, db_session):
-        """El régimen cambia la norma aplicable."""
+    def test_contributivo_y_subsidiado_son_un_solo_renglon(self, client, db_session):
+        """PROTEGER no está en la malla contractual: su nombre no elige contrato.
+
+        Donde el régimen SÍ decide —COOSALUD, que tiene dos contratos con
+        números distintos— eso lo resuelven los alias de la malla leyendo el
+        texto de la glosa, no un renglón del desplegable.
+        """
         _seed_glosa(db_session, "PROTEGER EPS S.A.S. CONTRIBUTIVO")
         _seed_glosa(db_session, "PROTEGER EPS S.A.S. SUBSIDIADO", valor=2000)
         eps = client.get("/contratos/eps-seleccionables").json()
-        assert len([e for e in eps if e.startswith("PROTEGER")]) == 2
+        assert len([e for e in eps if e.startswith("PROTEGER")]) == 1
+
+    def test_el_marcador_no_se_cuela_por_un_contrato(self, client, db_session):
+        """En la captura de Yesid salía DOS veces: el filtro no cubría los contratos."""
+        _seed_contrato(db_session, "OTRA / SIN DEFINIR")
+        eps = client.get("/contratos/eps-seleccionables").json()
+        assert "OTRA / SIN DEFINIR" not in eps
+        assert "OTRA" not in eps
 
     def test_una_entidad_nueva_de_verdad_sigue_entrando(self, client, db_session):
         """La regla une duplicados; no puede tapar una entidad nueva."""
