@@ -10,6 +10,10 @@
 
 pytest==9.0.3
 pytest-asyncio==1.3.0
+# 10-09-2026 — reparte la suite entre los núcleos. Sin esto, correr las
+# pruebas es 13 minutos; con `-n auto --dist loadfile`, 3 min 38 s. Va
+# declarado acá para que en el PC del que trabaja corra igual que en el CI.
+pytest-xdist==3.8.0
 
 # Motor de la caja de herramientas PDF de la Suite Cartera HUS
 # (tools/suite_cartera_hus). Necesario para tests/test_pdf_tools.py; si falta,
