@@ -39,8 +39,35 @@ jobs:
       - run: ruff format --check .
 
   test:
-    name: Tests (pytest)
+    # 10-09-2026 — TRES MÁQUINAS A LA VEZ, NO UNA.
+    #
+    # Medido en el CI de verdad: la suite entera tardaba 6 min 07 s, y de
+    # esos, `tests/test_api` sola se llevaba 4 min 33 s. El runner de GitHub
+    # da 2 núcleos —en el log solo aparecen dos procesos, gw0 y gw1— y poner
+    # más procesos que núcleos NO ayuda: medido, `-n 2` y `-n 4` tardan lo
+    # mismo (4m35 contra 4m33). Estas pruebas gastan procesador, no espera.
+    #
+    # O sea que dentro de una máquina ya no queda nada que exprimir. Lo único
+    # que baja el reloj es repartir el trabajo entre VARIAS máquinas, que
+    # arrancan a la vez.
+    #
+    # Por qué `tests/test_api` va partida en dos y el resto junto: es la
+    # carpeta que manda (4m33 de 6m07). Dejarla entera en un trabajo habría
+    # dejado ese trabajo en 4m33 y los otros esperándolo — el reloj lo marca
+    # el más lento, no el promedio.
+    #
+    # El reparto es por ARCHIVO y determinista (los impares a un grupo, los
+    # pares al otro, sobre la lista ordenada): la misma lista sale siempre,
+    # así que un fallo se puede reproducir corriendo ese grupo.
+    name: Tests (pytest · ${{ matrix.grupo }})
     runs-on: ubuntu-latest
+    strategy:
+      # Que un grupo falle NO cancela los otros: si se caen dos cosas
+      # distintas, el auditor quiere verlas las dos en la misma corrida y no
+      # descubrir la segunda quince minutos después de arreglar la primera.
+      fail-fast: false
+      matrix:
+        grupo: [api-1, api-2, resto]
     env:
       SECRET_KEY: ci-test-secret-do-not-use-in-production
       DATABASE_URL: sqlite:///./test_ci.db
@@ -103,13 +130,34 @@ jobs:
           # tienen nada que ver con el código — cambiar quince minutos de
           # espera por un verde poco fiable sería peor que no hacer nada.
           #
-          # Medido sobre la suite completa antes de ponerlo:
-          #   en serie ............................. 13 min
-          #   -n 4 (reparto por prueba) ............ más lento, se pisan
-          #   -n 4 --dist loadfile ................. 3 min 38 s, 12.587 en
-          #                                          verde, cero falladas
+          # Medido en el CI (2 núcleos), no en la máquina de quien programa:
+          #   en serie ......................................... ~13 min
+          #   -n auto --dist loadfile, todo en una máquina ..... 6 min 07 s
+          #   partido en tres máquinas (esto) .................. el más
+          #       lento de los tres manda; test_api partida en dos deja
+          #       cada mitad cerca de 2 min 15 s
           set -o pipefail
-          python -m pytest tests/ -v --tb=long --maxfail=5 \
+          case "${{ matrix.grupo }}" in
+            api-1)
+              # Los archivos IMPARES de test_api, sobre la lista ordenada.
+              mapfile -t OBJETIVO < <(find tests/test_api -name 'test_*.py' | sort | awk 'NR % 2 == 1')
+              ;;
+            api-2)
+              # Los PARES.
+              mapfile -t OBJETIVO < <(find tests/test_api -name 'test_*.py' | sort | awk 'NR % 2 == 0')
+              ;;
+            resto)
+              # Todo lo que no es test_api. `--ignore` y no una lista, para
+              # que una carpeta nueva de pruebas entre sola en este grupo en
+              # vez de quedarse sin correr en silencio.
+              OBJETIVO=(tests --ignore=tests/test_api)
+              ;;
+          esac
+          if [ ${#OBJETIVO[@]} -eq 0 ]; then
+            echo "El grupo ${{ matrix.grupo }} se quedó sin archivos que correr. Eso es un error de reparto, no un éxito."
+            exit 1
+          fi
+          python -m pytest "${OBJETIVO[@]}" -v --tb=long --maxfail=5 \
             -n auto --dist loadfile \
             --junitxml=junit.xml \
             -o "junit_family=xunit2" 2>&1 | tee /tmp/pytest-output.log
@@ -133,7 +181,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: pytest-output-log
+          name: pytest-output-log-${{ matrix.grupo }}
           path: /tmp/pytest-output.log
           retention-days: 7
           if-no-files-found: warn
@@ -143,10 +191,40 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: junit-results
+          name: junit-results-${{ matrix.grupo }}
           path: junit.xml
           retention-days: 7
           if-no-files-found: warn
+
+  # 10-09-2026 — ESTE TRABAJO EXISTE POR EL NOMBRE, NO POR LO QUE HACE.
+  #
+  # La protección de la rama exige un chequeo llamado EXACTAMENTE
+  # «Tests (pytest)». Al repartir la suite en tres máquinas, los trabajos
+  # pasaron a llamarse «Tests (pytest · api-1)», «… api-2» y «… resto», y
+  # ese nombre dejó de existir: GitHub se quedaba esperando un chequeo que
+  # ya nadie iba a reportar y la PR quedaba bloqueada PARA SIEMPRE, con
+  # todo en verde.
+  #
+  # Este trabajo vuelve a producir ese nombre y reporta el resultado de los
+  # tres. Así no hay que ir a tocar la configuración del repositorio —que
+  # nadie recuerda dónde está el día que haga falta— y si mañana se agrega
+  # un cuarto grupo, sigue funcionando sin cambiar nada más.
+  test-ok:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    needs: [test]
+    # Igual que en `ci-ok`: sigue corriendo cuando algún grupo FALLA (que es
+    # el caso que tiene que bloquear) y solo se salta si se canceló todo.
+    if: ${{ !cancelled() }}
+    steps:
+      - name: Comprobar que los tres grupos pasaron
+        run: |
+          echo "resultado de los grupos = ${{ needs.test.result }}"
+          if [ "${{ needs.test.result }}" != "success" ]; then
+            echo "Alguno de los grupos de pruebas no pasó."
+            exit 1
+          fi
+          echo "Los tres grupos en verde."
 
   security:
     name: Security scan (pip-audit)
@@ -173,7 +251,7 @@ jobs:
   ci-ok:
     name: CI OK
     runs-on: ubuntu-latest
-    needs: [lint, test, security]
+    needs: [lint, test-ok, security]
     # `!cancelled()` y no `always()`: con `cancel-in-progress`, un push nuevo
     # cancela la corrida anterior, y con `always()` esta casilla igual se
     # ejecutaba y la reportaba en ROJO. Eso pinta de rojo cada commit que se
@@ -188,10 +266,10 @@ jobs:
       - name: Comprobar que los tres pasaron
         run: |
           echo "lint     = ${{ needs.lint.result }}"
-          echo "test     = ${{ needs.test.result }}"
+          echo "test     = ${{ needs.test-ok.result }}"
           echo "security = ${{ needs.security.result }}"
           if [ "${{ needs.lint.result }}" != "success" ] \
-             || [ "${{ needs.test.result }}" != "success" ] \
+             || [ "${{ needs.test-ok.result }}" != "success" ] \
              || [ "${{ needs.security.result }}" != "success" ]; then
             echo "::error::Alguno de los tres pasos no terminó bien. No se puede fusionar."
             exit 1

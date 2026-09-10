@@ -91,6 +91,69 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — El CI en tres máquinas: de 7 min 20 s a unos 4
+
+Yesid, viendo el reloj: «*¿dónde está ese supuesto 3 minutos?*». Tenía razón
+en reclamar, y el número que yo había dado estaba mal.
+
+**Lo que pasó:** medí los 3 min 38 s en una máquina de **4 núcleos**. El
+runner de GitHub da **2** — el log lo muestra, solo aparecen dos procesos,
+`gw0` y `gw1`. Ahí las pruebas tardan **6 min 07 s**, más 1 min 14 s de
+instalación: **7 min 20 s** de trabajo completo. Se había partido a la mitad,
+no en cuatro. El número bueno es el del CI, no el de la máquina de quien mide.
+
+**Lo que se miró antes de tocar nada:**
+
+| | |
+|---|---|
+| Instalación previa | 1 min 14 s — no es el problema |
+| `tests/test_api` sola | **4 min 33 s de los 6 min 07 s** |
+| Más procesos que núcleos | **no sirve**: `-n 2` da 4m35 y `-n 4` da 4m33 |
+
+Estas pruebas gastan procesador, no espera. Dentro de una máquina no quedaba
+nada que exprimir.
+
+**Lo que se hizo:** repartir el trabajo en **tres máquinas que arrancan a la
+vez**. `tests/test_api` va partida en dos porque es la que manda: dejarla
+entera habría dejado ese trabajo en 4m33 y los otros esperándolo — el reloj lo
+marca el más lento, no el promedio.
+
+El reparto es por archivo y **determinista** (impares a un grupo, pares al
+otro, sobre la lista ordenada), así que un fallo se reproduce corriendo ese
+grupo. Y si un grupo se queda sin archivos, el CI **falla a propósito**: un
+verde que no probó nada es peor que quince minutos de espera.
+
+**Comprobado antes de subirlo**, que es lo que de verdad importa acá:
+
+| Grupo | Pruebas |
+|---|---|
+| api-1 | 1.565 |
+| api-2 | 1.731 |
+| resto | 9.328 |
+| **Suma** | **12.624** |
+| Suite completa | **12.624** |
+
+Ni una de menos, ni una repetida.
+
+**Y un defecto que se destapó al primer intento, con todo en verde.** Al
+renombrar los trabajos a «Tests (pytest · api-1)» y demás, **el chequeo
+obligatorio de la rama —que se llama exactamente «Tests (pytest)»— dejó de
+existir**. GitHub se quedó esperando un reporte que ya nadie iba a mandar y la
+PR quedó **bloqueada para siempre**, con los tres grupos en verde.
+
+Lo peor no fue el bloqueo: fue que **no se ve como un error**. Se ve como «una
+comprobación aún no se ha completado», que es lo que uno se queda mirando un
+rato más. Ahora hay un trabajo cuyo único fin es producir ese nombre y
+reportar el resultado de los tres — así no hay que ir a tocar la
+configuración del repositorio, que nadie recuerda dónde está el día que haga
+falta.
+
+22 pruebas nuevas: reconstruyen el reparto y vuelven a cuadrar la suma, y
+vigilan que el nombre exigido lo siga produciendo alguien. Si se cambia otra
+vez, avisan solas en vez de colgar todas las PR.
+
+---
+
 ### 10-09-2026 — Gemini vuelve al dictamen, y se puede comparar con datos
 
 Yesid pidió alternativas gratis: los tokens de Claude los paga él y una tanda
@@ -171,7 +234,14 @@ núcleos del runner:
 | Repartida por prueba | **más lento** — se pisan entre ellas |
 | Repartida **por archivo** | **3 min 38 s** |
 
-**3,6 veces más rápido**, con las 12.587 pruebas en verde y ninguna fallada.
+**CORRECCIÓN, medida al día siguiente en el CI de verdad (10-09-2026):** esos
+3 min 38 s son de una máquina de **4 núcleos**. El runner de GitHub le da
+**2**, y ahí las pruebas tardan **6 min 07 s** — el log lo muestra: solo
+aparecen dos procesos, `gw0` y `gw1`.
+
+Con la instalación previa (1 min 14 s), el trabajo completo pasó de **~14
+minutos a 7 min 20 s**. Se partió a la mitad, no en cuatro. El número bueno
+es el del CI, no el de la máquina de quien lo mide.
 
 Repartir **por archivo** no es un adorno: hace que todas las pruebas de un
 mismo archivo caigan en el mismo proceso. Sin eso, dos que comparten la base de
