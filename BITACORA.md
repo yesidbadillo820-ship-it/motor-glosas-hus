@@ -133,9 +133,24 @@ verde que no probó nada es peor que quince minutos de espera.
 | **Suma** | **12.624** |
 | Suite completa | **12.624** |
 
-Ni una de menos, ni una repetida. 17 pruebas nuevas que reconstruyen el mismo
-reparto y vuelven a cuadrar la suma: si alguien lo cambia y deja pruebas
-afuera, avisan solas.
+Ni una de menos, ni una repetida.
+
+**Y un defecto que se destapó al primer intento, con todo en verde.** Al
+renombrar los trabajos a «Tests (pytest · api-1)» y demás, **el chequeo
+obligatorio de la rama —que se llama exactamente «Tests (pytest)»— dejó de
+existir**. GitHub se quedó esperando un reporte que ya nadie iba a mandar y la
+PR quedó **bloqueada para siempre**, con los tres grupos en verde.
+
+Lo peor no fue el bloqueo: fue que **no se ve como un error**. Se ve como «una
+comprobación aún no se ha completado», que es lo que uno se queda mirando un
+rato más. Ahora hay un trabajo cuyo único fin es producir ese nombre y
+reportar el resultado de los tres — así no hay que ir a tocar la
+configuración del repositorio, que nadie recuerda dónde está el día que haga
+falta.
+
+22 pruebas nuevas: reconstruyen el reparto y vuelven a cuadrar la suma, y
+vigilan que el nombre exigido lo siga produciendo alguien. Si se cambia otra
+vez, avisan solas en vez de colgar todas las PR.
 
 ---
 

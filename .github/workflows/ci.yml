@@ -196,6 +196,36 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  # 10-09-2026 — ESTE TRABAJO EXISTE POR EL NOMBRE, NO POR LO QUE HACE.
+  #
+  # La protección de la rama exige un chequeo llamado EXACTAMENTE
+  # «Tests (pytest)». Al repartir la suite en tres máquinas, los trabajos
+  # pasaron a llamarse «Tests (pytest · api-1)», «… api-2» y «… resto», y
+  # ese nombre dejó de existir: GitHub se quedaba esperando un chequeo que
+  # ya nadie iba a reportar y la PR quedaba bloqueada PARA SIEMPRE, con
+  # todo en verde.
+  #
+  # Este trabajo vuelve a producir ese nombre y reporta el resultado de los
+  # tres. Así no hay que ir a tocar la configuración del repositorio —que
+  # nadie recuerda dónde está el día que haga falta— y si mañana se agrega
+  # un cuarto grupo, sigue funcionando sin cambiar nada más.
+  test-ok:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    needs: [test]
+    # Igual que en `ci-ok`: sigue corriendo cuando algún grupo FALLA (que es
+    # el caso que tiene que bloquear) y solo se salta si se canceló todo.
+    if: ${{ !cancelled() }}
+    steps:
+      - name: Comprobar que los tres grupos pasaron
+        run: |
+          echo "resultado de los grupos = ${{ needs.test.result }}"
+          if [ "${{ needs.test.result }}" != "success" ]; then
+            echo "Alguno de los grupos de pruebas no pasó."
+            exit 1
+          fi
+          echo "Los tres grupos en verde."
+
   security:
     name: Security scan (pip-audit)
     runs-on: ubuntu-latest
@@ -221,7 +251,7 @@ jobs:
   ci-ok:
     name: CI OK
     runs-on: ubuntu-latest
-    needs: [lint, test, security]
+    needs: [lint, test-ok, security]
     # `!cancelled()` y no `always()`: con `cancel-in-progress`, un push nuevo
     # cancela la corrida anterior, y con `always()` esta casilla igual se
     # ejecutaba y la reportaba en ROJO. Eso pinta de rojo cada commit que se
@@ -236,7 +266,7 @@ jobs:
       - name: Comprobar que los tres pasaron
         run: |
           echo "lint     = ${{ needs.lint.result }}"
-          echo "test     = ${{ needs.test.result }}"
+          echo "test     = ${{ needs.test-ok.result }}"
           echo "security = ${{ needs.security.result }}"
           if [ "${{ needs.lint.result }}" != "success" ] \
              || [ "${{ needs.test.result }}" != "success" ] \

@@ -89,8 +89,15 @@ class TestElCiEstaConfiguradoAsi:
         assert "exit 1" in texto
 
     def test_ci_ok_espera_a_las_pruebas(self):
-        """Con matriz, `needs: test` espera a los TRES grupos."""
-        assert "test" in self._ci()["jobs"]["ci-ok"]["needs"]
+        """Espera por medio de `test-ok`, que a su vez espera a los tres grupos.
+
+        Cambió el 10-09-2026: antes esperaba a `test` directamente. Ahora pasa
+        por el agregador, que además produce el nombre que exige la protección
+        de la rama.
+        """
+        ci = self._ci()
+        assert "test-ok" in ci["jobs"]["ci-ok"]["needs"]
+        assert "test" in ci["jobs"]["test-ok"]["needs"]
 
     def test_los_artefactos_no_se_pisan_entre_grupos(self):
         texto = CI.read_text(encoding="utf-8")
@@ -101,3 +108,51 @@ class TestElCiEstaConfiguradoAsi:
         """--dist loadfile: las pruebas de un archivo, en el mismo proceso."""
         texto = CI.read_text(encoding="utf-8")
         assert "-n auto --dist loadfile" in texto
+
+
+class TestElNombreQueLaRamaExige:
+    """El chequeo obligatorio se llama «Tests (pytest)» y alguien lo tiene que producir.
+
+    10-09-2026. Al repartir la suite en tres máquinas, los trabajos pasaron a
+    llamarse «Tests (pytest · api-1)», «… api-2» y «… resto». La protección de
+    la rama exige uno llamado EXACTAMENTE «Tests (pytest)», y ese nombre dejó
+    de existir: GitHub se quedó esperando un chequeo que ya nadie iba a
+    reportar, con todo lo demás en verde y la PR **bloqueada para siempre**.
+
+    Lo peor del caso: no se ve como un error. Se ve como «una comprobación
+    aún no se ha completado», que es lo que uno espera mirar un rato más.
+
+    Por eso hay un trabajo cuyo único fin es producir ese nombre y reportar el
+    resultado de los tres grupos. Esta clase lo vigila: renombrar los grupos
+    otra vez sin dejar el nombre exigido volvería a colgar todas las PR.
+    """
+
+    def _ci(self) -> dict:
+        return yaml.safe_load(CI.read_text(encoding="utf-8"))
+
+    def test_alguien_produce_el_nombre_exacto(self):
+        nombres = {j["name"] for j in self._ci()["jobs"].values()}
+        assert "Tests (pytest)" in nombres, (
+            "la protección de la rama exige ese nombre exacto; sin él, toda PR "
+            "queda esperando un chequeo que nadie va a reportar"
+        )
+
+    def test_ese_trabajo_espera_a_los_tres_grupos(self):
+        assert "test" in self._ci()["jobs"]["test-ok"]["needs"]
+
+    def test_si_un_grupo_falla_el_agregador_falla(self):
+        """Si no, un grupo rojo pasaría por verde."""
+        texto = CI.read_text(encoding="utf-8")
+        assert 'if [ "${{ needs.test.result }}" != "success" ]; then' in texto
+        assert "exit 1" in texto
+
+    def test_sigue_corriendo_aunque_un_grupo_falle(self):
+        """Con `needs`, un fallo salta el trabajo y el chequeo nunca se reporta.
+
+        Sin `!cancelled()`, un grupo rojo dejaría la PR otra vez colgada
+        esperando — el mismo bloqueo, disfrazado de otra cosa.
+        """
+        assert self._ci()["jobs"]["test-ok"]["if"] is not None
+
+    def test_ci_ok_pasa_por_el_agregador(self):
+        assert "test-ok" in self._ci()["jobs"]["ci-ok"]["needs"]
