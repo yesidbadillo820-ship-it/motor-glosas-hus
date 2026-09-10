@@ -156,8 +156,10 @@ plata, porque hay sufijos que **sí** distinguen:
   deja la tarifa mal calculada — y La Previsora es el pagador con más glosas
   del export real.
 - **CONTRIBUTIVO / SUBSIDIADO** es el régimen, y con él la norma aplicable.
-- **ADRES** no es solo accidentes de tránsito: en este hospital tiene además
-  la baja de cartera de la Res. 577/2019. Son rutas de pago distintas.
+- **ADRES** estuvo un rato en esa lista, por precaución mía. Cartera lo
+  respondió el mismo día: «ADRES nada de otros nombres». Todo lo de ADRES
+  entra por accidentes de tránsito, así que va en una sola línea. Mandó el
+  dato real, no mi suposición.
 
 Así que la regla une por **identidad**, no por parecido: dos nombres son la
 misma entidad si uno es el comienzo del otro *y lo que sobra no distingue*.
