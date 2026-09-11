@@ -1,5 +1,37 @@
 # Registro de cambios
 
+## Sesión 11-sep-2026 (2) — Cronómetro de peticiones: saber QUÉ está lento
+
+Al diagnosticar «la plataforma está lentísima» se pudo medir RAM (1,1 GB de
+16, con 3,5 libres), CPU (9 %), el share (17 ms) y el motor local (13 ms
+contra 130 ms por el túnel) — pero no había registro de cuánto tarda cada
+endpoint. La pregunta que importaba era la única sin instrumentar.
+
+- **`app/services/tiempos_peticiones.py`** (nuevo) — cronómetro en memoria,
+  acotado a propósito: `agrupar_ruta()` normaliza `/glosas/{n}`,
+  `/soportes-auto/factura/{factura}` y UUIDs para que mil glosas abiertas no
+  sean mil filas; tope de `MAX_RUTAS` (400) y `deque(maxlen=MAX_RECIENTES)`
+  (50) para las lentas. Ordena por `promedio × veces` —lo que se lleva el día
+  del auditor— y no por el pico. Sobre `SEGUNDOS_PARA_AVISAR` (2 s) escribe
+  `[LENTITUD]` en el log. Medido: **1,53 µs por petición** (0,012 % de una
+  petición real).
+- **`app/main.py`** — `_cronometro_middleware`, declarado **de último** a
+  propósito: Starlette monta los middlewares al revés, así que el último
+  declarado es el que envuelve a todos y mide lo que de verdad esperó el
+  usuario. El `finally` garantiza que también se anoten las que fallan, y el
+  `except` interno impide que medir tumbe una petición.
+- **`app/api/routers/diagnostico.py`** — `GET /admin/diagnostico/lentitud` y
+  `POST /admin/diagnostico/lentitud/reiniciar` (solo admin).
+- **`static/index.html`** — botón «⏱️ ¿Qué está lento?» en Diagnóstico,
+  `cargarLentitud()` / `renderLentitud()` / `reiniciarLentitud()`. Tabla por
+  pantalla + últimas lentas con hora, y la aclaración de que esto NO mide el
+  viaje por internet.
+- **Pruebas** — `tests/test_services/test_saber_que_esta_lento.py` (20):
+  agrupado de rutas, orden por peso real, topes de memoria, tolerancia a
+  valores raros, y que el cronómetro siga siendo el **último** middleware
+  declarado (si deja de serlo, mide de menos). Suite: 12.781 en verde.
+
+
 ## Sesión 11-sep-2026 — El indexador de soportes deja de machacar el servidor
 
 Diagnóstico de «la plataforma está lentísima» a las 8:35 a.m. El indexador

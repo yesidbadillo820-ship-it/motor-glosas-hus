@@ -1696,6 +1696,43 @@ async def _tenant_middleware(request, call_next):
     return response
 
 
+@app.middleware("http")
+async def _cronometro_middleware(request, call_next):
+    """Cuánto tardó el motor en contestar. 11-09-2026.
+
+    Cuando la plataforma se pone lenta no había con qué saber QUÉ estaba
+    lento: se podía mirar memoria, procesador y servidor de archivos, pero
+    no la única pregunta que importa. Ahora cada petición se cronometra —son
+    microsegundos—, las que pasan de 2 segundos quedan anotadas en el
+    registro, y el resumen por pantalla se ve en «Diagnóstico del sistema».
+
+    Va declarado DE ÚLTIMO a propósito. Starlette monta los middlewares al
+    revés de como se escriben: el último que se declara es el que envuelve a
+    todos los demás. Así este cronómetro mide lo que de verdad esperó el
+    auditor —compresión, cabeceras, tenant y todo— y no solo el último trozo.
+    """
+    import time as _t
+
+    _inicio = _t.perf_counter()
+    _estado = 500
+    try:
+        respuesta = await call_next(request)
+        _estado = getattr(respuesta, "status_code", 200)
+        return respuesta
+    finally:
+        try:
+            from app.services.tiempos_peticiones import anotar
+
+            anotar(
+                request.method,
+                request.url.path,
+                _estado,
+                _t.perf_counter() - _inicio,
+            )
+        except Exception:  # noqa: BLE001 — medir no puede tumbar una petición
+            pass
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 from app.api.routers.auth_router import router as auth_router

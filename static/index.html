@@ -5280,6 +5280,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
             <button class="btn-sm" onclick="diagReindexarSoportes()" style="background:#dbeafe;color:#1e40af;border-color:#bfdbfe;">Reindexar soportes</button>
             <button class="btn-sm" onclick="cargarBillingForense()" style="background:#fef2f2;color:#991b1b;border-color:#fecaca;">Billing forense IA</button>
             <button class="btn-sm" onclick="cargarIAStatus()" style="background:#f0fdf4;color:#15803d;border-color:#bbf7d0;">Estado de IAs</button>
+            <button class="btn-sm" onclick="cargarLentitud()" style="background:#fff7ed;color:#9a3412;border-color:#fed7aa;">⏱️ ¿Qué está lento?</button>
             <button class="btn-sm" onclick="probarCorreo(this)" style="background:#fefce8;color:#854d0e;border-color:#fde68a;">📧 Probar correo</button>
             <button class="btn-sm" onclick="verCorreosRecientes(this)" style="background:#eff6ff;color:#1e40af;border-color:#bfdbfe;">📬 Correos enviados</button>
           </div>
@@ -5288,6 +5289,7 @@ body.dark .land-causal-chip.t-MEDICAMENTOS{color:#fca5a5}
         <div id="diag-resumen" style="margin-bottom:1rem;"></div>
         <div id="diag-ia-status" style="margin-bottom:1rem;"></div>
         <div id="diag-billing" style="margin-bottom:1rem;"></div>
+        <div id="diag-lentitud" style="margin-bottom:1rem;"></div>
         <div id="diag-secciones"></div>
       </div>
     </div>
@@ -18166,6 +18168,110 @@ async function verCorreosRecientes(btn){
   }finally{
     if(btn){ btn.disabled = false; btn.textContent = '📬 Correos enviados'; }
   }
+}
+
+// ─── ¿Qué está lento? (11-09-2026) ────────────────────────────────────
+// Nació de un «¿por qué está tan lenta la plataforma?» que no se pudo
+// contestar con datos: el motor no anotaba cuánto tardaba en contestar y
+// tocó suponer. Ahora se cronometra cada petición y esto lo muestra.
+async function cargarLentitud(){
+  var caja = document.getElementById('diag-lentitud');
+  if(!caja) return;
+  caja.innerHTML = '<div style="color:var(--text3);font-size:.82rem">Midiendo…</div>';
+  try{
+    var r = await fetch('/admin/diagnostico/lentitud', { headers: authH() });
+    if(!r.ok){
+      caja.innerHTML = '<div style="color:#b91c1c;font-size:.82rem;background:#fef2f2;'
+        + 'border:1px solid #fecaca;border-radius:8px;padding:.7rem .9rem">'
+        + 'No se pudo leer (código ' + r.status + ').</div>';
+      return;
+    }
+    var d = await r.json();
+    renderLentitud(d);
+  }catch(e){
+    caja.innerHTML = '<div style="color:#b91c1c;font-size:.82rem">Error: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+async function reiniciarLentitud(){
+  if(!confirm('¿Poner el contador en cero?\n\nSirve para medir un rato concreto: '
+    + 'lo pone en cero, abre la pantalla que se siente lenta, y vuelve acá a mirar.')) return;
+  try{
+    var r = await fetch('/admin/diagnostico/lentitud/reiniciar', { method:'POST', headers: authH() });
+    if(r.ok){ toast('Listo', 'Contador en cero. Use la pantalla lenta y vuelva.', 'success'); cargarLentitud(); }
+    else toast('Error', 'No se pudo reiniciar', 'error');
+  }catch(e){ toast('Error', e.message, 'error'); }
+}
+
+function renderLentitud(d){
+  var caja = document.getElementById('diag-lentitud');
+  if(!caja) return;
+  var mins = Math.round((d.midiendo_desde_seg || 0)/60);
+  var desde = mins < 1 ? 'menos de un minuto' : (mins < 60 ? mins + ' minutos' : Math.round(mins/60) + ' horas');
+  var filas = d.por_pantalla || [];
+  var lentas = d.ultimas_lentas || [];
+
+  var h = '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem">'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">'
+    +   '<div>'
+    +     '<h3 style="margin:0 0 .2rem 0;font-size:1rem">⏱️ ¿Qué está lento?</h3>'
+    +     '<div style="font-size:.78rem;color:var(--text3)">'
+    +       'Midiendo hace ' + desde + ' · ' + fmtNum(d.peticiones||0) + ' peticiones · '
+    +       '<b>' + fmtNum(d.peticiones_lentas||0) + '</b> pasaron de ' + (d.umbral_seg||2) + ' s'
+    +     '</div>'
+    +   '</div>'
+    +   '<button class="btn-sm" onclick="reiniciarLentitud()">Poner en cero</button>'
+    + '</div>';
+
+  if(!filas.length){
+    h += '<div style="margin-top:.8rem;font-size:.82rem;color:var(--text3);background:var(--bg);'
+      + 'border:1px dashed var(--border);border-radius:8px;padding:.9rem">'
+      + 'Todavía no hay nada medido. Use el motor un rato y vuelva.</div>';
+  } else {
+    h += '<div style="overflow-x:auto;margin-top:.8rem"><table style="width:100%;border-collapse:collapse;font-size:.8rem">'
+      + '<thead><tr style="text-align:left;color:var(--text3);border-bottom:1px solid var(--border)">'
+      +   '<th style="padding:.4rem .5rem">Pantalla</th>'
+      +   '<th style="padding:.4rem .5rem;text-align:right">Veces</th>'
+      +   '<th style="padding:.4rem .5rem;text-align:right">Promedio</th>'
+      +   '<th style="padding:.4rem .5rem;text-align:right">La peor</th>'
+      +   '<th style="padding:.4rem .5rem;text-align:right">Lentas</th>'
+      + '</tr></thead><tbody>';
+    filas.forEach(function(f){
+      // Rojo lo que de verdad muerde: más de un segundo de promedio.
+      var color = f.promedio_s >= 1 ? '#b91c1c' : (f.promedio_s >= 0.4 ? '#9a3412' : 'var(--text)');
+      h += '<tr style="border-bottom:1px solid var(--border)">'
+        + '<td style="padding:.4rem .5rem;font-family:var(--font-mono);font-size:.74rem">' + escHtml(f.ruta) + '</td>'
+        + '<td style="padding:.4rem .5rem;text-align:right">' + fmtNum(f.veces) + '</td>'
+        + '<td style="padding:.4rem .5rem;text-align:right;color:' + color + ';font-weight:700">'
+        +   (f.promedio_s*1000).toFixed(0) + ' ms</td>'
+        + '<td style="padding:.4rem .5rem;text-align:right">' + f.peor_s.toFixed(1) + ' s</td>'
+        + '<td style="padding:.4rem .5rem;text-align:right">' + (f.lentas || '—') + '</td>'
+        + '</tr>';
+    });
+    h += '</tbody></table></div>';
+  }
+
+  if(lentas.length){
+    h += '<div style="margin-top:.9rem"><div style="font-size:.78rem;font-weight:700;color:var(--text2);margin-bottom:.35rem">'
+      + 'Las últimas que se pasaron de ' + (d.umbral_seg||2) + ' segundos</div>';
+    lentas.slice(0,10).forEach(function(x){
+      var hora = new Date(x.cuando*1000).toLocaleTimeString('es-CO');
+      h += '<div style="font-size:.74rem;font-family:var(--font-mono);color:var(--text2);'
+        + 'padding:.25rem 0;border-bottom:1px solid var(--border)">'
+        + hora + ' · <b style="color:#b91c1c">' + x.segundos.toFixed(1) + ' s</b> · '
+        + escHtml(x.metodo) + ' ' + escHtml(x.ruta) + '</div>';
+    });
+    h += '</div>';
+  }
+
+  h += '<div style="margin-top:.9rem;font-size:.76rem;color:var(--text3);background:var(--bg);'
+    + 'border:1px solid var(--border);border-radius:8px;padding:.6rem .8rem;line-height:1.5">'
+    + '<b>Esto cuenta solo lo que tarda el motor</b>, desde que le llega la petición hasta '
+    + 'que contesta. No cuenta el viaje por internet. Si acá todo sale rápido y la pantalla '
+    + 'igual se siente pesada, la demora está en el camino —el túnel o la red del hospital—, '
+    + 'no adentro del motor.</div>'
+    + '</div>';
+  caja.innerHTML = h;
 }
 
 async function cargarDiagnostico(){
