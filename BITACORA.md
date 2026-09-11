@@ -2839,6 +2839,48 @@ la contesta cartera. Ahora se reportan aparte: 783 glosas de CALIDAD en 36
 facturas esperan a las doctoras, y 281 de COBERTURA en **una sola** factura
 (HUS545379, $47.882.455) esperan a que el área defina el texto — son CO4601,
 accidente de tránsito, la EPS pide agotar primero los topes del SOAT.
+### 11-09-2026 — Frente 12: el alimento de la paciente lleva 27 días formulado y sin entregar
+
+**Qué pasó.** Llegaron dos documentos nuevos del frente personal (proyecto 12):
+la prescripción del soporte nutricional y la historia clínica de nutrición del
+15 de agosto. Al leerlos con la app quedó a la vista lo importante: la fórmula
+que es la **única vía de alimentación** de la paciente se formuló el 15 de
+agosto y **a hoy no han entregado nada**. La familia confirmó el dato: apenas
+hace unos días le entregaron el papel, no el alimento. La propia prescripción
+lo delata, porque trae impresa su fecha de impresión: 25 días después de
+expedida.
+
+**La lección para el frente.** La primera lectura automática dijo «se agota en
+3 días», suponiendo que la entrega se había hecho el día de la fórmula. Era
+falso. **Una fecha de prescripción no es una fecha de entrega**, y la app lo
+estaba dando por hecho. Se corrigió el registro y ahora el expediente distingue
+las dos cosas: lo que ordenaron y lo que de verdad llegó.
+
+**Lo que se entregó.**
+- Tres escritos listos para radicar, con los espacios en blanco marcados:
+  petición urgente a la EPS, queja ante la Superintendencia Nacional de Salud y
+  **tutela con solicitud de medida provisional** (la medida provisional es lo
+  que puede resolver el juez de una vez, sin esperar los 10 días del fallo).
+- Una hoja de instrucciones: qué radicar primero, por cuáles canales, qué
+  adjuntar y —lo más importante— **exigir siempre el número de radicado**, sin
+  el cual una tutela no prospera.
+- Aviso de las dos trampas previsibles: que la EPS alegue que «la fórmula ya se
+  venció» (el retraso es de ellos) y que diga que «es NO PBS» (eso es un
+  asunto de pago entre la EPS y el Estado, no de la paciente).
+
+**Cinco contradicciones nuevas, todas con su cita y su página.** Dos pesos
+distintos el mismo día (uno de ellos en un renglón donde también anotaron una
+medida imposible); dos cantidades diarias distintas escritas por la misma
+profesional; una vía de administración que no corresponde a la sonda que la
+paciente tiene; un examen pedido por escrito que nadie ordenó; y el retraso de
+la entrega. El expediente pasó de 8 a 13 contradicciones.
+
+**Cómo se probó.** 94 verificaciones del motor de lectura y 54 pruebas en el
+navegador, todas en verde. Una prueba del motor venía fallando por una razón
+tonta y vale anotarla: **verificaba una palabra literal del mensaje de aviso**
+(«MENOR») y el mensaje se había redactado mejor («es anterior a la ya
+registrada»). El aviso funcionaba; la prueba era la que estaba vieja. Se
+corrigió para que verifique el sentido, no la palabra exacta.
 
 ---
 
@@ -13974,6 +14016,18 @@ de la que más cuesta a la que menos:
   HUS543423 ($46,9 mill), HUS543160 ($20,9 mill), HUS541431 ($17,2 mill),
   HUS543764 ($15,8 mill).
 - **Responder el portal antes del 14/09/2026.** Eso sí se puede hacer ya.
+### Cuidados médicos de la familiar — URGENTE (11-09)
+- **Radicar hoy la petición a la EPS por el soporte nutricional**: lleva 27
+  días formulado y sin entregar, y es la única vía de alimentación de la
+  paciente. Exigir número de radicado.
+- **A las 48 horas del radicado, si no llega el alimento:** queja en la
+  Superintendencia Nacional de Salud **y** tutela con medida provisional, el
+  mismo día. Los tres escritos están listos, solo falta llenar nombre, cédula
+  y correo.
+- **Aprovechar el control de nutrición del 15-09** para que quede por escrito:
+  el peso real, la cantidad diaria correcta, cuál sonda tiene la paciente, el
+  examen de la glucemia que nadie ordenó, y la prescripción renovada.
+
 ### Cuidados médicos de la familiar — EPS Sura (07-09)
 - **Radicar el memorial de impulso** al proceso de la Supersalud (el plazo de
   respuesta ya se venció) y **la queja a Sura** por lo que sigue sin
@@ -14970,6 +15024,12 @@ facturas y el consolidado de la MISMA remesa de la EPS, y trabajarla de punta a
 punta hasta bajar el acta. Es lo único que dice si sirve en una audiencia. Si
 al cerrar sale «No se pudo cerrar», ahora la pantalla muestra el motivo exacto:
 copiarlo al chat.
+### Cuidados médicos de la familiar — lo primero de todo
+1. **Confirmar que la EPS entregó el alimento.** Si no, radicar la queja en la
+   Superintendencia y la tutela con medida provisional el mismo día.
+2. Terminar la versión premium de la app (lo visual, los gráficos, el informe
+   en PDF, los perfiles con permisos y el centro de avisos). El expediente y
+   los datos ya están al día; falta la capa de presentación.
 
 ### Cuidados médicos de la familiar — lo primero
 1. Radicar el **Borrador A** (impulso a la Supersalud) por el correo oficial
