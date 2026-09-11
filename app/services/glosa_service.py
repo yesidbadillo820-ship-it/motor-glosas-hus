@@ -1916,6 +1916,13 @@ _RE_MONTO_DICTAMEN = re.compile(
 _MIN_DIGITOS_MONTO = 4  # ignora cifras chicas ("$10", "$0.00") y porcentajes
 _FRASE_VALOR_NEUTRO = "el valor objetado consignado en el expediente"
 
+# «($3.235.050.000)» pisado queda «(el valor objetado consignado en el
+# expediente)». Ese paréntesis sobra: se borra entero.
+_RE_PARENTESIS_NEUTRALIZADO = re.compile(
+    r"\s*[(\[]\s*" + re.escape(_FRASE_VALOR_NEUTRO) + r"\s*[)\]]",
+    re.IGNORECASE,
+)
+
 # ── Ronda 14 (Bug K): constantes legítimas que el system prompt enseña a la IA ──
 # Regresión introducida por el sanitizer Bug J de ronda 13: cuando el dictamen
 # escribía "UVB 2026 = $12.110" (constante del manual SOAT incluida
@@ -2037,6 +2044,16 @@ def _neutralizar_valores_inventados(
             lambda m: m.group(1).lower() + " " + _FRASE_VALOR_NEUTRO,
             resultado,
         )
+        # 10-09-2026 — LA FRASE ENTRE PARÉNTESIS NUNCA SUENA A NADA.
+        # El paréntesis después de una suma escrita en letras existe para
+        # repetirla en números: «…CINCUENTA MIL PESOS MCTE ($50.000)». Pisar
+        # esa cifra deja «…CINCUENTA MIL PESOS MCTE (el valor objetado
+        # consignado en el expediente)», que además de no significar nada
+        # delata el retoque. Si la cifra no se puede sostener, lo honesto es
+        # que el paréntesis desaparezca y la suma en letras quede sola.
+        resultado = _RE_PARENTESIS_NEUTRALIZADO.sub("", resultado)
+        resultado = re.sub(r"[ \t]{2,}", " ", resultado)
+        resultado = re.sub(r"\s+([,.;:])", r"\1", resultado)
         logger.warning(
             f"[VALOR-INVENTADO] {n_neutralizados} cifra(s) monetaria(s) "
             f"NO presente(s) en el input del usuario → neutralizada(s). "
@@ -8505,6 +8522,36 @@ def _en_pesos_colombianos(crudo: str) -> str:
     return "$ " + f"{int(limpio):,}".replace(",", ".")
 
 
+def _es_falta_de_cuota(e: BaseException) -> bool:
+    """¿El proveedor dijo «se le acabó el cupo» (429 / quota / rate limit)?
+
+    Insistir contra un 429 del tier gratis no recupera nada: gasta el tiempo
+    del auditor y peticiones de un cupo que ya no existe.
+    """
+    texto = f"{type(e).__name__} {e}".upper()
+    if getattr(getattr(e, "response", None), "status_code", None) == 429:
+        return True
+    return any(
+        marca in texto
+        for marca in ("429", "RATE LIMIT", "RATE_LIMIT", "QUOTA", "RESOURCE_EXHAUSTED")
+    )
+
+
+def _motivo_del_fallo(e: BaseException) -> str:
+    """El motivo de un fallo, que nunca puede quedar vacío.
+
+    10-09-2026. En el log del hospital salía «IA anthropic falló: .» — un
+    punto y nada más. El error era un corte de conexión, y esos vienen SIN
+    texto: `str(e)` devuelve la cadena vacía. El auditor veía que algo falló
+    y no tenía ni una palabra que buscar.
+
+    El nombre del tipo nunca está vacío, así que siempre se antepone.
+    """
+    texto = str(e).strip()
+    tipo = type(e).__name__
+    return f"{tipo}: {texto}" if texto else tipo
+
+
 class GlosaService:
     def __init__(
         self,
@@ -8543,9 +8590,25 @@ class GlosaService:
         # de Fly), se normaliza a "groq" para no dejar el motor sin
         # proveedor primario válido.
         self.primary_ai = (primary_ai or "anthropic").lower()
-        if self.primary_ai in ("gemini", "openrouter"):
+        # 10-09-2026 — GEMINI VUELVE AL DICTAMEN.
+        #
+        # Salió en junio de 2026 con esta razón de Yesid: «no las veo
+        # trabajando y de pago ya tenemos Claude». Las dos mitades de esa
+        # frase cambiaron:
+        #
+        #   · «de pago ya tenemos Claude» — ahora los tokens de Claude los
+        #     paga él, y una tanda de glosas de prueba se los comió.
+        #   · «no las veo trabajando» — era otra generación del modelo.
+        #
+        # Y el tier gratis de Gemini da 250.000 tokens por minuto contra los
+        # 8.000 del gratis de Groq. Los prompts de este motor pesan unos
+        # 21.000: en Groq gratis **una sola glosa no cabe en el minuto**.
+        #
+        # OpenRouter sigue afuera: no hay llave configurada ni evidencia de
+        # que sirva. Si llega ese valor, se normaliza como antes.
+        if self.primary_ai == "openrouter":
             logger.warning(
-                f"[IA] primary_ai={self.primary_ai!r} ya no genera dictámenes "
+                "[IA] primary_ai='openrouter' no genera dictámenes "
                 "(proveedor retirado jun-2026). Normalizando a 'groq'."
             )
             self.primary_ai = "groq"
@@ -8563,11 +8626,16 @@ class GlosaService:
         self.groq_model_fallback_1 = groq_model_fallback_1 or _cfg.groq_model_fallback_1
         self.groq_model_fallback_2 = groq_model_fallback_2 or _cfg.groq_model_fallback_2
         self.groq_model_fallback_3 = groq_model_fallback_3 or _cfg.groq_model_fallback_3
-        # Google Gemini se conserva ÚNICAMENTE para lectura de PDFs
-        # escaneados: OCR (pdf_service.extraer_con_ocr) y la cadena
-        # multimodal del pdf_fallback_patch (A=Anthropic → B=Gemini PDF →
-        # C=Gemini Vision). NO participa en la generación de dictámenes
-        # vía _llamar_ia.
+        # Google Gemini hace dos cosas distintas y conviene no confundirlas:
+        #
+        #   · Lectura de PDFs escaneados — OCR (`pdf_service.extraer_con_ocr`)
+        #     y la cadena multimodal del `pdf_fallback_patch` (A=Anthropic →
+        #     B=Gemini PDF → C=Gemini Vision). Usa `gemini_model`.
+        #   · Redacción de dictámenes, desde el 10-09-2026, cuando
+        #     `PRIMARY_AI=gemini`. Usa `gemini_model_dictamen`, que es OTRO
+        #     ajuste a propósito: el modelo bueno para leer un escaneo no
+        #     tiene por qué ser el bueno para redactar un escrito jurídico,
+        #     y cambiar uno no puede cambiar el otro sin querer.
         from app.services.gemini_service import GeminiService
 
         gem_key = gemini_api_key or os.getenv("GEMINI_API_KEY", "")
@@ -8575,6 +8643,25 @@ class GlosaService:
             GeminiService(api_key=gem_key, default_model=gemini_model) if gem_key else None
         )
         self.gemini_model = gemini_model or _cfg.gemini_model
+        self.gemini_model_dictamen = _cfg.gemini_model_dictamen
+
+        # 10-09-2026 — DOS CUPOS EN VEZ DE UNO, si el hospital quiere.
+        # El primer día que Gemini redactó dictámenes se quedó sin cuota a
+        # media tarde, y no por los dictámenes: la misma llave la gasta el
+        # OCR de PDFs escaneados, que consume mucho más. Con una segunda
+        # llave gratis en `GEMINI_API_KEY_DICTAMEN`, los dictámenes van por
+        # ella y el OCR se queda con la primera. Sin ella —lo de hoy— este
+        # bloque deja `gemini_dictamen` apuntando al mismo servicio de
+        # siempre y no cambia nada.
+        _key_dictamen = (
+            getattr(_cfg, "gemini_api_key_dictamen", "") or os.getenv("GEMINI_API_KEY_DICTAMEN", "")
+        ).strip()
+        if _key_dictamen and _key_dictamen != gem_key:
+            self.gemini_dictamen = GeminiService(
+                api_key=_key_dictamen, default_model=self.gemini_model_dictamen
+            )
+        else:
+            self.gemini_dictamen = self.gemini
 
     async def analizar(
         self,
@@ -12289,10 +12376,36 @@ class GlosaService:
             # ═══════════════════════════════════════════════════════════
             try:
                 _texto_glosa_input = str(getattr(data, "tabla_excel", "") or "")
+                # 10-09-2026 — LA CLÁUSULA DEL CONTRATO TAMBIÉN ES LEGÍTIMA.
+                # El caso: el dictamen citó la CLÁUSULA SEGUNDA del contrato
+                # 440-DIGSA y salió así radicado:
+                #
+                #   «…ES POR LA SUMA DE TRES MIL DOSCIENTOS TREINTA Y CINCO
+                #    MILLONES CINCUENTA MIL PESOS MCTE (el valor objetado
+                #    consignado en el expediente), RESPALDADO CON EL CDP NO
+                #    58925 … POR CINCUENTA MIL PESOS M/CTE (el valor objetado
+                #    consignado en el expediente)…»
+                #
+                # Las cifras de esa cláusula no venían en la glosa, así que
+                # esta red las tomó por inventadas y las pisó — dentro de una
+                # transcripción literal del contrato. Una cláusula citada mal
+                # es peor que no citarla: la entidad abre su propio contrato,
+                # ve que no dice eso, y el dictamen entero pierde el peso.
+                # Las cláusulas se las inyecta el motor al prompt (arriba,
+                # `_clausulas_contrato`): sus cifras son del contrato firmado,
+                # no de la imaginación del modelo.
+                _texto_clausulas = " ".join(
+                    str(c.get("texto_literal") or c.get("texto") or "")
+                    for c in (_clausulas_contrato or [])
+                    if isinstance(c, dict)
+                )
                 _extras_legitimos = (
                     str(getattr(data, "numero_factura", "") or ""),
                     str(getattr(data, "numero_radicado", "") or ""),
                     str(getattr(data, "numero_contrato", "") or ""),
+                    _texto_clausulas,
+                    str(_val_fact_str or ""),
+                    str(_val_pact_str or ""),
                 )
                 _dictamen_sin_valor_falso = _neutralizar_valores_inventados(
                     dictamen,
@@ -14514,6 +14627,77 @@ class GlosaService:
         )
         return [m for m in candidatos if m and not (m in vistos or vistos.add(m))]
 
+    async def _llamar_gemini_con_retry(
+        self, system: str, user: str, max_intentos: int = 3, llamada_corta: bool = False
+    ) -> tuple[str, str]:
+        """Llama a Gemini para REDACTAR un dictamen. Devuelve (texto, modelo).
+
+        10-09-2026 — Gemini vuelve al dictamen. Salió en junio de 2026 y las
+        dos razones de entonces cambiaron: los tokens de Claude ahora los paga
+        el hospital, y el modelo es de otra generación. El tier gratis de
+        Gemini da 250.000 tokens por minuto contra los 8.000 del gratis de
+        Groq; los prompts de este motor pesan unos 21.000, así que en Groq
+        gratis una sola glosa no cabe en el minuto.
+
+        Mismo contrato que los otros dos proveedores —(system, user) entra,
+        (texto, modelo) sale— y si falla LEVANTA, para que la cadena de
+        `_llamar_ia` pruebe el siguiente. No se traga errores: un dictamen
+        vacío servido en silencio es peor que un fallo visible.
+
+        `llamada_corta` marca las llamadas auxiliares (auto-crítica,
+        refinamiento). Se le baja el techo de salida, igual que hace Groq con
+        su reasoning_effort: no tiene sentido pagar 3.000 tokens de salida
+        para una respuesta de dos renglones.
+        """
+        cliente = getattr(self, "gemini_dictamen", None) or getattr(self, "gemini", None)
+        if not cliente:
+            raise RuntimeError("GEMINI_API_KEY no configurada")
+
+        modelo = self.gemini_model_dictamen or self.gemini_model
+        max_tokens = 1200 if llamada_corta else 3000
+        ultimo: Exception = RuntimeError("Gemini no respondió")
+
+        for intento in range(max_intentos):
+            try:
+                texto, modelo_usado = await cliente.completar(
+                    system=system,
+                    user=user,
+                    modelo=modelo,
+                    temperature=0.10,
+                    max_tokens=max_tokens,
+                )
+                if not (texto or "").strip():
+                    # Respuesta vacía: para el motor es un fallo, no un
+                    # dictamen. Si se devolviera, el auditor vería una hoja
+                    # en blanco con sello de validado.
+                    raise RuntimeError("Gemini devolvió una respuesta vacía")
+                return texto, f"gemini/{modelo_usado or modelo}"
+            except Exception as e:  # noqa: BLE001 — se reintenta y se relanza
+                ultimo = e
+                # 10-09-2026 — SIN CUOTA NO SE INSISTE.
+                # Un 429 del tier gratis no es un tropiezo del que se sale
+                # esperando dos segundos: es el cupo del día agotado. Antes
+                # se reintentaba igual, gastando siete segundos del auditor y
+                # otras dos peticiones contra un cupo que ya no existe. Groq
+                # hace lo mismo desde junio, por la misma razón. Se sale de
+                # una para que la cadena pruebe el siguiente proveedor.
+                if _es_falta_de_cuota(e):
+                    logger.warning(
+                        f"[IA] Gemini sin cuota ({_motivo_del_fallo(e)}). No se reintenta: "
+                        "se pasa al siguiente proveedor. Si se repite a diario, ponga una "
+                        "segunda llave gratis en GEMINI_API_KEY_DICTAMEN para que los "
+                        "dictámenes no compitan con la lectura de PDFs escaneados."
+                    )
+                    break
+                if intento < max_intentos - 1:
+                    espera = 2**intento
+                    logger.warning(
+                        f"[IA] Gemini falló (intento {intento + 1}/{max_intentos}): {e}. "
+                        f"Reintento en {espera}s."
+                    )
+                    await asyncio.sleep(espera)
+        raise ultimo
+
     async def _llamar_groq_con_retry(
         self, system: str, user: str, max_intentos: int = 4, llamada_corta: bool = False
     ) -> tuple[str, str]:
@@ -14817,13 +15001,32 @@ class GlosaService:
 
         # Ronda 49: retry con backoff para timeouts transitorios de red
         # (connection reset, stream idle timeout, protocolo). Hasta 3 intentos.
-        _ERRORES_TRANSITORIOS = (
-            httpx.ReadTimeout,
-            httpx.ConnectTimeout,
-            httpx.PoolTimeout,
-            httpx.RemoteProtocolError,
-            httpx.ReadError,
-        )
+        # 10-09-2026 — ANTHROPIC FALLABA SIN DECIR POR QUÉ, Y SIN REINTENTAR.
+        #
+        # En el PC del hospital, cada llamada a Anthropic salía así en el log:
+        #
+        #     IA anthropic falló: . Intentando siguiente proveedor…
+        #
+        # Un punto después de los dos puntos: el motivo venía VACÍO. Y fallaba
+        # en medio segundo, o sea que no pasó por los tres reintentos.
+        #
+        # La causa: esta lista nombraba los errores de red UNO POR UNO y se
+        # dejó por fuera `httpx.ConnectError`, que es justo el que lanza una
+        # conexión cortada por el host remoto — el «WinError 10054» que el
+        # propio panel de Diagnóstico le venía mostrando al auditor. Al no
+        # estar en la lista, no se reintentaba: se propagaba de una.
+        #
+        # Ahora se atrapa `httpx.TransportError`, que es la clase MADRE de
+        # todos ellos (ConnectError, ConnectTimeout, ReadTimeout, ReadError,
+        # WriteError, WriteTimeout, PoolTimeout, RemoteProtocolError,
+        # ProxyError…). Enumerarlos a mano fue el error: cada vez que httpx
+        # agregue uno, esta lista volvería a quedarse corta en silencio.
+        #
+        # Lo que importa para el hospital: cuando la red del HUS corta la
+        # conexión con Anthropic —y la corta— el motor lo reintenta en vez de
+        # rendirse al primer intento. Y si aun así falla, ahora dice cuál fue
+        # el error en vez de dejar un punto.
+        _ERRORES_TRANSITORIOS = (httpx.TransportError,)
         # Headers: si activamos cache con TTL=1h necesitamos el beta header
         # 'extended-cache-ttl-2025-04-11'. Si no, payload normal.
         _headers = {
@@ -15269,11 +15472,23 @@ class GlosaService:
         # PDFs escaneados (pdf_service + pdf_fallback_patch) y NO entra
         # aqui; OpenRouter salio del proyecto.
         def _agregar_fallbacks(intentos: list, ya_incluido: str) -> None:
-            """Agrega los proveedores restantes en orden de preferencia."""
+            """Agrega los proveedores restantes en orden de preferencia.
+
+            Gemini va de último entre los respaldos a propósito: entró al
+            dictamen el 10-09-2026 y todavía no tiene historial en producción.
+            Quien lo quiera de primero lo pone en PRIMARY_AI.
+            """
             if ya_incluido != "anthropic" and self.anthropic_key:
                 intentos.append(("anthropic", self._llamar_anthropic))
             if ya_incluido != "groq" and self.groq:
                 intentos.append(("groq", self._llamar_groq_con_retry))
+            # `getattr` y no `self.gemini` a secas: hay pruebas —y caminos
+            # degradados— que arman el servicio con `GlosaService.__new__()`,
+            # saltándose el __init__, y solo le ponen los atributos que van a
+            # usar. Leer uno que no existe reventaba la cadena entera con un
+            # AttributeError, justo en el momento de elegir proveedor.
+            if ya_incluido != "gemini" and getattr(self, "gemini", None):
+                intentos.append(("gemini", self._llamar_gemini_con_retry))
 
         if modelo_override and self.anthropic_key:
             # modelo_override SIEMPRE va a Anthropic (Opus/Haiku especifico)
@@ -15287,6 +15502,11 @@ class GlosaService:
             # Fallback: Anthropic (calidad) despues.
             intentos = [("groq", self._llamar_groq_con_retry)]
             _agregar_fallbacks(intentos, "groq")
+        elif self.primary_ai == "gemini" and getattr(self, "gemini", None):
+            # El auditor eligió Gemini: es gratis y con mucho más margen por
+            # minuto que el gratis de Groq. Se respeta igual que los otros.
+            intentos = [("gemini", self._llamar_gemini_con_retry)]
+            _agregar_fallbacks(intentos, "gemini")
         else:
             # primary_ai desconocido o sin proveedor disponible para el
             # primary elegido: Groq (gratis/rapido) -> Anthropic (calidad).
@@ -15345,7 +15565,12 @@ class GlosaService:
                 )
                 if nombre == "anthropic":
                     _causa_anthropic = str(e)[:200]
-                logger.warning(f"IA {nombre} falló: {e}. Intentando siguiente proveedor…")
+                # `{e}` a secas dejaba «falló: .» cuando el error venía sin
+                # texto (pasa con los cortes de conexión). El TIPO nunca está
+                # vacío, así que el auditor siempre se lleva algo que buscar.
+                logger.warning(
+                    f"IA {nombre} falló: {_motivo_del_fallo(e)}. Intentando siguiente proveedor…"
+                )
                 continue
 
         logger.error(f"Todos los proveedores IA fallaron: {ultimo_error}")

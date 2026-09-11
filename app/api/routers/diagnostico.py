@@ -604,3 +604,44 @@ def diagnostico_completo(
         out["estado_global"] = "ok"
 
     return out
+
+
+@router.get("/lentitud")
+def lentitud(
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Qué pantalla es la lenta. 11-09-2026.
+
+    Nació de un «*ayúdame a mirar por qué está tan lenta la plataforma*» que
+    no se pudo contestar con datos: se podía mirar la memoria, el procesador
+    y el servidor de archivos, pero el motor no anotaba en ninguna parte
+    cuánto tardaba en contestar. Tocó salir a suponer.
+
+    Ahora cada petición se cronometra y esto devuelve el resumen: cuántas
+    veces se abrió cada pantalla, cuánto tardó en promedio, cuál fue la peor,
+    y las últimas que pasaron del umbral.
+
+    Ojo con lo que NO mide: el viaje por internet. Esto cuenta desde que la
+    petición entra al motor hasta que sale. Si acá todo sale rápido y la
+    pantalla igual se siente pesada, la demora está en el camino —el túnel,
+    la red del hospital— y no adentro.
+    """
+    from app.services.tiempos_peticiones import resumen
+
+    return resumen(limite=25)
+
+
+@router.post("/lentitud/reiniciar")
+def lentitud_reiniciar(
+    current_user: UsuarioRecord = Depends(get_admin),
+):
+    """Vuelve a empezar la cuenta, para medir un rato concreto.
+
+    Sirve para lo que uno de verdad quiere hacer: «póngalo en cero, abro la
+    pantalla que se siente lenta, y miro qué salió».
+    """
+    from app.services.tiempos_peticiones import reiniciar, resumen
+
+    reiniciar()
+    logger.info(f"[LENTITUD] contador reiniciado por {current_user.email}")
+    return {"ok": True, "mensaje": "Contador en cero.", "estado": resumen()}

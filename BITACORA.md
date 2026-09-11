@@ -123,6 +123,591 @@ factura HUS0000544255 **no aparece en el export del DGH**, y la propia
 observación de MUTUAL viene mutilada («La tecnología 20299706 - no se
 encuentra dentro del contrato», sin nombre de servicio).
 
+### 11-09-2026 (2) — Ahora el motor sabe decir QUÉ está lento
+
+De la misma mañana. Cuando Yesid preguntó por qué la plataforma estaba lenta,
+resultó que **no había con qué contestarle**. Se pudo medir todo lo de
+alrededor —y salió sano—:
+
+| | |
+|---|---|
+| Memoria del motor | 1,1 GB, con 3,5 GB libres en el PC |
+| Procesador | 9 % |
+| El servidor de archivos `\\Prime` | responde en 17 ms |
+| El motor, preguntándole desde el propio PC | **13 ms** |
+| El motor, pasando por internet | **130 ms** |
+
+O sea: ni memoria, ni procesador, ni el servidor de archivos. **El motor
+contesta en 13 milésimas de segundo.** Lo que se siente pesado es el viaje por
+internet, que cuesta unos 130 ms por cada pedido — y una pantalla hace entre 2
+y 15 pedidos al abrirse.
+
+**Pero lo grave es otra cosa:** el motor **no anotaba en ninguna parte cuánto
+tardaba en contestar**. La única pregunta que de verdad importa —«¿cuál
+pantalla es la lenta?»— era la única sin respuesta, y tocó salir a suponer.
+
+Eso ya no pasa. Ahora hay un botón **«⏱️ ¿Qué está lento?»** en *Diagnóstico
+del sistema*, y muestra:
+
+- cuántas veces se abrió cada pantalla y **cuánto tardó en promedio**,
+- **cuál fue la peor vez** de cada una,
+- y la lista de las que se pasaron de 2 segundos, con la hora.
+
+Hay un botón **«Poner en cero»** para lo que uno de verdad quiere hacer: dejar
+el contador en cero, abrir la pantalla que se siente lenta, y volver a mirar
+qué salió.
+
+Y la pantalla lo aclara, porque es la trampa de siempre: **eso cuenta solo lo
+que tarda el motor**, no el viaje por internet. Si ahí todo sale rápido y la
+pantalla igual se siente pesada, la demora está en el camino y no adentro.
+
+Medir no cuesta nada: **1,5 microsegundos por petición**, sobre las 13.000 que
+tarda una de verdad. Es la diezmilésima parte.
+
+### 11-09-2026 — Por qué se puso lenta la plataforma (y quién tuvo la culpa)
+
+Yesid a las 8:35 de la mañana: «*ayúdame a mirar por qué está tan lenta la
+plataforma*». En su pantalla, el indexador de soportes recorriendo el servidor
+de archivos: **101.991 facturas, 426.405 archivos**, y arriba el aviso de
+«nueva versión disponible».
+
+**Esos dos hechos son el mismo hecho.** El motor se actualiza solo: cada 5
+minutos mira si hay cambios y, si los hay, se reinicia. Se fusionó un cambio a
+las 8:16 a.m., el motor se reinició… y **al arrancar se ponía a recorrer el
+servidor de archivos entero**, sin preguntarse si hacía falta. A las 8:35
+todavía iba. O sea: la lentitud la causó el despliegue de la mañana, no una
+falla del motor.
+
+Y no hacía falta recorrer nada: el recorrido de las **2 de la mañana** ya
+había dejado el índice al día. Los archivos eran los mismos.
+
+**Dos cosas se arreglaron, y las dos están medidas.**
+
+**1) El arranque ya no recorre por gusto.** Si el índice se hizo hace menos de
+20 horas, un reinicio no dispara nada: el turno de las 2 AM sigue en pie y
+listo. Solo se recorre al arrancar cuando de verdad falta —la primera vez, o
+si el motor estuvo apagado a las 2 AM y se perdió el turno—. El botón
+«**Reindexar ahora**» sigue funcionando igual: lo que usted pide a mano no se
+le discute.
+
+**2) Se le pedía al servidor seis veces más de lo necesario.** Cada carpeta se
+listaba **tres veces** (una para recorrer, otra para contar, otra para leer),
+más una pregunta por la carpeta; y de cada archivo se volvía a preguntar
+tamaño y fecha **uno por uno** — 426.405 preguntas más.
+
+Cuando el servidor está al otro lado de la red, como el de radicación, lo caro
+no es pensar: es cada ida y vuelta. Medido sobre un árbol armado igual al del
+hospital:
+
+| | Viajes al servidor |
+|---|---|
+| Como estaba | **23.712** |
+| Como quedó | **3.910** |
+
+Indexando exactamente lo mismo: las mismas 3.000 facturas, los mismos 12.000
+archivos. Llevado a su servidor de verdad, son unos **800.000 viajes que pasan
+a ser 130.000**.
+
+Ahora cada carpeta se pide **una sola vez** y se aprovecha todo lo que esa
+respuesta ya trajo: los archivos, las subcarpetas, y el tamaño y la fecha de
+cada uno.
+
+**Lo que se cuidó, que era lo delicado:** el motor se salta las carpetas que no
+han cambiado, y para eso les toma una «huella». Al cambiar la forma de
+recorrer, cambió la huella — así que hay pruebas nuevas que comprueban que
+sigue viendo **un archivo nuevo, una factura nueva entera y un archivo
+borrado**, y que el tamaño y la fecha que muestra son los de verdad.
+
+### 10-09-2026 — El dictamen dejó de llevarle la contraria al papel, y Gemini con su propio cupo
+
+**1) «El iobitridol no es un medio de contraste, sino una solución antiséptica».**
+
+Eso salió radicado, para defender el cobro. Y es falso: el iobitridol es un
+medio de contraste yodado. Lo dice la propia factura —«equivalente a 30% p/v
+de yodo»— y lo dice la entidad, que lo objetó llamándolo así: «SE OBJETA
+MEDIO DE CONTRASTE UTILIZADO».
+
+Del otro lado eso lo lee un médico auditor. Una sola frase así desacredita la
+respuesta entera, incluidos los siete renglones de millones que iban bien
+argumentados.
+
+Ahora el motor no deja pasar un dictamen que **niegue con todas sus letras lo
+que el papel de la entidad afirma**. No se metió a opinar de medicina —eso
+sería inventar de otra forma—: solo mira si el dictamen dice «esto NO es un
+medio de contraste» cuando el papel dice que sí lo es. Negarle a la entidad
+sus afirmaciones jurídicas —que la glosa es extemporánea, que no hubo
+autorización— sigue siendo el trabajo del dictamen y no se toca.
+
+Con esto, **el dictamen que se radicó ese día hoy no sale**: el motor lo para
+y nombra las dos mentiras, la de los 500 ML y la del antiséptico.
+
+**2) Gemini se quedaba sin cuota a media tarde.**
+
+Y no era por los dictámenes: la **misma llave** la gasta el motor para leer
+los PDF escaneados, que consume mucho más. Las dos tareas se comían el mismo
+cupo gratis del día, y la que perdía era la que usted estaba mirando.
+
+Se dejó listo para arreglarlo sin cambiar nada más: si el hospital saca una
+**segunda llave gratis de Google** y la pone en el archivo de configuración,
+los dictámenes van por esa y la lectura de PDF se queda con la primera — dos
+cupos en vez de uno. Si no se pone, todo sigue igual que hoy.
+
+Y mientras tanto, una cosa que sí se arregló de una: cuando Google contesta
+«se le acabó el cupo», el motor **ya no insiste**. Antes reintentaba tres
+veces, gastando siete segundos de su espera y dos peticiones más contra un
+cupo que ya no existía. Ahora pasa de una al siguiente proveedor y deja
+escrito en el registro que fue la cuota, no una falla.
+
+### 10-09-2026 — El CI: de casi 5 minutos a unos 3
+
+Quedó a medias en la mañana. Se había repartido la suite en tres máquinas y
+bajó de 13 minutos a unos 5, pero ahí se atascó — y la razón, viéndolo, era
+obvia:
+
+| Máquina | Tardó |
+|---|---|
+| api-1 | 2 min 34 s |
+| api-2 | 3 min 51 s |
+| resto | **4 min 46 s** ← esta marcaba el reloj |
+
+**Dos máquinas terminaban y se quedaban mirando a la tercera.** El reloj lo
+marca la más lenta, no el promedio, así que la mitad del tiempo comprado se
+perdía esperando. Y el motivo es que el reparto era **por nombre de archivo**
+—los impares a un grupo, los pares al otro— y los archivos no duran lo mismo:
+uno solo, `test_preauditoria.py`, se lleva minuto y medio él solo.
+
+**Lo que se hizo:** repartir por lo que cada archivo **tarda de verdad**. Se
+midió la suite completa archivo por archivo, la tabla quedó guardada en el
+repositorio, y ahora el reparto le da el archivo más pesado a la máquina que
+va más liviana. Son cuatro máquinas y quedan **parejas al 1 %**:
+
+| Máquina | Trabajo |
+|---|---|
+| 1 | 227,7 s |
+| 2 | 227,7 s |
+| 3 | 227,7 s |
+| 4 | 227,7 s |
+
+**Y esto ya está medido en el CI de verdad, no calculado:** la PR quedó
+completa —lint, las cuatro máquinas de pruebas y el escáner de seguridad— en
+
+| Grupo | Tardó |
+|---|---|
+| 3 | 2 min 53 s |
+| 4 | 2 min 59 s |
+| 1 | 3 min 03 s |
+| 2 | **3 min 10 s** ← el reloj |
+
+Antes eran 2m34 / 3m51 / **4m46**, con el trabajo completo en unos 5 minutos.
+La distancia entre la máquina más rápida y la más lenta pasó de **2 min 12 s a
+17 segundos**: ya casi no hay nadie esperando a nadie.
+
+Y para que se vea de dónde a dónde: **de trece minutos en fila, a tres**.
+
+**Tres cosas que se cuidaron, porque son las que muerden:**
+
+1. **Ningún archivo se queda sin correr ni corre dos veces.** Se comprueba
+   archivo por archivo en cada corrida. Un verde que no probó nada es peor
+   que quince minutos de espera.
+2. **El reparto salió del archivo de configuración del CI** y quedó en un
+   programa aparte que **sí se puede probar**. La lógica metida en esa
+   configuración es la que nadie revisa hasta el día que falla.
+3. **Una prueba nueva que todavía no está medida entra igual**, con la
+   duración del montón. Nunca se queda por fuera.
+
+Si con el tiempo el reparto se desbalancea porque se agregaron muchas
+pruebas, se vuelven a medir con un comando y ya. Las pruebas avisan si la
+tabla se puso vieja.
+
+### 10-09-2026 — La cláusula del contrato ya no sale mal transcrita, y el comparador dejó de regalar notas
+
+**1) El dictamen citaba el contrato y le cambiaba las cifras.**
+
+En el mismo caso, el dictamen transcribió la CLÁUSULA SEGUNDA del contrato
+440-DIGSA y salió radicado así:
+
+> «…ES POR LA SUMA DE TRES MIL DOSCIENTOS TREINTA Y CINCO MILLONES CINCUENTA
+> MIL PESOS MCTE **(el valor objetado consignado en el expediente)**, VALOR
+> QUE SE ENCUENTRA RESPALDADO CON EL CDP NO 58925 … POR CINCUENTA MIL PESOS
+> M/CTE **(el valor objetado consignado en el expediente)**…»
+
+Es el motor mordiéndose la cola. Él tiene una red que borra las cifras de
+plata que la IA se inventa y las cambia por esa frase. Pero **no sabía que
+las cláusulas del contrato son legítimas** — se las inyecta él mismo al
+modelo, sacadas del contrato firmado. Como esas cifras no venían en la glosa,
+las tomó por inventadas y las pisó, dentro de una transcripción literal.
+
+Citar mal un contrato es peor que no citarlo: la entidad abre **su propio
+contrato**, ve que no dice eso, y todo el dictamen pierde el peso.
+
+Ahora las cifras de la cláusula, del valor facturado y del valor pactado
+entran como legítimas y la transcripción sale igualita al contrato.
+
+Y de paso, la otra mitad: cuando la cifra **sí** es inventada, el paréntesis
+se borra completo en vez de quedar «CINCUENTA MIL PESOS MCTE (el valor
+objetado consignado en el expediente)», que no significa nada y delata el
+retoque. El paréntesis después de una suma en letras está para repetirla en
+números; si el número no se sostiene, lo honesto es que no haya paréntesis.
+
+**2) El comparador de IAs le ponía 9/9 a un dictamen que el motor rechazó.**
+
+El programa que compara Groq contra Gemini sobre la misma glosa le había dado
+**nueve aciertos de nueve** a un dictamen que el propio motor había mandado a
+revisión humana: puntaje 70, confianza REVISAR, y en su registro la
+advertencia *«el dictamen no abordó 2 de 2 conceptos»*. La nota solo miraba si
+aparecían ciertas palabras — y aparecían, en el encabezado, sin que el
+dictamen argumentara nada.
+
+Una nota que le dice «excelente» a lo que el motor rechaza no sirve para
+escoger proveedor: sirve para escoger mal. Ahora la nota trae siempre dos
+mitades juntas: los hechos del caso (que salieron de los papeles) **y el
+veredicto del propio motor** — su puntaje, su nivel de confianza, si bloqueó
+el dictamen para radicar y las diez advertencias que suelta mientras trabaja
+(conceptos sin responder, cláusulas evadidas, plata inventada, cantidades
+inventadas, documentos que no existen…).
+
+Un proveedor solo sale **LIMPIO** si acierta todo **y** el motor no le objetó
+nada. Ese mismo dictamen que sacaba 9/9 ahora sale **CON PEGAS**, con el
+motivo escrito debajo.
+
+### 10-09-2026 — El dictamen dejó de inventar mililitros y renglones de factura
+
+Del mismo caso (objeción 189801). La entidad objetó el IOBITRIDOL diciendo
+que *según nota operatoria se utilizan 40 CC, la hoja de gastos registra
+frasco de 100 ML / 50 ML, por lo tanto no se reconoce el cobro de 4
+unidades*. Y el dictamen salió a defender el cobro con esta frase:
+
+> «EL **ÍTEM 13** DE LA FACTURA INDICA LA ADQUISICIÓN DE **CINCO UNIDADES DE
+> 100 ML CADA UNA, TOTALIZANDO 500 ML**»
+
+Nada de eso existe. El medicamento es de **50 ML** — lo dice la descripción
+del propio renglón, «IOBITRIDOL 300MG/50ML». Ni el ítem 13, ni las cinco
+unidades, ni los 500 ML estaban en algo que el motor hubiera leído. Es decir:
+el hospital le discutía a la entidad con una cuenta inventada, y encima se la
+atribuía a un renglón concreto de la factura. La entidad abre la factura, ve
+que el ítem 13 no dice eso, y ahí se pierde la glosa **y la credibilidad de
+los otros siete renglones**.
+
+El motor ya vigilaba las cifras de plata inventadas, pero solo las que llevan
+signo de pesos y separador de miles. «500 ML» y «ÍTEM 13» pasaban de largo.
+
+Ahora hay una revisión que compara **toda cantidad con unidad** del dictamen
+—mililitros, miligramos, gramos, unidades, frascos, ampollas— y **todo número
+de ítem, renglón o folio** contra lo que de verdad se le entregó al modelo (la
+glosa completa y el texto de los soportes que alcanzó a leer). Lo que no
+aparezca en ninguna parte se marca como grave y el dictamen no sale: se
+reintenta o se manda a revisión humana.
+
+Está hecha para no molestar sin razón: centímetro cúbico y mililitro se toman
+como lo mismo (40 CC = 40 ML), el gramo vale escrito «G», «GR» o «GRS», los
+numerales de las normas no se confunden con dosis («ANEXO 3 G» no son tres
+gramos), y «un frasco» se lee como el artículo que es, no como una cuenta.
+
+**Comprobado sobre papel real:** en el dictamen completo de ese caso —seis mil
+caracteres, con la cláusula del contrato, el CDP y treinta y seis citas de
+normas— señala **exactamente las tres invenciones y ninguna cosa más**. Y los
+cuatro dictámenes reales de producción que el motor guarda de banco de pruebas
+pasan limpios.
+
+### 10-09-2026 — Cada causal con SU valor, y dejar de decir «soporte completo» cuando no se sabe
+
+Dos defectos que salieron del caso real de la factura **HUS0000541440**
+(objeción N° 189801, la de Sanidad Militar). Los dos hacían que el motor
+dijera con seguridad cosas que no le constaban.
+
+**1) Los dos bloques del dictamen decían $55.985.100.**
+
+La objeción trae **ocho renglones**: siete de **SO4201** (soportes) por
+**$55.882.100** y uno de **FA0701** (cantidades de medicamento, el
+IOBITRIDOL) por **$103.000**. El dictamen sacaba los dos bloques con el
+total de la glosa entera. O sea: un bloque de ciento tres mil pesos
+afirmando que está contestando cincuenta y cinco millones. La entidad lee
+eso y entiende que el hospital no supo qué le glosaron.
+
+El motor sí intentaba repartir, pero se rendía apenas veía una cifra antes
+del primer código, porque «huele a total global». En la objeción de verdad
+esa cifra es el **VALOR FACTURA del encabezado** — y con eso el reparto no
+llegaba ni a intentarse nunca.
+
+Ahora se reparte así: un mismo código puede salir varias veces (SO4201 sale
+siete), a cada aparición se le atribuye la cifra que viene detrás, y las de
+un mismo código se suman. **Y luego se comprueba contra el papel de la
+entidad:** si el texto declara un TOTAL OBJETADO, la suma de todas las
+causales tiene que dar exactamente eso. Si cuadra, el reparto está probado y
+no hubo que suponer nada. Si no cuadra, el motor **no adivina**: deja los
+bloques como estaban antes.
+
+En la objeción real cuadra al peso: SO4201 $55.882.100 + FA0701 $103.000 =
+$55.985.100.
+
+**2) El panel verde que decía «Está el soporte que la causal exige».**
+
+La SO4201 de esta objeción pide, siete veces y con todas las letras,
+*«NO SE EVIDENCIA FRA DE COMPRA Y COTIZACION AVALADA POR SANIDAD MILITAR»*.
+El motor mostraba el panel **en verde**, diciendo que el soporte exigido
+estaba, porque para las causales de la familia SO usaba por defecto
+«historia clínica y epicrisis» — que sí estaban adjuntas. Historia clínica
+había; **factura de compra y cotización avalada, no**. El auditor podía
+mandar la respuesta confiado y perder los cincuenta y cinco millones.
+
+Ahora hay una lista corta de causales cuyo soporte **el motor no puede ver
+desde acá** (la lista de precios pactada, la factura de compra del material,
+la cotización avalada, los soportes del recobro ante ADRES/ARL, la
+constancia de envío del trámite). Para esas, el panel **no se pone verde**:
+avisa con nombre y apellido qué documento hay que conseguir a mano. Cuando
+la causal sí pide historia clínica o epicrisis y están, sigue en verde
+igual que siempre.
+
+**Comprobado:** 35 pruebas nuevas y viejas de estos dos puntos en verde, y
+831 pruebas relacionadas de catálogo, soportes y evidencia sin romperse.
+
+### 10-09-2026 — El CI en tres máquinas: de 7 min 20 s a unos 4
+
+Yesid, viendo el reloj: «*¿dónde está ese supuesto 3 minutos?*». Tenía razón
+en reclamar, y el número que yo había dado estaba mal.
+
+**Lo que pasó:** medí los 3 min 38 s en una máquina de **4 núcleos**. El
+runner de GitHub da **2** — el log lo muestra, solo aparecen dos procesos,
+`gw0` y `gw1`. Ahí las pruebas tardan **6 min 07 s**, más 1 min 14 s de
+instalación: **7 min 20 s** de trabajo completo. Se había partido a la mitad,
+no en cuatro. El número bueno es el del CI, no el de la máquina de quien mide.
+
+**Lo que se miró antes de tocar nada:**
+
+| | |
+|---|---|
+| Instalación previa | 1 min 14 s — no es el problema |
+| `tests/test_api` sola | **4 min 33 s de los 6 min 07 s** |
+| Más procesos que núcleos | **no sirve**: `-n 2` da 4m35 y `-n 4` da 4m33 |
+
+Estas pruebas gastan procesador, no espera. Dentro de una máquina no quedaba
+nada que exprimir.
+
+**Lo que se hizo:** repartir el trabajo en **tres máquinas que arrancan a la
+vez**. `tests/test_api` va partida en dos porque es la que manda: dejarla
+entera habría dejado ese trabajo en 4m33 y los otros esperándolo — el reloj lo
+marca el más lento, no el promedio.
+
+El reparto es por archivo y **determinista** (impares a un grupo, pares al
+otro, sobre la lista ordenada), así que un fallo se reproduce corriendo ese
+grupo. Y si un grupo se queda sin archivos, el CI **falla a propósito**: un
+verde que no probó nada es peor que quince minutos de espera.
+
+**Comprobado antes de subirlo**, que es lo que de verdad importa acá:
+
+| Grupo | Pruebas |
+|---|---|
+| api-1 | 1.565 |
+| api-2 | 1.731 |
+| resto | 9.328 |
+| **Suma** | **12.624** |
+| Suite completa | **12.624** |
+
+Ni una de menos, ni una repetida.
+
+**Y un defecto que se destapó al primer intento, con todo en verde.** Al
+renombrar los trabajos a «Tests (pytest · api-1)» y demás, **el chequeo
+obligatorio de la rama —que se llama exactamente «Tests (pytest)»— dejó de
+existir**. GitHub se quedó esperando un reporte que ya nadie iba a mandar y la
+PR quedó **bloqueada para siempre**, con los tres grupos en verde.
+
+Lo peor no fue el bloqueo: fue que **no se ve como un error**. Se ve como «una
+comprobación aún no se ha completado», que es lo que uno se queda mirando un
+rato más. Ahora hay un trabajo cuyo único fin es producir ese nombre y
+reportar el resultado de los tres — así no hay que ir a tocar la
+configuración del repositorio, que nadie recuerda dónde está el día que haga
+falta.
+
+22 pruebas nuevas: reconstruyen el reparto y vuelven a cuadrar la suma, y
+vigilan que el nombre exigido lo siga produciendo alguien. Si se cambia otra
+vez, avisan solas en vez de colgar todas las PR.
+
+---
+
+### 10-09-2026 — Gemini vuelve al dictamen, y se puede comparar con datos
+
+Yesid pidió alternativas gratis: los tokens de Claude los paga él y una tanda
+de glosas de prueba se los comió.
+
+**Lo primero que revisé le ahorra tiempo:** en Groq **ya está en el techo**. El
+`gpt-oss-120b` que usa es el modelo insignia de Groq — no hay uno mejor allí, y
+cambiar de modelo dentro de Groq no le va a mejorar el dictamen.
+
+**Lo segundo:** Cerebras era la alternativa obvia (un millón de tokens al día),
+pero **su tier gratis sin tarjeta terminó en agosto de 2026**. Callejón sin
+salida.
+
+**Lo tercero, y es el que sirve:** Gemini. Y la llave **ya estaba configurada**
+en el motor, usándose solo para leer PDFs escaneados. El número que decide:
+
+| | Groq gratis | Gemini gratis |
+|---|---|---|
+| Tokens por minuto | **8.000** | **250.000** |
+
+Los prompts de este motor pesan unos **21.000 tokens**. En el tier gratis de
+Groq **una sola glosa no cabe en el límite del minuto**.
+
+**La puerta la había cerrado él mismo**, y estaba escrito en el código con sus
+palabras (junio de 2026): «*no las veo trabajando y de pago ya tenemos Claude*».
+Las dos mitades de esa frase cambiaron: ahora esos tokens los paga el hospital,
+y el modelo es de otra generación. Así que se reabrió — y no estaba bloqueado,
+estaba **borrado**: hubo que escribir el proveedor de nuevo.
+
+El modelo con el que Gemini **redacta** es un ajuste APARTE del que usa para
+**leer escaneos**. Son tareas distintas: el bueno para un escaneo no tiene por
+qué ser el bueno para un escrito jurídico, y cambiar uno no puede cambiar el
+otro sin querer.
+
+**Y sobre «cuál da mejor dictamen»: eso no se opina, se mide.** Quedó
+`tools/comparar_proveedores_ia.py`, que corre **la misma glosa** por cada
+proveedor y los pone lado a lado. El caso patrón es real —la factura
+HUS0000541440— y las respuestas correctas salieron de los papeles, no de una
+suposición: la factura electrónica y la recepción de objeción N° 189801.
+
+No puntúa «qué tan bonito escribe». Cuenta **nueve hechos verificables**: si
+reconoce el contrato, si usa la tarifa pactada, si responde los ocho conceptos,
+si contesta las dos causales, si no se inventa el valor de la factura, si no
+declara extemporánea una glosa que no lo está, si no llama CUPS al código de un
+insumo, si no repite el disparate del iobitridol, y si nombra lo que la entidad
+de verdad pide. **Cada fila lleva escrito de qué papel salió.**
+
+Por defecto corre **solo los gratis**: Anthropic se paga y no entra sin pedirlo
+expresamente.
+
+Probado contra los dos extremos: el dictamen que de verdad salió mal saca
+**1 de 9**; el correcto, **9 de 9**. 22 pruebas nuevas.
+
+---
+
+### 10-09-2026 — Se acabaron los quince minutos de espera (y los conflictos)
+
+Con las palabras de Yesid: «*tengo que esperar hasta 15 minutos que un PR pase
+una validación y aparte de eso todos salen con conflictos*». Las dos cosas eran
+ciertas y las dos tenían arreglo.
+
+**Los conflictos no eran mala suerte: era siempre el mismo archivo.** Cada rama
+agrega su entrada del día al mismo sitio de la bitácora, así que git ve dos
+textos distintos en el mismo renglón y se planta. En un solo día hubo que
+resolverlo **ocho veces**, siempre igual: conservando las dos entradas.
+
+Ahora lo hace git solo. Una línea en `.gitattributes` —`BITACORA.md
+merge=union`— le dice que en este archivo se quede con **los dos** lados en vez
+de parar. Funciona porque la bitácora solo crece: nadie reescribe una entrada
+vieja. **Probado antes de ponerlo**: dos ramas escribiendo en el mismo renglón,
+cero conflictos, las dos entradas ahí. Se le aplicó también al CHANGELOG.
+
+**Y los quince minutos eran trece.** La suite ahora se reparte entre los
+núcleos del runner:
+
+| | Tiempo |
+|---|---|
+| Como corría | **13 min** |
+| Repartida por prueba | **más lento** — se pisan entre ellas |
+| Repartida **por archivo** | **3 min 38 s** |
+
+**CORRECCIÓN, medida al día siguiente en el CI de verdad (10-09-2026):** esos
+3 min 38 s son de una máquina de **4 núcleos**. El runner de GitHub le da
+**2**, y ahí las pruebas tardan **6 min 07 s** — el log lo muestra: solo
+aparecen dos procesos, `gw0` y `gw1`.
+
+Con la instalación previa (1 min 14 s), el trabajo completo pasó de **~14
+minutos a 7 min 20 s**. Se partió a la mitad, no en cuatro. El número bueno
+es el del CI, no el de la máquina de quien lo mide.
+
+Repartir **por archivo** no es un adorno: hace que todas las pruebas de un
+mismo archivo caigan en el mismo proceso. Sin eso, dos que comparten la base de
+prueba o un archivo temporal se pisan y la suite empieza a fallar por razones
+que no tienen que ver con el código. Cambiar quince minutos de espera por un
+verde poco fiable habría sido peor que no hacer nada — por eso la primera
+medición, la que salía «más lento», se midió de nuevo en vez de descartarla.
+
+6 pruebas nuevas que vigilan **las dos banderas juntas**: una sin la otra es
+peor que ninguna.
+
+---
+
+### 10-09-2026 — Un código de medicamento se leía como el valor de la factura
+
+Trabajando una glosa real del Dispensario (factura HUS0000541440, 8 conceptos,
+$55.985.100 objetados), el dictamen salió con un recuadro rojo que decía:
+
+> «La entidad objeta $55.985.100 sobre una factura de **$224.249**. No se puede
+> glosar un valor que nunca se facturó.»
+
+**La factura valía $126.565.918.** El «$224.249» salió de `224249-2`, que es el
+**código del IOBITRIDOL**. El patrón que busca «FACTURADAS ‹número›» se saltó el
+fin de renglón y agarró el código del medicamento que venía debajo.
+
+**Lo peligroso no es el número mal leído.** Es que ese recuadro le dice al
+auditor que tiene el caso ganado sin discutir el fondo. Si lo radica, la entidad
+abre la factura, ve los 126 millones y ya no le cree **nada más** del escrito —
+que es justo el flanco que el propio Quality Gate enumera: «el documento se
+contradice solo → tumbo sin entrar en el fondo».
+
+Ahora un número pegado a un código no se lee como plata. Un código se reconoce
+por sus bordes: `224249-2` lleva un guion y otro dígito detrás; `FMQ6476` lleva
+letras delante. La plata no. Y cuando no hay dato, queda en cero: sin dato es
+honesto, un dato falso arma un recuadro que miente.
+
+**Y buscándolo aparecieron dos huecos más, de antes:**
+
+- El patrón de «OBJETADO» exigía un **espacio** y la entidad escribe **dos
+  puntos**: «VALOR OBJETADO: $103.000» no se leía.
+- No cubría los verbos. «SE RECONOCIÓ SOLO $90.000» daba cero, porque solo
+  buscaba «RECONOCIDO». En los verbos el «$» es obligatorio a propósito:
+  «objeto» sin tilde también es un sustantivo.
+
+14 pruebas nuevas con el texto real de la objeción. La mitad vigila que no se
+cuele un código; la otra mitad, que la plata de verdad se siga leyendo — si el
+arreglo se pasa de estricto, esas se caen.
+
+---
+
+---
+
+### 10-09-2026 — Lote del Dispensario del 09 de septiembre: cargado el GI-33-5462-2026
+
+**Lo que llegó.** El export `GLOSAS_Y_DEVOLUCIONES_09_SEPTIEMBRE` traía 761
+facturas de cuatro entidades. Del Dispensario eran **200**; el resto (COOSALUD
+y Hospital Naval) se dejó por fuera.
+
+**Lo que se cargó.** 196 facturas y **273 objeciones por $55.222.292**, en una
+corrida de 100 minutos. Quedaron todas con su respuesta en el portal: 186
+directas, 2 sin diálogo de confirmación, y las demás resueltas en el repaso
+—la del piloto ya estaba, una se reintentó y entró, y otra el portal la
+reportó como finalizada—. El paquete quedó en
+`D:\USUARIO CARTERA\Documents\GI-33-5462-2026\` con el Excel, el reporte
+y el PDF de evidencias.
+
+**Las de calidad y pertinencia salieron del cargue, como manda la directriz.**
+Son **18 objeciones de 8 facturas por $3.922.641**, y esta vez el técnico las
+había dejado con su médico asignado en el export, así que se repartieron:
+**LAURA DIAZ** (3 facturas) y **ZULAY GONZALEZ** (5 facturas). Se les entregó
+un Excel con una hoja por profesional, con el número de objeción tal como
+aparece en la grilla y lo que la EPS reclama en sus propias palabras.
+
+**Lo que el portal dejó ver de paso.** Cinco facturas avisaron que les quedan
+glosas por contestar. Descontando las de calidad que dejamos a propósito,
+sobran **12 objeciones que no vinieron en este export** —ocho de ellas en la
+HUS0000549861—, seguramente de una recepción anterior. Hay que buscarlas en el
+portal y traerlas en el próximo lote.
+
+**Soportes: se analizaron cinco y se dijo la verdad de cada uno.** El auditor
+mandó los documentos y el resultado fue disparejo: la orden médica de la
+HUS0000550614 ($997.235) sirve completa y el informe radiológico de la
+HUS0000547474 sirve; el resultado de patología de la HUS0000548414 sustenta la
+biopsia pero **no** la colposcopia; el reporte de la HUS0000550812 cubre una de
+las once monitorizaciones cobradas; y en la HUS0000549713, tras revisar las 232
+páginas de la historia, aparecen cuatro glucometrías con resultado de las
+quince cobradas: **se recomendó aceptar esa glosa** en vez de arriesgar una
+ratificación.
+
+**Y una regla nueva de redacción, pedida por el auditor:** en las glosas de
+tarifas la respuesta va **sin una sola cifra**. Dar el valor facturado y el
+pactado le sirve al pagador para hacer la resta y ratificar por la diferencia;
+el hospital gana por el título contractual —el código está pactado en el anexo
+que ambas partes firmaron—, no por la aritmética.
+
 
 ### 10-09-2026 — MUTUAL SER entra a la pantalla, y una glosa que salía inflada
 
@@ -169,6 +754,7 @@ Ahí el bot no junta nada, los deja todos y avisa.
 2. **TA0201 · $146.400** — MUTUAL lo llama «ACIDO LACTICO LLACTATO POR METODO
    ENZIMATICO» y el DGH lo tiene como «LACTATO ARTERIAL» (19624G). El código y
    el valor unitario coinciden exacto; sólo el nombre difiere.
+
 ### 10-09-2026 — Un solo renglón por entidad: yo me había saltado la regla
 
 Yesid abrió el desplegable y volvió a contar repetidas. Tenía razón, y esta
@@ -595,6 +1181,7 @@ el motor de verdad ofrece**: si mañana alguien agrega una pantalla con un
 tipo nuevo, la prueba avisa sola.
 
 15 pruebas nuevas, 8 fallan sin el arreglo.
+
 ### 09-09-2026 (tarde, 9) — El motor podía negarse a responder una glosa que SÍ tenía el servicio
 
 Yesid mandó dos análisis del código con ~136 hallazgos. Se verificaron uno
@@ -1216,6 +1803,7 @@ escrito sin una prueba detrás.
 32 pruebas nuevas y comprobación en navegador.
 
 ---
+
 ### 09-09-2026 — Por qué no llegaban los soportes: el límite de 260 caracteres de Windows
 
 La corrida de las 178 facturas para radicar trajo soportes de **solo 3**. La
@@ -1620,6 +2208,7 @@ aviso hizo su trabajo de ponerlo a la vista.
 
 **Archivos entregados:** `OBJECIONES_FAMISANAR_03092026.xlsx` (el que se sube)
 y `CRUCE_FAMISANAR_03-09-2026.xlsx` (el respaldo, 60 renglones en REVISAR).
+
 ### 08-09-2026 (noche, 3) — El dictamen ya no puede contradecir el contrato del propio motor
 
 **El caso.** En la prueba del botón Analizar, la glosa de tarifas de COOSALUD
@@ -2287,6 +2876,49 @@ la contesta cartera. Ahora se reportan aparte: 783 glosas de CALIDAD en 36
 facturas esperan a las doctoras, y 281 de COBERTURA en **una sola** factura
 (HUS545379, $47.882.455) esperan a que el área defina el texto — son CO4601,
 accidente de tránsito, la EPS pide agotar primero los topes del SOAT.
+
+### 11-09-2026 — Frente 12: el alimento de la paciente lleva 27 días formulado y sin entregar
+
+**Qué pasó.** Llegaron dos documentos nuevos del frente personal (proyecto 12):
+la prescripción del soporte nutricional y la historia clínica de nutrición del
+15 de agosto. Al leerlos con la app quedó a la vista lo importante: la fórmula
+que es la **única vía de alimentación** de la paciente se formuló el 15 de
+agosto y **a hoy no han entregado nada**. La familia confirmó el dato: apenas
+hace unos días le entregaron el papel, no el alimento. La propia prescripción
+lo delata, porque trae impresa su fecha de impresión: 25 días después de
+expedida.
+
+**La lección para el frente.** La primera lectura automática dijo «se agota en
+3 días», suponiendo que la entrega se había hecho el día de la fórmula. Era
+falso. **Una fecha de prescripción no es una fecha de entrega**, y la app lo
+estaba dando por hecho. Se corrigió el registro y ahora el expediente distingue
+las dos cosas: lo que ordenaron y lo que de verdad llegó.
+
+**Lo que se entregó.**
+- Tres escritos listos para radicar, con los espacios en blanco marcados:
+  petición urgente a la EPS, queja ante la Superintendencia Nacional de Salud y
+  **tutela con solicitud de medida provisional** (la medida provisional es lo
+  que puede resolver el juez de una vez, sin esperar los 10 días del fallo).
+- Una hoja de instrucciones: qué radicar primero, por cuáles canales, qué
+  adjuntar y —lo más importante— **exigir siempre el número de radicado**, sin
+  el cual una tutela no prospera.
+- Aviso de las dos trampas previsibles: que la EPS alegue que «la fórmula ya se
+  venció» (el retraso es de ellos) y que diga que «es NO PBS» (eso es un
+  asunto de pago entre la EPS y el Estado, no de la paciente).
+
+**Cinco contradicciones nuevas, todas con su cita y su página.** Dos pesos
+distintos el mismo día (uno de ellos en un renglón donde también anotaron una
+medida imposible); dos cantidades diarias distintas escritas por la misma
+profesional; una vía de administración que no corresponde a la sonda que la
+paciente tiene; un examen pedido por escrito que nadie ordenó; y el retraso de
+la entrega. El expediente pasó de 8 a 13 contradicciones.
+
+**Cómo se probó.** 94 verificaciones del motor de lectura y 54 pruebas en el
+navegador, todas en verde. Una prueba del motor venía fallando por una razón
+tonta y vale anotarla: **verificaba una palabra literal del mensaje de aviso**
+(«MENOR») y el mensaje se había redactado mejor («es anterior a la ya
+registrada»). El aviso funcionaba; la prueba era la que estaba vieja. Se
+corrigió para que verifique el sentido, no la palabra exacta.
 
 ---
 
@@ -3234,6 +3866,7 @@ Con 29 pruebas nuevas. Arquitectura completa en
 
 **PENDIENTE del Pilar 1:** SIMED y Mutual Ser, la pantalla de la bandeja «En
 espera de EPS», y la pasada que resuelve las radicaciones dudosas.
+
 ### 03-09-2026 (cierre) — Regla de runbook: los permisos van en la instrucción
 
 Al cerrar la V2 le indiqué «doble clic» sobre
@@ -5443,6 +6076,7 @@ botones del sistema. Ya se ve como lo que es.
 **De paso, el despliegue.** El motor se quedó con el código de la víspera
 porque había gente trabajando, y correr el bot a mano se aplazaba igual. Ahora
 `autodeploy_motor_local.cmd YA` aplica de una y deja constancia.
+
 ### Julio–Agosto 2026 — Frente COOSALUD: objeciones en DGH y respuestas en el portal
 
 Este frente lo llevó un chat aparte (los bots de `tools/`: organizar el ZIP del
@@ -6357,6 +6991,7 @@ columna de recaudo de julio de los 5 consolidados y la serie mensual queda en
   original: 191.859 leídas, 189.446 facturas, 2.413 anuladas). Cada parte
   tarda 17 segundos, muy por debajo del límite. Se puede partir sin riesgo
   porque en ese archivo **ninguna factura se repite**.
+
 ### 28-07 (tarde) — Tres fallas del uso real y el borrado de envíos
 Reportadas por el auditor durante la jornada, con evidencia en pantalla:
 - **La misma factura quedó radicada 5 veces.** En el historial aparecían cinco
@@ -7620,6 +8255,7 @@ dejarlo escrito porque le va a pasar a más facturas:
 - `tools/validar_json_rips.py` ahora detecta este caso solo: lee el
   `CODIGO_PRESTADOR` del bloque de interoperabilidad del XML, compara los largos
   y dice cuál de los dos archivos tiene el error y quién lo corrige. 35 pruebas.
+
 ### 03-08 (octava parte) — Todo listo para empezar a subir a SIIFA
 
 - **`tools\CARGAR_SIIFA.cmd`** — bot de doble clic con menú, para no escribir
@@ -9102,6 +9738,7 @@ Se cubrió con **29 pruebas automáticas** (`tests/test_tools/test_descontar_ace
 incluidas las dos trampas del formato (el desglose que suma y el que no) y los
 avisos: aceptado mayor que el servicio, aceptado sin ítem en el detallado y
 Excel dañado que no puede tumbar el lote.
+
 ### 14-08 — El importador aprende a PONER AL DÍA y entra el consolidado ADRES
 
 Yesid mandó TRES Excel para dejar la página al día: el consolidado 2026
@@ -11335,6 +11972,7 @@ que el avance sobrevive al recargar), sin un solo error de JavaScript.
 
 **Documentos:** `docs/GUIA_SISTEMA_ICFES.md` (cómo se usa) y
 `docs/ESTRATEGIA_ICFES_400.md` (el plan concreto para llegar a 400).
+
 ### 20-08 (noche) — Los soportes del .zip caían donde el índice nunca mira
 
 Último pendiente de la lista, y era real. La carpeta de soportes se resolvía
@@ -13432,6 +14070,19 @@ de la que más cuesta a la que menos:
   HUS543423 ($46,9 mill), HUS543160 ($20,9 mill), HUS541431 ($17,2 mill),
   HUS543764 ($15,8 mill).
 - **Responder el portal antes del 14/09/2026.** Eso sí se puede hacer ya.
+
+### Cuidados médicos de la familiar — URGENTE (11-09)
+- **Radicar hoy la petición a la EPS por el soporte nutricional**: lleva 27
+  días formulado y sin entregar, y es la única vía de alimentación de la
+  paciente. Exigir número de radicado.
+- **A las 48 horas del radicado, si no llega el alimento:** queja en la
+  Superintendencia Nacional de Salud **y** tutela con medida provisional, el
+  mismo día. Los tres escritos están listos, solo falta llenar nombre, cédula
+  y correo.
+- **Aprovechar el control de nutrición del 15-09** para que quede por escrito:
+  el peso real, la cantidad diaria correcta, cuál sonda tiene la paciente, el
+  examen de la glucemia que nadie ordenó, y la prescripción renovada.
+
 ### Cuidados médicos de la familiar — EPS Sura (07-09)
 - **Radicar el memorial de impulso** al proceso de la Supersalud (el plazo de
   respuesta ya se venció) y **la queja a Sura** por lo que sigue sin
@@ -14199,6 +14850,26 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
     al tórax se le descontaron $7.800 cuando se aceptó por $758.700.
 
 ### Dispensario — respuesta de glosas SIMED y conciliación
+0. **(10-09) Las 18 de calidad del lote 09-sep, con los médicos.** LAURA DIAZ
+   (HUS0000546722, 547328, 548588) y ZULAY GONZALEZ (549063, 549713, 549861,
+   551822, 551985). Ya tienen su Excel con una hoja por profesional. Falta que
+   respondan para poder cargarlas a mano, y ojo con la **549713**, que además
+   tiene cinco objeciones de soportes: hay que trabajarla completa.
+0-bis. **(10-09) Las 12 objeciones que el portal reclama y no vinieron en el
+   export.** Están en HUS0000549861 (ocho), HUS0000551425 (dos),
+   HUS0000549713 y HUS0000551822 (una cada una). Buscarlas en el portal o en
+   DGH y traerlas en el próximo export.
+0-ter. **(10-09) Soportes que faltan por enviar.** El reporte de la colposcopia
+   de la HUS0000548414 ($354.385); los diez reportes restantes de la
+   HUS0000550812 ($2.340.570); y los tres administrativos, que no son clínicos:
+   lista de precios de la HUS0000549861, lista y cotización firmada de la
+   HUS0000545590, y la resolución interna de tarifas del traslado de la
+   HUS0000545118.
+0-quater. **(10-09) Las 26 pendientes de la plataforma que quedaron por fuera
+   del lote.** El auditor pidió dejarlas por ahora. Son 18 sin rastro en
+   ningún registro —entre ellas la HUS0000548808 por $9.788.922— más las siete
+   que ya veníamos arrastrando y la HUS0000545286 ($12.351.616), que **ya tiene
+   respuesta generada en el lote del 04-sep** y solo falta cargarla.
 0. **(04-09, lo primero de mañana) Correr el lote del 04 de septiembre.** El
    Excel ya está entregado (`respuestas_glosa_DISPENSARIO_04SEP_FINAL.xlsx`,
    88 respuestas / 63 facturas / $17.060.666). Dos pasos, en el equipo de
@@ -14408,6 +15079,13 @@ facturas y el consolidado de la MISMA remesa de la EPS, y trabajarla de punta a
 punta hasta bajar el acta. Es lo único que dice si sirve en una audiencia. Si
 al cerrar sale «No se pudo cerrar», ahora la pantalla muestra el motivo exacto:
 copiarlo al chat.
+
+### Cuidados médicos de la familiar — lo primero de todo
+1. **Confirmar que la EPS entregó el alimento.** Si no, radicar la queja en la
+   Superintendencia y la tutela con medida provisional el mismo día.
+2. Terminar la versión premium de la app (lo visual, los gráficos, el informe
+   en PDF, los perfiles con permisos y el centro de avisos). El expediente y
+   los datos ya están al día; falta la capa de presentación.
 
 ### Cuidados médicos de la familiar — lo primero
 1. Radicar el **Borrador A** (impulso a la Supersalud) por el correo oficial
