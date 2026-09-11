@@ -29,6 +29,7 @@ el detalle por factura.
 | **EMSSANAR** | No manda Excel: son los **PDF** de ripslink («Objeción a Factura N° HUS…»), uno por factura. Se marcan varios de una vez (hasta 300, que es el tope del DGH). |
 | **ADRES** | Excel de glosas del ADRES. Tiene motor propio: homologa los códigos SOAT a los CUPS del hospital, aplica el tope de valor de cada servicio y decide el tipo por la columna `CLASIFICACION` (sus causales son de cuatro dígitos y no dicen el grupo). Se le puede agregar el **Homologador Gold Standard CUPS↔SOAT** como segundo archivo. |
 | **MUTUAL SER** | Consolidado de 7 columnas. Ojo: su columna «SERVICIO» trae el **código**, no el nombre; el nombre del servicio viaja dentro del texto de la observación («La tecnología 903883 - GLUCOSA SEMIAUTOMATIZADA…») y de ahí se rescata para el cruce. |
+| **CAPITAL SALUD** | Export de 6 columnas. No manda código de servicio —sólo el nombre, con guiones en vez de espacios— ni columna de código de glosa: ese va dentro de «DescripcionGlosa». |
 
 Si el formato cambió y no la reconoce, se elige a mano en el selector; si no la
 reconoce **no procesa a ciegas**, avisa qué encabezados leyó.

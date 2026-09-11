@@ -371,6 +371,25 @@ def _mutual_corto() -> bytes:
     )
 
 
+def _capital() -> bytes:
+    """Export de CAPITAL SALUD: sin código de servicio y con el código de glosa
+    metido dentro de «DescripcionGlosa»."""
+    return _excel(
+        "Hoja1",
+        ["FACTURA", "servicio", "Cantidad", "DescripcionGlosa", "OBSERVACION", "VALOR GLOSA"],
+        [
+            [
+                "HUS0000548556",
+                "CATETER-INTRAVENOSO-20",
+                1,
+                "SO4201 - Existe ausencia total, parcial o inconsistencia de la lista de precios",
+                "no adjuntan factura de compra",
+                5800,
+            ],
+        ],
+    )
+
+
 # ─── De quién es el archivo ─────────────────────────────────────────────────
 
 
@@ -408,6 +427,9 @@ class TestDetectarEntidad:
     def test_mutual_en_su_formato_corto(self):
         """Aunque cambie las columnas entre lotes, sigue siendo MUTUAL."""
         assert svc.detectar_entidad(_mutual_corto()).id == "mutual"
+
+    def test_capital(self):
+        assert svc.detectar_entidad(_capital()).id == "capital"
 
     def test_un_pdf_es_de_emssanar(self, tmp_path):
         """Es la única entidad que no manda Excel."""
@@ -681,6 +703,30 @@ class TestProcesar:
         assert r.valor_total == 5800
         assert r.reglas_ok and not r.fallas_reglas
         assert r.nombre_objeciones == "OBJECIONES_MUTUAL_08092026.xlsx"
+
+    def test_capital_de_punta_a_punta(self):
+        """CAPITAL no manda código de servicio: se ubica por nombre y valor.
+        El nombre viene con guiones y hay que igualarlos a espacios."""
+        r = svc.procesar(_capital(), _dgh(), fecha="2026-09-09")
+        assert r.entidad_id == "capital"
+        assert r.objeciones == 1 and r.facturas == 1
+        assert r.valor_total == 5800
+        assert r.confianza["ALTA"] == 1
+        assert r.reglas_ok and not r.fallas_reglas
+        assert r.nombre_objeciones == "OBJECIONES_CAPITAL_SALUD_09092026.xlsx"
+        assert r.nombre_cruce == "CRUCE_CAPITAL_SALUD_09092026.xlsx"
+
+    def test_capital_saca_el_codigo_de_glosa_de_la_descripcion(self):
+        import io
+
+        r = svc.procesar(_capital(), _dgh(), fecha="2026-09-09")
+        ws = openpyxl.load_workbook(io.BytesIO(r.objeciones_xlsx)).active
+        cols = [c.value for c in ws[1]]
+        fila = dict(zip(cols, [c.value for c in ws[2]], strict=True))
+        assert fila["CRNCONOBJ"] == "SO4201"
+        assert fila["SLNSERPRO"] == "FMQ0113"
+        assert fila["CTNCENCOS"] is None
+        assert fila["CROTIPOBJ"] == 0
 
     def test_un_pdf_que_no_es_una_objecion(self, tmp_path):
         with pytest.raises(svc.ErrorObjeciones, match="PDF"):
