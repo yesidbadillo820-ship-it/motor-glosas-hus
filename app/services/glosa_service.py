@@ -8522,6 +8522,21 @@ def _en_pesos_colombianos(crudo: str) -> str:
     return "$ " + f"{int(limpio):,}".replace(",", ".")
 
 
+def _es_falta_de_cuota(e: BaseException) -> bool:
+    """¿El proveedor dijo «se le acabó el cupo» (429 / quota / rate limit)?
+
+    Insistir contra un 429 del tier gratis no recupera nada: gasta el tiempo
+    del auditor y peticiones de un cupo que ya no existe.
+    """
+    texto = f"{type(e).__name__} {e}".upper()
+    if getattr(getattr(e, "response", None), "status_code", None) == 429:
+        return True
+    return any(
+        marca in texto
+        for marca in ("429", "RATE LIMIT", "RATE_LIMIT", "QUOTA", "RESOURCE_EXHAUSTED")
+    )
+
+
 def _motivo_del_fallo(e: BaseException) -> str:
     """El motivo de un fallo, que nunca puede quedar vacío.
 
@@ -8629,6 +8644,24 @@ class GlosaService:
         )
         self.gemini_model = gemini_model or _cfg.gemini_model
         self.gemini_model_dictamen = _cfg.gemini_model_dictamen
+
+        # 10-09-2026 — DOS CUPOS EN VEZ DE UNO, si el hospital quiere.
+        # El primer día que Gemini redactó dictámenes se quedó sin cuota a
+        # media tarde, y no por los dictámenes: la misma llave la gasta el
+        # OCR de PDFs escaneados, que consume mucho más. Con una segunda
+        # llave gratis en `GEMINI_API_KEY_DICTAMEN`, los dictámenes van por
+        # ella y el OCR se queda con la primera. Sin ella —lo de hoy— este
+        # bloque deja `gemini_dictamen` apuntando al mismo servicio de
+        # siempre y no cambia nada.
+        _key_dictamen = (
+            getattr(_cfg, "gemini_api_key_dictamen", "") or os.getenv("GEMINI_API_KEY_DICTAMEN", "")
+        ).strip()
+        if _key_dictamen and _key_dictamen != gem_key:
+            self.gemini_dictamen = GeminiService(
+                api_key=_key_dictamen, default_model=self.gemini_model_dictamen
+            )
+        else:
+            self.gemini_dictamen = self.gemini
 
     async def analizar(
         self,
@@ -14616,7 +14649,8 @@ class GlosaService:
         su reasoning_effort: no tiene sentido pagar 3.000 tokens de salida
         para una respuesta de dos renglones.
         """
-        if not self.gemini:
+        cliente = getattr(self, "gemini_dictamen", None) or getattr(self, "gemini", None)
+        if not cliente:
             raise RuntimeError("GEMINI_API_KEY no configurada")
 
         modelo = self.gemini_model_dictamen or self.gemini_model
@@ -14625,7 +14659,7 @@ class GlosaService:
 
         for intento in range(max_intentos):
             try:
-                texto, modelo_usado = await self.gemini.completar(
+                texto, modelo_usado = await cliente.completar(
                     system=system,
                     user=user,
                     modelo=modelo,
@@ -14640,6 +14674,21 @@ class GlosaService:
                 return texto, f"gemini/{modelo_usado or modelo}"
             except Exception as e:  # noqa: BLE001 — se reintenta y se relanza
                 ultimo = e
+                # 10-09-2026 — SIN CUOTA NO SE INSISTE.
+                # Un 429 del tier gratis no es un tropiezo del que se sale
+                # esperando dos segundos: es el cupo del día agotado. Antes
+                # se reintentaba igual, gastando siete segundos del auditor y
+                # otras dos peticiones contra un cupo que ya no existe. Groq
+                # hace lo mismo desde junio, por la misma razón. Se sale de
+                # una para que la cadena pruebe el siguiente proveedor.
+                if _es_falta_de_cuota(e):
+                    logger.warning(
+                        f"[IA] Gemini sin cuota ({_motivo_del_fallo(e)}). No se reintenta: "
+                        "se pasa al siguiente proveedor. Si se repite a diario, ponga una "
+                        "segunda llave gratis en GEMINI_API_KEY_DICTAMEN para que los "
+                        "dictámenes no compitan con la lectura de PDFs escaneados."
+                    )
+                    break
                 if intento < max_intentos - 1:
                     espera = 2**intento
                     logger.warning(

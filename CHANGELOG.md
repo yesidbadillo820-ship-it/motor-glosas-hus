@@ -1,5 +1,36 @@
 # Registro de cambios
 
+## Sesión 10-sep-2026 (6) — Naturaleza contradicha, y Gemini con cupo propio
+
+- **`app/services/quality_gate/post_validator.py`** — nuevo
+  `check_no_contradice_la_naturaleza_del_servicio()` (ERROR, check 13). El
+  dictamen radicado decía «EL MEDICAMENTO IOBITRIDOL NO ES UN MEDIO DE
+  CONTRASTE, SINO UN SOLUCIÓN ANTISEPTICA» sobre una glosa que lo objeta
+  llamándolo medio de contraste, y sobre una factura que dice «equivalente a
+  30%P/V de yodo». El check es estrecho a propósito: salta solo cuando el
+  dictamen niega (`NO ES / NO SE TRATA DE / NO CORRESPONDE A / NO CONSTITUYE`)
+  una de las 11 naturalezas de `_NATURALEZAS_QUE_NO_SE_REDEFINEN` **y** esa
+  misma naturaleza está en lo que la entidad mandó. `_sin_tildes()` normaliza
+  los dos lados (en mayúscula sostenida casi nadie pone tildes, y sin eso el
+  caso real se escapaba). Las negaciones jurídicas —«no es extemporánea», «no
+  procede»— no se tocan.
+- **`app/core/config.py`, `app/services/glosa_service.py`, `.env.example`** —
+  `GEMINI_API_KEY_DICTAMEN` opcional: con una segunda llave gratis, los
+  dictámenes usan `self.gemini_dictamen` y el OCR se queda con `self.gemini`.
+  Vacía (lo de hoy) apunta al mismo cliente y no cambia nada.
+- **`app/services/glosa_service.py`** — `_es_falta_de_cuota()` y salida
+  inmediata del bucle de reintentos de Gemini ante un 429 / quota /
+  RESOURCE_EXHAUSTED, como Groq hace desde junio. Antes se quemaban 7 s y dos
+  peticiones más contra un cupo agotado.
+- **Pruebas** — `test_no_le_lleve_la_contraria_al_papel.py` (13) y
+  `test_gemini_con_su_propio_cupo.py` (19). Los 4 dictámenes reales de
+  producción pasan los dos checks nuevos. Suite completa: 12.750 en verde.
+- **Verificado sobre el papel:** el dictamen que se radicó ese día, pasado
+  hoy por el post-validador, queda en score 0 y **no aprobado**, con
+  `[medidas_fabricadas]` y `[naturaleza_contradicha]` nombrando las dos
+  mentiras.
+
+
 ## Sesión 10-sep-2026 (5) — CI: reparto por duración medida, cuatro máquinas
 
 Las tres máquinas del reparto por nombre tardaban 2m34 / 3m51 / **4m46**: dos

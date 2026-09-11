@@ -17,6 +17,7 @@ La decisión global agrega todo en un PostValidationResult con score 0-100.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -606,6 +607,99 @@ def check_medidas_no_fabricadas(
     return PostCheckResult(ok=True, severidad="INFO", razon="cantidades consistentes con el input")
 
 
+# ── Negarle al papel lo que el papel dice ───────────────────────────────────
+#
+# 10-09-2026, mismo caso. El dictamen escribió, para defender el cobro:
+#
+#   «…Y QUE EL MEDICAMENTO IOBITRIDOL NO ES UN MEDIO DE CONTRASTE, SINO UN
+#    SOLUCIÓN ANTISEPTICA»
+#
+# El iobitridol es un medio de contraste yodado — la propia factura lo dice
+# («EQUIVALENTE A 30%P/V DE YODO») y la entidad lo objetó llamándolo así
+# («SE OBJETA MEDIO DE CONTRASTE UTILIZADO»). El dictamen le está negando al
+# papel lo que el papel dice, y del otro lado lo lee un médico auditor: esa
+# sola frase desacredita la respuesta entera, incluidos los siete renglones
+# de millones que iban bien argumentados.
+#
+# El check es estrecho a propósito. NO se mete a opinar de medicina: solo
+# mira si el dictamen niega, con todas sus letras, una naturaleza que el
+# papel de la entidad afirma con esas mismas palabras. Negarle a la entidad
+# sus afirmaciones jurídicas o administrativas —que la glosa es
+# extemporánea, que no hubo autorización— es el trabajo del dictamen y no
+# se toca. Lo que no puede hacer es reclasificar QUÉ ES una cosa sin una
+# ficha técnica que lo respalde, porque eso no se discute: se comprueba.
+_NATURALEZAS_QUE_NO_SE_REDEFINEN = (
+    "MEDIO DE CONTRASTE",
+    "MEDIOS DE CONTRASTE",
+    "ANTIS[EÉ]PTICO",
+    "ANTIBI[OÓ]TICO",
+    "ANEST[EÉ]SICO",
+    "DISPOSITIVO M[EÉ]DICO",
+    "MATERIAL DE OSTEOS[IÍ]NTESIS",
+    "MATERIAL QUIR[UÚ]RGICO",
+    "INSUMO",
+    "MEDICAMENTO",
+    "PROCEDIMIENTO QUIR[UÚ]RGICO",
+)
+
+_PAT_NEGACION_DE_NATURALEZA = re.compile(
+    r"\bNO\s+(?:ES|SON|SE\s+TRATA\s+DE|CORRESPONDE\s+A|CONSTITUYE)\s+"
+    r"(?:UN[AO]?S?\s+|EL\s+|LA\s+|LOS\s+|LAS\s+)?"
+    r"(?P<que>" + "|".join(_NATURALEZAS_QUE_NO_SE_REDEFINEN) + r")\b",
+    re.IGNORECASE,
+)
+
+
+def _sin_tildes(texto: str) -> str:
+    """«antiséptico» y «ANTISEPTICO» son la misma palabra. Deja las dos igual."""
+    plano = unicodedata.normalize("NFD", (texto or "").upper())
+    return " ".join("".join(c for c in plano if not unicodedata.combining(c)).split())
+
+
+def check_no_contradice_la_naturaleza_del_servicio(
+    texto_dictamen: str,
+    texto_glosa_input: str | None,
+    fuentes_adicionales: list[str] | None = None,
+) -> PostCheckResult:
+    """El dictamen no puede negar QUÉ ES una cosa cuando el papel lo dice.
+
+    Solo salta cuando las dos condiciones se dan a la vez: el dictamen niega
+    una naturaleza de la lista corta de arriba, y esa misma naturaleza está
+    escrita en lo que la entidad mandó. No opina de medicina y no toca las
+    negaciones jurídicas —«no es extemporánea», «no procede la glosa»—, que
+    son el trabajo del dictamen.
+    """
+    if not texto_dictamen:
+        return PostCheckResult(ok=True, severidad="INFO", razon="texto vacío")
+
+    fuente = " ".join([texto_glosa_input or "", *(f for f in (fuentes_adicionales or []) if f)])
+    if not fuente.strip():
+        return PostCheckResult(ok=True, severidad="INFO", razon="sin input con qué comparar")
+
+    # Sin tildes de los dos lados: en estos papeles «ANTISEPTICO» y
+    # «antiséptico» son la misma palabra, y en mayúscula sostenida casi nadie
+    # las pone. Comparar tal cual dejaría pasar justo el caso que se busca.
+    fuente_norm = _sin_tildes(fuente)
+    contradichas: list[str] = []
+    for m in _PAT_NEGACION_DE_NATURALEZA.finditer(texto_dictamen):
+        dicho = _sin_tildes(m.group("que"))
+        if dicho in fuente_norm and dicho not in contradichas:
+            contradichas.append(dicho)
+
+    if contradichas:
+        return PostCheckResult(
+            ok=False,
+            severidad="ERROR",
+            razon=(
+                "el dictamen niega lo que el papel de la entidad afirma: "
+                + ", ".join(f"«no es {c.lower()}»" for c in contradichas[:3])
+                + ". Del otro lado lo lee un auditor médico y desacredita "
+                "toda la respuesta."
+            ),
+        )
+    return PostCheckResult(ok=True, severidad="INFO", razon="no contradice la naturaleza del cobro")
+
+
 def check_datos_clinicos_usados(
     texto_dictamen: str,
     texto_glosa_input: str | None,
@@ -738,6 +832,16 @@ def post_validar_dictamen(
         #     medicamento de 50 ML que nadie contó). Igual de grave que una
         #     cifra de plata fabricada, y hasta hoy no lo miraba nadie.
         checks["medidas_fabricadas"] = check_medidas_no_fabricadas(
+            texto,
+            texto_glosa_input=texto_glosa_input,
+            fuentes_adicionales=fuentes_adicionales,
+        )
+
+        # 13. Reclasificar qué ES una cosa contra lo que dice el papel
+        #     (10-09-2026: «el IOBITRIDOL no es un medio de contraste, sino
+        #     una solución antiséptica», sobre una glosa que lo objeta
+        #     llamándolo medio de contraste).
+        checks["naturaleza_contradicha"] = check_no_contradice_la_naturaleza_del_servicio(
             texto,
             texto_glosa_input=texto_glosa_input,
             fuentes_adicionales=fuentes_adicionales,

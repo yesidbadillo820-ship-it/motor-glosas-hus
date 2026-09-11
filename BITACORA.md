@@ -91,6 +91,46 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — El dictamen dejó de llevarle la contraria al papel, y Gemini con su propio cupo
+
+**1) «El iobitridol no es un medio de contraste, sino una solución antiséptica».**
+
+Eso salió radicado, para defender el cobro. Y es falso: el iobitridol es un
+medio de contraste yodado. Lo dice la propia factura —«equivalente a 30% p/v
+de yodo»— y lo dice la entidad, que lo objetó llamándolo así: «SE OBJETA
+MEDIO DE CONTRASTE UTILIZADO».
+
+Del otro lado eso lo lee un médico auditor. Una sola frase así desacredita la
+respuesta entera, incluidos los siete renglones de millones que iban bien
+argumentados.
+
+Ahora el motor no deja pasar un dictamen que **niegue con todas sus letras lo
+que el papel de la entidad afirma**. No se metió a opinar de medicina —eso
+sería inventar de otra forma—: solo mira si el dictamen dice «esto NO es un
+medio de contraste» cuando el papel dice que sí lo es. Negarle a la entidad
+sus afirmaciones jurídicas —que la glosa es extemporánea, que no hubo
+autorización— sigue siendo el trabajo del dictamen y no se toca.
+
+Con esto, **el dictamen que se radicó ese día hoy no sale**: el motor lo para
+y nombra las dos mentiras, la de los 500 ML y la del antiséptico.
+
+**2) Gemini se quedaba sin cuota a media tarde.**
+
+Y no era por los dictámenes: la **misma llave** la gasta el motor para leer
+los PDF escaneados, que consume mucho más. Las dos tareas se comían el mismo
+cupo gratis del día, y la que perdía era la que usted estaba mirando.
+
+Se dejó listo para arreglarlo sin cambiar nada más: si el hospital saca una
+**segunda llave gratis de Google** y la pone en el archivo de configuración,
+los dictámenes van por esa y la lectura de PDF se queda con la primera — dos
+cupos en vez de uno. Si no se pone, todo sigue igual que hoy.
+
+Y mientras tanto, una cosa que sí se arregló de una: cuando Google contesta
+«se le acabó el cupo», el motor **ya no insiste**. Antes reintentaba tres
+veces, gastando siete segundos de su espera y dos peticiones más contra un
+cupo que ya no existía. Ahora pasa de una al siguiente proveedor y deja
+escrito en el registro que fue la cuota, no una falla.
+
 ### 10-09-2026 — El CI: de casi 5 minutos a unos 3
 
 Quedó a medias en la mañana. Se había repartido la suite en tres máquinas y
