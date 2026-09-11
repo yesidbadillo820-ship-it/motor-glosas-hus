@@ -91,6 +91,38 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 11-09-2026 — MUTUAL cambia las columnas de un lote a otro
+
+**El botón volvió a rechazar un archivo de MUTUAL, y otra vez estuvo bien que
+lo rechazara.** El lote del 8 de septiembre no vino con las mismas columnas
+que el del 7: eran **cinco en vez de siete**, la columna del código de
+servicio pasó de llamarse «SERVICIO» a **«Tecnología»**, y no venían ni
+«Cantidad facturada» ni «Concepto de glosa». El lector no conocía ese nombre y
+se detuvo con el aviso en pantalla, en vez de armar un archivo mal hecho.
+
+Ya quedó arreglado: el lector acepta los dos nombres para esa columna, y la
+cantidad y el concepto pasaron a ser opcionales. Lo único que sigue exigiendo
+son las cuatro columnas sin las cuales el archivo no se puede armar —factura,
+código del servicio, valor y código de glosa—; si falta alguna, dice cuál.
+
+**El lote del 8 de septiembre: 153 objeciones, 3 facturas, $31.236.017.**
+Cruzaron 148 (111 de confianza alta, 37 media). Ninguna factura se glosa por
+encima de lo facturado.
+
+**Cuatro celdas quedaron en blanco para llenar a mano**, todas medicamentos
+que el hospital y MUTUAL nombran distinto: GABAPENTINA / GABAPENTIN 300 MG,
+PARACETAMOL / ACETAMINOFEN, SODIO CLORURO / SOLUCIÓN SALINA. En esas tres el
+código **sí existe** en el DGH de esa factura; no se llenaron porque el motor
+castiga que el nombre no concuerde y prefiere dejar la celda vacía antes que
+arriesgarse. Se le propuso al auditor que, cuando el código exista tal cual en
+la factura, se escriba igual y quede marcado en REVISAR — **falta que lo
+autorice**, porque ese motor lo comparten las nueve entidades.
+
+**Un renglón para reclamar:** la tecnología **20299706 ($121.800)** de la
+factura HUS0000544255 **no aparece en el export del DGH**, y la propia
+observación de MUTUAL viene mutilada («La tecnología 20299706 - no se
+encuentra dentro del contrato», sin nombre de servicio).
+
 ### 11-09-2026 (2) — Ahora el motor sabe decir QUÉ está lento
 
 De la misma mañana. Cuando Yesid preguntó por qué la plataforma estaba lenta,
@@ -546,6 +578,7 @@ Probado contra los dos extremos: el dictamen que de verdad salió mal saca
 **1 de 9**; el correcto, **9 de 9**. 22 pruebas nuevas.
 
 ---
+
 ### 10-09-2026 — Se acabaron los quince minutos de espera (y los conflictos)
 
 Con las palabras de Yesid: «*tengo que esperar hasta 15 minutos que un PR pase
@@ -721,6 +754,7 @@ Ahí el bot no junta nada, los deja todos y avisa.
 2. **TA0201 · $146.400** — MUTUAL lo llama «ACIDO LACTICO LLACTATO POR METODO
    ENZIMATICO» y el DGH lo tiene como «LACTATO ARTERIAL» (19624G). El código y
    el valor unitario coinciden exacto; sólo el nombre difiere.
+
 ### 10-09-2026 — Un solo renglón por entidad: yo me había saltado la regla
 
 Yesid abrió el desplegable y volvió a contar repetidas. Tenía razón, y esta
@@ -1147,6 +1181,7 @@ el motor de verdad ofrece**: si mañana alguien agrega una pantalla con un
 tipo nuevo, la prueba avisa sola.
 
 15 pruebas nuevas, 8 fallan sin el arreglo.
+
 ### 09-09-2026 (tarde, 9) — El motor podía negarse a responder una glosa que SÍ tenía el servicio
 
 Yesid mandó dos análisis del código con ~136 hallazgos. Se verificaron uno
@@ -1768,6 +1803,7 @@ escrito sin una prueba detrás.
 32 pruebas nuevas y comprobación en navegador.
 
 ---
+
 ### 09-09-2026 — Por qué no llegaban los soportes: el límite de 260 caracteres de Windows
 
 La corrida de las 178 facturas para radicar trajo soportes de **solo 3**. La
@@ -2172,6 +2208,7 @@ aviso hizo su trabajo de ponerlo a la vista.
 
 **Archivos entregados:** `OBJECIONES_FAMISANAR_03092026.xlsx` (el que se sube)
 y `CRUCE_FAMISANAR_03-09-2026.xlsx` (el respaldo, 60 renglones en REVISAR).
+
 ### 08-09-2026 (noche, 3) — El dictamen ya no puede contradecir el contrato del propio motor
 
 **El caso.** En la prueba del botón Analizar, la glosa de tarifas de COOSALUD
@@ -2839,6 +2876,49 @@ la contesta cartera. Ahora se reportan aparte: 783 glosas de CALIDAD en 36
 facturas esperan a las doctoras, y 281 de COBERTURA en **una sola** factura
 (HUS545379, $47.882.455) esperan a que el área defina el texto — son CO4601,
 accidente de tránsito, la EPS pide agotar primero los topes del SOAT.
+
+### 11-09-2026 — Frente 12: el alimento de la paciente lleva 27 días formulado y sin entregar
+
+**Qué pasó.** Llegaron dos documentos nuevos del frente personal (proyecto 12):
+la prescripción del soporte nutricional y la historia clínica de nutrición del
+15 de agosto. Al leerlos con la app quedó a la vista lo importante: la fórmula
+que es la **única vía de alimentación** de la paciente se formuló el 15 de
+agosto y **a hoy no han entregado nada**. La familia confirmó el dato: apenas
+hace unos días le entregaron el papel, no el alimento. La propia prescripción
+lo delata, porque trae impresa su fecha de impresión: 25 días después de
+expedida.
+
+**La lección para el frente.** La primera lectura automática dijo «se agota en
+3 días», suponiendo que la entrega se había hecho el día de la fórmula. Era
+falso. **Una fecha de prescripción no es una fecha de entrega**, y la app lo
+estaba dando por hecho. Se corrigió el registro y ahora el expediente distingue
+las dos cosas: lo que ordenaron y lo que de verdad llegó.
+
+**Lo que se entregó.**
+- Tres escritos listos para radicar, con los espacios en blanco marcados:
+  petición urgente a la EPS, queja ante la Superintendencia Nacional de Salud y
+  **tutela con solicitud de medida provisional** (la medida provisional es lo
+  que puede resolver el juez de una vez, sin esperar los 10 días del fallo).
+- Una hoja de instrucciones: qué radicar primero, por cuáles canales, qué
+  adjuntar y —lo más importante— **exigir siempre el número de radicado**, sin
+  el cual una tutela no prospera.
+- Aviso de las dos trampas previsibles: que la EPS alegue que «la fórmula ya se
+  venció» (el retraso es de ellos) y que diga que «es NO PBS» (eso es un
+  asunto de pago entre la EPS y el Estado, no de la paciente).
+
+**Cinco contradicciones nuevas, todas con su cita y su página.** Dos pesos
+distintos el mismo día (uno de ellos en un renglón donde también anotaron una
+medida imposible); dos cantidades diarias distintas escritas por la misma
+profesional; una vía de administración que no corresponde a la sonda que la
+paciente tiene; un examen pedido por escrito que nadie ordenó; y el retraso de
+la entrega. El expediente pasó de 8 a 13 contradicciones.
+
+**Cómo se probó.** 94 verificaciones del motor de lectura y 54 pruebas en el
+navegador, todas en verde. Una prueba del motor venía fallando por una razón
+tonta y vale anotarla: **verificaba una palabra literal del mensaje de aviso**
+(«MENOR») y el mensaje se había redactado mejor («es anterior a la ya
+registrada»). El aviso funcionaba; la prueba era la que estaba vieja. Se
+corrigió para que verifique el sentido, no la palabra exacta.
 
 ---
 
@@ -3786,6 +3866,7 @@ Con 29 pruebas nuevas. Arquitectura completa en
 
 **PENDIENTE del Pilar 1:** SIMED y Mutual Ser, la pantalla de la bandeja «En
 espera de EPS», y la pasada que resuelve las radicaciones dudosas.
+
 ### 03-09-2026 (cierre) — Regla de runbook: los permisos van en la instrucción
 
 Al cerrar la V2 le indiqué «doble clic» sobre
@@ -5995,6 +6076,7 @@ botones del sistema. Ya se ve como lo que es.
 **De paso, el despliegue.** El motor se quedó con el código de la víspera
 porque había gente trabajando, y correr el bot a mano se aplazaba igual. Ahora
 `autodeploy_motor_local.cmd YA` aplica de una y deja constancia.
+
 ### Julio–Agosto 2026 — Frente COOSALUD: objeciones en DGH y respuestas en el portal
 
 Este frente lo llevó un chat aparte (los bots de `tools/`: organizar el ZIP del
@@ -6909,6 +6991,7 @@ columna de recaudo de julio de los 5 consolidados y la serie mensual queda en
   original: 191.859 leídas, 189.446 facturas, 2.413 anuladas). Cada parte
   tarda 17 segundos, muy por debajo del límite. Se puede partir sin riesgo
   porque en ese archivo **ninguna factura se repite**.
+
 ### 28-07 (tarde) — Tres fallas del uso real y el borrado de envíos
 Reportadas por el auditor durante la jornada, con evidencia en pantalla:
 - **La misma factura quedó radicada 5 veces.** En el historial aparecían cinco
@@ -8172,6 +8255,7 @@ dejarlo escrito porque le va a pasar a más facturas:
 - `tools/validar_json_rips.py` ahora detecta este caso solo: lee el
   `CODIGO_PRESTADOR` del bloque de interoperabilidad del XML, compara los largos
   y dice cuál de los dos archivos tiene el error y quién lo corrige. 35 pruebas.
+
 ### 03-08 (octava parte) — Todo listo para empezar a subir a SIIFA
 
 - **`tools\CARGAR_SIIFA.cmd`** — bot de doble clic con menú, para no escribir
@@ -9654,6 +9738,7 @@ Se cubrió con **29 pruebas automáticas** (`tests/test_tools/test_descontar_ace
 incluidas las dos trampas del formato (el desglose que suma y el que no) y los
 avisos: aceptado mayor que el servicio, aceptado sin ítem en el detallado y
 Excel dañado que no puede tumbar el lote.
+
 ### 14-08 — El importador aprende a PONER AL DÍA y entra el consolidado ADRES
 
 Yesid mandó TRES Excel para dejar la página al día: el consolidado 2026
@@ -11887,6 +11972,7 @@ que el avance sobrevive al recargar), sin un solo error de JavaScript.
 
 **Documentos:** `docs/GUIA_SISTEMA_ICFES.md` (cómo se usa) y
 `docs/ESTRATEGIA_ICFES_400.md` (el plan concreto para llegar a 400).
+
 ### 20-08 (noche) — Los soportes del .zip caían donde el índice nunca mira
 
 Último pendiente de la lista, y era real. La carpeta de soportes se resolvía
@@ -13810,6 +13896,16 @@ valor leido del PDF o con el objetado.
 
 ## 3) PENDIENTE
 
+### Objeciones DGH — MUTUAL (11-09)
+- **Autorizar (o no) el cambio en el motor de cruce:** que cuando el código
+  que manda la entidad exista tal cual en el DGH de esa factura, se escriba
+  aunque el nombre no concuerde, quedando marcado en REVISAR. Habría llenado
+  tres celdas del lote del 8-sep sin adivinar nada. **No se toca sin su visto
+  bueno:** ese motor lo usan las nueve entidades.
+- **Reclamar la tecnología 20299706 ($121.800)** de la HUS0000544255: no está
+  en el export del DGH y la observación de MUTUAL viene incompleta.
+
+
 ### MUTUAL SER (10-09)
 - **Revisar el contrato 20352.** MUTUAL objetó el 95,1 % de la factura
   HUS0000544271 diciendo que casi nada está pactado. Confirmar si es cierto o
@@ -13974,6 +14070,19 @@ de la que más cuesta a la que menos:
   HUS543423 ($46,9 mill), HUS543160 ($20,9 mill), HUS541431 ($17,2 mill),
   HUS543764 ($15,8 mill).
 - **Responder el portal antes del 14/09/2026.** Eso sí se puede hacer ya.
+
+### Cuidados médicos de la familiar — URGENTE (11-09)
+- **Radicar hoy la petición a la EPS por el soporte nutricional**: lleva 27
+  días formulado y sin entregar, y es la única vía de alimentación de la
+  paciente. Exigir número de radicado.
+- **A las 48 horas del radicado, si no llega el alimento:** queja en la
+  Superintendencia Nacional de Salud **y** tutela con medida provisional, el
+  mismo día. Los tres escritos están listos, solo falta llenar nombre, cédula
+  y correo.
+- **Aprovechar el control de nutrición del 15-09** para que quede por escrito:
+  el peso real, la cantidad diaria correcta, cuál sonda tiene la paciente, el
+  examen de la glucemia que nadie ordenó, y la prescripción renovada.
+
 ### Cuidados médicos de la familiar — EPS Sura (07-09)
 - **Radicar el memorial de impulso** al proceso de la Supersalud (el plazo de
   respuesta ya se venció) y **la queja a Sura** por lo que sigue sin
@@ -14970,6 +15079,13 @@ facturas y el consolidado de la MISMA remesa de la EPS, y trabajarla de punta a
 punta hasta bajar el acta. Es lo único que dice si sirve en una audiencia. Si
 al cerrar sale «No se pudo cerrar», ahora la pantalla muestra el motivo exacto:
 copiarlo al chat.
+
+### Cuidados médicos de la familiar — lo primero de todo
+1. **Confirmar que la EPS entregó el alimento.** Si no, radicar la queja en la
+   Superintendencia y la tutela con medida provisional el mismo día.
+2. Terminar la versión premium de la app (lo visual, los gráficos, el informe
+   en PDF, los perfiles con permisos y el centro de avisos). El expediente y
+   los datos ya están al día; falta la capa de presentación.
 
 ### Cuidados médicos de la familiar — lo primero
 1. Radicar el **Borrador A** (impulso a la Supersalud) por el correo oficial

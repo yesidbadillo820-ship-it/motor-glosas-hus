@@ -346,6 +346,31 @@ def _homologador() -> bytes:
     return _excel("CUPS", ["CUPS", "SOAT"], [["903883", "29117"], ["FMQ0113", "21705"]])
 
 
+def _mutual_corto() -> bytes:
+    """El formato de 5 columnas del 8 de septiembre: «Tecnología» en vez de
+    «SERVICIO», y sin cantidad ni concepto de glosa."""
+    return _excel(
+        "Hoja1",
+        [
+            "Número de factura",
+            "Tecnología",
+            "Valor glosado",
+            "Código de glosa",
+            "Observacion",
+        ],
+        [
+            [
+                "HUS0000548556",
+                "FMQ0113",
+                5800,
+                "TA0601",
+                "La tecnología FMQ0113 - CATETER INTRAVENOSO 20 no se encuentra "
+                "dentro del contrato número 20352.",
+            ]
+        ],
+    )
+
+
 # ─── De quién es el archivo ─────────────────────────────────────────────────
 
 
@@ -379,6 +404,10 @@ class TestDetectarEntidad:
         tenga, no la primera del catálogo."""
         assert svc.detectar_entidad(_sanitas()).id == "sanitas"
         assert svc.detectar_entidad(_adres()).id == "adres"
+
+    def test_mutual_en_su_formato_corto(self):
+        """Aunque cambie las columnas entre lotes, sigue siendo MUTUAL."""
+        assert svc.detectar_entidad(_mutual_corto()).id == "mutual"
 
     def test_un_pdf_es_de_emssanar(self, tmp_path):
         """Es la única entidad que no manda Excel."""
@@ -642,6 +671,16 @@ class TestProcesar:
         assert [f["SLNSERPRO"] for f in filas] == ["FMQ0113", "903883H"]
         assert {f["CTNCENCOS"] for f in filas} == {None}
         assert {f["CROTIPOBJ"] for f in filas} == {0}
+
+    def test_mutual_corto_de_punta_a_punta(self):
+        """El lote del 8 de septiembre: la pantalla lo rechazaba por el nombre
+        de la columna del servicio."""
+        r = svc.procesar(_mutual_corto(), _dgh(), fecha="2026-09-08")
+        assert r.entidad_id == "mutual"
+        assert r.objeciones == 1
+        assert r.valor_total == 5800
+        assert r.reglas_ok and not r.fallas_reglas
+        assert r.nombre_objeciones == "OBJECIONES_MUTUAL_08092026.xlsx"
 
     def test_un_pdf_que_no_es_una_objecion(self, tmp_path):
         with pytest.raises(svc.ErrorObjeciones, match="PDF"):

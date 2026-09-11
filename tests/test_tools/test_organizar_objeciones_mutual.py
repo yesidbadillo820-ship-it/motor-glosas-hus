@@ -195,6 +195,63 @@ class TestLectura:
         )
         assert len(org.leer_mutual(ruta)) == 2
 
+    def test_el_formato_corto_del_8_de_septiembre(self, tmp_path):
+        """MUTUAL cambia las columnas entre lotes.
+
+        El del 8 de septiembre llegó con CINCO: la del código rebautizada
+        «Tecnología» y sin cantidad ni concepto. La pantalla lo rechazaba con
+        «no trae las columnas cod_servicio».
+        """
+        ruta = _xlsx(
+            tmp_path / "m8.xlsx",
+            encabezados=[
+                "Número de factura",
+                "Tecnología",
+                "Valor glosado",
+                "Código de glosa",
+                "Observacion",
+            ],
+            filas=[
+                [
+                    "HUS0000544255",
+                    "890494",
+                    165400,
+                    "TA0201",
+                    "La tecnología 890494 - INTERCONSULTA HOSPITALARIA POR UROLOGIA "
+                    "no se encuentra dentro del contrato número 20352.",
+                ]
+            ],
+            hoja="Hoja1",
+        )
+        objeciones = org.leer_mutual(ruta)
+        assert len(objeciones) == 1
+        o = objeciones[0]
+        assert o["cod_servicio"] == "890494"
+        assert o["servicio"] == "INTERCONSULTA HOSPITALARIA POR UROLOGIA"
+        assert o["valor"] == 165400
+        assert o["codigo"] == "TA0201"
+        # Las dos que no vinieron quedan vacías, no rompen nada.
+        assert not o["cantidad"]
+        assert o["concepto"] == ""
+
+    def test_sin_cantidad_el_renglon_igual_se_arma(self, tmp_path):
+        """El valor unitario se deja en 0 en vez de dividir por cero."""
+        ruta = _xlsx(
+            tmp_path / "m8.xlsx",
+            encabezados=[
+                "Número de factura",
+                "Tecnología",
+                "Valor glosado",
+                "Código de glosa",
+                "Observacion",
+            ],
+            filas=[["HUS0000544255", "890494", 165400, "TA0201", "sin nombre"]],
+            hoja="Hoja1",
+        )
+        filas = org.construir_filas(org.leer_mutual(ruta), _fecha())
+        assert len(filas) == 1
+        assert filas[0]["CROVALOBJ"] == 165400
+
     def test_un_archivo_de_otra_entidad_se_detiene_con_mensaje_claro(self, tmp_path):
         ruta = _xlsx(
             tmp_path / "otro.xlsx",
