@@ -19,6 +19,28 @@ from app.core.logging_utils import logger
 
 _HORA_OBJETIVO = 2  # 2:00 AM (antes del mantenimiento)
 
+# 11-09-2026 — POR QUÉ EL ARRANQUE YA NO RECORRE SIEMPRE.
+#
+# El motor del hospital se autodespliega: baja la rama cada 5 minutos y, si
+# hay commit nuevo, se reinicia. O sea que hay reinicios A CUALQUIER HORA del
+# día laboral, no solo de madrugada.
+#
+# Y al arrancar se recorría el servidor de archivos ENTERO, sin preguntar si
+# hacía falta. Con 101.991 facturas y 426.405 archivos al otro lado de la red
+# (`\\Prime\radicacion_2026`), eso son cientos de miles de viajes por red
+# que se llevan minutos, machacan el servidor de archivos y le roban turno al
+# motor mientras el auditor trabaja. El caso de hoy: se fusionó un cambio a
+# las 8:16 a.m., el motor se reinició, y a las 8:35 seguía recorriendo.
+#
+# El recorrido diario de las 2 AM ya deja el índice al día. Repetirlo porque
+# hubo un despliegue no agrega NADA: son los mismos archivos. Así que al
+# arrancar solo se recorre si de verdad falta —índice vacío, o tan viejo que
+# se perdió el turno de las 2 AM porque el motor estaba apagado—.
+#
+# Lo que NO cambia: el botón «Reindexar ahora» sigue recorriendo cuando el
+# auditor lo pide, y el turno de las 2 AM sigue igual.
+_HORAS_PARA_NO_REPETIR = 20.0
+
 _task: Optional[asyncio.Task] = None
 
 
@@ -30,9 +52,19 @@ def _segundos_hasta_proxima_ejecucion() -> float:
     return (objetivo - ahora).total_seconds()
 
 
-async def _ejecutar_safe() -> None:
+async def _ejecutar_safe(*, solo_si_hace_falta: bool = False) -> None:
     try:
         from app.services.soportes_autodiscovery_service import get_indexer
+
+        if solo_si_hace_falta:
+            edad_s = get_indexer().construido_hace()
+            if edad_s is not None and edad_s < _HORAS_PARA_NO_REPETIR * 3600:
+                logger.info(
+                    f"[SOPORTES-REINDEX] El índice se recorrió hace {edad_s / 3600:.1f}h; "
+                    "no se vuelve a recorrer el servidor por un reinicio. "
+                    "El turno de las 2 AM sigue en pie."
+                )
+                return
 
         # Ronda 30: rebuild() recorre el share CIFS completo (IO/CPU-bound).
         # Corría síncrono dentro de esta corrutina y bloqueaba el event loop
@@ -50,10 +82,12 @@ async def _ejecutar_safe() -> None:
 
 
 async def _loop() -> None:
-    # Build inicial al arrancar — así no hay que esperar a las 2 AM
-    # del día siguiente. Si el mount aún no está listo, el indexador
-    # registra `ultimo_error` y el healthz lo refleja.
-    await _ejecutar_safe()
+    # Build inicial al arrancar SOLO SI HACE FALTA — así no hay que esperar a
+    # las 2 AM del día siguiente cuando el motor estuvo apagado, pero tampoco
+    # se recorre el servidor entero cada vez que un despliegue lo reinicia.
+    # Si el mount aún no está listo, el indexador registra `ultimo_error` y el
+    # healthz lo refleja.
+    await _ejecutar_safe(solo_si_hace_falta=True)
     while True:
         try:
             espera_s = _segundos_hasta_proxima_ejecucion()

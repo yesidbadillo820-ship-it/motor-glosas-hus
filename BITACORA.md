@@ -91,6 +91,60 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 11-09-2026 — Por qué se puso lenta la plataforma (y quién tuvo la culpa)
+
+Yesid a las 8:35 de la mañana: «*ayúdame a mirar por qué está tan lenta la
+plataforma*». En su pantalla, el indexador de soportes recorriendo el servidor
+de archivos: **101.991 facturas, 426.405 archivos**, y arriba el aviso de
+«nueva versión disponible».
+
+**Esos dos hechos son el mismo hecho.** El motor se actualiza solo: cada 5
+minutos mira si hay cambios y, si los hay, se reinicia. Se fusionó un cambio a
+las 8:16 a.m., el motor se reinició… y **al arrancar se ponía a recorrer el
+servidor de archivos entero**, sin preguntarse si hacía falta. A las 8:35
+todavía iba. O sea: la lentitud la causó el despliegue de la mañana, no una
+falla del motor.
+
+Y no hacía falta recorrer nada: el recorrido de las **2 de la mañana** ya
+había dejado el índice al día. Los archivos eran los mismos.
+
+**Dos cosas se arreglaron, y las dos están medidas.**
+
+**1) El arranque ya no recorre por gusto.** Si el índice se hizo hace menos de
+20 horas, un reinicio no dispara nada: el turno de las 2 AM sigue en pie y
+listo. Solo se recorre al arrancar cuando de verdad falta —la primera vez, o
+si el motor estuvo apagado a las 2 AM y se perdió el turno—. El botón
+«**Reindexar ahora**» sigue funcionando igual: lo que usted pide a mano no se
+le discute.
+
+**2) Se le pedía al servidor seis veces más de lo necesario.** Cada carpeta se
+listaba **tres veces** (una para recorrer, otra para contar, otra para leer),
+más una pregunta por la carpeta; y de cada archivo se volvía a preguntar
+tamaño y fecha **uno por uno** — 426.405 preguntas más.
+
+Cuando el servidor está al otro lado de la red, como el de radicación, lo caro
+no es pensar: es cada ida y vuelta. Medido sobre un árbol armado igual al del
+hospital:
+
+| | Viajes al servidor |
+|---|---|
+| Como estaba | **23.712** |
+| Como quedó | **3.910** |
+
+Indexando exactamente lo mismo: las mismas 3.000 facturas, los mismos 12.000
+archivos. Llevado a su servidor de verdad, son unos **800.000 viajes que pasan
+a ser 130.000**.
+
+Ahora cada carpeta se pide **una sola vez** y se aprovecha todo lo que esa
+respuesta ya trajo: los archivos, las subcarpetas, y el tamaño y la fecha de
+cada uno.
+
+**Lo que se cuidó, que era lo delicado:** el motor se salta las carpetas que no
+han cambiado, y para eso les toma una «huella». Al cambiar la forma de
+recorrer, cambió la huella — así que hay pruebas nuevas que comprueban que
+sigue viendo **un archivo nuevo, una factura nueva entera y un archivo
+borrado**, y que el tamaño y la fecha que muestra son los de verdad.
+
 ### 10-09-2026 — El dictamen dejó de llevarle la contraria al papel, y Gemini con su propio cupo
 
 **1) «El iobitridol no es un medio de contraste, sino una solución antiséptica».**
