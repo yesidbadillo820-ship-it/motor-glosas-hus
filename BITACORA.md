@@ -91,6 +91,45 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 11-09-2026 (4) — Frente 12: lo que dicen unos resultados de laboratorio no es lo que más importa; importa lo que NO piden
+
+**El caso.** Llegaron los resultados de los cinco exámenes que la EPS había
+autorizado. La lectura obvia habría sido revisar valor por valor y decir cuáles
+salieron fuera de rango. Eso se hizo —siete de quince— pero el hallazgo que de
+verdad sirve fue otro: **entre los cinco exámenes no hay ninguno que mida el
+azúcar**, y ese era justamente el que la nutricionista había pedido por escrito
+casi un mes antes. Un examen que no se pide no aparece en ningún informe: hay
+que salir a buscar la ausencia.
+
+**La lección, que sirve igual para auditar una factura.** Revisar lo que está
+escrito es la mitad del trabajo. La otra mitad es preguntarse **qué debería
+estar y no está**, y para eso hay que cruzar el documento nuevo contra lo que ya
+se había pedido en documentos viejos. En este caso el cruce fue contra una
+solicitud escrita el 15 de agosto; en cartera, el equivalente es cruzar lo
+facturado contra lo que la orden médica pedía.
+
+**Un segundo hallazgo, del mismo tipo.** Un valor bajo de creatinina —que el
+propio laboratorio marcó como fuera de rango— apunta en la misma dirección que
+la valoración de nutrición y en dirección contraria al renglón de «estado
+nutricional normal» que otra historia del mismo día había anotado. Es decir: el
+laboratorio de la propia entidad respalda a la profesional de la propia
+entidad, y desmiente el papel que la entidad podría usar para negar. Se dejó
+planteado como **pregunta para el médico**, no como diagnóstico: la aplicación
+no diagnostica, muestra cada cifra con su rango al lado y dice expresamente que
+estar fuera de rango no significa, por sí solo, que haya una enfermedad.
+
+**Lo que se hizo.** Los resultados quedaron cargados en el expediente con su
+rango al lado; el examen faltante pasó a rojo; se agregaron dos contradicciones
+nuevas (van 16); y los tres escritos para radicar se actualizaron con los dos
+hechos nuevos y con el informe como anexo.
+
+**Cómo se probó.** 143 pruebas en navegador y 94 del motor de lectura, en
+verde. Una falla de esa corrida fue mía y vale anotarla: la prueba esperaba
+seis valores fuera de rango y el código contó siete. **El código tenía razón**;
+el número equivocado estaba en la prueba.
+
+---
+
 ### 11-09-2026 (4) — El cronómetro funcionó: encontró el tapón de verdad
 
 A la hora de haberlo instalado, Yesid pasó la pantalla de «¿Qué está lento?».
