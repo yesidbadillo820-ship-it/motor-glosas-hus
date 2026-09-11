@@ -49,6 +49,24 @@ router = APIRouter(prefix="/admin/diagnostico", tags=["diagnostico"])
 _PING_CACHE: dict = {}
 _PING_TTL_S = 15 * 60
 
+# 11-09-2026 — CUÁNTO SE ESPERA A UNA IA QUE NO CONTESTA.
+#
+# Esta pantalla le pregunta «¿estás viva?» a Anthropic y a Gemini. Eran
+# **15 y 10 segundos** de espera, uno detrás del otro: hasta 25 segundos con
+# el auditor mirando la pantalla quieta.
+#
+# Medido con el cronómetro, en una hora de trabajo real del HUS:
+# `GET /admin/diagnostico` con **2.200 ms de promedio** y picos de 15,3 s,
+# 12,5 s y 8,3 s — la fila más lenta de toda la tabla, de lejos. Y los dos
+# proveedores llevaban rato caídos (`WinError 10054` en Anthropic, `HTTP 503`
+# en Gemini), así que esa espera era por una respuesta que no iba a llegar.
+#
+# Tres segundos alcanzan y sobran: **si una IA se demora más de tres segundos
+# en contestar «ok» a cuatro palabras, la respuesta que la pantalla tiene que
+# dar es justamente que está degradada**. Esperar veinticinco no aporta una
+# respuesta mejor, solo una más tarde.
+_PING_TIMEOUT_S = 3.0
+
 
 def _ping_cached(key: str, fn):
     now = datetime.now(timezone.utc)
@@ -282,7 +300,7 @@ def diagnostico_completo(
             try:
                 import httpx
 
-                timeout = httpx.Timeout(connect=8.0, read=15.0, write=8.0, pool=5.0)
+                timeout = httpx.Timeout(_PING_TIMEOUT_S, pool=_PING_TIMEOUT_S)
                 with httpx.Client(timeout=timeout) as client:
                     resp = client.post(
                         "https://api.anthropic.com/v1/messages",
@@ -411,7 +429,7 @@ def diagnostico_completo(
                     "contents": [{"role": "user", "parts": [{"text": "ping"}]}],
                     "generationConfig": {"maxOutputTokens": 4, "temperature": 0},
                 }
-                with _httpx_g.Client(timeout=10.0) as client:
+                with _httpx_g.Client(timeout=_PING_TIMEOUT_S) as client:
                     rg = client.post(url, json=payload, headers={"x-goog-api-key": gemini_key})
                 if rg.status_code == 200:
                     return (

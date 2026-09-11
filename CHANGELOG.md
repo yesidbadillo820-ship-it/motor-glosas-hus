@@ -1,5 +1,65 @@
 # Registro de cambios
 
+## Sesión 11-sep-2026 (6) — Los pings de IA de Diagnóstico, de 25 s a 6 s
+
+Tercera medición con el cronómetro, una hora de uso real (3.348 peticiones):
+**39 sobre 2 s (1,2 %, venía de 2,9 %)** y `GET /health` en **31 ms**. Con la
+tabla ordenada, la fila peor ya no era del índice:
+`GET /admin/diagnostico` con **2.200 ms de promedio y 15,3 s de pico**.
+
+- **Causa** — `diagnostico_completo()` hace un ping real (no un HEAD: un
+  `POST` de 4 tokens) a Anthropic y a Gemini, en serie. Los timeouts eran
+  `httpx.Timeout(connect=8, read=15)` y `Client(timeout=10.0)`: **hasta 25 s**
+  de espera. Los dos proveedores estaban caídos (`WinError 10054` /
+  `HTTP 503`), así que era espera pura.
+- **`app/api/routers/diagnostico.py`** — `_PING_TIMEOUT_S = 3.0` aplicado a
+  los dos. Techo de 6 s en el peor caso, y el resultado —incluido el fallo—
+  se cachea `_PING_TTL_S` (15 min), así que no se repaga en cada apertura.
+- **Pruebas** — `tests/test_api/test_el_diagnostico_no_hace_esperar.py` (6):
+  el tope existe y es ≤5 s, se aplica a los dos pings, no queda ningún
+  `timeout=` largo escrito a mano (la forma en que estos números vuelven a
+  crecer sin que nadie mire), el techo del peor caso es ≤10 s, y el fallo
+  también se cachea. Verificado reinyectando el 15.0.
+  Suite completa: 12.825 en verde.
+- **Nota de método** — la medición se tomó con el motor aún en `6371f71`
+  (arranque 11:04), o sea **sin** el `gc.freeze()` de la #708 fusionada a las
+  11:40. Los picos de 14,9 s / 13,5 s de la tabla son de ese arranque y no
+  se repitieron en la hora. Hay que remedir cuando el motor levante con
+  ambos arreglos.
+
+
+## Sesión 11-sep-2026 (5) — `gc.freeze()` sobre el índice: 455 ms de pausa global a cero
+
+Segunda vuelta de la medición, ya con el arreglo del arranque en producción:
+**24 de 826 peticiones sobre 2 s (2,9 %, venía de 34,5 %)** y `GET /health`
+—`SELECT 1`— en **93 ms de promedio**.
+
+- **Diagnóstico** — 93 ms en `/health` no es lentitud de ese endpoint: es una
+  pausa global que le cae encima a ~1 de cada 5 peticiones. El índice son
+  **811.598 objetos** que el recolector de ciclos recorre en cada pasada de
+  generación 2. Medido con el `SoporteEntry` real: **455 ms por pasada**
+  contra 2,2 ms sin el índice; `0,2 × 455 ≈ 91 ms`, que es el promedio
+  observado. El cálculo se hizo antes de tocar el código.
+- **`app/services/soportes_autodiscovery_service.py`** —
+  `_sacar_el_indice_del_camino_del_recolector()`: `gc.collect()` seguido de
+  `gc.freeze()`, llamado en las dos puertas por donde el índice entra a
+  memoria (`_cargar_de_disco()` y el cambiazo final de `rebuild()`).
+  Comprobado sobre el indexador real: **99 ms → 0 ms** con 300.000 archivos,
+  y el `lookup()` sigue devolviendo lo mismo.
+- **Seguridad** — `freeze()` solo excluye del recolector de CICLOS; el
+  refcounting sigue liberando. `SoporteEntry` es un dataclass plano sin
+  ciclos, así que el índice viejo muere al ser reemplazado.
+  `test_el_indice_viejo_SI_se_libera_al_reconstruir` lo demuestra con
+  `weakref`, no lo afirma.
+- **Pruebas** — 4 nuevas (19 en el archivo). Suite completa: 12.819 en verde.
+- **Pendiente propuesto, NO hecho** — quedan los picos de 13-15 s del
+  arranque: los **14,6 s** de abrir 358 MB de JSON y rearmar 811.598 objetos.
+  Ya no bloquean el event loop (van en hilo) pero sí compiten por el GIL. El
+  arreglo de fondo es mover el índice a SQLite —`lookup()` pasa a ser una
+  consulta indexada, sin carga inicial ni 1,5 GB de RAM—. Es un cambio
+  grande: queda propuesto, no metido de sorpresa.
+
+
 ## Sesión 11-sep-2026 (4) — Abrir el índice de soportes congelaba el sitio entero
 
 Primer hallazgo del cronómetro instalado una hora antes. Medido en producción,

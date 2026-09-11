@@ -356,3 +356,99 @@ class TestAbrirElIndiceNoCongelaElSitio:
             f"el sitio se quedó {peor_atraso:.2f}s sin atender mientras se abría "
             f"el índice (la demora simulada era {DEMORA}s)"
         )
+
+
+class TestElIndiceNoParaElMotorEnCadaLimpieza:
+    """Medido en producción, 13 minutos de trabajo normal, ya con el arreglo
+    del arranque puesto:
+
+        GET /health          99 veces ·  93 ms de promedio · 5,9 s la peor
+        GET /glosas/alertas 100 veces · 522 ms de promedio
+
+    `/health` hace `SELECT 1` y devuelve tres campos: debería estar en dos o
+    tres milésimas, no en 93.
+
+    La cuenta cuadra sola. El índice son **811.598 objetos** en memoria, y
+    cada vez que Python pasa a recoger basura los revisa TODOS: **455 ms por
+    pasada**, contra 2,2 ms sin el índice. Mientras revisa, el motor entero
+    se detiene — no es una pantalla lenta, son todas a la vez. Si una de cada
+    cinco peticiones cae encima de una pasada, el promedio da justo 93 ms.
+    """
+
+    def test_congelar_el_indice_abarata_la_limpieza(self, tmp_path: Path):
+        import gc
+        import time
+
+        _arbol(tmp_path, facturas=300)
+        ix = _indexador(tmp_path)
+        ix.rebuild()
+        assert ix.stats()["archivos_indexados"] == 1200
+
+        def _pausa_ms() -> float:
+            t = time.perf_counter()
+            gc.collect()
+            return (time.perf_counter() - t) * 1000
+
+        con_arreglo = min(_pausa_ms() for _ in range(3))
+        gc.unfreeze()
+        sin_arreglo = max(_pausa_ms() for _ in range(3))
+        gc.collect()
+        gc.freeze()  # se deja como estaba, para no afectar otras pruebas
+
+        assert con_arreglo < sin_arreglo, (
+            f"congelar el índice no sirvió de nada: {con_arreglo:.1f} ms contra "
+            f"{sin_arreglo:.1f} ms"
+        )
+
+    def test_el_indice_sigue_sirviendo_despues_de_congelarlo(self, tmp_path: Path):
+        """Lo importante no es que sea rápido: es que siga contestando bien."""
+        _arbol(tmp_path, facturas=20)
+        ix = _indexador(tmp_path)
+        ix.rebuild()
+        assert len(ix.lookup("HUS0000400005", auto_rebuild=False)) == 4
+        assert ix.stats()["facturas_indexadas"] == 20
+
+    def test_el_indice_viejo_SI_se_libera_al_reconstruir(self, tmp_path: Path):
+        """La pregunta obvia: ¿congelarlo hace que la memoria se acumule?
+
+        No. `gc.freeze()` solo saca los objetos del recolector de CICLOS; la
+        liberación por conteo de referencias sigue igual, y estas entradas son
+        datos planos sin ciclos. Esto no se afirma, se demuestra: se guarda
+        una referencia débil a una entrada del índice viejo y se exige que
+        muera al reconstruir.
+        """
+        import gc
+        import weakref
+
+        _arbol(tmp_path, facturas=10)
+        ix = _indexador(tmp_path)
+        ix.rebuild()
+
+        alguna = next(iter(ix._indice.values()))[0]
+        testigo = weakref.ref(alguna)
+        del alguna
+        assert testigo() is not None
+
+        for archivo in tmp_path.rglob("*.pdf"):
+            archivo.unlink()
+        ix._firmas = {}  # forzar relectura de todas las carpetas
+        ix.rebuild()
+        gc.collect()
+
+        assert testigo() is None, (
+            "la entrada del índice viejo sigue viva después de reconstruir: "
+            "congelar el índice estaría acumulando memoria en cada recorrido"
+        )
+
+    def test_esta_enchufado_en_los_dos_caminos(self):
+        """El índice entra en memoria por dos puertas —abrirlo del disco y
+        reconstruirlo— y las dos tienen que dejarlo fuera del recolector."""
+        import inspect
+
+        from app.services import soportes_autodiscovery_service as sas
+
+        fuente = inspect.getsource(sas)
+        assert fuente.count("_sacar_el_indice_del_camino_del_recolector()") >= 3, (
+            "faltan llamadas: tiene que ir al cargar de disco Y al terminar un recorrido"
+        )
+        assert "gc.freeze()" in inspect.getsource(sas._sacar_el_indice_del_camino_del_recolector)
