@@ -12,6 +12,41 @@ Genera: docs/usuarios_motor_glosas.xlsx con 3 hojas:
 import sys
 from pathlib import Path
 
+
+# ── La contraseña inicial ya no se puede adivinar ───────────────────────
+#
+# 11-09-2026. Hasta hoy era `email.split("@")[0]`: **la parte del correo
+# antes de la arroba**. O sea que sabiendo el correo de un gestor —que está
+# en la firma de cualquiera de sus mensajes— se sabía su contraseña. Y la
+# hoja generada traía la lista completa y la regla escrita, y esa hoja quedó
+# guardada en el repositorio.
+#
+# Ahora cada quien nace con una clave al azar. Se entrega por un canal
+# aparte, no por la misma hoja que circula por correo.
+def _clave_inicial_al_azar(largo: int = 14) -> str:
+    """Clave temporal que nadie puede deducir del correo.
+
+    Se evitan los caracteres que se confunden al dictarla por teléfono
+    (l/1/I, O/0) porque estas claves se leen en voz alta o se copian a mano.
+    """
+    import secrets
+
+    letras = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
+    numeros = "23456789"
+    simbolos = "!@#$%*+-"
+    alfabeto = letras + numeros + simbolos
+    while True:
+        clave = "".join(secrets.choice(alfabeto) for _ in range(largo))
+        # Que siempre traiga de los tres tipos: si sale una sin número, el
+        # gestor la cambia por otra débil y volvemos al principio.
+        if (
+            any(c in letras for c in clave)
+            and any(c in numeros for c in clave)
+            and any(c in simbolos for c in clave)
+        ):
+            return clave
+
+
 PROY = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROY))
 
@@ -106,9 +141,10 @@ def crear_hoja_credenciales(wb):
     _hoja_titulo(
         ws,
         "Credenciales de Acceso · 29 usuarios",
-        "La CONTRASEÑA INICIAL es el PREFIJO del correo (parte antes del @). "
-        "Ej.: glosashus04@sinacsc.com → contraseña: glosashus04 · "
-        "Cambie su contraseña en el primer ingreso.",
+        "Cada CONTRASEÑA INICIAL es única y al azar: no se puede deducir del "
+        "correo. El motor NO deja usar ninguna otra pantalla hasta cambiarla "
+        "en el primer ingreso. Entregue cada fila SOLO a su dueño, por un "
+        "canal aparte, y no reenvíe esta hoja completa.",
     )
 
     headers = ["#", "Nombre completo", "Correo institucional", "Contraseña inicial", "Rol"]
@@ -133,7 +169,7 @@ def crear_hoja_credenciales(wb):
 
     for i, (nombre, email, rol) in enumerate(USUARIOS, start=1):
         row = 5 + i
-        password = email.split("@")[0]
+        password = _clave_inicial_al_azar()
         rol_bg, rol_fg = rol_colors.get(rol, ("E2E8F0", "334155"))
 
         c = ws.cell(row=row, column=1, value=i)

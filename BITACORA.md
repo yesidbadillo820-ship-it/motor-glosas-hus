@@ -91,6 +91,59 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 11-09-2026 (7) — La contraseña del primer día servía para todo
+
+Llegó una auditoría externa del motor. Antes de creerle nada, **comprobé sus
+acusaciones una por una contra el código**. En lo de seguridad tenía razón, y
+hay una que había que arreglar ya.
+
+**Tres cosas que por separado parecen menores, y juntas son una puerta
+abierta:**
+
+1. La contraseña inicial de cada gestor **era la parte de su correo antes de
+   la arroba**. Si su correo es `glosashus04@sinacsc.com`, su contraseña era
+   `glosashus04`.
+2. La hoja de Excel con **los 29 usuarios, sus correos y esa regla escrita**
+   estaba guardada en el repositorio del proyecto.
+3. El motor marcaba a cada quien con «tiene que cambiar la clave», el login
+   lo avisaba y la pantalla lo mostraba… **pero nunca lo exigía**.
+
+Junte las tres: **cualquiera que supiera el correo de un gestor podía entrar
+como él y usar el motor completo.** En un sistema con historias clínicas eso
+no es una deuda para después.
+
+**Lo que se hizo hoy:**
+
+- **La clave inicial ya no sirve para trabajar.** Quien no la haya cambiado
+  puede hacer exactamente tres cosas: cambiarla, salirse y ver su propio
+  nombre. Todo lo demás le contesta que primero cambie la contraseña.
+- **Pero nadie queda encerrado**, que era el riesgo del arreglo: se comprobó
+  que sí puede cambiarla, que al hacerlo la marca se le quita sola, y que de
+  ahí en adelante trabaja normal.
+- **Las contraseñas nuevas ya no se pueden adivinar**: cada usuario nace con
+  una clave al azar de 14 caracteres, sin las letras y números que se
+  confunden al dictarlos por teléfono (la ele con el uno, la o con el cero).
+- **La hoja con las credenciales salió del repositorio** y quedó una regla
+  para que no vuelva a entrar por un descuido. El archivo sigue en el disco
+  del hospital: lo que se quitó es que viajara con el código.
+
+**Lo que le queda a usted, y es importante:** los 29 gestores que ya existen
+**siguen con la contraseña vieja**. El arreglo los frena solo si están
+marcados. Para saber quién está en riesgo hay una herramienta nueva:
+
+    venv\Scripts\python.exe tools\revisar_claves_iniciales.py
+
+Eso **no cambia nada**: solo dice quién sigue con la clave del primer día. Si
+sale alguien, se vuelve a correr con `--marcar` y a esa persona el motor le
+pedirá una contraseña nueva la próxima vez que entre. **A nadie se le cambia
+la clave ni se le saca de la sesión.**
+
+**Sobre el resto del informe:** lo de seguridad es cierto. Lo de «596 rutas
+muertas» está exagerado — tomé ocho al azar y siete sí se usan; su método no
+miró las pruebas. Y se equivoca al decir que el login vive en `/auth/login`:
+vive en `/token`, y existe. Por eso no apliqué el parche que venía adjunto:
+en un sistema con datos de pacientes, cada cambio lo escribo y lo pruebo yo.
+
 ### 11-09-2026 (6) — La pantalla de Diagnóstico esperaba 25 segundos a dos IAs caídas
 
 La medición de una hora completa —3.348 peticiones— dejó las cosas así:
