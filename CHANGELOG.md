@@ -1,5 +1,44 @@
 # Registro de cambios
 
+## Sesión 11-sep-2026 — El indexador de soportes deja de machacar el servidor
+
+Diagnóstico de «la plataforma está lentísima» a las 8:35 a.m. El indexador
+recorría `\\Prime\radicacion_2026` (101.991 facturas / 426.405 archivos) en
+horario laboral, disparado por el reinicio del autodespliegue de las 8:16.
+
+- **`app/services/soportes_reindex_scheduler.py`** — el build de arranque pasa
+  a `_ejecutar_safe(solo_si_hace_falta=True)`: si el índice tiene menos de
+  `_HORAS_PARA_NO_REPETIR` (20 h) no se recorre nada. El motor se reinicia
+  varias veces al día por el autodespliegue y cada reinicio disparaba un walk
+  completo que no aportaba nada sobre el de las 2 AM. El turno diario y el
+  botón «Reindexar ahora» (que llama sin la bandera) no cambian.
+- **`app/services/soportes_autodiscovery_service.py`** — nuevo
+  `_recorrer_con_contenido()`: un `scandir` por carpeta que devuelve
+  `(carpeta, archivos, firma)`. Antes había 3 `scandir` + 1 `stat` por
+  carpeta (os.walk descartaba su propia lista de archivos, `_firma_de`
+  relistaba para contar, y el cuerpo del bucle relistaba para leer) más un
+  `Path.stat()` por archivo. `_construir_entry()` acepta ahora el
+  `os.stat_result` que el listado ya trajo (en Windows viene en la misma
+  respuesta del directorio, sin viaje extra), y los compartidos de lote se
+  guardan como `(Path, stat)` para que la pasada 2 tampoco re-pregunte.
+  Nuevo método público `construido_hace()`. `_recorrer_carpetas()` y
+  `_firma_de()` se conservan para compatibilidad.
+  - **Cambio de semántica de la huella**: era `(mtime de la carpeta, nº de
+    entradas)`; ahora es `(mtime del archivo más nuevo, nº de entradas)`,
+    que se arma con el listado que de todos modos hay que pedir. La primera
+    corrida tras el despliegue re-lee todo una vez (las firmas viejas no
+    casan) y a partir de ahí el diferencial vuelve a saltar carpetas.
+- **Medido** con un contador de `scandir`/`stat` sobre un árbol de 3.000
+  facturas / 12.000 archivos con la estructura real: **23.712 → 3.910 viajes**
+  (6×), indexando idéntico.
+- **Pruebas** — `tests/test_services/test_el_indexador_no_machaca_el_servidor.py`
+  (11): tope de viajes por carpeta, el diferencial ve archivo nuevo / factura
+  nueva / archivo borrado, tamaño y fecha correctos, y las cuatro rutas del
+  arranque (fresco no recorre, viejo sí, sin índice sí, botón siempre). El
+  tope de viajes falla si se reinyecta el `stat` por archivo (verificado).
+  Suite completa: 12.761 en verde.
+
+
 ## Sesión 10-sep-2026 (6) — Naturaleza contradicha, y Gemini con cupo propio
 
 - **`app/services/quality_gate/post_validator.py`** — nuevo
