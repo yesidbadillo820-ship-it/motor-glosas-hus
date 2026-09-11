@@ -1,6 +1,6 @@
 # Registro de cambios
 
-## Sesión 11-sep-2026 (3) — Abrir el índice de soportes congelaba el sitio entero
+## Sesión 11-sep-2026 (4) — Abrir el índice de soportes congelaba el sitio entero
 
 Primer hallazgo del cronómetro instalado una hora antes. Medido en producción,
 un minuto después de un reinicio: **47 de 136 peticiones sobre 2 s**, y
