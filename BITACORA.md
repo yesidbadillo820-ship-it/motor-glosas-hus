@@ -91,6 +91,47 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 11-09-2026 (2) — Ahora el motor sabe decir QUÉ está lento
+
+De la misma mañana. Cuando Yesid preguntó por qué la plataforma estaba lenta,
+resultó que **no había con qué contestarle**. Se pudo medir todo lo de
+alrededor —y salió sano—:
+
+| | |
+|---|---|
+| Memoria del motor | 1,1 GB, con 3,5 GB libres en el PC |
+| Procesador | 9 % |
+| El servidor de archivos `\\Prime` | responde en 17 ms |
+| El motor, preguntándole desde el propio PC | **13 ms** |
+| El motor, pasando por internet | **130 ms** |
+
+O sea: ni memoria, ni procesador, ni el servidor de archivos. **El motor
+contesta en 13 milésimas de segundo.** Lo que se siente pesado es el viaje por
+internet, que cuesta unos 130 ms por cada pedido — y una pantalla hace entre 2
+y 15 pedidos al abrirse.
+
+**Pero lo grave es otra cosa:** el motor **no anotaba en ninguna parte cuánto
+tardaba en contestar**. La única pregunta que de verdad importa —«¿cuál
+pantalla es la lenta?»— era la única sin respuesta, y tocó salir a suponer.
+
+Eso ya no pasa. Ahora hay un botón **«⏱️ ¿Qué está lento?»** en *Diagnóstico
+del sistema*, y muestra:
+
+- cuántas veces se abrió cada pantalla y **cuánto tardó en promedio**,
+- **cuál fue la peor vez** de cada una,
+- y la lista de las que se pasaron de 2 segundos, con la hora.
+
+Hay un botón **«Poner en cero»** para lo que uno de verdad quiere hacer: dejar
+el contador en cero, abrir la pantalla que se siente lenta, y volver a mirar
+qué salió.
+
+Y la pantalla lo aclara, porque es la trampa de siempre: **eso cuenta solo lo
+que tarda el motor**, no el viaje por internet. Si ahí todo sale rápido y la
+pantalla igual se siente pesada, la demora está en el camino y no adentro.
+
+Medir no cuesta nada: **1,5 microsegundos por petición**, sobre las 13.000 que
+tarda una de verdad. Es la diezmilésima parte.
+
 ### 11-09-2026 — Por qué se puso lenta la plataforma (y quién tuvo la culpa)
 
 Yesid a las 8:35 de la mañana: «*ayúdame a mirar por qué está tan lenta la
