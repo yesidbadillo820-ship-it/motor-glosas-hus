@@ -143,6 +143,42 @@ muertas» está exagerado — tomé ocho al azar y siete sí se usan; su método
 miró las pruebas. Y se equivoca al decir que el login vive en `/auth/login`:
 vive en `/token`, y existe. Por eso no apliqué el parche que venía adjunto:
 en un sistema con datos de pacientes, cada cambio lo escribo y lo pruebo yo.
+### 11-09-2026 — CAPITAL SALUD entra a la pantalla (décima entidad)
+
+**El auditor pasó el export de CAPITAL SALUD por el botón «Objeciones DGH» y
+la pantalla no lo tomó.** Era entidad nueva: no existía bot para armar su
+archivo de objeciones. Ya se hizo, y **CAPITAL SALUD es la décima entidad**.
+
+**Lo raro de su formato,** y por qué hubo que hacerle bot propio:
+
+- **No manda el código del servicio**, sólo el nombre — como SALUD TOTAL. El
+  cruce contra el DGH se apoya en el nombre y el valor.
+- **El nombre viene con guiones donde van los espacios**
+  (`INTERNACION-ADULTOS-COMPLEJIDAD-ALTA`). Se igualan al leer: con guiones el
+  parecido contra el DGH se hundía y no cruzaba nada.
+- **No manda el código de glosa en columna propia**: va pegado al principio de
+  la descripción (`SO4201 - Existe ausencia total…`). De ahí se saca. Si esa
+  celda no empieza por un código, la casilla queda vacía y el bot avisa: no se
+  inventa un código.
+
+**El lote del 9 de septiembre.** 53 objeciones de una factura
+(HUS0000532847) por **$4.271.600** — el 42 % de los $10.228.700 facturados.
+Cruzaron 51 de 53 (30 seguras, 21 de confianza media) y **2 quedaron para
+llenar a mano**. Reglas verificadas: CTNCENCOS vacía, ningún código inventado
+y CROTIPOBJ 0 (todas las glosas son administrativas).
+
+**Lo que le quedó al auditor.** Las dos de REVISAR son el mismo caso:
+`SO4201 · $1.800 · PARACETAMOL`. El DGH lo tiene como **ACETAMINOFEN TAB X
+500 MG** (`53560-5`), dos renglones de 6 unidades a $1.800 que cuadran exacto.
+Es el nombre comercial contra el genérico. Como CAPITAL no manda código de
+servicio, el motor sólo tenía el nombre para comparar y prefirió no adivinar.
+
+**Lo que se comprobó y NO es problema.** CAPITAL repite el mismo servicio
+tantas veces como renglones tenga la factura (cuatro hemogramas, tres terapias
+respiratorias, tres bombas de infusión…). Se revisó uno por uno contra el
+export: el DGH tiene exactamente el mismo número de renglones. **Son
+objeciones de verdad y se conservan todas**; juntarlas habría borrado plata
+objetada.
 
 ### 11-09-2026 (6) — La pantalla de Diagnóstico esperaba 25 segundos a dos IAs caídas
 
