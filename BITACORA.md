@@ -91,6 +91,249 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 10-09-2026 — El dictamen dejó de llevarle la contraria al papel, y Gemini con su propio cupo
+
+**1) «El iobitridol no es un medio de contraste, sino una solución antiséptica».**
+
+Eso salió radicado, para defender el cobro. Y es falso: el iobitridol es un
+medio de contraste yodado. Lo dice la propia factura —«equivalente a 30% p/v
+de yodo»— y lo dice la entidad, que lo objetó llamándolo así: «SE OBJETA
+MEDIO DE CONTRASTE UTILIZADO».
+
+Del otro lado eso lo lee un médico auditor. Una sola frase así desacredita la
+respuesta entera, incluidos los siete renglones de millones que iban bien
+argumentados.
+
+Ahora el motor no deja pasar un dictamen que **niegue con todas sus letras lo
+que el papel de la entidad afirma**. No se metió a opinar de medicina —eso
+sería inventar de otra forma—: solo mira si el dictamen dice «esto NO es un
+medio de contraste» cuando el papel dice que sí lo es. Negarle a la entidad
+sus afirmaciones jurídicas —que la glosa es extemporánea, que no hubo
+autorización— sigue siendo el trabajo del dictamen y no se toca.
+
+Con esto, **el dictamen que se radicó ese día hoy no sale**: el motor lo para
+y nombra las dos mentiras, la de los 500 ML y la del antiséptico.
+
+**2) Gemini se quedaba sin cuota a media tarde.**
+
+Y no era por los dictámenes: la **misma llave** la gasta el motor para leer
+los PDF escaneados, que consume mucho más. Las dos tareas se comían el mismo
+cupo gratis del día, y la que perdía era la que usted estaba mirando.
+
+Se dejó listo para arreglarlo sin cambiar nada más: si el hospital saca una
+**segunda llave gratis de Google** y la pone en el archivo de configuración,
+los dictámenes van por esa y la lectura de PDF se queda con la primera — dos
+cupos en vez de uno. Si no se pone, todo sigue igual que hoy.
+
+Y mientras tanto, una cosa que sí se arregló de una: cuando Google contesta
+«se le acabó el cupo», el motor **ya no insiste**. Antes reintentaba tres
+veces, gastando siete segundos de su espera y dos peticiones más contra un
+cupo que ya no existía. Ahora pasa de una al siguiente proveedor y deja
+escrito en el registro que fue la cuota, no una falla.
+
+### 10-09-2026 — El CI: de casi 5 minutos a unos 3
+
+Quedó a medias en la mañana. Se había repartido la suite en tres máquinas y
+bajó de 13 minutos a unos 5, pero ahí se atascó — y la razón, viéndolo, era
+obvia:
+
+| Máquina | Tardó |
+|---|---|
+| api-1 | 2 min 34 s |
+| api-2 | 3 min 51 s |
+| resto | **4 min 46 s** ← esta marcaba el reloj |
+
+**Dos máquinas terminaban y se quedaban mirando a la tercera.** El reloj lo
+marca la más lenta, no el promedio, así que la mitad del tiempo comprado se
+perdía esperando. Y el motivo es que el reparto era **por nombre de archivo**
+—los impares a un grupo, los pares al otro— y los archivos no duran lo mismo:
+uno solo, `test_preauditoria.py`, se lleva minuto y medio él solo.
+
+**Lo que se hizo:** repartir por lo que cada archivo **tarda de verdad**. Se
+midió la suite completa archivo por archivo, la tabla quedó guardada en el
+repositorio, y ahora el reparto le da el archivo más pesado a la máquina que
+va más liviana. Son cuatro máquinas y quedan **parejas al 1 %**:
+
+| Máquina | Trabajo |
+|---|---|
+| 1 | 227,7 s |
+| 2 | 227,7 s |
+| 3 | 227,7 s |
+| 4 | 227,7 s |
+
+**Y esto ya está medido en el CI de verdad, no calculado:** la PR quedó
+completa —lint, las cuatro máquinas de pruebas y el escáner de seguridad— en
+
+| Grupo | Tardó |
+|---|---|
+| 3 | 2 min 53 s |
+| 4 | 2 min 59 s |
+| 1 | 3 min 03 s |
+| 2 | **3 min 10 s** ← el reloj |
+
+Antes eran 2m34 / 3m51 / **4m46**, con el trabajo completo en unos 5 minutos.
+La distancia entre la máquina más rápida y la más lenta pasó de **2 min 12 s a
+17 segundos**: ya casi no hay nadie esperando a nadie.
+
+Y para que se vea de dónde a dónde: **de trece minutos en fila, a tres**.
+
+**Tres cosas que se cuidaron, porque son las que muerden:**
+
+1. **Ningún archivo se queda sin correr ni corre dos veces.** Se comprueba
+   archivo por archivo en cada corrida. Un verde que no probó nada es peor
+   que quince minutos de espera.
+2. **El reparto salió del archivo de configuración del CI** y quedó en un
+   programa aparte que **sí se puede probar**. La lógica metida en esa
+   configuración es la que nadie revisa hasta el día que falla.
+3. **Una prueba nueva que todavía no está medida entra igual**, con la
+   duración del montón. Nunca se queda por fuera.
+
+Si con el tiempo el reparto se desbalancea porque se agregaron muchas
+pruebas, se vuelven a medir con un comando y ya. Las pruebas avisan si la
+tabla se puso vieja.
+
+### 10-09-2026 — La cláusula del contrato ya no sale mal transcrita, y el comparador dejó de regalar notas
+
+**1) El dictamen citaba el contrato y le cambiaba las cifras.**
+
+En el mismo caso, el dictamen transcribió la CLÁUSULA SEGUNDA del contrato
+440-DIGSA y salió radicado así:
+
+> «…ES POR LA SUMA DE TRES MIL DOSCIENTOS TREINTA Y CINCO MILLONES CINCUENTA
+> MIL PESOS MCTE **(el valor objetado consignado en el expediente)**, VALOR
+> QUE SE ENCUENTRA RESPALDADO CON EL CDP NO 58925 … POR CINCUENTA MIL PESOS
+> M/CTE **(el valor objetado consignado en el expediente)**…»
+
+Es el motor mordiéndose la cola. Él tiene una red que borra las cifras de
+plata que la IA se inventa y las cambia por esa frase. Pero **no sabía que
+las cláusulas del contrato son legítimas** — se las inyecta él mismo al
+modelo, sacadas del contrato firmado. Como esas cifras no venían en la glosa,
+las tomó por inventadas y las pisó, dentro de una transcripción literal.
+
+Citar mal un contrato es peor que no citarlo: la entidad abre **su propio
+contrato**, ve que no dice eso, y todo el dictamen pierde el peso.
+
+Ahora las cifras de la cláusula, del valor facturado y del valor pactado
+entran como legítimas y la transcripción sale igualita al contrato.
+
+Y de paso, la otra mitad: cuando la cifra **sí** es inventada, el paréntesis
+se borra completo en vez de quedar «CINCUENTA MIL PESOS MCTE (el valor
+objetado consignado en el expediente)», que no significa nada y delata el
+retoque. El paréntesis después de una suma en letras está para repetirla en
+números; si el número no se sostiene, lo honesto es que no haya paréntesis.
+
+**2) El comparador de IAs le ponía 9/9 a un dictamen que el motor rechazó.**
+
+El programa que compara Groq contra Gemini sobre la misma glosa le había dado
+**nueve aciertos de nueve** a un dictamen que el propio motor había mandado a
+revisión humana: puntaje 70, confianza REVISAR, y en su registro la
+advertencia *«el dictamen no abordó 2 de 2 conceptos»*. La nota solo miraba si
+aparecían ciertas palabras — y aparecían, en el encabezado, sin que el
+dictamen argumentara nada.
+
+Una nota que le dice «excelente» a lo que el motor rechaza no sirve para
+escoger proveedor: sirve para escoger mal. Ahora la nota trae siempre dos
+mitades juntas: los hechos del caso (que salieron de los papeles) **y el
+veredicto del propio motor** — su puntaje, su nivel de confianza, si bloqueó
+el dictamen para radicar y las diez advertencias que suelta mientras trabaja
+(conceptos sin responder, cláusulas evadidas, plata inventada, cantidades
+inventadas, documentos que no existen…).
+
+Un proveedor solo sale **LIMPIO** si acierta todo **y** el motor no le objetó
+nada. Ese mismo dictamen que sacaba 9/9 ahora sale **CON PEGAS**, con el
+motivo escrito debajo.
+
+### 10-09-2026 — El dictamen dejó de inventar mililitros y renglones de factura
+
+Del mismo caso (objeción 189801). La entidad objetó el IOBITRIDOL diciendo
+que *según nota operatoria se utilizan 40 CC, la hoja de gastos registra
+frasco de 100 ML / 50 ML, por lo tanto no se reconoce el cobro de 4
+unidades*. Y el dictamen salió a defender el cobro con esta frase:
+
+> «EL **ÍTEM 13** DE LA FACTURA INDICA LA ADQUISICIÓN DE **CINCO UNIDADES DE
+> 100 ML CADA UNA, TOTALIZANDO 500 ML**»
+
+Nada de eso existe. El medicamento es de **50 ML** — lo dice la descripción
+del propio renglón, «IOBITRIDOL 300MG/50ML». Ni el ítem 13, ni las cinco
+unidades, ni los 500 ML estaban en algo que el motor hubiera leído. Es decir:
+el hospital le discutía a la entidad con una cuenta inventada, y encima se la
+atribuía a un renglón concreto de la factura. La entidad abre la factura, ve
+que el ítem 13 no dice eso, y ahí se pierde la glosa **y la credibilidad de
+los otros siete renglones**.
+
+El motor ya vigilaba las cifras de plata inventadas, pero solo las que llevan
+signo de pesos y separador de miles. «500 ML» y «ÍTEM 13» pasaban de largo.
+
+Ahora hay una revisión que compara **toda cantidad con unidad** del dictamen
+—mililitros, miligramos, gramos, unidades, frascos, ampollas— y **todo número
+de ítem, renglón o folio** contra lo que de verdad se le entregó al modelo (la
+glosa completa y el texto de los soportes que alcanzó a leer). Lo que no
+aparezca en ninguna parte se marca como grave y el dictamen no sale: se
+reintenta o se manda a revisión humana.
+
+Está hecha para no molestar sin razón: centímetro cúbico y mililitro se toman
+como lo mismo (40 CC = 40 ML), el gramo vale escrito «G», «GR» o «GRS», los
+numerales de las normas no se confunden con dosis («ANEXO 3 G» no son tres
+gramos), y «un frasco» se lee como el artículo que es, no como una cuenta.
+
+**Comprobado sobre papel real:** en el dictamen completo de ese caso —seis mil
+caracteres, con la cláusula del contrato, el CDP y treinta y seis citas de
+normas— señala **exactamente las tres invenciones y ninguna cosa más**. Y los
+cuatro dictámenes reales de producción que el motor guarda de banco de pruebas
+pasan limpios.
+
+### 10-09-2026 — Cada causal con SU valor, y dejar de decir «soporte completo» cuando no se sabe
+
+Dos defectos que salieron del caso real de la factura **HUS0000541440**
+(objeción N° 189801, la de Sanidad Militar). Los dos hacían que el motor
+dijera con seguridad cosas que no le constaban.
+
+**1) Los dos bloques del dictamen decían $55.985.100.**
+
+La objeción trae **ocho renglones**: siete de **SO4201** (soportes) por
+**$55.882.100** y uno de **FA0701** (cantidades de medicamento, el
+IOBITRIDOL) por **$103.000**. El dictamen sacaba los dos bloques con el
+total de la glosa entera. O sea: un bloque de ciento tres mil pesos
+afirmando que está contestando cincuenta y cinco millones. La entidad lee
+eso y entiende que el hospital no supo qué le glosaron.
+
+El motor sí intentaba repartir, pero se rendía apenas veía una cifra antes
+del primer código, porque «huele a total global». En la objeción de verdad
+esa cifra es el **VALOR FACTURA del encabezado** — y con eso el reparto no
+llegaba ni a intentarse nunca.
+
+Ahora se reparte así: un mismo código puede salir varias veces (SO4201 sale
+siete), a cada aparición se le atribuye la cifra que viene detrás, y las de
+un mismo código se suman. **Y luego se comprueba contra el papel de la
+entidad:** si el texto declara un TOTAL OBJETADO, la suma de todas las
+causales tiene que dar exactamente eso. Si cuadra, el reparto está probado y
+no hubo que suponer nada. Si no cuadra, el motor **no adivina**: deja los
+bloques como estaban antes.
+
+En la objeción real cuadra al peso: SO4201 $55.882.100 + FA0701 $103.000 =
+$55.985.100.
+
+**2) El panel verde que decía «Está el soporte que la causal exige».**
+
+La SO4201 de esta objeción pide, siete veces y con todas las letras,
+*«NO SE EVIDENCIA FRA DE COMPRA Y COTIZACION AVALADA POR SANIDAD MILITAR»*.
+El motor mostraba el panel **en verde**, diciendo que el soporte exigido
+estaba, porque para las causales de la familia SO usaba por defecto
+«historia clínica y epicrisis» — que sí estaban adjuntas. Historia clínica
+había; **factura de compra y cotización avalada, no**. El auditor podía
+mandar la respuesta confiado y perder los cincuenta y cinco millones.
+
+Ahora hay una lista corta de causales cuyo soporte **el motor no puede ver
+desde acá** (la lista de precios pactada, la factura de compra del material,
+la cotización avalada, los soportes del recobro ante ADRES/ARL, la
+constancia de envío del trámite). Para esas, el panel **no se pone verde**:
+avisa con nombre y apellido qué documento hay que conseguir a mano. Cuando
+la causal sí pide historia clínica o epicrisis y están, sigue en verde
+igual que siempre.
+
+**Comprobado:** 35 pruebas nuevas y viejas de estos dos puntos en verde, y
+831 pruebas relacionadas de catálogo, soportes y evidencia sin romperse.
+
 ### 10-09-2026 — El CI en tres máquinas: de 7 min 20 s a unos 4
 
 Yesid, viendo el reloj: «*¿dónde está ese supuesto 3 minutos?*». Tenía razón

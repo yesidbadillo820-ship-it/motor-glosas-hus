@@ -97,6 +97,7 @@ async def ejecutar_quality_gate(
     max_intentos: int = MAX_INTENTOS,
     modelos_fallback: Optional[list[str]] = None,
     clausulas_contrato: Optional[list[dict]] = None,
+    fuentes_adicionales: Optional[list[str]] = None,
 ) -> QualityGateResult:
     """Ejecuta el pipeline completo de Quality Gate.
 
@@ -111,6 +112,9 @@ async def ejecutar_quality_gate(
         es_extemporanea: si True, post-val acepta coda procesal
         max_intentos: máximo de regeneraciones (default 3)
         modelos_fallback: orden de modelos a probar (default groq → anthropic)
+        fuentes_adicionales: todo lo demás que la IA vio (el prompt completo
+            con el texto de los soportes). Evita acusar de inventadas las
+            cantidades que sí venían en un soporte leído.
 
     Returns:
         QualityGateResult con .estado y .dictamen_final si aprobado.
@@ -181,6 +185,7 @@ async def ejecutar_quality_gate(
             texto_glosa_input=texto_glosa,
             valor_objetado_input=valor_objetado,
             clausulas_contrato=clausulas_contrato,
+            fuentes_adicionales=fuentes_adicionales,
         )
 
         # Si el único problema son citas inválidas, intentar limpieza
@@ -206,6 +211,7 @@ async def ejecutar_quality_gate(
                         texto_glosa_input=texto_glosa,
                         valor_objetado_input=valor_objetado,
                         clausulas_contrato=clausulas_contrato,
+                        fuentes_adicionales=fuentes_adicionales,
                     )
                     if post_limpio.aprobado and post_limpio.score >= post.score:
                         intento.texto = texto_limpio

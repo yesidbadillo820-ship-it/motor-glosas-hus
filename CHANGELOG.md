@@ -1,5 +1,156 @@
 # Registro de cambios
 
+## Sesión 10-sep-2026 (6) — Naturaleza contradicha, y Gemini con cupo propio
+
+- **`app/services/quality_gate/post_validator.py`** — nuevo
+  `check_no_contradice_la_naturaleza_del_servicio()` (ERROR, check 13). El
+  dictamen radicado decía «EL MEDICAMENTO IOBITRIDOL NO ES UN MEDIO DE
+  CONTRASTE, SINO UN SOLUCIÓN ANTISEPTICA» sobre una glosa que lo objeta
+  llamándolo medio de contraste, y sobre una factura que dice «equivalente a
+  30%P/V de yodo». El check es estrecho a propósito: salta solo cuando el
+  dictamen niega (`NO ES / NO SE TRATA DE / NO CORRESPONDE A / NO CONSTITUYE`)
+  una de las 11 naturalezas de `_NATURALEZAS_QUE_NO_SE_REDEFINEN` **y** esa
+  misma naturaleza está en lo que la entidad mandó. `_sin_tildes()` normaliza
+  los dos lados (en mayúscula sostenida casi nadie pone tildes, y sin eso el
+  caso real se escapaba). Las negaciones jurídicas —«no es extemporánea», «no
+  procede»— no se tocan.
+- **`app/core/config.py`, `app/services/glosa_service.py`, `.env.example`** —
+  `GEMINI_API_KEY_DICTAMEN` opcional: con una segunda llave gratis, los
+  dictámenes usan `self.gemini_dictamen` y el OCR se queda con `self.gemini`.
+  Vacía (lo de hoy) apunta al mismo cliente y no cambia nada.
+- **`app/services/glosa_service.py`** — `_es_falta_de_cuota()` y salida
+  inmediata del bucle de reintentos de Gemini ante un 429 / quota /
+  RESOURCE_EXHAUSTED, como Groq hace desde junio. Antes se quemaban 7 s y dos
+  peticiones más contra un cupo agotado.
+- **Pruebas** — `test_no_le_lleve_la_contraria_al_papel.py` (13) y
+  `test_gemini_con_su_propio_cupo.py` (19). Los 4 dictámenes reales de
+  producción pasan los dos checks nuevos. Suite completa: 12.750 en verde.
+- **Verificado sobre el papel:** el dictamen que se radicó ese día, pasado
+  hoy por el post-validador, queda en score 0 y **no aprobado**, con
+  `[medidas_fabricadas]` y `[naturaleza_contradicha]` nombrando las dos
+  mentiras.
+
+
+## Sesión 10-sep-2026 (5) — CI: reparto por duración medida, cuatro máquinas
+
+Las tres máquinas del reparto por nombre tardaban 2m34 / 3m51 / **4m46**: dos
+terminaban y esperaban a la tercera, y el reloj lo marca la más lenta. El
+reparto era por nombre de archivo (impares/pares) y los archivos no duran lo
+mismo — `tests/test_api/test_preauditoria.py` se lleva 96 s él solo.
+
+- **`scripts/repartir_pruebas.py`** (nuevo) — reparto goloso LPT por duración
+  medida: el archivo más pesado a la máquina más liviana. Determinista
+  (desempate por ruta, y a igual carga gana el grupo de menor número). Los
+  archivos sin medir valen la **mediana**, así que una prueba nueva entra
+  igual y nunca se queda por fuera. Sin tabla de duraciones reparte por
+  cantidad, que es exactamente lo que había antes. Subcomandos: `--grupos/
+  --grupo` (lo que consume el CI), `--resumen` y `--medir junit.xml [...]`
+  para rehacer las mediciones desde los artefactos del propio CI.
+- **`tests/duraciones_pruebas.json`** (nuevo, 60 KB) — 1.071 archivos medidos.
+- **`.github/workflows/ci.yml`** — matriz `grupo: [1, 2, 3, 4]`, nombre
+  «Tests (pytest · grupo N de 4)», y el paso de pruebas pasó del `case` de
+  bash a `mapfile -t OBJETIVO < <(python scripts/repartir_pruebas.py …)`. El
+  agregador `test-ok` no cambia: `needs.test.result` resume la matriz entera,
+  así que agregar o quitar grupos no toca nada más.
+- **Pruebas** — `tests/test_tools/test_repartir_pruebas.py` (19) y
+  `test_el_ci_no_deja_pruebas_afuera.py` reescrito sobre el nuevo reparto
+  (26): cobertura archivo por archivo, sin repetidos, sin grupos vacíos,
+  determinismo, balance ≤1,25×, degradación sin tabla, y avisos de tabla
+  vieja (cobertura ≥50 %, fantasmas ≤20 %).
+- **Medido en el CI de verdad** (PR #700, corrida 34545040058), job completo
+  con instalación incluida: **2m53 / 2m59 / 3m03 / 3m10**, contra los
+  2m34 / 3m51 / **4m46** del reparto por nombre. El *spread* pasó de 2m12 a
+  **17 s**. En local (2 núcleos, `taskset -c 0,1`): 141 / 133 / 127 / 128 s
+  contra 286 s. Suite completa 12.718 pruebas en verde.
+
+
+## Sesión 10-sep-2026 (4) — La cláusula citada sin retoques, y la rúbrica del comparador con dientes
+
+- **`app/services/glosa_service.py`** — `_neutralizar_valores_inventados()`
+  pisaba las cifras de las cláusulas del contrato inyectadas por el propio
+  motor (`_clausulas_contrato`, clave `texto_literal`), porque no venían en
+  la glosa. Resultado radicado: «TRES MIL DOSCIENTOS TREINTA Y CINCO MILLONES
+  CINCUENTA MIL PESOS MCTE (el valor objetado consignado en el expediente)».
+  Ahora `_extras_legitimos` incluye `_texto_clausulas`, `_val_fact_str` y
+  `_val_pact_str`. Y `_RE_PARENTESIS_NEUTRALIZADO` borra el paréntesis entero
+  cuando la cifra sí era inventada, en vez de dejar la frase neutra donde
+  debía ir un número; limpieza de dobles espacios y espacio-antes-de-coma.
+- **`tools/comparar_proveedores_ia.py`** — la rúbrica dejó de ser word
+  matching puro. Nuevos `Veredicto`, `CapturaDeAvisos` (handler sobre el
+  logger `motor_glosas`, nivel WARNING) y `_veredicto_del_motor()`, que leen
+  `score`, `confianza`, `bloqueado_para_radicar`, `motivos_bloqueo` y las 10
+  marcas de `AVISOS_QUE_DESCALIFICAN` (verificadas contra el código del
+  motor, no supuestas). `_correr()` devuelve el veredicto, `_tabla()` marca
+  LIMPIO / CON PEGAS y lista los reproches. Décima comprobación: el letrero
+  rojo de conceptos sin responder.
+- **Pruebas** — `tests/test_services/test_clausula_citada_sin_retoques.py`
+  (10) y 8 casos nuevos en `tests/test_tools/test_comparar_proveedores_ia.py`,
+  incluido uno que falla si alguien renombra una marca del motor y la rúbrica
+  se queda escuchando marcas muertas (verificado reinyectando el defecto).
+  8.470 pruebas de servicios, tools, utils y frontend en verde.
+
+
+## Sesión 10-sep-2026 (3) — `check_medidas_no_fabricadas`: dosis, unidades y números de ítem inventados
+
+Mismo caso (objeción 189801, causal FA0701 del IOBITRIDOL). El dictamen
+radicado afirmaba «EL ÍTEM 13 DE LA FACTURA INDICA LA ADQUISICIÓN DE CINCO
+UNIDADES DE 100 ML CADA UNA, TOTALIZANDO 500 ML» sobre un medicamento de
+50 ML. `check_valores_no_fabricados` no lo veía: solo mira cifras con `$` y
+separador de miles.
+
+- **`app/services/quality_gate/post_validator.py`** — nuevo
+  `check_medidas_no_fabricadas()` (severidad ERROR, check 12 del post-gate).
+  Extrae del dictamen y de la fuente todas las parejas *(número, unidad)*
+  —`_PAT_MEDIDA` con unidades canonizadas (CC≡ML, GR≡G≡GRS, UG≡MCG)—, los
+  `ÍTEM/RENGLÓN/FOLIO n` (`_PAT_ITEM`) y los conteos de envase
+  (`_PAT_CONTEO`), y marca lo que está en el dictamen y no en la fuente.
+  `_ANTES_QUE_NO_ES_MEDIDA` evita leer «ANEXO 3 G» como gramos;
+  `UN`/`UNA`/`UNO` quedan fuera de `_NUMERO_EN_LETRAS` a propósito (en
+  español son artículo, no cuenta) porque un ERROR falso cuesta una
+  regeneración de IA y una escalada a humano.
+- **`post_validar_dictamen()`, `ejecutar_quality_gate()`** — parámetro nuevo
+  `fuentes_adicionales: list[str] | None`.
+- **`app/services/quality_gate_adapter.py`** — pasa `[user_prompt]`, que es la
+  lista fiel de lo que la IA vio (glosa + contexto contractual + texto de los
+  soportes leídos). Así el check solo acusa lo que nadie le entregó.
+- **Pruebas** — `tests/test_services/test_medidas_que_nadie_conto.py` (18),
+  incluida una que corre los 4 dictámenes reales de `tests/benchmark/casos.json`
+  y dos que fallan si alguien desconecta el check del gate (verificado
+  reinyectando el defecto). 8.754 pruebas de servicios y API en verde.
+
+
+## Sesión 10-sep-2026 (2) — Cada causal con su valor, y el panel de soportes que dejó de mentir
+
+Los dos defectos salieron de la objeción real N° 189801 (factura
+HUS0000541440): ocho renglones, siete SO4201 por $55.882.100 y uno FA0701 por
+$103.000.
+
+- **`app/services/multi_codigo.py`** — `valores_por_codigo()` reescrita. Antes
+  abortaba (`{}`) al ver cualquier monto antes del primer código, y en la
+  objeción real ese monto es el VALOR FACTURA del encabezado: el reparto no se
+  intentaba nunca y los dos bloques del dictamen salían con el total global.
+  Ahora acumula **todas** las apariciones de cada código (SO4201 aparece
+  siete veces) atribuyendo el primer monto de cada tramo, y **cuadra la suma
+  contra el `TOTAL OBJETADO` declarado en el propio texto** (±1 peso). Si
+  cuadra, el reparto está probado contra el papel de la entidad; si no, se
+  devuelve `{}` en vez de adivinar. Sin total declarado se conserva la regla
+  estrecha anterior. Helpers `_a_numero()` / `_formatear()` para los formatos
+  colombianos (`$ 6.898.700,00`).
+- **`app/services/catalogo_glosas.py`** — `SOPORTE_QUE_EL_MOTOR_NO_VE` y
+  `soporte_que_el_motor_no_ve()`. SO4201 exige lista de precios pactada,
+  factura de compra y cotización avalada — documentos que no están en el
+  índice de radicación ni en los PDF del análisis. `soportes_que_pide()`
+  devuelve `()` para esos códigos en vez de caer al patrón de la familia SO
+  (historia clínica/epicrisis), que es lo que ponía el panel en verde.
+- **`app/api/routers/analizar.py`** — `_evidencia_de_los_soportes()` agrega
+  `pide_y_no_lo_veo`.
+- **`static/index.html`** — `renderEvidenciaSoportes()` nombra esos documentos
+  en la columna de exigidos y `hayDuda` impide que el panel se pinte en verde.
+- **Pruebas** — `tests/test_services/test_cada_causal_con_su_valor.py` (15) y
+  `tests/test_frontend/test_lo_que_el_motor_no_puede_ver.py` (8). Los 12 casos
+  de `test_gl206_valor_por_codigo.py` siguen pasando.
+
+
 ## Sesión 09-sep-2026 (tarde, 8) — `evidencia_soportes`: la mitad que faltaba del panel de análisis
 
 El pedido original («que vean qué van a auditar, o también si es por tarifas

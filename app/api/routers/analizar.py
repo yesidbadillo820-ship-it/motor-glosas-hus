@@ -1797,13 +1797,25 @@ def _evidencia_de_los_soportes(
     if not numero_factura or not str(numero_factura).strip():
         return None
 
+    pide: list[str] = []
+    # 10-09-2026 — lo que la causal exige y el motor NO puede buscar.
+    # SO4201 pide la lista de precios; el indexador solo conoce documentos
+    # clínicos y de facturación. Antes caía en la regla general de la familia
+    # SO, encontraba la historia clínica y declaraba «está el soporte que la
+    # causal exige» sobre $55.882.100 que en realidad no estaban probados.
+    # Decir «esto no lo puedo ver» manda al auditor a buscarlo; decir «está»
+    # lo manda a radicar confiado.
+    no_lo_veo: list[str] = []
     try:
-        from app.services.catalogo_glosas import soportes_que_pide
+        from app.services.catalogo_glosas import (
+            soporte_que_el_motor_no_ve,
+            soportes_que_pide,
+        )
 
         pide = list(soportes_que_pide(codigo_glosa) or ())
+        no_lo_veo = list(soporte_que_el_motor_no_ve(codigo_glosa) or ())
     except Exception as e:  # noqa: BLE001 — sin catálogo no se exige nada
         logger.debug(f"[EVIDENCIA-SOPORTES] catálogo no disponible: {e}")
-        pide = []
 
     hay: list[dict] = []
     construyendo = False
@@ -1857,6 +1869,9 @@ def _evidencia_de_los_soportes(
         "hay_en_el_expediente": hay,
         "se_adjunto_en_este_analisis": adjuntos,
         "faltan": faltan,
+        # Lo que la causal exige y el motor no sabe buscar. Va aparte de
+        # `faltan` a propósito: «no lo puedo ver» no es «no está».
+        "pide_y_no_lo_veo": no_lo_veo,
         # El «no se sabe», dicho con todas las letras.
         "no_se_pudo_consultar": bool(construyendo),
     }

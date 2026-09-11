@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 import os
 import sys
 from dataclasses import dataclass
@@ -98,6 +99,28 @@ VALOR OBJETADO: $103.000,00
 Observaciones: SE OBJETA MEDIO DE CONTRASTE UTILIZADO SEGUN NOTA OPERATORIA SE UTILIZA 40CC LA HOJA DE GASTOS REGISTRA FRASCO DE 100 ML 50 ML POR LO TANTO NO SE RECONOCE COBRO DE 4 UNIDADES.
 
 TOTAL OBJETADO: $55.985.100,00"""
+
+
+# ── Por qué contar palabras no alcanza ──────────────────────────────────────
+#
+# 10-09-2026. La primera versión de este archivo le puso 9/9 a un dictamen que
+# **el propio motor había mandado a revisión humana**: score 70, confianza
+# REVISAR, y en el log su propia advertencia «[SUBCONCEPTOS-OMITIDOS] el
+# dictamen no abordó 2/2 concepto(s)». La rúbrica solo miraba si aparecían
+# ciertas palabras, y aparecían — en el encabezado, sin que el dictamen
+# argumentara nada.
+#
+# Una nota que le dice «excelente» a lo que el motor rechaza no sirve para
+# escoger proveedor: sirve para escoger mal. Por eso ahora la nota tiene dos
+# mitades que se muestran siempre juntas:
+#
+#   · los HECHOS de abajo, que salieron de los papeles del caso, y
+#   · el VEREDICTO DEL MOTOR sobre ese mismo dictamen — su score, su nivel de
+#     confianza, si lo bloqueó para radicar y las advertencias que soltó
+#     mientras lo armaba.
+#
+# Un proveedor solo queda LIMPIO si acierta todos los hechos **y** el motor no
+# le objetó nada. Si el motor lo objeta, se dice, aunque acierte todo.
 
 
 @dataclass
@@ -171,11 +194,110 @@ COMPROBACIONES = (
         debe_decir=("FACTURA DE COMPRA", "COTIZACI"),
         por_que="los siete renglones de SO4201 piden eso, no la historia clínica",
     ),
+    Comprobacion(
+        "No trae el letrero rojo de conceptos sin responder",
+        no_puede_decir=("CONCEPTOS DE LA GLOSA SIN RESPONDER",),
+        por_que="el motor pone ese letrero cuando el dictamen dejó conceptos "
+        "sin defender; la entidad los da por aceptados",
+    ),
 )
 
 
-async def _correr(proveedor: str) -> tuple[str, str, float]:
-    """Devuelve (dictamen, modelo, segundos) del proveedor pedido."""
+# ── El veredicto del propio motor ───────────────────────────────────────────
+
+
+@dataclass
+class Veredicto:
+    """Lo que el motor dijo de SU dictamen. No es opinión de esta rúbrica."""
+
+    score: float = 0.0
+    confianza: str = ""
+    bloqueado: bool = False
+    motivos: tuple[str, ...] = ()
+    avisos: tuple[str, ...] = ()
+
+    @property
+    def objeta(self) -> bool:
+        return bool(self.bloqueado or self.motivos or self.avisos)
+
+    def reproches(self) -> list[str]:
+        """Las pegas del motor, en orden de gravedad y en cristiano."""
+        fuera: list[str] = []
+        if self.bloqueado:
+            fuera.append("el motor lo BLOQUEÓ para radicar")
+        fuera.extend(f"motivo de bloqueo: {m}" for m in self.motivos)
+        fuera.extend(self.avisos)
+        return fuera
+
+
+# Advertencias del motor que descalifican un dictamen. La clave es el texto
+# EXACTO que el motor escribe en su registro —verificado contra el código, no
+# supuesto— y el valor es cómo se le cuenta al auditor. Si alguien renombra
+# una de estas marcas, `tests/test_tools/test_comparar_proveedores_ia.py` lo
+# tumba: una rúbrica que escucha marcas que ya no existen vuelve a ser blanda
+# sin que nadie se entere.
+AVISOS_QUE_DESCALIFICAN = {
+    "[SUBCONCEPTOS-OMITIDOS]": "dejó conceptos de la glosa sin responder",
+    "[CLAUSULAS-EVADIDAS]": "no contestó una cláusula que citó la entidad",
+    "[PLATA-INVENTADA]": "escribió cifras de plata que nadie le dio",
+    "[CIFRA-QUE-NO-CUADRA]": "una cifra del dictamen no cuadra con la glosa",
+    "[CLAUSULA-INVENTADA]": "citó cláusulas del contrato que no existen",
+    "[CLINICO-SIN-RESPALDO]": "afirmó cosas clínicas sin soporte",
+    "[DOC-NO-APORTADO]": "dijo que aportaba documentos que no existen",
+    "CONTRATO DE OTRA EPS": "citó el contrato de otra entidad",
+    "MEDIDAS_FABRICADAS": "inventó cantidades, dosis o números de ítem",
+    "ESCALANDO A HUMANO": "el Quality Gate lo mandó a revisión humana",
+}
+
+
+class CapturaDeAvisos(logging.Handler):
+    """Se queda con las quejas que el motor suelta mientras arma el dictamen.
+
+    El motor ya se da cuenta de casi todo lo que la rúbrica no ve —conceptos
+    sin responder, cláusulas evadidas, escaladas del Quality Gate— pero lo
+    escribe en el registro y ahí se queda. Esto lo recoge para que cuente.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.WARNING)
+        self.lineas: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self.lineas.append(record.getMessage())
+        except Exception:  # noqa: BLE001 — un aviso perdido no tumba la medición
+            pass
+
+    def descalificantes(self) -> tuple[str, ...]:
+        vistos: list[str] = []
+        for linea in self.lineas:
+            arriba = linea.upper()
+            for marca, explicacion in AVISOS_QUE_DESCALIFICAN.items():
+                if marca in arriba and explicacion not in vistos:
+                    vistos.append(explicacion)
+        return tuple(vistos)
+
+
+def _veredicto_del_motor(resultado: object, captura: CapturaDeAvisos) -> Veredicto:
+    """Arma el veredicto leyendo lo que el motor dejó dicho en el resultado."""
+    confianza = getattr(resultado, "confianza", None) or {}
+    nivel = ""
+    if isinstance(confianza, dict):
+        nivel = str(
+            confianza.get("nivel") or confianza.get("etiqueta") or confianza.get("label") or ""
+        )
+    motivos = tuple(str(m) for m in (getattr(resultado, "motivos_bloqueo", None) or []))
+    return Veredicto(
+        score=float(getattr(resultado, "score", 0.0) or 0.0),
+        confianza=nivel,
+        bloqueado=bool(getattr(resultado, "bloqueado_para_radicar", False)),
+        motivos=motivos,
+        avisos=captura.descalificantes(),
+    )
+
+
+async def _correr(proveedor: str) -> tuple[str, str, float, Veredicto]:
+    """Devuelve (dictamen, modelo, segundos, veredicto) del proveedor pedido."""
     import time
 
     from app.core.config import get_settings
@@ -203,12 +325,24 @@ async def _correr(proveedor: str) -> tuple[str, str, float]:
         fecha_recepcion="2026-08-25",
         valor_aceptado="0",
     )
+    # Se escucha el registro del motor mientras trabaja: ahí es donde avisa de
+    # los conceptos sin responder y de las escaladas del Quality Gate.
+    captura = CapturaDeAvisos()
+    del_motor = logging.getLogger("motor_glosas")
+    nivel_previo = del_motor.level
+    del_motor.addHandler(captura)
+    if nivel_previo == logging.NOTSET or nivel_previo > logging.WARNING:
+        del_motor.setLevel(logging.WARNING)
     t0 = time.time()
-    resultado = await servicio.analizar(entrada)
+    try:
+        resultado = await servicio.analizar(entrada)
+    finally:
+        del_motor.removeHandler(captura)
+        del_motor.setLevel(nivel_previo)
     segundos = time.time() - t0
     dictamen = getattr(resultado, "dictamen", "") or getattr(resultado, "respuesta", "") or ""
     modelo = getattr(resultado, "modelo_ia", "") or proveedor
-    return dictamen, modelo, segundos
+    return dictamen, modelo, segundos, _veredicto_del_motor(resultado, captura)
 
 
 def _tabla(resultados: dict) -> str:
@@ -225,10 +359,21 @@ def _tabla(resultados: dict) -> str:
             lineas.append(f"  {prov.upper():<{anchos}}  ✗ no respondió: {datos['error']}")
             continue
         aciertos = sum(1 for ok, _ in datos["notas"] if ok)
+        v: Veredicto = datos["veredicto"]
+        limpio = aciertos == len(COMPROBACIONES) and not v.objeta
+        sello = "LIMPIO" if limpio else "CON PEGAS"
         lineas.append(
-            f"  {prov.upper():<{anchos}}  {aciertos}/{len(COMPROBACIONES)} aciertos  "
-            f"· {datos['segundos']:.1f}s · {datos['modelo']}"
+            f"  {prov.upper():<{anchos}}  {aciertos}/{len(COMPROBACIONES)} hechos  "
+            f"· motor: {v.score:.0f}/100{(' ' + v.confianza) if v.confianza else ''}  "
+            f"· {sello}  · {datos['segundos']:.1f}s · {datos['modelo']}"
         )
+        for reproche in v.reproches():
+            lineas.append(f"  {'':<{anchos}}    ⛔ {reproche}")
+    lineas.append("")
+    lineas.append("  «LIMPIO» pide las dos cosas: los hechos del caso Y que el motor")
+    lineas.append("  no le haya objetado nada a su propio dictamen. Acertar todos los")
+    lineas.append("  hechos con una pega del motor NO es un buen dictamen: es uno que")
+    lineas.append("  supo decir las palabras que la rúbrica busca.")
     lineas.append("")
     lineas.append("─" * 78)
     lineas.append("  DETALLE — cada fila salió de un papel, no de una opinión")
@@ -244,7 +389,8 @@ def _tabla(resultados: dict) -> str:
             lineas.append(f"      {'✓' if ok else '✗'} {prov:<10} {motivo}")
     lineas.append("")
     lineas.append("═" * 78)
-    lineas.append("  Esto NO decide por usted: cuenta hechos verificables, no estilo.")
+    lineas.append("  Esto NO decide por usted: cuenta hechos verificables, no estilo,")
+    lineas.append("  y le suma lo que el propio motor opinó de cada dictamen.")
     lineas.append("═" * 78)
     return "\n".join(lineas)
 
@@ -289,11 +435,12 @@ async def _principal() -> int:
     for prov in disponibles:
         print(f"  … corriendo {prov}", flush=True)
         try:
-            dictamen, modelo, segundos = await _correr(prov)
+            dictamen, modelo, segundos, veredicto = await _correr(prov)
             resultados[prov] = {
                 "modelo": modelo,
                 "segundos": segundos,
                 "dictamen": dictamen,
+                "veredicto": veredicto,
                 "notas": [c.evaluar(dictamen) for c in COMPROBACIONES],
             }
         except Exception as e:  # noqa: BLE001 — se reporta, no se traga

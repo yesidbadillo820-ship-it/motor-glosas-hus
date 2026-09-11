@@ -1,4 +1,4 @@
-"""El CI reparte la suite en tres máquinas. Ninguna prueba puede perderse.
+"""El CI reparte la suite en cuatro máquinas. Ninguna prueba puede perderse.
 
 10-09-2026. «Tengo que esperar hasta 15 minutos que un PR pase una
 validación» (Yesid). Medido en el CI de verdad —no en la máquina de quien
@@ -6,12 +6,18 @@ programa—:
 
     en serie ............................................. ~13 min
     -n auto --dist loadfile, una sola máquina ............ 6 min 07 s
-    y de esos, tests/test_api sola ....................... 4 min 33 s
+    tres máquinas, reparto por nombre de archivo ......... 4 min 46 s
 
 Dentro de una máquina ya no queda nada que exprimir: el runner da 2 núcleos
 y poner más procesos NO ayuda (medido: -n 2 → 4m35, -n 4 → 4m33; estas
-pruebas gastan procesador, no espera). Lo único que baja el reloj es repartir
-entre VARIAS máquinas que arrancan a la vez.
+pruebas gastan procesador, no espera).
+
+POR QUÉ NO BASTÓ CON REPARTIR. Las tres máquinas tardaron 2m34, 3m51 y 4m46:
+dos terminaban y se quedaban mirando a la tercera. El reloj lo marca la más
+lenta, no el promedio. El reparto era por NOMBRE de archivo —impares a un
+grupo, pares al otro— y los archivos no duran lo mismo. Ahora se reparte por
+lo que cada archivo TARDA de verdad (`scripts/repartir_pruebas.py` sobre
+`tests/duraciones_pruebas.json`), y las cuatro máquinas quedan parejas.
 
 EL RIESGO DE REPARTIR, y por eso existe este archivo: que un grupo se quede
 sin su parte y nadie lo note. Un verde que no probó nada es peor que quince
@@ -24,65 +30,124 @@ suma dé la suite entera: ni una prueba de menos, ni una repetida.
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 import yaml
 
 RAIZ = Path(__file__).resolve().parents[2]
 CI = RAIZ / ".github" / "workflows" / "ci.yml"
+if str(RAIZ) not in sys.path:
+    sys.path.insert(0, str(RAIZ))
+
+from scripts.repartir_pruebas import (  # noqa: E402
+    archivos_de_prueba,
+    duraciones_medidas,
+    repartir,
+)
+
+GRUPOS_DEL_CI = 4
 
 
-def _archivos_de_test_api() -> list[Path]:
-    return sorted((RAIZ / "tests" / "test_api").rglob("test_*.py"))
-
-
-def _grupo(impares: bool) -> list[Path]:
-    """El mismo reparto que hace el CI: impares a un grupo, pares al otro.
-
-    El `awk 'NR % 2 == 1'` del CI cuenta desde 1, así que «impar» es el
-    primero, el tercero, el quinto…
-    """
-    todos = _archivos_de_test_api()
-    return [f for i, f in enumerate(todos, start=1) if (i % 2 == 1) == impares]
+def _reparto() -> list[list[str]]:
+    """El mismo reparto que hace el CI, con el mismo script."""
+    return repartir(archivos_de_prueba(), GRUPOS_DEL_CI, duraciones_medidas())
 
 
 class TestElRepartoCubreTodo:
-    def test_los_dos_grupos_suman_la_carpeta_entera(self):
-        todos = _archivos_de_test_api()
-        assert len(_grupo(True)) + len(_grupo(False)) == len(todos)
+    def test_los_grupos_suman_la_suite_entera(self):
+        todos = archivos_de_prueba()
+        repartidos = [a for g in _reparto() for a in g]
+        assert len(repartidos) == len(todos)
 
-    def test_ningun_archivo_queda_en_los_dos_grupos(self):
-        repetidos = set(_grupo(True)) & set(_grupo(False))
-        assert not repetidos, f"se correrían dos veces: {sorted(p.name for p in repetidos)}"
+    def test_ningun_archivo_queda_en_dos_grupos(self):
+        repartidos = [a for g in _reparto() for a in g]
+        vistos: set[str] = set()
+        repetidos = {a for a in repartidos if a in vistos or vistos.add(a)}
+        assert not repetidos, f"se correrían dos veces: {sorted(repetidos)}"
 
     def test_ningun_archivo_se_queda_sin_grupo(self):
-        sin_grupo = set(_archivos_de_test_api()) - set(_grupo(True)) - set(_grupo(False))
-        assert not sin_grupo, (
-            f"estos archivos NO los correría nadie: {sorted(p.name for p in sin_grupo)}"
+        sin_grupo = set(archivos_de_prueba()) - {a for g in _reparto() for a in g}
+        assert not sin_grupo, f"estos archivos NO los correría nadie: {sorted(sin_grupo)}"
+
+    def test_ningun_grupo_queda_vacio(self):
+        vacios = [i for i, g in enumerate(_reparto(), start=1) if not g]
+        assert not vacios, f"los grupos {vacios} no correrían nada: un verde que no probó nada"
+
+    def test_el_reparto_es_siempre_el_mismo(self):
+        """Determinista, para poder reproducir un fallo corriendo ese grupo."""
+        assert _reparto() == _reparto()
+
+    def test_las_maquinas_quedan_parejas(self):
+        """Si una dobla a otra, el reloj lo marca la lenta y no se gana nada."""
+        pesos = duraciones_medidas()
+        cargas = [sum(pesos.get(a, 0.0) for a in g) for g in _reparto()]
+        assert min(cargas) > 0
+        assert max(cargas) / min(cargas) <= 1.25, (
+            f"reparto desbalanceado: {[round(c) for c in cargas]} segundos"
         )
 
-    def test_los_grupos_quedan_parejos(self):
-        """Si uno dobla al otro, el reloj lo marca el lento y no se gana nada."""
-        a, b = len(_grupo(True)), len(_grupo(False))
-        assert abs(a - b) <= 1, f"reparto desbalanceado: {a} contra {b}"
+    def test_un_archivo_nuevo_sin_medir_entra_igual(self):
+        """Nunca se queda por fuera: vale la mediana de los demás."""
+        nuevo = "tests/test_services/test_recien_nacido_que_nadie_midio.py"
+        con_el_nuevo = repartir([*archivos_de_prueba(), nuevo], GRUPOS_DEL_CI, duraciones_medidas())
+        assert nuevo in [a for g in con_el_nuevo for a in g]
+
+    def test_sin_mediciones_reparte_igual_por_cantidad(self):
+        """Si el archivo de duraciones se pierde, el CI no se cae: reparte por número."""
+        grupos = repartir(archivos_de_prueba(), GRUPOS_DEL_CI, {})
+        tamanos = [len(g) for g in grupos]
+        assert max(tamanos) - min(tamanos) <= 1
+
+
+class TestLasDuracionesNoSePudren:
+    """Un archivo de duraciones muy viejo devuelve el CI al desbalance."""
+
+    def test_existe_y_tiene_datos(self):
+        medidas = duraciones_medidas()
+        assert len(medidas) > 100, "sin mediciones el reparto vuelve a ser por cantidad"
+
+    def test_cubre_la_mayor_parte_de_la_suite(self):
+        archivos = set(archivos_de_prueba())
+        medidos = archivos & set(duraciones_medidas())
+        cobertura = len(medidos) / max(len(archivos), 1)
+        assert cobertura >= 0.5, (
+            f"solo el {cobertura:.0%} de los archivos está medido. Rehacer con: "
+            "python -m pytest tests --junitxml=junit.xml && "
+            "python scripts/repartir_pruebas.py --medir junit.xml"
+        )
+
+    def test_no_apunta_a_archivos_que_ya_no_existen(self):
+        """Un fantasma en la tabla no rompe nada, pero avisa de que está vieja."""
+        fantasmas = set(duraciones_medidas()) - set(archivos_de_prueba())
+        assert len(fantasmas) <= len(archivos_de_prueba()) * 0.2, (
+            f"{len(fantasmas)} archivos medidos ya no existen: la tabla está vieja"
+        )
 
 
 class TestElCiEstaConfiguradoAsi:
     def _ci(self) -> dict:
         return yaml.safe_load(CI.read_text(encoding="utf-8"))
 
-    def test_hay_tres_grupos(self):
+    def test_hay_cuatro_grupos_numerados(self):
         grupos = self._ci()["jobs"]["test"]["strategy"]["matrix"]["grupo"]
-        assert grupos == ["api-1", "api-2", "resto"]
+        assert grupos == [1, 2, 3, 4]
+
+    def test_el_ci_pide_los_mismos_grupos_que_esta_prueba_reconstruye(self):
+        """Si el CI pide 5 y acá se comprueban 4, la comprobación no vale."""
+        assert len(self._ci()["jobs"]["test"]["strategy"]["matrix"]["grupo"]) == GRUPOS_DEL_CI
+        assert f"--grupos {GRUPOS_DEL_CI}" in CI.read_text(encoding="utf-8")
 
     def test_un_grupo_que_falla_no_cancela_los_otros(self):
         """Dos fallos distintos se ven en la misma corrida, no en dos."""
         assert self._ci()["jobs"]["test"]["strategy"]["fail-fast"] is False
 
-    def test_el_grupo_resto_usa_ignore_y_no_una_lista(self):
-        """Así una carpeta de pruebas NUEVA entra sola en vez de quedarse sin correr."""
+    def test_el_reparto_lo_hace_el_script_y_no_el_yaml(self):
+        """La lógica metida en el YAML es la que nadie revisa hasta que falla."""
         texto = CI.read_text(encoding="utf-8")
-        assert "OBJETIVO=(tests --ignore=tests/test_api)" in texto
+        assert "python scripts/repartir_pruebas.py --grupos" in texto
+        assert (RAIZ / "scripts" / "repartir_pruebas.py").exists()
+        assert (RAIZ / "tests" / "duraciones_pruebas.json").exists()
 
     def test_un_grupo_vacio_es_un_error_y_no_un_exito(self):
         texto = CI.read_text(encoding="utf-8")
@@ -138,7 +203,7 @@ class TestElNombreQueLaRamaExige:
             "queda esperando un chequeo que nadie va a reportar"
         )
 
-    def test_ese_trabajo_espera_a_los_tres_grupos(self):
+    def test_ese_trabajo_espera_a_todos_los_grupos(self):
         assert "test" in self._ci()["jobs"]["test-ok"]["needs"]
 
     def test_si_un_grupo_falla_el_agregador_falla(self):
@@ -191,7 +256,7 @@ class TestNingunTrabajoMiraAOtroQueNoEspera:
             + "; ".join(rotas)
         )
 
-    def test_ci_ok_comprueba_los_tres_que_espera(self):
+    def test_ci_ok_comprueba_todos_los_que_espera(self):
         """Si mira menos de los que espera, algo rojo pasaría por verde."""
         texto = CI.read_text(encoding="utf-8")
         d = yaml.safe_load(texto)

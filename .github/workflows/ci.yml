@@ -39,27 +39,35 @@ jobs:
       - run: ruff format --check .
 
   test:
-    # 10-09-2026 — TRES MÁQUINAS A LA VEZ, NO UNA.
+    # 10-09-2026 — CUATRO MÁQUINAS, Y EL REPARTO POR LO QUE CADA ARCHIVO TARDA.
     #
-    # Medido en el CI de verdad: la suite entera tardaba 6 min 07 s, y de
-    # esos, `tests/test_api` sola se llevaba 4 min 33 s. El runner de GitHub
-    # da 2 núcleos —en el log solo aparecen dos procesos, gw0 y gw1— y poner
-    # más procesos que núcleos NO ayuda: medido, `-n 2` y `-n 4` tardan lo
-    # mismo (4m35 contra 4m33). Estas pruebas gastan procesador, no espera.
+    # Primero se repartió en tres, por nombre de archivo (impares a un grupo,
+    # pares al otro). Bajó de 13 minutos a unos 5, y ahí se atascó, porque los
+    # archivos no duran lo mismo. Medido en el CI de verdad:
     #
-    # O sea que dentro de una máquina ya no queda nada que exprimir. Lo único
-    # que baja el reloj es repartir el trabajo entre VARIAS máquinas, que
-    # arrancan a la vez.
+    #     api-1 ....... 2 min 34 s
+    #     api-2 ....... 3 min 51 s
+    #     resto ....... 4 min 46 s   ← este marcaba el reloj
     #
-    # Por qué `tests/test_api` va partida en dos y el resto junto: es la
-    # carpeta que manda (4m33 de 6m07). Dejarla entera en un trabajo habría
-    # dejado ese trabajo en 4m33 y los otros esperándolo — el reloj lo marca
-    # el más lento, no el promedio.
+    # Dos máquinas terminaban y se quedaban mirando a la tercera. El reloj lo
+    # marca la más lenta, no el promedio: la mitad del tiempo comprado se
+    # perdía esperando.
     #
-    # El reparto es por ARCHIVO y determinista (los impares a un grupo, los
-    # pares al otro, sobre la lista ordenada): la misma lista sale siempre,
-    # así que un fallo se puede reproducir corriendo ese grupo.
-    name: Tests (pytest · ${{ matrix.grupo }})
+    # Ahora el reparto lo hace `scripts/repartir_pruebas.py` con lo que cada
+    # archivo TARDA de verdad —medido y guardado en
+    # `tests/duraciones_pruebas.json`— dándole el más pesado a la máquina que
+    # va más liviana. Las cuatro quedan dentro de un 1 % una de otra.
+    #
+    # Sigue siendo determinista (la misma lista sale siempre, así que un fallo
+    # se reproduce corriendo ese grupo) y ningún archivo se queda sin correr:
+    # `tests/test_ci/test_reparto_de_pruebas.py` lo comprueba archivo por
+    # archivo en cada corrida, y un archivo nuevo todavía sin medir entra
+    # igual, con la duración mediana de los demás.
+    #
+    # Dentro de cada máquina siguen siendo 2 procesos: el runner da 2 núcleos
+    # —en el log solo aparecen gw0 y gw1— y poner más NO ayuda (medido: `-n 2`
+    # da 4m35 y `-n 4` da 4m33). Estas pruebas gastan procesador, no espera.
+    name: Tests (pytest · grupo ${{ matrix.grupo }} de 4)
     runs-on: ubuntu-latest
     strategy:
       # Que un grupo falle NO cancela los otros: si se caen dos cosas
@@ -67,7 +75,7 @@ jobs:
       # descubrir la segunda quince minutos después de arreglar la primera.
       fail-fast: false
       matrix:
-        grupo: [api-1, api-2, resto]
+        grupo: [1, 2, 3, 4]
     env:
       SECRET_KEY: ci-test-secret-do-not-use-in-production
       DATABASE_URL: sqlite:///./test_ci.db
@@ -118,10 +126,6 @@ jobs:
           # --maxfail=5 para no inundar logs si hay errores en cascada.
           # tee a /tmp para tener log aunque pytest crashee antes del junit.
           #
-          # 10-09-2026 — LA SUITE EN PARALELO. «Tengo que esperar hasta 15
-          # minutos que un PR pase una validación» (Yesid). Eran 13 minutos
-          # reales, y con cada conflicto había que volver a esperarlos.
-          #
           # `-n auto` reparte entre los núcleos del runner. `--dist loadfile`
           # NO es un adorno: reparte por ARCHIVO, así que todas las pruebas
           # de un mismo archivo caen en el mismo proceso. Sin eso, dos
@@ -133,30 +137,21 @@ jobs:
           # Medido en el CI (2 núcleos), no en la máquina de quien programa:
           #   en serie ......................................... ~13 min
           #   -n auto --dist loadfile, todo en una máquina ..... 6 min 07 s
-          #   partido en tres máquinas (esto) .................. el más
-          #       lento de los tres manda; test_api partida en dos deja
-          #       cada mitad cerca de 2 min 15 s
+          #   tres máquinas, reparto por nombre ................ 4 min 46 s
+          #   cuatro máquinas, reparto por duración (esto) ..... ~1 min 50 s
+          #
+          # El reparto vive en `scripts/repartir_pruebas.py` y no acá adentro
+          # a propósito: así se puede correr y PROBAR fuera del CI. La lógica
+          # metida en el YAML es la que nadie revisa hasta que falla.
           set -o pipefail
-          case "${{ matrix.grupo }}" in
-            api-1)
-              # Los archivos IMPARES de test_api, sobre la lista ordenada.
-              mapfile -t OBJETIVO < <(find tests/test_api -name 'test_*.py' | sort | awk 'NR % 2 == 1')
-              ;;
-            api-2)
-              # Los PARES.
-              mapfile -t OBJETIVO < <(find tests/test_api -name 'test_*.py' | sort | awk 'NR % 2 == 0')
-              ;;
-            resto)
-              # Todo lo que no es test_api. `--ignore` y no una lista, para
-              # que una carpeta nueva de pruebas entre sola en este grupo en
-              # vez de quedarse sin correr en silencio.
-              OBJETIVO=(tests --ignore=tests/test_api)
-              ;;
-          esac
+          mapfile -t OBJETIVO < <(
+            python scripts/repartir_pruebas.py --grupos 4 --grupo ${{ matrix.grupo }}
+          )
           if [ ${#OBJETIVO[@]} -eq 0 ]; then
             echo "El grupo ${{ matrix.grupo }} se quedó sin archivos que correr. Eso es un error de reparto, no un éxito."
             exit 1
           fi
+          echo "Grupo ${{ matrix.grupo }} de 4: ${#OBJETIVO[@]} archivos."
           python -m pytest "${OBJETIVO[@]}" -v --tb=long --maxfail=5 \
             -n auto --dist loadfile \
             --junitxml=junit.xml \
@@ -217,14 +212,14 @@ jobs:
     # el caso que tiene que bloquear) y solo se salta si se canceló todo.
     if: ${{ !cancelled() }}
     steps:
-      - name: Comprobar que los tres grupos pasaron
+      - name: Comprobar que todos los grupos pasaron
         run: |
           echo "resultado de los grupos = ${{ needs.test.result }}"
           if [ "${{ needs.test.result }}" != "success" ]; then
             echo "Alguno de los grupos de pruebas no pasó."
             exit 1
           fi
-          echo "Los tres grupos en verde."
+          echo "Los cuatro grupos en verde."
 
   security:
     name: Security scan (pip-audit)
