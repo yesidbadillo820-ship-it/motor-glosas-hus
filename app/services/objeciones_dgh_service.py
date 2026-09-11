@@ -22,6 +22,9 @@ Entidades que sabe leer hoy:
                  SAVIA…): 10 columnas, con el acta en la primera
     EMSSANAR     no manda Excel: son los PDF de objeción de ripslink, uno por
                  factura. Se pueden subir varios de una vez.
+    CAPITAL      6 columnas. No manda código de servicio (sólo el nombre, con
+                 guiones) ni columna de código de glosa: ese va dentro de
+                 «DescripcionGlosa».
     ADRES        Excel de glosas del ADRES. Tiene motor propio (homologación
                  SOAT↔CUPS, topes de valor); acepta el homologador Gold
                  Standard como segundo archivo.
@@ -204,6 +207,21 @@ ENTIDADES: tuple[Entidad, ...] = (
             "Consolidado de MUTUAL SER (5 o 7 columnas, según el lote). La columna "
             "«SERVICIO» o «Tecnología» trae el código, no el nombre; el nombre se "
             "saca de la observación."
+        ),
+    ),
+    Entidad(
+        id="capital",
+        nombre="CAPITAL SALUD",
+        corto="CAPITAL_SALUD",
+        modulo="organizar_objeciones_capital",
+        # «DESCRIPCIONGLOSA» (sin espacio) es la seña que no comparte con nadie:
+        # ahí adentro va el código de glosa, que no viene en columna propia.
+        senas=("FACTURA", "DESCRIPCIONGLOSA", "VALOR GLOSA", "OBSERVACION"),
+        columnas=6,
+        ayuda=(
+            "Export de CAPITAL SALUD. No manda código de servicio (sólo el nombre, "
+            "con guiones) ni columna de código de glosa: ese va dentro de "
+            "«DescripcionGlosa»."
         ),
     ),
 )
@@ -573,6 +591,12 @@ def _filas_adres(bot, rutas: list[Path], ruta_dgh: Path, fecha: datetime, servic
     return conversion.registros
 
 
+def _filas_capital(
+    bot, rutas: list[Path], ruta_dgh: Path, fecha: datetime, servicios, trazas
+) -> list[dict]:
+    return bot.construir_filas(bot.leer_capital(_uno(rutas)), fecha, servicios, trazas)
+
+
 _ARMADORES = {
     "famisanar": _filas_famisanar,
     "dispensario": _filas_dispensario,
@@ -583,6 +607,7 @@ _ARMADORES = {
     "emssanar": _filas_emssanar,
     "adres": _filas_adres,
     "mutual": _filas_mutual,
+    "capital": _filas_capital,
 }
 
 
@@ -703,7 +728,7 @@ def _escribir_objeciones(bot, entidad_id: str, filas: list[dict], salida: Path) 
         bot.escribir_consolidado(filas, salida)
     elif entidad_id == "dispensario":
         bot.escribir_excel([[f[c] for c in bot.ENCABEZADOS] for f in filas], salida)
-    elif entidad_id in ("sanitas", "mutual"):
+    elif entidad_id in ("sanitas", "mutual", "capital"):
         bot.escribir_objeciones(filas, salida)
     elif entidad_id == "vco":
         bot.escribir_cargue([[f[c] for c in bot.COLUMNAS_CARGUE] for f in filas], salida)
