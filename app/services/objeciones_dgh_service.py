@@ -25,8 +25,9 @@ Entidades que sabe leer hoy:
     ADRES        Excel de glosas del ADRES. Tiene motor propio (homologación
                  SOAT↔CUPS, topes de valor); acepta el homologador Gold
                  Standard como segundo archivo.
-    MUTUAL SER   consolidado de 7 columnas. Su columna «SERVICIO» trae el
-                 código, no el nombre: el nombre va dentro de la observación.
+    MUTUAL SER   consolidado de 5 o 7 columnas, según el lote. La columna del
+                 servicio («SERVICIO» o «Tecnología») trae el código, no el
+                 nombre: el nombre va dentro de la observación.
 
 Las reglas fijas del formato (CTNCENCOS vacía, CROTIPOBJ por factura,
 SLNSERPRO sin códigos inventados, el 100% de los renglones) están en CLAUDE.md
@@ -187,11 +188,22 @@ ENTIDADES: tuple[Entidad, ...] = (
         nombre="MUTUAL SER",
         corto="MUTUAL",
         modulo="organizar_objeciones_mutual",
-        senas=("NUMERO DE FACTURA", "CANTIDAD FACTURADA", "VALOR GLOSADO", "CONCEPTO DE GLOSA"),
-        columnas=7,
+        # MUTUAL cambia las columnas entre lotes (7 el 7-sep, 5 el 8-sep, con
+        # «SERVICIO» rebautizada «Tecnología»). Se listan las de los dos
+        # formatos: las estables reconocen ambos y las que varían sólo suman.
+        senas=(
+            "NUMERO DE FACTURA",
+            "VALOR GLOSADO",
+            "CODIGO DE GLOSA",
+            "TECNOLOGIA",
+            "CANTIDAD FACTURADA",
+            "CONCEPTO DE GLOSA",
+        ),
+        columnas=0,  # varía entre lotes
         ayuda=(
-            "Consolidado de MUTUAL SER. Su columna «SERVICIO» trae el código, no el "
-            "nombre; el nombre se saca de la observación."
+            "Consolidado de MUTUAL SER (5 o 7 columnas, según el lote). La columna "
+            "«SERVICIO» o «Tecnología» trae el código, no el nombre; el nombre se "
+            "saca de la observación."
         ),
     ),
 )

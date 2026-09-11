@@ -11,13 +11,22 @@ que las columnas se resuelven por nombre (tolerando tildes y mayúsculas):
     Número de factura    → HUS0000544271
     SERVICIO             → el CÓDIGO del servicio (903883, FMQ0817, 10A004…)
     Cantidad facturada   → cantidad
-    Valor glosado        → viene como texto con signo de pesos ("$ 304.500")
+    Valor glosado        → "$ 304.500" o el número pelado, según el lote
     Concepto de glosa    → el texto del concepto ("Recargos no pactados - TARIFAS")
     Código de glosa      → TA0201, TA2901, FA1305… (ya limpio)
     Observacion          → el motivo, y adentro el NOMBRE del servicio
 
-OJO CON LA COLUMNA «SERVICIO». Pese al nombre, no trae la descripción sino el
-**código**. El nombre del servicio viaja escondido en la observación:
+EL FORMATO CAMBIA ENTRE LOTES. MUTUAL no manda siempre las mismas columnas: el
+lote del 7 de septiembre traía las siete de arriba y el del 8 sólo cinco, con
+la columna del código rebautizada **«Tecnología»** y sin cantidad ni concepto.
+Por eso el lector acepta varios nombres para lo mismo y trata cantidad y
+concepto como opcionales. Lo único que exige son las cuatro sin las cuales el
+archivo no se puede armar: factura, código del servicio, valor y código de
+glosa; si falta una, se detiene diciendo cuál.
+
+OJO CON LA COLUMNA DEL SERVICIO. Pese a llamarse «SERVICIO» o «Tecnología», no
+trae la descripción sino el **código**. El nombre del servicio viaja escondido
+en la observación:
 
     "La tecnología 903883 - GLUCOSA SEMIAUTOMATIZADA [GLUCOMETRIA] no se
      encuentra dentro del contrato número 20352."
@@ -141,7 +150,16 @@ GENUSUARIO4_CONST = "999"
 # Encabezados que reconoce el lector (normalizados: sin tildes, en mayúscula).
 ALIAS_COLUMNAS: dict[str, set[str]] = {
     "factura": {"NUMERO DE FACTURA", "NUMERO FACTURA", "FACTURA"},
-    "cod_servicio": {"SERVICIO", "CODIGO SERVICIO", "CODIGO DEL SERVICIO"},
+    # MUTUAL le cambia el nombre a esta columna entre lotes: el del 7 de
+    # septiembre la llamó «SERVICIO» y el del 8 «Tecnología». Es la misma:
+    # el CÓDIGO del servicio.
+    "cod_servicio": {
+        "SERVICIO",
+        "TECNOLOGIA",
+        "CODIGO SERVICIO",
+        "CODIGO DEL SERVICIO",
+        "CODIGO TECNOLOGIA",
+    },
     "cantidad": {"CANTIDAD FACTURADA", "CANTIDAD"},
     "valor": {"VALOR GLOSADO", "VALOR GLOSA", "VALOR OBJETADO"},
     "concepto": {"CONCEPTO DE GLOSA", "CONCEPTO GLOSA", "CONCEPTO"},

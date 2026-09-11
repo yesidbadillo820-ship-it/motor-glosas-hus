@@ -91,6 +91,39 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 11-09-2026 — MUTUAL cambia las columnas de un lote a otro
+
+**El botón volvió a rechazar un archivo de MUTUAL, y otra vez estuvo bien que
+lo rechazara.** El lote del 8 de septiembre no vino con las mismas columnas
+que el del 7: eran **cinco en vez de siete**, la columna del código de
+servicio pasó de llamarse «SERVICIO» a **«Tecnología»**, y no venían ni
+«Cantidad facturada» ni «Concepto de glosa». El lector no conocía ese nombre y
+se detuvo con el aviso en pantalla, en vez de armar un archivo mal hecho.
+
+Ya quedó arreglado: el lector acepta los dos nombres para esa columna, y la
+cantidad y el concepto pasaron a ser opcionales. Lo único que sigue exigiendo
+son las cuatro columnas sin las cuales el archivo no se puede armar —factura,
+código del servicio, valor y código de glosa—; si falta alguna, dice cuál.
+
+**El lote del 8 de septiembre: 153 objeciones, 3 facturas, $31.236.017.**
+Cruzaron 148 (111 de confianza alta, 37 media). Ninguna factura se glosa por
+encima de lo facturado.
+
+**Cuatro celdas quedaron en blanco para llenar a mano**, todas medicamentos
+que el hospital y MUTUAL nombran distinto: GABAPENTINA / GABAPENTIN 300 MG,
+PARACETAMOL / ACETAMINOFEN, SODIO CLORURO / SOLUCIÓN SALINA. En esas tres el
+código **sí existe** en el DGH de esa factura; no se llenaron porque el motor
+castiga que el nombre no concuerde y prefiere dejar la celda vacía antes que
+arriesgarse. Se le propuso al auditor que, cuando el código exista tal cual en
+la factura, se escriba igual y quede marcado en REVISAR — **falta que lo
+autorice**, porque ese motor lo comparten las nueve entidades.
+
+**Un renglón para reclamar:** la tecnología **20299706 ($121.800)** de la
+factura HUS0000544255 **no aparece en el export del DGH**, y la propia
+observación de MUTUAL viene mutilada («La tecnología 20299706 - no se
+encuentra dentro del contrato», sin nombre de servicio).
+
+
 ### 10-09-2026 — MUTUAL SER entra a la pantalla, y una glosa que salía inflada
 
 **El auditor pasó el consolidado de MUTUAL por el botón «Objeciones DGH» y la
@@ -13224,6 +13257,16 @@ valor leido del PDF o con el objetado.
 ---
 
 ## 3) PENDIENTE
+
+### Objeciones DGH — MUTUAL (11-09)
+- **Autorizar (o no) el cambio en el motor de cruce:** que cuando el código
+  que manda la entidad exista tal cual en el DGH de esa factura, se escriba
+  aunque el nombre no concuerde, quedando marcado en REVISAR. Habría llenado
+  tres celdas del lote del 8-sep sin adivinar nada. **No se toca sin su visto
+  bueno:** ese motor lo usan las nueve entidades.
+- **Reclamar la tecnología 20299706 ($121.800)** de la HUS0000544255: no está
+  en el export del DGH y la observación de MUTUAL viene incompleta.
+
 
 ### MUTUAL SER (10-09)
 - **Revisar el contrato 20352.** MUTUAL objetó el 95,1 % de la factura
