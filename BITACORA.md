@@ -91,6 +91,50 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 11-09-2026 (5) — El motor se detenía medio segundo, una y otra vez, todo el día
+
+La medición honesta que pedí ayer —13 minutos de trabajo normal, 826
+peticiones— dio esto:
+
+| | Antes (primer minuto tras reinicio) | Ahora (13 min de uso real) |
+|---|---|---|
+| Peticiones lentas | 47 de 136 = **34,5 %** | 24 de 826 = **2,9 %** |
+| `/health` de promedio | 330 ms | **93 ms** |
+
+**Doce veces menos lentitud.** El arreglo del arranque sirvió. Pero `/health`
+seguía en 93 milésimas cuando debería estar en dos o tres, y había picos
+sueltos feos: 14,9 s, 13,5 s, 15,3 s — en pantallas cuyo promedio era de
+medio segundo.
+
+Eso no es una pantalla lenta. **Son ratos en que el motor entero se detiene.**
+
+**Qué era.** El índice de soportes son **811.598 objetos** viviendo en la
+memoria del motor. Python, cada tanto y por su cuenta, hace una pasada de
+limpieza y **los revisa todos**. Medido: **455 milésimas por pasada**, contra
+2,2 sin el índice. Mientras revisa, no atiende a nadie.
+
+Y la cuenta cuadra sola: si una de cada cinco peticiones cae encima de una
+pasada de esas, el promedio da justo esas 93 milésimas que se veían en
+pantalla. No hubo que adivinar nada — el número salió antes de tocar el
+código.
+
+**Qué se hizo.** Decirle al recolector: *«el índice no se mueve, no lo
+vuelvas a revisar»*. Una línea. Medido después: **de 455 ms a cero**.
+
+**La pregunta obvia —¿y no se acumula la memoria?—** está contestada con una
+prueba, no con una opinión: se guarda una marca sobre una entrada del índice
+viejo y se exige que muera cuando se reconstruye. Si algún día empezara a
+acumularse, esa prueba se cae sola.
+
+**Lo que queda, y lo digo claro:** los picos de 13 a 15 segundos del arranque
+siguen ahí. Son los **14,6 segundos** que cuesta abrir el archivo del índice
+—358 MB— y rearmar los 811.598 objetos. Ya no congelan el motor del todo,
+pero sí lo dejan lento un rato después de cada reinicio.
+
+La solución de fondo es dejar de guardar el índice como un archivo de texto
+gigante que hay que abrir entero, y pasarlo a una base de datos donde buscar
+una factura sea una consulta y ya. Eso es un trabajo aparte, más grande, y no
+lo voy a meter de sorpresa: queda **propuesto** para cuando usted diga.
 ### 11-09-2026 (4) — Frente 12: lo que dicen unos resultados de laboratorio no es lo que más importa; importa lo que NO piden
 
 **El caso.** Llegaron los resultados de los cinco exámenes que la EPS había
