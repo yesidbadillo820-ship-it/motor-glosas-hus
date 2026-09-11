@@ -91,6 +91,40 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 11-09-2026 (6) — La pantalla de Diagnóstico esperaba 25 segundos a dos IAs caídas
+
+La medición de una hora completa —3.348 peticiones— dejó las cosas así:
+
+| | 13 minutos | 1 hora |
+|---|---|---|
+| Peticiones lentas | 24 de 826 = 2,9 % | **39 de 3.348 = 1,2 %** |
+| `/health` de promedio | 93 ms | **31 ms** |
+
+Y con la tabla ordenada saltó a la vista una fila que no tenía nada que ver
+con el índice:
+
+    GET /admin/diagnostico   19 veces · 2.200 ms de promedio · 15,3 s la peor
+
+**La más lenta de todas, de lejos.** Y la causa estaba escrita en la misma
+pantalla, dos líneas más abajo: esa pantalla le pregunta «¿estás viva?» a
+Anthropic y a Gemini, y **las dos llevaban rato caídas** («se forzó la
+interrupción de la conexión» y «alta demanda, código 503»).
+
+Las esperas eran de **15 y 10 segundos**, una detrás de la otra. Hasta
+**25 segundos** con usted mirando la pantalla quieta, por una respuesta que
+no iba a llegar.
+
+**Ahora espera 3 segundos a cada una.** Y no es un recorte arbitrario: si una
+IA se demora más de tres segundos en contestar «ok» a cuatro palabras, lo que
+la pantalla tiene que decirle es justamente **que está degradada**. Esperar
+veinticinco no da una respuesta mejor, solo una más tarde.
+
+**Aviso sobre la medición:** el motor todavía estaba corriendo el código de
+las 11:04, o sea **sin el arreglo del recolector de basura** que se fusionó a
+las 11:40. Los picos de 14,9 s y 13,5 s que se ven en la tabla son del
+arranque de las 11:04 y no se repitieron en toda la hora. Cuando el motor
+recoja los dos arreglos nuevos hay que volver a medir.
+
 ### 11-09-2026 (5) — El motor se detenía medio segundo, una y otra vez, todo el día
 
 La medición honesta que pedí ayer —13 minutos de trabajo normal, 826
