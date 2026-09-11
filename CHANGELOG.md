@@ -57,9 +57,11 @@ mismo — `tests/test_api/test_preauditoria.py` se lleva 96 s él solo.
   (26): cobertura archivo por archivo, sin repetidos, sin grupos vacíos,
   determinismo, balance ≤1,25×, degradación sin tabla, y avisos de tabla
   vieja (cobertura ≥50 %, fantasmas ≤20 %).
-- **Medido** (2 núcleos, `taskset -c 0,1`): grupos de 141 / 133 / 127 / 128 s
-  contra los 286 s de la peor de las tres anteriores. Suite completa
-  12.718 pruebas en verde.
+- **Medido en el CI de verdad** (PR #700, corrida 34545040058), job completo
+  con instalación incluida: **2m53 / 2m59 / 3m03 / 3m10**, contra los
+  2m34 / 3m51 / **4m46** del reparto por nombre. El *spread* pasó de 2m12 a
+  **17 s**. En local (2 núcleos, `taskset -c 0,1`): 141 / 133 / 127 / 128 s
+  contra 286 s. Suite completa 12.718 pruebas en verde.
 
 
 ## Sesión 10-sep-2026 (4) — La cláusula citada sin retoques, y la rúbrica del comparador con dientes

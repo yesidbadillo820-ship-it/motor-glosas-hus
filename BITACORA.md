@@ -161,11 +161,21 @@ va más liviana. Son cuatro máquinas y quedan **parejas al 1 %**:
 | 3 | 227,7 s |
 | 4 | 227,7 s |
 
-Medido acá con dos núcleos, como los del CI: la más lenta tarda **141 s**
-contra los 286 s que tardaba la peor de las tres de antes. En el CI, que
-corre algo más rápido, eso deja las pruebas cerca de **1 min 50 s**; con el
-minuto y cuarto de instalación, **el trabajo completo queda en unos 3
-minutos**.
+**Y esto ya está medido en el CI de verdad, no calculado:** la PR quedó
+completa —lint, las cuatro máquinas de pruebas y el escáner de seguridad— en
+
+| Grupo | Tardó |
+|---|---|
+| 3 | 2 min 53 s |
+| 4 | 2 min 59 s |
+| 1 | 3 min 03 s |
+| 2 | **3 min 10 s** ← el reloj |
+
+Antes eran 2m34 / 3m51 / **4m46**, con el trabajo completo en unos 5 minutos.
+La distancia entre la máquina más rápida y la más lenta pasó de **2 min 12 s a
+17 segundos**: ya casi no hay nadie esperando a nadie.
+
+Y para que se vea de dónde a dónde: **de trece minutos en fila, a tres**.
 
 **Tres cosas que se cuidaron, porque son las que muerden:**
 
