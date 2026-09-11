@@ -254,3 +254,105 @@ class TestElArranqueNoRecorrePorGusto:
         monkeypatch.setattr("app.services.soportes_autodiscovery_service.get_indexer", lambda: ix)
         asyncio.run(sch._ejecutar_safe())  # sin solo_si_hace_falta
         assert llamadas["n"] == 1
+
+
+class TestAbrirElIndiceNoCongelaElSitio:
+    """11-09-2026, medido con el cronómetro nuevo, un minuto después de arrancar:
+
+        GET /health                      13 veces · 330 ms de promedio · 3,1 s la peor
+        GET /vida/celebraciones           2 veces ·   9,1 s de promedio
+        GET /inteligencia/diagnostico     3 veces ·   7,2 s de promedio
+
+    `/health` solo hace `SELECT 1`. Si HASTA ESE se demora, no es que cada
+    pantalla sea lenta por su cuenta: están haciendo fila. Y en las últimas
+    lentas se ve la fila con nombre propio — seis peticiones distintas
+    terminando **todas en el mismo segundo**, 10:23:26.
+
+    La causa: `get_indexer()` corría dentro de la corrutina del scheduler, y
+    esa llamada ABRE EL ÍNDICE GUARDADO — hoy 358 MB de archivo y 811.598
+    objetos que rearmar. Medido: **14,6 segundos de puro Python**. Catorce
+    segundos con el event loop tomado son catorce segundos con el sitio
+    entero congelado, en CADA reinicio.
+
+    En la ronda 30 ya se había movido `rebuild()` a un hilo «para no congelar
+    TODO el sitio»… pero se dejó fuera la mitad que abre el índice.
+    """
+
+    def test_abrir_el_indice_va_a_un_hilo(self):
+        import inspect
+
+        from app.services import soportes_reindex_scheduler as sch
+
+        fuente = inspect.getsource(sch._ejecutar_safe)
+        assert "await asyncio.to_thread(get_indexer)" in fuente, (
+            "get_indexer() abre un índice de cientos de MB; si corre en la "
+            "corrutina, congela el sitio entero en cada reinicio"
+        )
+
+    def test_el_recorrido_tambien_va_a_un_hilo(self):
+        import inspect
+
+        from app.services import soportes_reindex_scheduler as sch
+
+        fuente = inspect.getsource(sch._ejecutar_safe)
+        assert "await asyncio.to_thread(indexador.rebuild)" in fuente
+
+    def test_nada_pesado_queda_en_la_corrutina(self):
+        """Ni `get_indexer().algo` ni `get_indexer().otro` sueltos: las dos
+        formas vuelven a poner el trabajo en el event loop."""
+        import inspect
+        import re
+
+        from app.services import soportes_reindex_scheduler as sch
+
+        fuente = inspect.getsource(sch._ejecutar_safe)
+        sin_comentarios = "\n".join(
+            ln for ln in fuente.splitlines() if not ln.strip().startswith("#")
+        )
+        sueltas = re.findall(r"get_indexer\(\)\s*\.", sin_comentarios)
+        assert not sueltas, "get_indexer().algo dentro de la corrutina vuelve a congelar el sitio"
+
+    def test_el_sitio_sigue_respondiendo_mientras_se_abre_el_indice(self):
+        """La prueba de verdad: con un indexador que tarda en abrirse, el
+        event loop tiene que seguir atendiendo."""
+        import asyncio
+        import time
+
+        from app.services import soportes_reindex_scheduler as sch
+
+        DEMORA = 0.6
+
+        class _IndexadorLento:
+            def __init__(self):
+                time.sleep(DEMORA)  # como abrir los 358 MB del índice
+
+            def construido_hace(self):
+                return 3600.0  # fresco: no dispara recorrido
+
+        async def _correr():
+            atrasos = []
+
+            async def _latido():
+                while True:
+                    t0 = time.perf_counter()
+                    await asyncio.sleep(0.01)
+                    atrasos.append(time.perf_counter() - t0 - 0.01)
+
+            latido = asyncio.create_task(_latido())
+            await sch._ejecutar_safe(solo_si_hace_falta=True)
+            latido.cancel()
+            return max(atrasos) if atrasos else 0.0
+
+        import app.services.soportes_autodiscovery_service as sas
+
+        original = sas.get_indexer
+        sas.get_indexer = _IndexadorLento  # type: ignore[assignment]
+        try:
+            peor_atraso = asyncio.run(_correr())
+        finally:
+            sas.get_indexer = original  # type: ignore[assignment]
+
+        assert peor_atraso < DEMORA / 2, (
+            f"el sitio se quedó {peor_atraso:.2f}s sin atender mientras se abría "
+            f"el índice (la demora simulada era {DEMORA}s)"
+        )

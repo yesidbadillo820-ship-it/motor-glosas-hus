@@ -56,8 +56,28 @@ async def _ejecutar_safe(*, solo_si_hace_falta: bool = False) -> None:
     try:
         from app.services.soportes_autodiscovery_service import get_indexer
 
+        # 11-09-2026 — ABRIR EL ÍNDICE TAMBIÉN CONGELABA EL SITIO.
+        #
+        # En la ronda 30 se movió `rebuild()` a un hilo aparte justo por eso…
+        # pero se dejó `get_indexer()` acá, en la corrutina. Y esa llamada no
+        # es barata: la primera vez ABRE EL ÍNDICE GUARDADO, que hoy son
+        # **358 MB de archivo y 811.598 objetos** que hay que rearmar en
+        # memoria. Medido: **14,6 segundos de puro Python**.
+        #
+        # Catorce segundos con el event loop tomado son catorce segundos con
+        # el sitio ENTERO congelado: no hay petición que se atienda, ni
+        # siquiera la más boba. Y pasa en CADA reinicio, que con el
+        # autodespliegue son varios al día. Es exactamente lo que se vio el
+        # 11-09 a las 10:23, un minuto después de arrancar: `/health` —que
+        # solo hace `SELECT 1`— tardando 330 ms de promedio y hasta 3,1 s, y
+        # seis peticiones distintas terminando todas en el mismo segundo
+        # porque venían haciendo fila.
+        #
+        # Se movió la mitad que faltaba: abrir el índice también va al hilo.
+        indexador = await asyncio.to_thread(get_indexer)
+
         if solo_si_hace_falta:
-            edad_s = get_indexer().construido_hace()
+            edad_s = indexador.construido_hace()
             if edad_s is not None and edad_s < _HORAS_PARA_NO_REPETIR * 3600:
                 logger.info(
                     f"[SOPORTES-REINDEX] El índice se recorrió hace {edad_s / 3600:.1f}h; "
@@ -66,11 +86,9 @@ async def _ejecutar_safe(*, solo_si_hace_falta: bool = False) -> None:
                 )
                 return
 
-        # Ronda 30: rebuild() recorre el share CIFS completo (IO/CPU-bound).
-        # Corría síncrono dentro de esta corrutina y bloqueaba el event loop
-        # —congelando TODO el sitio— durante el build inicial al arranque y
-        # cada reindex. Se ejecuta en un thread aparte.
-        stats = await asyncio.to_thread(get_indexer().rebuild)
+        # `rebuild()` recorre el share entero (red + procesador). También va
+        # al hilo, por lo mismo.
+        stats = await asyncio.to_thread(indexador.rebuild)
         logger.info(
             f"[SOPORTES-REINDEX] OK: {stats['archivos_indexados']} archivos / "
             f"{stats['facturas_indexadas']} facturas"
