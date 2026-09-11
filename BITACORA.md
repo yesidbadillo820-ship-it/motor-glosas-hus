@@ -6,7 +6,7 @@
 > (con fecha, lo hecho, lo pendiente y lo de mañana). Escrito en lenguaje claro
 > para el auditor de cartera del HUS.
 
-**Última actualización:** 10-09-2026
+**Última actualización:** 11-09-2026
 
 ---
 
@@ -90,6 +90,50 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 ---
 
 ## 2) Resumen de lo ya hecho (por fecha)
+
+### 11-09-2026 — COOSALUD: se cerraron los soportes del paquete del 07-09
+
+**Quedó hecho.** Las **14 facturas que faltaban por soportes** del paquete
+GI-33-5434-2026 quedaron con su PDF adjuntado en el portal de VCO:
+**$35.714.233 sustentados** en 22 minutos, sin una sola factura en
+«PENDIENTE_PDX». Ocho cerraron completas; cinco subieron el soporte pero
+siguen abiertas porque además tienen glosas de calidad esperando a las
+doctoras (HUS543423, HUS543720, HUS543929, HUS545255, HUS545281), y una ya
+estaba cerrada del piloto.
+
+**Para que el bot hallara los soportes hubo que arreglar el índice.** El bot
+sabe adjuntar el PDF, pero necesita un índice que le diga en qué carpeta de
+`Y:` está cada factura, y el que había no tenía agosto: las 14 salieron «no
+está en el índice». Se agregó agosto (8.632 facturas nuevas, el índice pasó de
+151.504 a 160.136) y entonces sí: las 14 con su PDF ubicado, ninguna por
+encima del tope de 10 MB del portal.
+
+Quedó una herramienta para que esto no vuelva a sorprender:
+`tools\indice_soportes_coosalud.py`, con dos modos —**revisar**, que antes de
+tocar el portal dice factura por factura qué PDF se va a subir y cuál falta, y
+**armar**, que agrega los meses que hagan falta sin borrar lo ya indexado—.
+También se corrigió el README del bot, que documentaba el índice con un
+formato que **no funciona** (la factura y una tabulación delante de la ruta):
+así armado, el bot no habría hallado ni un soporte.
+
+**Dos advertencias para la próxima.**
+
+1. **El consolidado dice qué respuesta va, NO qué está ya cargado.** Se le
+   propusieron al auditor 98 facturas de calidad «pendientes» que en realidad
+   ya estaban cerradas desde el cargue del 07-09 —el `.bat` de ese día ya
+   llevaba `--incluir-calidad`, y su propio instructivo lo decía—. Se alcanzó
+   a correr media hora de portal para nada. No se dañó nada (el bot no toca
+   una factura cerrada), pero la regla queda: antes de proponer un cargue
+   masivo, mirar el reporte de la corrida anterior, no solo el Excel.
+2. **HUS543720 se cerró con un PDE**, no con el PDX (no tenía). Es soporte
+   válido y quedó en el log, pero conviene saberlo por si COOSALUD lo objeta.
+
+**De paso, el índice tampoco machaca el servidor.** Se le aplicó la misma
+lección del #701: listar cada carpeta una sola vez y no meterse dentro de la
+carpeta de la factura (adentro están los PDF, y lo único que se quiere es la
+ruta). Medido sobre un árbol de 300 facturas: **10 viajes al servidor donde
+antes se gastaban 1.820**.
+
 
 ### 11-09-2026 (5) — El motor se detenía medio segundo, una y otra vez, todo el día
 
@@ -14090,6 +14134,15 @@ valor leido del PDF o con el objetado.
 
 ## 3) PENDIENTE
 
+### COOSALUD — paquete del 07-09, lo único que falta (11-09)
+- **36 facturas esperan a las doctoras: 783 glosas de calidad,
+  $206.642.528.** Es lo único pendiente de este paquete; soportes, tarifas,
+  facturación, autorización y cobertura ya están cargados. Cinco de esas 36
+  ya tienen su soporte subido y cierran solas apenas llegue el concepto
+  médico. Las gruesas: HUS543423, HUS545287, HUS540907.
+- **DECISIÓN SUYA: quién es el médico de cada factura.** Sigue sin resolverse
+  (ver abajo): el archivo de COOSALUD no trae esa columna.
+
 ### Objeciones DGH — MUTUAL (11-09)
 - **Autorizar (o no) el cambio en el motor de cruce:** que cuando el código
   que manda la entidad exista tal cual en el DGH de esa factura, se escriba
@@ -14114,12 +14167,16 @@ valor leido del PDF o con el objetado.
   ítems de calidad/soportes no traen PROFESIONAL(MEDICO) en el archivo. Hay que
   llenar esa columna en la hoja **POR FACTURA** de
   `CALIDAD Y SOPORTES COOSALUD 09-09-2026.xlsx` antes de repartir.
-- **Enviar los soportes de 49 facturas** ($57.430.094) para poder analizarlas.
-  El grueso son **5 facturas que piden epicrisis** (HUS542135, HUS538173,
-  HUS541871, HUS541781, HUS540430 — $25,7 mill entre las cinco).
-- **Las 134 facturas de calidad** ($545.837.942) van para el médico auditor.
-  Las gruesas: HUS543423 ($61,7 mill), HUS545287 ($54,3 mill — 414 ítems),
-  HUS540907 ($27,1 mill), HUS534364 ($23,1 mill), HUS539866 ($22,4 mill).
+- ~~**Enviar los soportes de 49 facturas** ($57.430.094).~~ **RESUELTO el
+  11-09, y eran muchas menos.** De esas 49, a 35 ya las salvaba la
+  extemporaneidad: solo 14 necesitaban de verdad el documento ($35.714.233), y
+  las 14 quedaron cargadas en el portal. De las 5 epicrisis que se habían
+  anunciado, 4 ya estaban salvadas y la única real era HUS541781.
+- ~~**Las 134 facturas de calidad** ($545.837.942) van para el médico
+  auditor.~~ **CORREGIDO el 10-09: son 36, no 134.** Las otras 98 ya estaban
+  contestadas por extemporaneidad (RE9502) y de hecho ya estaban cerradas en
+  el portal desde el cargue del 07-09. Las 36 de verdad valen $206.642.528 y
+  siguen pendientes (ver arriba).
 - **Todas vencen el 24/09/2026.**
 
 ### Diagnóstico de fondo del 09-09 — las cuatro causas reales de la confianza baja
@@ -15228,6 +15285,12 @@ su vigencia en la malla contractual (hoy fechada 28-07-2026).
   son para que el área los mire, no se unieron por parecido.
 
 ## 4) PARA MAÑANA
+
+**COOSALUD 07-09 — ya solo faltan las doctoras.** Repartir las 36 facturas de
+calidad ($206.642.528) y llenar la columna del médico, que el archivo de
+COOSALUD no trae. **Vence el 14/09.** Todo lo demás de ese paquete ya está
+cargado en el portal.
+
 
 **COOSALUD 09-09 — repartir calidad y pedir los soportes.** Llenar la columna
 del médico en la hoja POR FACTURA, mandarle a auditoría médica las 134
