@@ -91,6 +91,75 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 11-09-2026 (3) — Frente 12: 39 revisores tumbaron 9 de 10 hallazgos, y encontraron el que faltaba
+
+**Por qué se hizo así.** Los hallazgos de esta aplicación terminan en una
+petición a la EPS o en una tutela. Un dato flojo no solo se cae: le quita
+credibilidad a los que sí tienen sustento. Así que antes de publicar las
+contradicciones nuevas se pusieron **39 revisores en paralelo** a intentar
+**tumbarlas**, cada uno desde un ángulo distinto (literalidad de las citas,
+contexto clínico, relevancia práctica). Una contradicción solo sobrevive si la
+mayoría no logra refutarla.
+
+**El resultado fue severo, y ese era el punto: de 10 candidatas, cayeron 9.**
+Tres ejemplos de lo que NO se publicó y por qué:
+- «El alimento quedó marcado NO PRIORIZADO» — no explica nada: en el mismo
+  expediente hay otro «NO PRIORIZADO» que sí se entregó.
+- «Los guantes: piden 100 al mes y 300» — el proveedor despacha 300 por 90 días
+  bajo cualquiera de las dos lecturas del papel. Decirlo sería asustar sin causa.
+- «La hoja dice que no tiene heridas y tiene úlcera grado 4» — es una casilla
+  mal diligenciada, desmentida en la misma hoja.
+
+**La que sí sobrevivió la había pasado por alto la primera lectura.** En la
+historia de medicina general del 15-08 —una sola consulta— el tamizaje dice
+«Estado nutricional normal» y unas páginas después el diagnóstico dice
+«desnutrición proteicocalórica moderada». Importa mucho: como el alimento está
+marcado «no cubierto», la EPS solo lo aprueba si el expediente demuestra que la
+paciente lo necesita, y hoy ese renglón es el mejor argumento que la EPS tiene
+para no entregar. Se verificó renglón por renglón antes de publicarla.
+
+**Lo que se le agregó a la aplicación.**
+- **Informe clínico en PDF** de 10 páginas, para llevar a la cita o radicar:
+  lo urgente, los servicios del más grave al menos, los medicamentos, las 14
+  contradicciones **con su cita textual y su página**, y el anexo que numera los
+  26 documentos. Lleva un código para saber si dos copias dicen lo mismo, y
+  **dentro del propio PDF queda escrito que eso no es una firma digital**.
+- **Restaurar un respaldo.** Antes solo se podía descargar. Un respaldo que no
+  se puede devolver es medio respaldo.
+- **Pasar la agenda al calendario del teléfono**, con aviso 7 días antes y la
+  víspera **a las 9 de la mañana** (no a medianoche, que es donde caen las
+  alarmas de los eventos de día completo si uno no las corre a mano).
+- **Perfiles Familiar / Cuidador / Médico**: al médico se le tapa la cédula, la
+  dirección y los escritos jurídicos.
+- Lo visual que se había pedido: vidrio esmerilado en las barras, sombras
+  teñidas con el verde de la marca, el tablero del expediente en la portada,
+  esqueletos de carga y estados vacíos ilustrados.
+
+**Tres cosas que se pidieron y NO se pueden, dichas en pantalla.** Notificación
+que suene con la aplicación cerrada (necesita un servidor; por eso el archivo
+de calendario no es un consuelo, es lo único que sí despierta el teléfono);
+firma digital en el PDF; y «autenticación» con los perfiles (no hay servidor
+que compruebe quién es quién: evitan la mirada de al lado, no un examen
+técnico).
+
+**Dictamen sobre migrar a React y a un backend: no.** La premisa era
+equivocada. Ese archivo grande **no es un monolito escrito a mano: es una
+salida de compilación**; el origen ya está separado en plantilla, motor de
+lectura, datos, ensamblador y pruebas. Migrar daría la modularidad que ya
+existe y costaría lo único valioso: que el archivo se abra con doble clic en el
+celular sin instalar nada. **El riesgo de verdad es otro y es de hoy:** todo lo
+que se cargue después de la semilla vive solo en el navegador de ese teléfono.
+Por eso lo primero de esta tanda fue el botón de restaurar.
+
+**Cómo se probó.** 131 pruebas en navegador y 94 del motor de lectura, todas en
+verde. Tres defectos reales se destaparon probando, no revisando: una clase de
+CSS que ya existía y aplastaba el gráfico nuevo; un relleno de color que no se
+veía porque era una etiqueta en línea; y un botón que se escondía por perfil
+pero seguía funcionando si alguien lo tocaba — el bloqueo se movió a la acción,
+y hay una prueba que lo comprueba tocándolo a la fuerza.
+
+---
+
 ### 11-09-2026 — MUTUAL cambia las columnas de un lote a otro
 
 **El botón volvió a rechazar un archivo de MUTUAL, y otra vez estuvo bien que
