@@ -30,6 +30,7 @@ ENV, mes, tamaño) lista para inyectar en el flujo de análisis.
 
 from __future__ import annotations
 
+import gc
 import json
 import logging
 import os
@@ -98,6 +99,39 @@ _RE_MES_RAIZ = re.compile(
     r"^\s*(?:\d{1,2}\.?\s*)?(" + "|".join(_MESES) + r")\s+(\d{4})\s*-\s*SOPORTES",
     re.IGNORECASE,
 )
+
+
+def _sacar_el_indice_del_camino_del_recolector() -> None:
+    """Que el recolector de basura deje de revisar el índice en cada pasada.
+
+    11-09-2026 — LA SEGUNDA MITAD DEL MISMO PROBLEMA.
+
+    Medido en producción con el cronómetro, en 13 minutos de trabajo normal:
+    `GET /health` —que solo hace `SELECT 1` y devuelve tres campos— con
+    **93 milésimas de promedio**. Debería estar en dos o tres.
+
+    La cuenta cuadra sola: el índice son **811.598 objetos** en memoria, y
+    cada vez que Python pasa a recoger basura los tiene que revisar TODOS.
+    Medido: **455 milésimas por pasada**, contra 2,2 sin el índice. Y
+    mientras revisa, el motor entero se detiene —no es una pantalla lenta,
+    son todas a la vez—. Si una de cada cinco peticiones cae encima de una
+    pasada, el promedio da justo esas 93 milésimas.
+
+    `gc.freeze()` le dice al recolector: «esto de acá no se mueve, no lo
+    vuelvas a revisar». Medido después: **de 455 ms a 0**.
+
+    POR QUÉ ES SEGURO, que es la pregunta obvia: `freeze()` solo saca los
+    objetos del recolector de CICLOS. La liberación normal por conteo de
+    referencias sigue igual, y estas entradas son datos planos —texto y
+    números— sin ciclos. Cuando el índice se reemplaza por uno nuevo, el
+    viejo se libera como siempre. Hay una prueba que lo comprueba con una
+    referencia débil, porque «no se acumula» no se afirma: se demuestra.
+    """
+    try:
+        gc.collect()  # primero se barre lo que sí es basura…
+        gc.freeze()  # …y lo que queda vivo deja de revisarse
+    except Exception as e:  # noqa: BLE001 — una optimización no tumba el motor
+        logger.debug(f"[SOPORTES] no se pudo congelar el índice para el GC: {e}")
 
 
 @dataclass
@@ -390,6 +424,7 @@ class SoportesIndexer:
             for factura, filas in (datos.get("indice") or {}).items():
                 indice[factura] = [SoporteEntry(**fila) for fila in filas]
             self._indice = indice
+            _sacar_el_indice_del_camino_del_recolector()
             self._firmas = {k: (v[0], v[1]) for k, v in (datos.get("firmas") or {}).items()}
             self._construido_en = float(datos.get("construido_en") or 0.0)
             self._archivos_indexados = int(datos.get("archivos_indexados") or 0)
@@ -697,6 +732,10 @@ class SoportesIndexer:
             # índice anterior.
             self._indice = nuevo_indice
             self._firmas = nuevas_firmas
+            # El índice viejo ya no lo referencia nadie: se libera por conteo
+            # de referencias (no hay ciclos) y el nuevo sale del camino del
+            # recolector, igual que al arrancar.
+            _sacar_el_indice_del_camino_del_recolector()
             self._construido_en = time.time()
             duracion = round(self._construido_en - inicio, 2)
             logger.info(

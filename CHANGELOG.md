@@ -1,5 +1,37 @@
 # Registro de cambios
 
+## Sesión 11-sep-2026 (5) — `gc.freeze()` sobre el índice: 455 ms de pausa global a cero
+
+Segunda vuelta de la medición, ya con el arreglo del arranque en producción:
+**24 de 826 peticiones sobre 2 s (2,9 %, venía de 34,5 %)** y `GET /health`
+—`SELECT 1`— en **93 ms de promedio**.
+
+- **Diagnóstico** — 93 ms en `/health` no es lentitud de ese endpoint: es una
+  pausa global que le cae encima a ~1 de cada 5 peticiones. El índice son
+  **811.598 objetos** que el recolector de ciclos recorre en cada pasada de
+  generación 2. Medido con el `SoporteEntry` real: **455 ms por pasada**
+  contra 2,2 ms sin el índice; `0,2 × 455 ≈ 91 ms`, que es el promedio
+  observado. El cálculo se hizo antes de tocar el código.
+- **`app/services/soportes_autodiscovery_service.py`** —
+  `_sacar_el_indice_del_camino_del_recolector()`: `gc.collect()` seguido de
+  `gc.freeze()`, llamado en las dos puertas por donde el índice entra a
+  memoria (`_cargar_de_disco()` y el cambiazo final de `rebuild()`).
+  Comprobado sobre el indexador real: **99 ms → 0 ms** con 300.000 archivos,
+  y el `lookup()` sigue devolviendo lo mismo.
+- **Seguridad** — `freeze()` solo excluye del recolector de CICLOS; el
+  refcounting sigue liberando. `SoporteEntry` es un dataclass plano sin
+  ciclos, así que el índice viejo muere al ser reemplazado.
+  `test_el_indice_viejo_SI_se_libera_al_reconstruir` lo demuestra con
+  `weakref`, no lo afirma.
+- **Pruebas** — 4 nuevas (19 en el archivo). Suite completa: 12.819 en verde.
+- **Pendiente propuesto, NO hecho** — quedan los picos de 13-15 s del
+  arranque: los **14,6 s** de abrir 358 MB de JSON y rearmar 811.598 objetos.
+  Ya no bloquean el event loop (van en hilo) pero sí compiten por el GIL. El
+  arreglo de fondo es mover el índice a SQLite —`lookup()` pasa a ser una
+  consulta indexada, sin carga inicial ni 1,5 GB de RAM—. Es un cambio
+  grande: queda propuesto, no metido de sorpresa.
+
+
 ## Sesión 11-sep-2026 (4) — Abrir el índice de soportes congelaba el sitio entero
 
 Primer hallazgo del cronómetro instalado una hora antes. Medido en producción,
