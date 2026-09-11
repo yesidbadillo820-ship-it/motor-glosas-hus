@@ -1,5 +1,52 @@
 # Registro de cambios
 
+## Sesión 11-sep-2026 (7) — La contraseña inicial deja de servir para todo
+
+Auditoría externa recibida y **verificada contra el código antes de actuar**.
+Los hallazgos de seguridad se confirmaron uno por uno; el titular de «596
+rutas muertas» no (7 de 8 muestreadas sí se referencian; su método excluyó
+`tests/`), y la afirmación de que el login vive en `/auth/login` es falsa
+(está en `/token`, `auth_router.py:21`). El parche adjunto **no se aplicó**:
+en un sistema con datos clínicos cada cambio se escribe y se prueba acá.
+
+**La cadena de tres eslabones, verificada:**
+1. `scripts/generar_excel_usuarios.py:136` con la clave derivada del correo.
+2. `docs/usuarios_motor_glosas.xlsx` (29 usuarios + la regla en la hoja) en el
+   repositorio desde la PR #303.
+3. `app/api/deps.py` **no mencionaba** `must_change_password` (22 menciones en
+   `app/`, ninguna en el punto donde se autoriza).
+
+- **`app/api/deps.py`** — `get_usuario_actual()` recibe el `Request` y llama a
+  `_con_clave_temporal_solo_puede_cambiarla()`: con la marca puesta, todo
+  responde **428 Precondition Required** salvo `RUTAS_CON_CLAVE_TEMPORAL`
+  (cambiar-password, logout, `/usuarios/yo`, `/sistema/version`, `/health`).
+  `request=None` (llamadas internas y tests legacy) no corta nada.
+- **`scripts/generar_excel_usuarios.py`** — `_clave_inicial_al_azar()` con
+  `secrets`, 14 caracteres, garantía de letra+número+símbolo y sin
+  `l/I/1/O/0` (estas claves se dictan por teléfono). Corregido también el
+  texto de la hoja, que enseñaba la regla vieja.
+- **`.gitignore` + `git rm --cached`** — el Excel sale del control de
+  versiones; queda la regla y un comodín `*credenciales*.xlsx`.
+- **`tools/revisar_claves_iniciales.py`** (nuevo) — el arreglo no cubre a los
+  usuarios que YA existían y perdieron la marca. Compara con
+  `verify_password` la clave de la regla vieja contra el hash guardado y
+  reporta quién sigue en riesgo. Sin `--marcar` **no escribe nada**; con
+  `--marcar` solo pone `must_change_password=1` (nunca toca `password_hash`).
+- **Pruebas** — `tests/test_api/test_la_clave_inicial_no_sirve_para_todo.py`
+  (14, contra la app real con `TestClient`: 5 rutas bloqueadas, el que ya
+  cambió no se entera, y **nadie queda encerrado** —puede cambiar, salir y
+  verse—) y `tests/test_tools/test_revisar_claves_iniciales.py` (6, una lee
+  el AST y falla si la herramienta llegara a escribir `password_hash`).
+  Verificado reinyectando el defecto: 6 pruebas caen.
+  Suite completa: **12.845 en verde**.
+
+**Pendiente, NO hecho, requiere decisión:** reescribir el historial de git
+para borrar el Excel de los commits viejos (rompe los clones de todos), CSP
+con nonce (obliga a sacar 523 `onclick=` inline), cookie HttpOnly en vez de
+`localStorage`, bloqueo por intentos fallidos, y la actualización de las
+dependencias con CVE.
+
+
 ## Sesión 11-sep-2026 (6) — Los pings de IA de Diagnóstico, de 25 s a 6 s
 
 Tercera medición con el cronómetro, una hora de uso real (3.348 peticiones):

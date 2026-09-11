@@ -111,3 +111,11 @@ static/noruego/
 # Aplicación de análisis de velas: se genera con `python -m mercados exportar`
 # a partir del CSV que exporta el usuario. Es un archivo derivado, no se versiona.
 static/mercados/
+
+# Credenciales de los gestores — NUNCA versionadas (11-09-2026).
+# `docs/usuarios_motor_glosas.xlsx` trae el nombre, el correo y la contraseña
+# inicial de cada uno de los 29 usuarios del HUS. Estuvo en el repositorio
+# desde la PR #303; se sacó del control de versiones y quedó acá para que no
+# vuelva a entrar por un `git add .` distraído.
+docs/usuarios_motor_glosas.xlsx
+*credenciales*.xlsx

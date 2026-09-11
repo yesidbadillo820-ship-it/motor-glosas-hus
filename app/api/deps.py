@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
@@ -11,7 +11,64 @@ from app.core.config import get_settings
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token", auto_error=False)
 
 
+# ── La clave inicial deja de servir para todo ───────────────────────────
+#
+# 11-09-2026. Auditoría externa, comprobada uno por uno contra el código:
+#
+#   1. La contraseña inicial de cada gestor es **la parte de su correo antes
+#      de la arroba** (`scripts/generar_excel_usuarios.py:136`).
+#   2. La lista de los 29 usuarios, con esa regla escrita, vive en
+#      `docs/usuarios_motor_glosas.xlsx` y está en el repositorio desde la
+#      PR #303.
+#   3. El motor **marcaba** al usuario con `must_change_password`, el login
+#      lo devolvía y la pantalla lo mostraba… pero **nadie lo exigía**. Este
+#      archivo ni siquiera lo mencionaba.
+#
+# Juntando las tres: quien supiera el correo de un gestor entraba como él y
+# usaba la API entera sin cambiar nada. En un sistema con historias clínicas
+# eso no es una deuda técnica, es una puerta abierta.
+#
+# Ahora, con la clave inicial sin cambiar, solo se puede hacer lo justo para
+# cambiarla. Todo lo demás contesta **428 (hace falta una condición previa)**,
+# que es el código correcto: no es que no tenga permiso, es que le falta un
+# paso.
+RUTAS_CON_CLAVE_TEMPORAL: frozenset[str] = frozenset(
+    {
+        "/auth/cambiar-password",  # lo único que de verdad hace falta
+        "/auth/logout",  # poder salirse siempre
+        "/usuarios/yo",  # la pantalla saluda por el nombre
+        "/sistema/version",  # el aviso de «nueva versión»
+        "/health",
+    }
+)
+
+
+def _con_clave_temporal_solo_puede_cambiarla(
+    usuario: UsuarioRecord, request: Optional[Request]
+) -> None:
+    """Corta el paso al que no ha cambiado su contraseña inicial.
+
+    `request` puede faltar en llamadas internas y en pruebas viejas; en ese
+    caso no se corta nada, porque no hay una ruta que juzgar. Lo que importa
+    es que TODA petición HTTP pasa por acá con su `request`.
+    """
+    if not getattr(usuario, "must_change_password", 0):
+        return
+    if request is None:
+        return
+    if (request.url.path or "").rstrip("/") in RUTAS_CON_CLAVE_TEMPORAL:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+        detail=(
+            "Debe cambiar la contraseña inicial antes de usar el motor. "
+            "La contraseña con la que entró es temporal."
+        ),
+    )
+
+
 def get_usuario_actual(
+    request: Request = None,  # type: ignore[assignment]
     token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> UsuarioRecord:
@@ -45,6 +102,7 @@ def get_usuario_actual(
     )
     if not usuario:
         raise credentials_exception
+    _con_clave_temporal_solo_puede_cambiarla(usuario, request)
     return usuario
 
 
