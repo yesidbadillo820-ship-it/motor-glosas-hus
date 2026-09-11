@@ -91,6 +91,49 @@ Guías por plataforma en `docs/`: `CONTEXTO_COOSALUD.md`,
 
 ## 2) Resumen de lo ya hecho (por fecha)
 
+### 11-09-2026 (3) — El cronómetro funcionó: encontró el tapón de verdad
+
+A la hora de haberlo instalado, Yesid pasó la pantalla de «¿Qué está lento?».
+Y ahí estaba, con nombre y apellido: **47 de 136 peticiones pasaron de 2
+segundos**. Una de cada tres.
+
+**El dato que lo delató todo:** `/health` —que solo le pregunta a la base «¿me
+oyes?» y contesta tres palabras— tardaba **330 milésimas de promedio y hasta
+3,1 segundos**. Ese debería tardar menos de una milésima. Si hasta ese se
+demora, **no es que cada pantalla sea lenta por su cuenta: están haciendo
+fila.**
+
+Y la fila se veía escrita: seis peticiones distintas terminando **todas a las
+10:23:26** — de 12,8 s, 11,3 s, 9,7 s, 6,8 s, 6,8 s y 3,5 s. Arrancaron
+juntas y se atoraron unas con otras.
+
+**¿Detrás de qué estaban haciendo fila?** De abrir el índice de soportes.
+
+El motor guarda el índice en un archivo para no tener que recorrer el
+servidor en cada arranque — eso está bien pensado. Pero ese archivo hoy pesa
+**358 MB** y son **811.598 archivos** que hay que volver a armar en memoria.
+Medido: **14,6 segundos de puro trabajo**.
+
+Y eso se estaba haciendo **en el mismo carril por donde se atienden las
+pantallas**. Catorce segundos ahí son catorce segundos con **el sitio entero
+congelado**: no se atiende nada, ni la petición más boba. Y pasa en **cada
+reinicio**, que con el autodespliegue son varios al día.
+
+Lo más aleccionador: en septiembre alguien ya había visto este problema y
+movió el *recorrido* del servidor a un carril aparte, «para no congelar TODO
+el sitio» —lo dice el comentario, con esas palabras—. Pero **dejó afuera la
+mitad que abre el archivo**, que resultó ser la que estaba mordiendo.
+
+Ahora las dos mitades van por el carril de al lado. Hay una prueba que
+simula un índice que tarda en abrirse y comprueba que **el sitio sigue
+contestando mientras tanto**; si alguien lo devuelve al carril principal, se
+cae sola.
+
+**Una advertencia honesta sobre esos números:** usted midió en **el primer
+minuto después de un reinicio**, que es el peor momento posible. Cuando baje
+este arreglo, ponga el contador en cero, use el motor unos diez minutos
+normales, y vuelva a mirar. Ahí sabremos si quedó algo más.
+
 ### 11-09-2026 — MUTUAL cambia las columnas de un lote a otro
 
 **El botón volvió a rechazar un archivo de MUTUAL, y otra vez estuvo bien que

@@ -1,5 +1,38 @@
 # Registro de cambios
 
+## Sesión 11-sep-2026 (3) — Abrir el índice de soportes congelaba el sitio entero
+
+Primer hallazgo del cronómetro instalado una hora antes. Medido en producción,
+un minuto después de un reinicio: **47 de 136 peticiones sobre 2 s**, y
+`GET /health` —un `SELECT 1`— en **330 ms de promedio y 3,1 s la peor**. Seis
+peticiones distintas terminando en el mismo segundo: cola, no lentitud
+individual.
+
+- **Causa** — `_ejecutar_safe()` llamaba `get_indexer()` **dentro de la
+  corrutina**. Esa llamada construye el singleton, y `__init__` hace
+  `_cargar_de_disco()`: hoy **358 MB de JSON y 811.598 `SoporteEntry`** que
+  rearmar. Medido en un árbol del tamaño real: `json.load` 10,4 s +
+  reconstrucción de objetos 4,2 s = **14,6 s de GIL tomado**, con el event
+  loop bloqueado y el sitio sin atender nada. En cada reinicio del
+  autodespliegue.
+  La ronda 30 ya había movido `rebuild()` a `asyncio.to_thread` con el
+  comentario «bloqueaba el event loop —congelando TODO el sitio—», pero dejó
+  `get_indexer()` fuera del hilo: `asyncio.to_thread(get_indexer().rebuild)`
+  evalúa `get_indexer()` en el loop antes de lanzar el hilo.
+- **`app/services/soportes_reindex_scheduler.py`** —
+  `indexador = await asyncio.to_thread(get_indexer)` y después
+  `await asyncio.to_thread(indexador.rebuild)`.
+- **Pruebas** — 4 nuevas en `test_el_indexador_no_machaca_el_servidor.py`
+  (15 en total): que abrir y recorrer van los dos al hilo, que no queda
+  ningún `get_indexer().algo` suelto en la corrutina, y una que mide el
+  **atraso real del event loop** con un indexador lento simulado y exige que
+  el sitio siga respondiendo. Verificado reinyectando el defecto.
+  Suite completa: 12.815 en verde.
+- **Pendiente de medir** — los números vienen del primer minuto tras un
+  reinicio, el peor momento posible. Hay que volver a medir en régimen
+  normal antes de concluir que no queda nada más.
+
+
 ## Sesión 11-sep-2026 (2) — Cronómetro de peticiones: saber QUÉ está lento
 
 Al diagnosticar «la plataforma está lentísima» se pudo medir RAM (1,1 GB de
