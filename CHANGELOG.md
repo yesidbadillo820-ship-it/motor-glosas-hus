@@ -1,5 +1,33 @@
 # Registro de cambios
 
+## Sesión 11-sep-2026 (6) — Los pings de IA de Diagnóstico, de 25 s a 6 s
+
+Tercera medición con el cronómetro, una hora de uso real (3.348 peticiones):
+**39 sobre 2 s (1,2 %, venía de 2,9 %)** y `GET /health` en **31 ms**. Con la
+tabla ordenada, la fila peor ya no era del índice:
+`GET /admin/diagnostico` con **2.200 ms de promedio y 15,3 s de pico**.
+
+- **Causa** — `diagnostico_completo()` hace un ping real (no un HEAD: un
+  `POST` de 4 tokens) a Anthropic y a Gemini, en serie. Los timeouts eran
+  `httpx.Timeout(connect=8, read=15)` y `Client(timeout=10.0)`: **hasta 25 s**
+  de espera. Los dos proveedores estaban caídos (`WinError 10054` /
+  `HTTP 503`), así que era espera pura.
+- **`app/api/routers/diagnostico.py`** — `_PING_TIMEOUT_S = 3.0` aplicado a
+  los dos. Techo de 6 s en el peor caso, y el resultado —incluido el fallo—
+  se cachea `_PING_TTL_S` (15 min), así que no se repaga en cada apertura.
+- **Pruebas** — `tests/test_api/test_el_diagnostico_no_hace_esperar.py` (6):
+  el tope existe y es ≤5 s, se aplica a los dos pings, no queda ningún
+  `timeout=` largo escrito a mano (la forma en que estos números vuelven a
+  crecer sin que nadie mire), el techo del peor caso es ≤10 s, y el fallo
+  también se cachea. Verificado reinyectando el 15.0.
+  Suite completa: 12.825 en verde.
+- **Nota de método** — la medición se tomó con el motor aún en `6371f71`
+  (arranque 11:04), o sea **sin** el `gc.freeze()` de la #708 fusionada a las
+  11:40. Los picos de 14,9 s / 13,5 s de la tabla son de ese arranque y no
+  se repitieron en la hora. Hay que remedir cuando el motor levante con
+  ambos arreglos.
+
+
 ## Sesión 11-sep-2026 (5) — `gc.freeze()` sobre el índice: 455 ms de pausa global a cero
 
 Segunda vuelta de la medición, ya con el arreglo del arranque en producción:
