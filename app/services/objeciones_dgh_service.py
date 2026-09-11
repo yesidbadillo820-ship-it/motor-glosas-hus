@@ -25,6 +25,8 @@ Entidades que sabe leer hoy:
     ADRES        Excel de glosas del ADRES. Tiene motor propio (homologación
                  SOAT↔CUPS, topes de valor); acepta el homologador Gold
                  Standard como segundo archivo.
+    MUTUAL SER   consolidado de 7 columnas. Su columna «SERVICIO» trae el
+                 código, no el nombre: el nombre va dentro de la observación.
 
 Las reglas fijas del formato (CTNCENCOS vacía, CROTIPOBJ por factura,
 SLNSERPRO sin códigos inventados, el 100% de los renglones) están en CLAUDE.md
@@ -178,6 +180,18 @@ ENTIDADES: tuple[Entidad, ...] = (
         ayuda=(
             "Excel de glosas del ADRES. Se puede subir además el Homologador "
             "Gold Standard CUPS↔SOAT como segundo archivo."
+        ),
+    ),
+    Entidad(
+        id="mutual",
+        nombre="MUTUAL SER",
+        corto="MUTUAL",
+        modulo="organizar_objeciones_mutual",
+        senas=("NUMERO DE FACTURA", "CANTIDAD FACTURADA", "VALOR GLOSADO", "CONCEPTO DE GLOSA"),
+        columnas=7,
+        ayuda=(
+            "Consolidado de MUTUAL SER. Su columna «SERVICIO» trae el código, no el "
+            "nombre; el nombre se saca de la observación."
         ),
     ),
 )
@@ -389,6 +403,15 @@ def _filas_saludtotal(
     )
 
 
+def _filas_mutual(
+    bot, rutas: list[Path], ruta_dgh: Path, fecha: datetime, servicios, trazas
+) -> list[dict]:
+    # MUTUAL lista el mismo servicio bajo varios conceptos de glosa pero lo
+    # cuenta una sola vez: sin fusionar, el archivo reclamaría de más.
+    objeciones = bot.fusionar_dobles_glosas(bot.leer_mutual(_uno(rutas)))
+    return bot.construir_filas(objeciones, fecha, servicios, trazas)
+
+
 def _filas_sanitas(
     bot, rutas: list[Path], ruta_dgh: Path, fecha: datetime, servicios, trazas
 ) -> list[dict]:
@@ -547,6 +570,7 @@ _ARMADORES = {
     "vco": _filas_vco,
     "emssanar": _filas_emssanar,
     "adres": _filas_adres,
+    "mutual": _filas_mutual,
 }
 
 
@@ -667,7 +691,7 @@ def _escribir_objeciones(bot, entidad_id: str, filas: list[dict], salida: Path) 
         bot.escribir_consolidado(filas, salida)
     elif entidad_id == "dispensario":
         bot.escribir_excel([[f[c] for c in bot.ENCABEZADOS] for f in filas], salida)
-    elif entidad_id == "sanitas":
+    elif entidad_id in ("sanitas", "mutual"):
         bot.escribir_objeciones(filas, salida)
     elif entidad_id == "vco":
         bot.escribir_cargue([[f[c] for c in bot.COLUMNAS_CARGUE] for f in filas], salida)

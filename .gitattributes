@@ -2,3 +2,24 @@
 # Los ayudantes de PowerShell viajan con los bots de doble clic y se
 # ejecutan en los PC del hospital: mismos finales de línea que los .cmd.
 *.ps1 text eol=crlf
+
+# 10-09-2026 — LA BITÁCORA YA NO VUELVE A CHOCAR.
+#
+# «Todos los PR salen con conflictos» — Yesid, y tenía razón: en un solo día
+# hubo que resolver a mano OCHO veces el mismo choque, siempre en este
+# archivo y siempre igual. Cada rama agrega su entrada del día en el mismo
+# sitio (arriba de «Resumen de lo ya hecho»), así que git ve dos textos
+# distintos en el mismo renglón y se planta.
+#
+# `merge=union` le dice a git que en este archivo, cuando los dos lados
+# escriban en el mismo sitio, **se queden con los dos** en vez de parar. Es
+# exactamente lo que hacíamos a mano: conservar las dos entradas.
+#
+# Funciona porque la bitácora solo CRECE: nadie reescribe una entrada vieja,
+# se agregan nuevas arriba. En un archivo donde dos personas editan la misma
+# línea esto sería malo —dejaría las dos versiones pegadas— pero acá no pasa.
+#
+# Si alguna vez el resultado queda con dos entradas en orden raro, se acomoda
+# en un commit normal. Eso cuesta un minuto; el choque costaba quince.
+BITACORA.md merge=union
+CHANGELOG.md merge=union

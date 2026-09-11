@@ -4,6 +4,7 @@ import logging
 import re
 from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
+from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
@@ -132,17 +133,35 @@ def eps_seleccionables(
     from app.models.db import GlosaRecord
     from app.services.catalogo_eps import eps_seleccionables as _unir
 
-    # El marcador del desplegable no es una entidad — sin este filtro, la
-    # unión lo metería a la lista como si «OTRA / SIN DEFINIR» fuera un
-    # pagador más (mismo marcador que `_EPS_GENERICAS` en glosa_service.py).
-    _generico = {"", "OTRA", "SIN DEFINIR", "OTRA / SIN DEFINIR", "OTRA/SIN DEFINIR"}
+    # El marcador «OTRA / SIN DEFINIR» ya no se filtra acá: lo hace
+    # `eps_seleccionables` para TODAS las fuentes. Filtrarlo solo en el
+    # historial dejaba entrar el de los contratos, y en la captura de Yesid
+    # del 10-09-2026 el marcador salía dos veces en el desplegable.
     con_contrato = [c.eps for c in db.query(ContratoRecord.eps).all() if c.eps]
+
+    # El historial va ORDENADO POR CUÁNTAS GLOSAS tiene cada grafía, de más a
+    # menos: cuando la misma entidad está escrita de dos maneras y ninguna
+    # tiene contrato, sobrevive la que de verdad se usa. El caso que lo pide:
+    # «DIRECCION DE SANIDAD EJERCITO - DISPENSARIO MEDICO BUCARAMANGA» tiene
+    # 332 glosas y «DISPENSARIO MEDICO» es una entrada del catálogo fijo.
     en_historial = [
-        r[0]
-        for r in db.query(GlosaRecord.eps).distinct().all()
-        if r[0] and r[0].strip() and r[0].strip().upper() not in _generico
+        eps
+        for eps, _n in (
+            db.query(GlosaRecord.eps, func.count(GlosaRecord.id).label("n"))
+            .filter(GlosaRecord.eps.isnot(None))
+            .group_by(GlosaRecord.eps)
+            .order_by(desc("n"))
+            .all()
+        )
+        if eps and eps.strip()
     ]
-    return _unir(con_contrato, en_historial)
+    # `preferidas` = las que tienen contrato cargado. Cuando la misma entidad
+    # está escrita de dos maneras (el caso de Yesid del 10-09-2026: SALUD
+    # TOTAL / SALUD TOTAL EPS, DISPENSARIO MEDICO / DIRECCION DE SANIDAD
+    # EJERCITO - DISPENSARIO MEDICO BUCARAMANGA), sobrevive el nombre con el
+    # que está FIRMADO el contrato: es el que la entidad reconoce y el que
+    # debe salir citado en el dictamen.
+    return _unir(en_historial, preferidas=con_contrato)
 
 
 @router.get("/exportar.csv")

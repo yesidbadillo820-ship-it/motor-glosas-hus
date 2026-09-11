@@ -38,6 +38,7 @@ Funciona via:
 from __future__ import annotations
 
 from app.core.config import espera_maxima
+from app.services.modelos_anthropic import temperatura_si_aplica
 import asyncio
 import os
 import re
@@ -280,7 +281,7 @@ async def auditar_forense(
 ) -> dict:
     """Triple fallback: Anthropic PDF -> Gemini PDF -> Gemini Vision con imagenes."""
     api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
-    modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+    modelo = modelo or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5")
     gemini_key = os.getenv("GEMINI_API_KEY", "")
     from app.core.config import modelo_gemini_vigente
 
@@ -360,7 +361,7 @@ Analiza los soportes adjuntos y responde según el formato HTML especificado en 
                     json={
                         "model": modelo,
                         "max_tokens": 6000,
-                        "temperature": 0.0,
+                        **temperatura_si_aplica(modelo, 0.0),
                         "system": SYSTEM_AUDITOR_FORENSE,
                         "messages": [{"role": "user", "content": content_blocks}],
                     },

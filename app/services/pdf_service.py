@@ -2,6 +2,7 @@ import io
 import os
 import base64
 import asyncio
+from app.services.modelos_anthropic import temperatura_si_aplica
 import logging
 import httpx
 import pdfplumber
@@ -132,7 +133,7 @@ class PdfService:
         self,
         file_content: bytes,
         anthropic_api_key: str = "",
-        anthropic_model: str = "claude-sonnet-4-5",
+        anthropic_model: str = "claude-sonnet-5",
         gemini_api_key: str = "",
         gemini_model: str = None,
     ) -> tuple[str, str]:
@@ -236,7 +237,7 @@ class PdfService:
                 json={
                     "model": model,
                     "max_tokens": 8000,
-                    "temperature": 0.0,
+                    **temperatura_si_aplica(model, 0.0),
                     "messages": [
                         {
                             "role": "user",
