@@ -61,14 +61,25 @@ misma respuesta.
 
 ### B) Índice de soportes (`--indice`)
 
-TXT con 133.000+ líneas tipo:
+TXT con 133.000+ líneas: **una carpeta por línea, la ruta sola**, terminada
+en `\HUS<numero>`.
+
 ```
-HUS500258	Y:\5. MAYO 2026 - SOPORTES RADICACION\COOSALUD\VANESSA\RIPS\ENV-226686-OK\HUS500258
+Y:\5. MAYO 2026 - SOPORTES RADICACION\COOSALUD\VANESSA\RIPS\ENV-226686-OK\HUS500258
+Y:\8. AGOSTO 2026 - SOPORTES RADICACION\COOSALUD\VANESSA\RIPS\ENV-231044-OK\HUS541781
 ```
 
-Una factura por línea con su carpeta en el share `\\172.16.32.83\...` o en el
-mapeo Y:. Lo usa para encontrar el PDF de soporte (PDX/HAM/PDE) cuando un
-grupo es de tipo SOPORTES.
+**Ojo: la línea NO lleva la factura adelante.** `cargar_indice` hace
+`Path(linea)` sobre la línea completa, así que un prefijo tipo
+`HUS500258<tab>` le arma una ruta relativa que no existe y la factura termina
+en PENDIENTE_PDX sin decir por qué.
+
+La carpeta puede estar en el share `\\172.16.32.83\...` o en el mapeo Y:. Se
+usa para encontrar el PDF de soporte (PDX/HAM/PDE) cuando un grupo es de tipo
+SOPORTES.
+
+Para armarlo y para revisarlo antes de correr el portal:
+`tools\indice_soportes_coosalud.py` (ver `README_indice_soportes_coosalud.md`).
 
 ### C) Credenciales del portal (variables de entorno)
 
