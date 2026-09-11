@@ -67,6 +67,17 @@ py tools\indice_soportes_coosalud.py armar ^
 Indexe solo los meses que le hacen falta. Para saber cuáles: son los meses de
 **radicación** de las facturas del lote, no los de la glosa.
 
+### Por qué no se demora tanto como uno creería
+
+El share está al otro lado de la red y ahí lo caro es cada ida y vuelta —la
+lección del 11-09, cuando el indexador del motor puso lenta la plataforma—. El
+recorrido lista cada carpeta **una sola vez** (con `os.scandir`, que ya dice
+qué es carpeta sin volver a preguntar) y **no entra dentro de la carpeta de la
+factura**: adentro están los PDF y los RIPS, y acá solo se quiere la ruta.
+
+Medido sobre un árbol de 300 facturas con seis archivos cada una: **10 viajes
+al servidor donde el recorrido completo gastaba 1.820**. 182 veces menos.
+
 ## Permisos
 
 Se corre con la **sesión normal del auditor**, sin «ejecutar como
@@ -74,7 +85,7 @@ administrador». Lo único que hace falta es tener la unidad `Y:` conectada.
 
 ## Pruebas
 
-`tests/test_tools/test_indice_soportes_coosalud.py` (23 casos), incluidos los
+`tests/test_tools/test_indice_soportes_coosalud.py` (26 casos), incluidos los
 bordes que duelen: índice viejo con tabulación, unidad caída, carpeta borrada,
 PDF pasado de peso, factura con ceros adelante y carpeta que solo empieza por
 «HUS» sin ser una factura.

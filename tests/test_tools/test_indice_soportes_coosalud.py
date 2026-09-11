@@ -7,6 +7,7 @@ en PENDIENTE_PDX (carpeta perdida, sin PDF, PDF más pesado que el tope).
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -61,6 +62,48 @@ class TestArmarElIndice:
 
     def test_una_raiz_que_no_existe_no_revienta(self, tmp_path):
         assert carpetas_de_facturas(tmp_path / "no_existe") == {}
+
+    def test_no_se_mete_dentro_de_la_carpeta_de_la_factura(self, tmp_path, monkeypatch):
+        """El share está en red: cada carpeta que se abre es un viaje.
+
+        Adentro de HUS<numero> están los PDF y los RIPS, que acá no interesan.
+        Si el recorrido entrara ahí, sobre el árbol del hospital serían cientos
+        de miles de visitas para no usar ninguna.
+        """
+        c = _carpeta(tmp_path, "HUS541781", "PDX_541781.pdf", mb=0.01)
+        (c / "RIPS").mkdir()
+        (c / "IMG").mkdir()
+
+        visitadas = []
+        real = os.scandir
+
+        def espia(ruta):
+            visitadas.append(str(ruta))
+            return real(ruta)
+
+        monkeypatch.setattr(os, "scandir", espia)
+        assert set(carpetas_de_facturas(tmp_path)) == {"HUS541781"}
+        assert not any(str(c) in v for v in visitadas), (
+            f"se metió dentro de la carpeta de la factura: {visitadas}"
+        )
+
+    def test_una_carpeta_sin_permiso_no_tumba_el_recorrido(self, tmp_path, monkeypatch):
+        _carpeta(tmp_path, "HUS541781")
+        real = os.scandir
+
+        def a_veces_falla(ruta):
+            if "ENV-" in str(ruta):
+                raise PermissionError("sin permiso")
+            return real(ruta)
+
+        monkeypatch.setattr(os, "scandir", a_veces_falla)
+        # La rama que falla se salta; el recorrido sigue y no revienta.
+        assert carpetas_de_facturas(tmp_path) == {}
+
+    def test_halla_la_factura_aunque_cuelgue_hondo(self, tmp_path):
+        hondo = tmp_path / "COOSALUD" / "VANESSA" / "RIPS" / "ENV-1" / "SUB" / "OTRA"
+        (hondo / "HUS541781").mkdir(parents=True)
+        assert set(carpetas_de_facturas(tmp_path)) == {"HUS541781"}
 
     def test_el_indice_se_relee_igual(self, tmp_path):
         c = _carpeta(tmp_path, "HUS541781")

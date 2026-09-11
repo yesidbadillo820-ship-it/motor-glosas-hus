@@ -32,6 +32,7 @@ No necesita nada aparte de Python.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -63,17 +64,39 @@ def carpetas_de_facturas(raiz: Path) -> dict[str, Path]:
     Si aparece la misma factura en dos sitios se queda con la primera en orden
     alfabético, que es estable entre corridas — así el índice no cambia solo
     porque el sistema de archivos devolvió las carpetas en otro orden.
+
+    CÓMO RECORRE, Y POR QUÉ ASÍ. El share está al otro lado de la red y ahí lo
+    caro es cada ida y vuelta (la lección del 11-09: se le pedían al servidor
+    seis veces más viajes de los necesarios). Entonces:
+
+      * se lista cada carpeta UNA vez con `os.scandir`, y el propio listado ya
+        dice qué es carpeta — nada de preguntar de nuevo por cada entrada;
+      * al dar con una carpeta de factura NO se entra en ella. Adentro están
+        los PDF y los RIPS, que acá no interesan: lo que se quiere es la ruta.
+        Sobre el árbol del hospital eso es no visitar cientos de miles de
+        archivos para no usar ninguno.
     """
     encontradas: dict[str, Path] = {}
-    if not raiz.is_dir():
-        return encontradas
-    for hijo in sorted(raiz.rglob("HUS*")):
+    pendientes = [raiz]
+    while pendientes:
+        carpeta = pendientes.pop()
         try:
-            if not hijo.is_dir() or not RE_FACTURA.match(hijo.name):
-                continue
+            with os.scandir(carpeta) as it:
+                entradas = list(it)
         except OSError:
+            # Carpeta que desapareció, sin permiso o unidad caída: se salta.
+            # El faltante se ve después en `revisar`, factura por factura.
             continue
-        encontradas.setdefault(normalizar(hijo.name), hijo)
+        for entrada in entradas:
+            try:
+                if not entrada.is_dir(follow_symlinks=False):
+                    continue
+            except OSError:
+                continue
+            if RE_FACTURA.match(entrada.name):
+                encontradas.setdefault(normalizar(entrada.name), Path(entrada.path))
+                continue
+            pendientes.append(Path(entrada.path))
     return encontradas
 
 
